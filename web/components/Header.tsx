@@ -26,14 +26,14 @@ export function Header() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
           <Image
-            src="/brand/Horizontal_Chog/Horizontal_Logo_white.svg"
-            alt="Chog"
-            width={150}
-            height={44}
+            src="/brand/Badge_(Face_Chog)/FACE_CHOG.svg"
+            alt=""
+            width={40}
+            height={40}
             priority
-            className="h-8 w-auto sm:h-9"
+            className="size-9"
           />
-          <span className="sr-only">Swap</span>
+          <span className="text-xl font-black tracking-tight text-white">On Deal</span>
         </Link>
         <nav className="order-3 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto">
           {NAV.map((item) => (
@@ -41,7 +41,7 @@ export function Header() {
               key={item.href}
               href={item.href}
               className={`rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                active(item.href) ? "bg-panel-2 text-white" : "text-muted hover:text-white"
+                active(item.href) ? "bg-white/12 text-white" : "text-white/70 hover:text-white"
               }`}
             >
               {item.label}

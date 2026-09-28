@@ -23,8 +23,8 @@ See the [roadmap](docs/06-roadmap.md).
 
 ## Deployments: Monad testnet (chain 10143)
 
-| Contract | Address | Block |
-|---|---|---|
+| Contract | Address                                                                                                                            | Block    |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | ChogSwap | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
 | MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
 
@@ -32,17 +32,17 @@ Both are source-verified on Sourcify (full match). Deployer: `0x503135438bbc176a
 
 ## Repo map
 
-| Path | What |
-|---|---|
-| [`docs/01-product-spec.md`](docs/01-product-spec.md) | What we're building and why, MVP scope, demo script |
-| [`docs/02-architecture.md`](docs/02-architecture.md) | System diagram, components, key flows, network |
-| [`docs/03-contract-design.md`](docs/03-contract-design.md) | State machine, storage, every function's checks and effects, events, errors |
-| [`docs/04-security.md`](docs/04-security.md) | Trust model, invariants, threats, test plan |
-| [`docs/05-frontend.md`](docs/05-frontend.md) | Screens → contract calls, tx flow, error copy |
-| [`docs/06-roadmap.md`](docs/06-roadmap.md) | Phase checklist and open questions |
-| [`docs/adr/`](docs/adr/) | Architecture decision records |
-| [`contracts/`](contracts/) | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
-| [`web/`](web/) | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md)) |
+| Path                                                       | What                                                                                |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`docs/01-product-spec.md`](docs/01-product-spec.md)       | What we're building and why, MVP scope, demo script                                 |
+| [`docs/02-architecture.md`](docs/02-architecture.md)       | System diagram, components, key flows, network                                      |
+| [`docs/03-contract-design.md`](docs/03-contract-design.md) | State machine, storage, every function's checks and effects, events, errors         |
+| [`docs/04-security.md`](docs/04-security.md)               | Trust model, invariants, threats, test plan                                         |
+| [`docs/05-frontend.md`](docs/05-frontend.md)               | Screens → contract calls, tx flow, error copy                                       |
+| [`docs/06-roadmap.md`](docs/06-roadmap.md)                 | Phase checklist and open questions                                                  |
+| [`docs/adr/`](docs/adr/)                                   | Architecture decision records                                                       |
+| [`contracts/`](contracts/)                                 | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
+| [`web/`](web/)                                             | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md))    |
 
 ## Stack
 

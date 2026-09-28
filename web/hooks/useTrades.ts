@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { swap } from "@/lib/contracts";
-import { toTrade, type Trade } from "@/lib/trades";
+import { DEMO_TRADES } from "@/lib/config";
+import { demoTrades, toTrade, type Trade } from "@/lib/trades";
 
 /**
  * The newest `limit` trades, newest first.
@@ -19,6 +20,7 @@ export function useTrades({ limit = 200 }: { limit?: number } = {}) {
     query: { refetchInterval: 5_000 },
   });
   const total = count.data ?? 0n;
+  const showDemoTrades = DEMO_TRADES;
 
   const ids = useMemo(() => {
     const out: bigint[] = [];
@@ -37,6 +39,7 @@ export function useTrades({ limit = 200 }: { limit?: number } = {}) {
   });
 
   const trades = useMemo(() => {
+    if (showDemoTrades) return demoTrades();
     const out: Trade[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
@@ -44,13 +47,13 @@ export function useTrades({ limit = 200 }: { limit?: number } = {}) {
       if (trade) out.push(trade);
     });
     return out;
-  }, [results.data, ids]);
+  }, [results.data, ids, showDemoTrades]);
 
   return {
     trades,
-    total,
-    hasMore: BigInt(ids.length) < total,
-    isLoading: count.isLoading || (ids.length > 0 && results.isLoading),
-    error: count.error ?? results.error,
+    total: showDemoTrades ? BigInt(demoTrades().length) : total,
+    hasMore: BigInt(trades.length) < (showDemoTrades ? BigInt(demoTrades().length) : total),
+    isLoading: !showDemoTrades && (count.isLoading || (ids.length > 0 && results.isLoading)),
+    error: showDemoTrades ? undefined : count.error ?? results.error,
   };
 }

@@ -11,7 +11,7 @@ import { useChogApproval } from "@/hooks/useChogApproval";
 import { useChogOwners, useOwnedChogs } from "@/hooks/useChogs";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { chogSwapAbi } from "@/lib/abi";
-import { MAX_TOKENS_PER_SIDE } from "@/lib/config";
+import { DEMO_CREATE, MAX_TOKENS_PER_SIDE } from "@/lib/config";
 import { swap } from "@/lib/contracts";
 import { parseIds, parseMon } from "@/lib/format";
 
@@ -22,14 +22,18 @@ export default function CreatePage() {
   return (
     <>
       <PageHeader title="Create a trade" />
-      <RequireWallet reason="Connect a wallet to create a trade.">
-        <CreateTrade />
-      </RequireWallet>
+      {DEMO_CREATE ? (
+        <CreateTrade preview />
+      ) : (
+        <RequireWallet reason="Connect a wallet to create a trade.">
+          <CreateTrade />
+        </RequireWallet>
+      )}
     </>
   );
 }
 
-function CreateTrade() {
+function CreateTrade({ preview = false }: { preview?: boolean }) {
   const { address } = useConnection();
   const router = useRouter();
   const { ids, isLoading } = useOwnedChogs(address);
@@ -54,6 +58,7 @@ function CreateTrade() {
   const { owners: requestedOwnerMap, isLoading: ownersLoading } = useChogOwners(requested);
   const requestedOwners = requested.map((id) => requestedOwnerMap.get(id));
   const ownerHint = requestedOwners.filter((owner) => owner && owner.toLowerCase() !== address?.toLowerCase()).length;
+  const previewIds = [1159n, 1376n, 143n, 67n, 909n];
 
   function toggle(id: bigint) {
     setOffered((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
@@ -93,7 +98,7 @@ function CreateTrade() {
     <div className="space-y-8">
       <section>
         <label className="label">Chogs you offer</label>
-        <ChogPicker ids={ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={isLoading} empty="No Chogs available. Mint or receive one first." />
+        <ChogPicker ids={preview ? previewIds : ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={!preview && isLoading} empty="No Chogs available. Mint or receive one first." />
       </section>
       <section className="grid gap-6 md:grid-cols-2">
         <div>
@@ -123,14 +128,19 @@ function CreateTrade() {
         </div>
       </section>
       <div className="card space-y-3 p-4">
-        <p className="text-sm text-muted">Chog Swap locks your offered Chogs in escrow. The requested side is transferred only when someone accepts.</p>
+        {preview && (
+          <p className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+            Preview mode — connect a wallet to approve and create a real trade.
+          </p>
+        )}
+        <p className="text-sm text-muted">On Deal locks your offered Chogs in escrow. The requested side is transferred only when someone accepts.</p>
         {validation && <p className="text-sm text-danger" role="alert">{validation}</p>}
         {!isApproved ? (
-          <TxButton state={approval.state} onClick={() => approval.run(approveCall)}>Approve Chog Swap</TxButton>
+          <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(approveCall)}>Approve On Deal</TxButton>
         ) : (
-          <TxButton state={tx.state} onClick={create}>Create trade</TxButton>
+          <TxButton state={tx.state} disabled={preview} onClick={create}>Create trade</TxButton>
         )}
-        <TxStatus state={approval.state} success="Chog Swap is approved." />
+        <TxStatus state={approval.state} success="On Deal is approved." />
         <TxStatus state={tx.state} success="Trade created." />
       </div>
     </div>

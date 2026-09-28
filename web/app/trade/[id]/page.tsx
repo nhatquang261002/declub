@@ -68,7 +68,7 @@ function TradeDetail({ id }: { id: bigint }) {
         <div className="flex flex-wrap items-center gap-3">
           {status === "open" && maker && <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swap, functionName: "cancelTrade", args: [id] })}>Cancel trade</TxButton>}
           {status === "expired" && <TxButton state={action.state} onClick={() => action.run({ ...swap, functionName: "reclaimExpired", args: [id] })}>Reclaim to maker</TxButton>}
-          {canFill && !isApproved && <TxButton state={action.state} onClick={() => action.run(approveCall)}>Approve Chog Swap</TxButton>}
+          {canFill && !isApproved && <TxButton state={action.state} onClick={() => action.run(approveCall)}>Approve On Deal</TxButton>}
           {canFill && isApproved && <TxButton state={action.state} onClick={runFill}>Accept &amp; swap</TxButton>}
           {status === "open" && !maker && !canFill && <p className="text-sm text-muted">{trade.taker && !sameAddress(trade.taker, address) ? "This is a private offer for another wallet." : "You don’t own every requested Chog."}</p>}
           {status !== "open" && status !== "expired" && <p className="text-sm text-muted">This trade is settled and read-only.</p>}

@@ -9,7 +9,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Chog Swap",
+  title: "On Deal",
   description: "Trustless OTC trading and escrow for Chogs on Monad.",
   icons: {
     icon: "/brand/Badge_(Face_Chog)/FACE_CHOG.svg",
@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               rel="noreferrer"
               className="font-mono underline hover:text-white"
             >
-              ChogSwap contract
+              On Deal contract
             </a>{" "}
             · no admin, no fees, assets only move in your transactions
           </footer>

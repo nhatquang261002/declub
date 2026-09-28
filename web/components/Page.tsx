@@ -21,7 +21,7 @@ export function RequireWallet({ children, reason }: { children: ReactNode; reaso
     return <p className="text-sm text-muted">Connecting wallet…</p>;
   }
   return (
-    <div className="card flex flex-col items-center gap-4 px-6 py-12 text-center">
+    <div className="page-section flex flex-col items-center gap-4 px-6 py-12 text-center">
       <p className="text-muted">{reason}</p>
       <ConnectButton />
     </div>
@@ -30,6 +30,6 @@ export function RequireWallet({ children, reason }: { children: ReactNode; reaso
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="card px-6 py-12 text-center text-sm text-muted">{children}</div>
+    <div className="page-section px-6 py-12 text-center text-sm text-muted">{children}</div>
   );
 }

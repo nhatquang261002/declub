@@ -22,6 +22,8 @@ No setup is needed. Addresses default to the Phase 1 testnet deployment. To poin
 
 You need an injected wallet (MetaMask, Rabby, …) on Monad testnet (chain 10143) with some test MON. The **My Chogs** page mints MockChogs for demo wallets.
 
+For a wallet-free UI review, set `NEXT_PUBLIC_DEMO_TRADES=true`. Sample trades replace the live trade list while enabled; leave it disabled for normal testnet use.
+
 ## Scripts
 
 | Command | What |

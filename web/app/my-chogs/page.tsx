@@ -33,7 +33,7 @@ function MyChogs() {
       {CHOG_MINTABLE && <MintPanel />}
 
       <p className="text-sm text-muted">
-        {ids.length} Chog{ids.length === 1 ? "" : "s"} in this wallet · Chog Swap is{" "}
+        {ids.length} Chog{ids.length === 1 ? "" : "s"} in this wallet · On Deal is{" "}
         {isApproved ? (
           <span className="text-mint">approved</span>
         ) : (

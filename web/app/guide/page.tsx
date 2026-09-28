@@ -16,7 +16,7 @@ const STEPS = [
   {
     number: "03",
     title: "Approve and lock",
-    body: "Approve Chog Swap once so it can escrow your offered Chogs. Creating the trade then locks your side in the contract immediately.",
+    body: "Approve On Deal once so it can escrow your offered Chogs. Creating the trade then locks your side in the contract immediately.",
   },
   {
     number: "04",
@@ -26,14 +26,14 @@ const STEPS = [
 ];
 
 const FAQ = [
-  ["What is Chog Swap?", "Chog Swap is a peer-to-peer, non-custodial way to trade Chogs. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
+  ["What is On Deal?", "On Deal is a peer-to-peer, non-custodial way to trade Chogs. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
   ["Do I have to trust the other trader?", "No. The swap is atomic: either every NFT and MON transfer succeeds, or the transaction reverts. The other trader never receives your escrowed assets without sending their side."],
-  ["What does escrow mean here?", "When you create an open trade, the Chogs you offer move into the Chog Swap contract. They remain there until the trade is filled, cancelled by you, or reclaimed after expiry."],
+  ["What does escrow mean here?", "When you create an open trade, the Chogs you offer move into the On Deal contract. They remain there until the trade is filled, cancelled by you, or reclaimed after expiry."],
   ["Can I cancel my trade?", "Yes. The maker can cancel any open trade before it is filled. Your escrowed Chogs and offered MON are returned to your wallet."],
   ["What happens when a trade expires?", "An expired trade cannot be filled. The maker, or another wallet on the maker's behalf, can call Reclaim to return the escrowed assets."],
   ["Who can accept a trade?", "Public trades can be accepted by any wallet that owns all requested Chogs. A direct trade can only be accepted by the wallet named by the maker."],
-  ["Are there platform fees?", "Chog Swap has no platform fee. You only pay the Monad transaction cost, plus any MON intentionally included in the trade."],
-  ["Why do I need to approve Chog Swap?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
+  ["Are there platform fees?", "On Deal has no platform fee. You only pay the Monad transaction cost, plus any MON intentionally included in the trade."],
+  ["Why do I need to approve On Deal?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
   ["Is this mainnet?", "The current demo runs on Monad testnet with MockChog. Treat test assets as disposable and never send valuable NFTs to an unfamiliar contract."],
 ];
 
@@ -41,7 +41,7 @@ export default function GuidePage() {
   return (
     <div className="space-y-14">
       <section className="max-w-3xl">
-        <div className="eyebrow">Chog Swap field guide</div>
+        <div className="eyebrow">On Deal field guide</div>
         <PageHeader title="Trade with confidence." />
         <p className="max-w-2xl text-lg leading-8 text-muted">
           Everything you need to make a safe Chog trade: how the flow works, what approval means,
@@ -49,7 +49,7 @@ export default function GuidePage() {
         </p>
       </section>
 
-      <section className="card overflow-hidden p-2 sm:p-3">
+      <section className="page-section overflow-hidden p-2 sm:p-3">
         <ChogSwapArt compact />
       </section>
 
@@ -72,7 +72,7 @@ export default function GuidePage() {
         </div>
       </section>
 
-      <section className="card border-accent/40 bg-panel-2 p-6 sm:p-8">
+      <section className="page-section p-6 sm:p-8">
         <p className="label">Safety checklist</p>
         <h2 className="text-2xl font-bold">Before you confirm</h2>
         <ul className="mt-5 grid gap-3 text-sm leading-6 text-muted sm:grid-cols-2">

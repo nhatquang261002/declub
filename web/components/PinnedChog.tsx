@@ -25,7 +25,7 @@ export function PinnedChog() {
     <aside className="chog-board mb-8" aria-label="Pinned Chog artwork board">
       <div className="chog-board-header">
         <div>
-          <p className="pinned-chog-kicker">Chog swap board</p>
+          <p className="pinned-chog-kicker">On Deal board</p>
           <p className="text-sm text-muted">A few characters pinned up while you browse.</p>
         </div>
         <span className="chog-board-pin" aria-hidden>✦</span>

@@ -6,33 +6,39 @@ import { useChogMetadata } from "@/hooks/useChogs";
 
 /** Square Chog artwork from tokenURI, with a placeholder while it loads. */
 export function ChogImage({ id, className = "" }: { id: bigint; className?: string }) {
-  const { metadata, isLoading } = useChogMetadata(id);
+  const { metadata } = useChogMetadata(id);
+  const localArtwork: Record<string, string> = {
+    "1159": "/art/chogs/chog-01.png",
+    "1376": "/art/chogs/chog-02.png",
+    "143": "/art/chogs/chog-03.png",
+    "67": "/art/chogs/chog-04.png",
+    "909": "/art/chogs/chog-05.png",
+  };
+  const image = metadata?.image ?? localArtwork[id.toString()];
 
   return (
     <div className={`relative aspect-square overflow-hidden bg-panel-2 ${className}`}>
-      {metadata?.image ? (
+      {image ? (
         <Image
-          src={metadata.image}
-          alt={metadata.name}
+          src={image}
+          alt={metadata?.name ?? `Chog #${id}`}
           fill
           unoptimized
           sizes="200px"
           className="object-cover"
         />
       ) : (
-        <div className="grid h-full place-items-center font-mono text-xs text-muted">
-          {isLoading ? "" : `#${id}`}
-        </div>
+        <div className="grid h-full place-items-center font-mono text-xs text-muted">#{id}</div>
       )}
     </div>
   );
 }
 
 /** Small tile used inside trade summaries. */
-export function ChogThumb({ id }: { id: bigint }) {
+export function ChogThumb({ id, large = false }: { id: bigint; large?: boolean }) {
   return (
-    <div className="w-14 shrink-0 text-center">
-      <ChogImage id={id} className="rounded-lg" />
+    <div className={`${large ? "w-20" : "w-14"} shrink-0 text-center`}>
+      <ChogImage id={id} className={`rounded-lg border border-white/10 ${large ? "rotate-[-2deg]" : ""}`} />
       <div className="mt-1 font-mono text-[11px] text-muted">#{id.toString()}</div>
     </div>
   );

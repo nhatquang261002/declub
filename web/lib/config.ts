@@ -25,6 +25,10 @@ export const CHOG_SWAP_DEPLOY_BLOCK = BigInt(env.deployBlock || 66352698);
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";
+export const DEMO_TRADES =
+  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_TRADES !== "false";
+export const DEMO_CREATE =
+  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_CREATE === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
 

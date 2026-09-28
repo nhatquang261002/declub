@@ -20,7 +20,7 @@ const COPY: Record<string, string> = {
   ExpiryInPast: "Pick an expiry in the future.",
   NothingToWithdraw: "There's nothing to withdraw.",
   WithdrawFailed: "Your wallet couldn't receive the MON.",
-  ERC721InsufficientApproval: "Approve Chog Swap to move your Chogs first.",
+  ERC721InsufficientApproval: "Approve On Deal to move your Chogs first.",
   ERC721IncorrectOwner: "A Chog in this trade isn't owned by the wallet sending it.",
   ERC721NonexistentToken: "One of these Chogs doesn't exist.",
   InvalidQuantity: "Mint between 1 and 20 at a time.",
