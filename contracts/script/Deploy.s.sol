@@ -73,6 +73,9 @@ contract Deploy is Script {
         console.log("# paste into .env");
         console.log(string.concat("NEXT_PUBLIC_CHOG_ADDRESS=", vm.toString(r.chog)));
         console.log(string.concat("NEXT_PUBLIC_CHOG_SWAP_ADDRESS=", vm.toString(r.swap)));
+        // block.number here is the simulation block, before anything is mined. It's a safe
+        // lower bound for event scans; the exact block is in broadcast/.../run-latest.json.
+        console.log("# deploy block: lower bound; exact block is in the broadcast receipts");
         console.log(
             string.concat("NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK=", vm.toString(r.deployBlock))
         );

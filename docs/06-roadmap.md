@@ -25,7 +25,7 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Slither run, findings triaged ([04](04-security.md#static-analysis))
 - [x] Confirm the Monad testnet chain id, RPC and verifier (10143, Sourcify via MonadVision)
 - [x] `script/Deploy.s.sol` + tests, dry run against Monad testnet succeeds
-- [ ] **Deploy and verify on testnet** (needs a funded deployer wallet, about 0.83 MON), then record addresses and the deploy block in `.env`
+- [x] Deploy and verify on testnet. ChogSwap `0xA3301cec…c298` and MockChog `0x220a2C52…26e4` at block 66352698, both a Sourcify full match (addresses in the [README](../README.md#deployments-monad-testnet-chain-10143))
 
 ## Phase 2: Marketplace UI
 

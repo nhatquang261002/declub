@@ -118,6 +118,15 @@ chog-swap/
 
 Both contracts' creation bytecode (solc 0.8.28, `evm_version = prague`) was gas-estimated against the Monad testnet node, so Monad's own EVM accepts it, not only Foundry's local EVM.
 
+### Deployed (testnet)
+
+| Contract | Address | Block |
+|---|---|---|
+| ChogSwap | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
+| MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
+
+Both are source-verified on Sourcify (full match). Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction record: [`contracts/broadcast/Deploy.s.sol/10143/run-latest.json`](../contracts/broadcast/Deploy.s.sol/10143/run-latest.json).
+
 A few Monad specifics that affect the design:
 
 - **Fast blocks:** the UI can wait for the transaction receipt instead of showing long "pending" states.
