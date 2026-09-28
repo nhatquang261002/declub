@@ -1,0 +1,426 @@
+@import "tailwindcss";
+
+/* Primitive tokens: the values from the Chog brand kit. */
+:root {
+  --chog-purple-950: #1b103d;
+  --chog-purple-900: #241252;
+  --chog-purple-800: #2b1764;
+  --chog-purple-700: #321c72;
+  --chog-purple-500: #593994;
+  --chog-pink-700: #902752;
+  --chog-pink-500: #d53f7c;
+  --chog-peach-500: #dd9974;
+  --chog-cream-500: #fdf6cd;
+  --chog-white: #ffffff;
+
+  /* Semantic tokens: components consume these, never brand values directly. */
+  --surface-canvas: var(--chog-purple-950);
+  --surface-raised: var(--chog-purple-700);
+  --surface-sunken: var(--chog-purple-800);
+  --surface-overlay: rgb(27 16 61 / 0.85);
+  --border-default: var(--chog-purple-500);
+  --border-subtle: rgb(253 246 205 / 0.12);
+  --content-primary: var(--chog-cream-500);
+  --content-secondary: #d7c9e9;
+  --content-inverse: var(--chog-white);
+  --action-primary: var(--chog-pink-500);
+  --action-primary-hover: var(--chog-pink-700);
+  --feedback-success: var(--chog-cream-500);
+  --feedback-warning: var(--chog-peach-500);
+  --feedback-danger: var(--chog-cream-500);
+
+  --radius-control: 0.75rem;
+  --radius-card: 1rem;
+  --radius-hero: 2rem;
+  --shadow-card: 0 1rem 2rem rgb(0 0 0 / 0.12);
+  --shadow-float: 0 1.5rem 3rem rgb(0 0 0 / 0.24);
+}
+
+@theme inline {
+  --color-ink: var(--surface-canvas);
+  --color-panel: var(--surface-raised);
+  --color-panel-2: var(--surface-sunken);
+  --color-line: var(--border-default);
+  --color-muted: var(--content-secondary);
+  --color-accent: var(--action-primary);
+  --color-accent-strong: var(--action-primary-hover);
+  --color-mint: var(--feedback-success);
+  --color-danger: var(--feedback-danger);
+  --color-warn: var(--feedback-warning);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root { color-scheme: dark; }
+
+body {
+  background:
+    radial-gradient(60rem 30rem at 50% -10rem, rgb(213 63 124 / 0.22), transparent),
+    var(--surface-canvas);
+  color: var(--content-primary);
+}
+
+@utility card {
+  @apply border border-line bg-panel;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+@utility hero-panel {
+  @apply relative border border-line bg-panel;
+  border-radius: var(--radius-hero);
+  background-image:
+    radial-gradient(circle at 85% 20%, rgb(213 63 124 / 0.24), transparent 24rem),
+    linear-gradient(135deg, var(--surface-raised) 0%, var(--surface-sunken) 58%, var(--chog-purple-900) 100%);
+}
+@utility eyebrow {
+  @apply inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-[0.16em] text-mint uppercase;
+  border: 1px solid var(--border-subtle);
+  background: rgb(0 0 0 / 0.1);
+}
+@utility hero-mascot {
+  @apply relative flex justify-center lg:justify-end;
+}
+@utility hero-stat {
+  @apply flex flex-col gap-1 border-white/10 px-6 py-4 text-sm sm:border-r sm:px-8;
+}
+
+.hero-stat strong {
+  @apply font-semibold text-mint;
+}
+
+.hero-stat span {
+  @apply text-xs text-muted;
+}
+
+.chog-board {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at 20% 10%, rgb(221 153 116 / 0.12), transparent 18rem),
+    linear-gradient(135deg, var(--surface-raised), var(--surface-sunken));
+  box-shadow: var(--shadow-card);
+}
+
+.chog-board-header {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0;
+}
+
+.pinned-chog-kicker {
+  color: var(--chog-cream-500);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.chog-board-pin {
+  color: var(--chog-pink-500);
+  font-size: 1.5rem;
+  transform: rotate(15deg);
+}
+
+.chog-board-canvas {
+  position: relative;
+  min-height: 20rem;
+}
+
+.board-chog {
+  position: absolute;
+  width: clamp(7.5rem, 20vw, 10.5rem);
+  padding: 0.45rem 0.45rem 0.6rem;
+  border: 1px solid rgb(27 16 61 / 0.22);
+  background: var(--chog-cream-500);
+  color: var(--chog-purple-950);
+  box-shadow: 0 0.8rem 1.2rem rgb(0 0 0 / 0.22);
+  transition: transform 300ms ease, box-shadow 300ms ease;
+}
+
+.board-chog:hover {
+  z-index: 10;
+  box-shadow: 0 1.2rem 2rem rgb(0 0 0 / 0.32);
+  transform: rotate(0deg) scale(1.08) !important;
+}
+
+.board-image {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.board-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.45rem 0.15rem 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.board-tape {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  z-index: 2;
+  width: 2.8rem;
+  height: 1rem;
+  background: rgb(213 63 124 / 0.78);
+  transform: translateX(-50%) rotate(-3deg);
+}
+
+.board-chog-one {
+  top: 11%;
+  left: 7%;
+  transform: rotate(-8deg);
+}
+
+.board-chog-two {
+  top: 18%;
+  left: 28%;
+  transform: rotate(5deg);
+}
+
+.board-chog-three {
+  top: 8%;
+  right: 28%;
+  transform: rotate(-4deg);
+}
+
+.board-chog-four {
+  top: 20%;
+  right: 7%;
+  transform: rotate(9deg);
+}
+
+.board-chog-five {
+  top: 38%;
+  left: 47%;
+  transform: rotate(-6deg);
+}
+
+@media (max-width: 640px) {
+  .chog-board-canvas {
+    min-height: 28rem;
+  }
+
+  .board-chog {
+    width: 9.5rem;
+  }
+
+  .board-chog-one { top: 8%; left: 4%; }
+  .board-chog-two { top: 8%; right: 4%; left: auto; }
+  .board-chog-three { top: 39%; right: 4%; }
+  .board-chog-four { top: 40%; left: 4%; }
+  .board-chog-five { top: 66%; left: 31%; }
+}
+
+@media (min-width: 641px) {
+  .chog-board-canvas {
+    min-height: 22rem;
+  }
+}
+
+.chog-art {
+  position: relative;
+  min-height: 21rem;
+  isolation: isolate;
+}
+
+.chog-art-compact {
+  min-height: 17rem;
+}
+
+.chog-art-glow {
+  position: absolute;
+  inset: 12% 8%;
+  z-index: -1;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(213 63 124 / 0.3), transparent 68%);
+  filter: blur(0.5rem);
+}
+
+.chog-art-chog {
+  position: absolute;
+  top: 16%;
+  width: min(42%, 12rem);
+  padding: 0.45rem 0.45rem 0.6rem;
+  border: 0.35rem solid #ffffff;
+  border-radius: 0.35rem;
+  background: #ffffff;
+  box-shadow: var(--shadow-float);
+  transform-origin: center;
+}
+
+.chog-art-tape {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  z-index: 2;
+  width: 2.8rem;
+  height: 1rem;
+  background: rgb(253 246 205 / 0.95);
+  border: 1px solid rgb(27 16 61 / 0.15);
+  transform: translateX(-50%) rotate(-3deg);
+}
+
+.chog-art-image {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgb(27 16 61 / 0.2);
+  border-radius: 0.2rem;
+}
+
+.chog-art-image img {
+  object-fit: cover;
+}
+
+.chog-art-label {
+  padding: 0.45rem 0.15rem 0;
+  color: var(--chog-purple-950);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.chog-art-chog-left {
+  left: 7%;
+  transform: rotate(-8deg);
+}
+
+.chog-art-chog-right {
+  right: 7%;
+  transform: rotate(8deg);
+}
+
+.chog-art-arrows {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.chog-art-arrow {
+  position: absolute;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: 999px;
+  background: var(--chog-pink-500);
+  color: var(--chog-pink-500);
+  color: var(--chog-purple-950);
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0.15rem 0.15rem 0 var(--chog-purple-950);
+}
+
+.chog-art-arrow-left {
+  top: 34%;
+  left: 43%;
+  transform: rotate(-8deg);
+}
+
+.chog-art-arrow-right {
+  top: 53%;
+  left: 50%;
+  transform: rotate(8deg);
+}
+
+.chog-art-token {
+  position: absolute;
+  z-index: 3;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: 0.7rem;
+  background: var(--chog-cream-500);
+  color: var(--chog-purple-950);
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0.25rem 0.25rem 0 var(--chog-pink-500);
+}
+
+.chog-art-token-left {
+  top: 9%;
+  left: 23%;
+}
+
+.chog-art-token-right {
+  right: 23%;
+  bottom: 17%;
+}
+
+.chog-art-spark {
+  position: absolute;
+  color: var(--chog-cream-500);
+  font-size: 1.4rem;
+}
+
+.chog-art-spark-one {
+  top: 11%;
+  right: 15%;
+}
+
+.chog-art-spark-two {
+  bottom: 18%;
+  left: 15%;
+}
+
+.chog-art-caption {
+  position: absolute;
+  bottom: 2%;
+  left: 50%;
+  transform: translateX(-50%) rotate(-3deg);
+  color: var(--chog-cream-500);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .chog-art {
+    min-height: 17rem;
+  }
+
+  .chog-art-compact {
+    min-height: 14rem;
+  }
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  border-radius: var(--radius-control);
+}
+@utility btn-primary {
+  @apply btn text-white hover:bg-accent-strong;
+  background: var(--action-primary);
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-panel-2 text-zinc-100 hover:border-accent;
+}
+@utility btn-danger {
+  @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+}
+@utility input {
+  @apply w-full border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-muted/60 focus:border-accent;
+  border-radius: var(--radius-control);
+}
+@utility label {
+  @apply mb-1.5 block text-xs font-medium tracking-wide text-muted uppercase;
+}

@@ -1,0 +1,56 @@
+"use client";
+
+import { useMemo } from "react";
+import { useReadContract, useReadContracts } from "wagmi";
+import { swap } from "@/lib/contracts";
+import { toTrade, type Trade } from "@/lib/trades";
+
+/**
+ * The newest `limit` trades, newest first.
+ *
+ * Trade ids are sequential (1..tradeCount) and `getTrade` returns the full terms, so this
+ * reads storage with one multicall instead of scanning `TradeCreated` logs. The public
+ * Monad RPC caps eth_getLogs at 100 blocks, which rules out a scan from the deploy block.
+ */
+export function useTrades({ limit = 200 }: { limit?: number } = {}) {
+  const count = useReadContract({
+    ...swap,
+    functionName: "tradeCount",
+    query: { refetchInterval: 5_000 },
+  });
+  const total = count.data ?? 0n;
+
+  const ids = useMemo(() => {
+    const out: bigint[] = [];
+    for (let id = total; id >= 1n && out.length < limit; id--) out.push(id);
+    return out;
+  }, [total, limit]);
+
+  const results = useReadContracts({
+    contracts: ids.map((id) => ({ ...swap, functionName: "getTrade", args: [id] }) as const),
+    query: {
+      enabled: ids.length > 0,
+      refetchInterval: 8_000,
+      // Keep showing the old list while a new tradeCount's batch loads.
+      placeholderData: (previous) => previous,
+    },
+  });
+
+  const trades = useMemo(() => {
+    const out: Trade[] = [];
+    results.data?.forEach((r, i) => {
+      if (r.status !== "success" || ids[i] === undefined) return;
+      const trade = toTrade(ids[i], r.result);
+      if (trade) out.push(trade);
+    });
+    return out;
+  }, [results.data, ids]);
+
+  return {
+    trades,
+    total,
+    hasMore: BigInt(ids.length) < total,
+    isLoading: count.isLoading || (ids.length > 0 && results.isLoading),
+    error: count.error ?? results.error,
+  };
+}

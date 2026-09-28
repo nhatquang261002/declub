@@ -16,7 +16,10 @@ cancel / expiry → #421 back to Alice. Nothing is ever stuck.
 
 ## Status
 
-**Phase 1: protocol, done.** `ChogSwap` and `MockChog` are live and verified on Monad testnet, with 91 tests passing (unit, fuzz, invariant), 100% coverage and Slither triaged. Next up is Phase 2 (UI). See the [roadmap](docs/06-roadmap.md).
+- **Phase 1: protocol, done.** `ChogSwap` and `MockChog` are live and verified on Monad testnet, with 91 tests passing (unit, fuzz, invariant), 100% coverage and Slither triaged.
+- **Phase 2: UI, in progress.** The Next.js app in [`web/`](web/) connects a wallet, lists trades and shows your Chogs (with a MockChog mint for demo wallets). Create, Trade Detail and History are next.
+
+See the [roadmap](docs/06-roadmap.md).
 
 ## Deployments: Monad testnet (chain 10143)
 
@@ -39,12 +42,12 @@ Both are source-verified on Sourcify (full match). Deployer: `0x503135438bbc176a
 | [`docs/06-roadmap.md`](docs/06-roadmap.md) | Phase checklist and open questions |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
 | [`contracts/`](contracts/) | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
-| [`web/`](web/) | Next.js app (Phase 2) |
+| [`web/`](web/) | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md)) |
 
 ## Stack
 
 - **Contracts:** Solidity 0.8.28, Foundry, OpenZeppelin
-- **Frontend:** Next.js, TypeScript, wagmi, viem, Tailwind
+- **Frontend:** Next.js 16, TypeScript, wagmi 3, viem, Tailwind 4
 - **Chain:** Monad testnet (chain id 10143), MockChog for the demo
 
 ## Quickstart
@@ -61,3 +64,8 @@ forge coverage --report summary --no-match-coverage "(test|script)"
 ```
 
 To deploy to Monad testnet, see [`contracts/script/README.md`](contracts/script/README.md).
+
+```bash
+# Frontend (defaults to the testnet deployment above)
+cd web && npm install && npm run dev      # http://localhost:3000
+```

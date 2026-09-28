@@ -31,15 +31,17 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 
 **Goal:** run the demo end to end in a browser.
 
-- [ ] `pnpm create next-app web` (TS, Tailwind, App Router)
-- [ ] wagmi config + Monad testnet chain + connect button
-- [ ] ABI generation (`@wagmi/cli` Foundry plugin)
-- [ ] My Chogs
-- [ ] Create Trade (approval step, form rules)
-- [ ] Open Trades (event scan + multicall)
-- [ ] Trade Detail (escrow panel, fill / cancel / reclaim)
-- [ ] History + withdraw
-- [ ] `useTxFlow` states + error mapping
+- [x] `create-next-app web` (Next.js 16, TS, Tailwind 4, App Router; npm)
+- [x] wagmi 3 config + Monad testnet chain + connect button (injected / EIP-6963)
+- [x] ABI generation (`@wagmi/cli` Foundry plugin → `web/lib/abi.ts`, `npm run abi`)
+- [x] Trade loading from storage: `tradeCount` + multicall `getTrade` ([ADR 0004](adr/0004-read-trades-from-storage.md); the public RPC caps `eth_getLogs` at 100 blocks)
+- [x] `useTxFlow` states + error mapping
+- [x] Open Trades (Open / For you / All tabs, paging)
+- [x] My Chogs (+ MockChog mint panel for demo wallets)
+- [x] Create Trade (approval step, form rules)
+- [x] Trade Detail (escrow panel, fill / cancel / reclaim)
+- [x] History + withdraw (local fill record until an indexer exists)
+- [~] `npm run build` + lint clean; manual pass on testnet remains
 - [ ] Rehearse the demo script ([01 · Product Spec §9](01-product-spec.md#9-demo-script))
 
 ## Phase 3: Differentiation
@@ -64,5 +66,6 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 | Question | Needed by |
 |---|---|
 | Real Chog contract address, and is it `ERC721Enumerable`? | Mainnet / Phase 2 "My Chogs" |
+| WalletConnect (needs a project id + `@walletconnect/ethereum-provider`)? | Mobile wallets |
 | Where do Chog traits live (IPFS JSON? API?), and are they final? | Phase 3 |
 | Protocol fee, ever? (v1: none) | Phase 4 |

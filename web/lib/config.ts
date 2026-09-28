@@ -1,0 +1,32 @@
+import { getAddress, type Address } from "viem";
+
+// NEXT_PUBLIC_* values are inlined at build time, so each must be read by its full name.
+// The defaults are the Phase 1 Monad testnet deployment (see the root README).
+const env = {
+  chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
+  rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
+  chog: process.env.NEXT_PUBLIC_CHOG_ADDRESS,
+  swap: process.env.NEXT_PUBLIC_CHOG_SWAP_ADDRESS,
+  deployBlock: process.env.NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK,
+  chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
+};
+
+function address(value: string | undefined, fallback: Address): Address {
+  return getAddress(value?.trim() || fallback);
+}
+
+export const CHAIN_ID = Number(env.chainId || 10143);
+export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
+export const EXPLORER_URL = "https://testnet.monadvision.com";
+
+export const CHOG_ADDRESS = address(env.chog, "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
+export const CHOG_SWAP_ADDRESS = address(env.swap, "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298");
+export const CHOG_SWAP_DEPLOY_BLOCK = BigInt(env.deployBlock || 66352698);
+
+/** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
+export const CHOG_MINTABLE = env.chogMintable !== "false";
+
+export const MAX_TOKENS_PER_SIDE = 10;
+
+export const explorerTx = (hash: string) => `${EXPLORER_URL}/tx/${hash}`;
+export const explorerAddress = (addr: string) => `${EXPLORER_URL}/address/${addr}`;

@@ -7,11 +7,11 @@
  │                                                                  │
  │  Next.js (App Router, TypeScript, Tailwind)                      │
  │    ├─ pages: Open Trades · My Chogs · Create · Trade #id · History│
- │    └─ hooks: useTrades · useTrade · useMyChogs · useTxFlow        │
+ │    └─ hooks: useTrades · useTrade · useOwnedChogs · useTxFlow     │
  │                         │                                         │
  │                 wagmi  +  viem  (+ injected wallet)               │
  └─────────────────────────┬────────────────────────────────────────┘
-                           │  JSON-RPC (reads, eth_getLogs, sendTx)
+                           │  JSON-RPC (eth_call/multicall reads, sendTx)
                            ▼
  ┌─────────────────────── Monad testnet (10143) ───────────────────┐
  │                                                                  │
@@ -58,7 +58,7 @@ Next.js + wagmi + viem + Tailwind. It talks to the chain directly and has no bac
 
 ### Indexer (deferred)
 
-Not in v1. The frontend rebuilds trade lists from contract events plus `getTrade` reads. Add an indexer when event scans get slow or when search and filters are needed. See [ADR 0003](adr/0003-no-indexer-in-v1.md).
+Not in v1. The frontend reads trades straight from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks. Add an indexer when loading gets slow, when search and filters are needed, or to show who filled public trades. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-trades-from-storage.md).
 
 ## Key flows
 
@@ -104,7 +104,7 @@ Anyone ─ reclaimExpired(id) ─► same refund path, only if expired
 chog-swap/
 ├── docs/          ← you are here
 ├── contracts/     Foundry: src/, test/, script/, lib/ (forge install)
-└── web/           Next.js app (Phase 2)
+└── web/           Next.js app: app/ (routes), components/, hooks/, lib/ (Phase 2)
 ```
 
 ## Network
@@ -131,4 +131,4 @@ A few Monad specifics that affect the design:
 
 - **Fast blocks:** the UI can wait for the transaction receipt instead of showing long "pending" states.
 - **Gas is charged on the gas limit, not gas used:** give fills sensible explicit limits rather than inflated defaults. Confirm this against Monad's docs.
-- **`eth_getLogs` block-range limits** on public RPCs: event scans have to be chunked, starting from the deploy block (`NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK`).
+- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-trades-from-storage.md)).
