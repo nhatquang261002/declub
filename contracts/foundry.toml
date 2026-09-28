@@ -1,0 +1,33 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+evm_version = "prague"
+optimizer = true
+optimizer_runs = 200
+fs_permissions = [{ access = "read", path = "./" }]
+# Reproducible metadata for Sourcify verification (per docs.monad.xyz verify guide)
+cbor_metadata = true
+bytecode_hash = "none"
+use_literal_content = true
+
+[fuzz]
+runs = 1000
+
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = false
+
+# Monad testnet: chain id 10143 (confirmed live against the RPC on 2026-09-28).
+# Verification uses Sourcify via MonadVision; flags live in script/README.md.
+[rpc_endpoints]
+monad_testnet = "https://testnet-rpc.monad.xyz"

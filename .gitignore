@@ -1,0 +1,23 @@
+# Env
+.env
+.env.local
+.env.*.local
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
