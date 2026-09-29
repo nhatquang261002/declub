@@ -141,7 +141,7 @@ function TradeDetail({ id }: { id: bigint }) {
           {canFill && isApproved && (!trade.requestedRoot || traitReady) && <TxButton state={action.state} onClick={runFill}>Accept &amp; swap</TxButton>}
           {status === "open" && !maker && !canFill && <p className="text-sm text-muted">{isTraitTrade ? "Select the maker’s committed trait and matching Chogs to accept this trade." : trade.taker && !sameAddress(trade.taker, address) ? "This is a private offer for another wallet." : "You don’t own every requested Chog."}</p>}
           {status !== "open" && status !== "expired" && <p className="text-sm text-muted">This trade is settled and read-only.</p>}
-          <Link href="/" className="btn-secondary">Back to trades</Link>
+          <Link href="/trades" className="btn-secondary">Back to trades</Link>
         </div>
         <TxStatus state={action.state} />
       </div>

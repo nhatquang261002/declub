@@ -50,7 +50,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Trait-based requests using a Merkle set ([design](03-contract-design.md#phase-3-trait-based-requests))
 - [x] Trait metadata pipeline (metadata traits → matching ids → root in the create flow)
 - [x] Direct-request inbox (the **For you** tab filters open trades by `taker = me`)
-- [ ] Search and filters, which probably triggers the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
+- [x] Search and filters on Open Trades, client-side (Chog / trade # / maker address, MON filter, sort by ending soon). Loads up to 200 trades while a filter is active
+- [ ] Trait search and server-side filtering, which probably triggers the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
 - [ ] Notifications
 
 ## Phase 4: Protocol expansion

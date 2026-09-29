@@ -12,7 +12,8 @@ web/
 ├── app/
 │   ├── layout.tsx              ✓ providers, header, footer
 │   ├── globals.css             ✓ Tailwind theme tokens + card/btn/input utilities
-│   ├── page.tsx                ✓ Open Trades (tabs: Open · For you · All)
+│   ├── page.tsx                ✓ Home: hero, how it works, links to Trades / Create / Guide
+│   ├── trades/page.tsx         ✓ Open Trades (tabs: Open · For you · All, search + filters)
 │   ├── my-chogs/page.tsx       ✓ wallet's Chogs → "Trade this", MockChog mint panel
 │   ├── create/page.tsx         ✓ Create Trade form
 │   ├── trade/[id]/page.tsx     ✓ Trade Detail + actions
@@ -71,7 +72,7 @@ scattering hex values through JSX or utility definitions.
 
 | Screen | Reads | Writes | Status |
 |---|---|---|---|
-| **Open Trades** `/` | `tradeCount`, multicall `getTrade` | — | ✓ |
+| **Open Trades** `/trades` | `tradeCount`, multicall `getTrade` | — | ✓ |
 | **My Chogs** `/my-chogs` | `balanceOf`, `tokenOfOwnerByIndex`, `tokenURI`, `isApprovedForAll` | `mint` (MockChog only) | ✓ |
 | **Create** `/create` | owned Chogs, `isApprovedForAll(me, swap)`, `ownerOf(requested)` as a hint | `setApprovalForAll` (once), `createTrade{value: offeredMon}` | ✓ |
 | **Trade #id** `/trade/[id]` | `getTrade`, `isExpired`, `ownerOf(requestedIds)`, `isApprovedForAll` | `fillTrade{value: requestedMon}` · `cancelTrade` · `reclaimExpired` | ✓ |

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "./ConnectButton";
 
 const NAV = [
-  { href: "/", label: "Trades" },
+  { href: "/trades", label: "Trades" },
   { href: "/create", label: "Create" },
   { href: "/history", label: "History" },
   { href: "/guide", label: "Guide" },
@@ -15,7 +15,7 @@ const NAV = [
 export function Header() {
   const pathname = usePathname();
   const active = (href: string) =>
-    href === "/" ? pathname === "/" || pathname.startsWith("/trade/") : pathname.startsWith(href);
+    href === "/trades" ? pathname.startsWith("/trade") : pathname.startsWith(href);
 
   return (
     <header
