@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useReadContract, useReadContracts } from "wagmi";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { chog } from "@/lib/contracts";
 import { loadMetadata } from "@/lib/metadata";
 
@@ -43,6 +43,31 @@ export function useOwnedChogs(owner: Address | undefined) {
   };
 }
 
+/** Metadata for every Chog currently owned by `owner`. */
+export function useOwnedChogMetadata(owner: Address | undefined) {
+  const { ids, isLoading: idsLoading, error: idsError } = useOwnedChogs(owner);
+  const tokenUris = useReadContracts({
+    contracts: ids.map((id) => ({ ...chog, functionName: "tokenURI", args: [id] }) as const),
+    query: { enabled: ids.length > 0, staleTime: Infinity },
+  });
+  const queries = useQueries({
+    queries: ids.map((id, index) => ({
+      queryKey: ["ownedChogMetadata", chog.address, id.toString(), tokenUris.data?.[index]?.result],
+      queryFn: () => loadMetadata(tokenUris.data![index].result as string, id),
+      enabled: tokenUris.data?.[index]?.status === "success",
+      staleTime: Infinity,
+    })),
+  });
+  return {
+    entries: ids.flatMap((id, index) => {
+      const metadata = queries[index]?.data;
+      return metadata ? [{ id, metadata }] : [];
+    }),
+    isLoading: idsLoading || tokenUris.isLoading || queries.some((query: UseQueryResult) => query.isLoading),
+    error: idsError ?? tokenUris.error ?? queries.find((query: UseQueryResult) => query.error)?.error,
+  };
+}
+
 /** Current owner per id; null if the token doesn't exist. */
 export function useChogOwners(ids: readonly bigint[]) {
   const result = useReadContracts({
@@ -78,4 +103,36 @@ export function useChogMetadata(id: bigint) {
   });
 
   return { metadata: metadata.data, isLoading: uri.isLoading || metadata.isLoading };
+}
+
+/** Loads the complete enumerable MockChog catalog for trait-request creation. */
+export function useChogCatalog() {
+  const supply = useReadContract({
+    ...chog,
+    functionName: "totalSupply",
+    query: { staleTime: 30_000 },
+  });
+  const count = Number(supply.data ?? 0n);
+  const ids = Array.from({ length: count }, (_, index) => BigInt(index + 1));
+  const tokenUris = useReadContracts({
+    contracts: ids.map((id) => ({ ...chog, functionName: "tokenURI", args: [id] }) as const),
+    query: { enabled: count > 0, staleTime: 30_000 },
+  });
+  const metadata = useQueries({
+    queries: ids.map((id, index) => ({
+      queryKey: ["chogCatalogMetadata", chog.address, id.toString(), tokenUris.data?.[index]?.result],
+      queryFn: () => loadMetadata(tokenUris.data![index].result as string, id),
+      enabled: tokenUris.data?.[index]?.status === "success",
+      staleTime: Infinity,
+    })),
+  });
+  return {
+    ids,
+    entries: ids.flatMap((id, index) => {
+      const data = metadata[index]?.data;
+      return data ? [{ id, metadata: data }] : [];
+    }),
+    isLoading: supply.isLoading || tokenUris.isLoading || metadata.some((query: UseQueryResult) => query.isLoading),
+    isEnumerable: true,
+  };
 }

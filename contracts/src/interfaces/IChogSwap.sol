@@ -55,6 +55,19 @@ interface IChogSwap {
 
     event TradeFilled(uint256 indexed tradeId, address indexed maker, address indexed taker);
 
+    /// @notice A trade whose requested side is a Merkle set of token ids.
+    event TraitTradeCreated(
+        uint256 indexed tradeId,
+        address indexed maker,
+        address indexed taker,
+        uint256[] offeredIds,
+        uint256 offeredMon,
+        bytes32 requestedRoot,
+        uint8 requestedCount,
+        uint256 requestedMon,
+        uint64 expiry
+    );
+
     /// @notice Maker cancelled; escrowed assets returned to the maker.
     event TradeCancelled(uint256 indexed tradeId, address indexed maker);
 
@@ -85,6 +98,10 @@ interface IChogSwap {
     error WrongMonAmount(uint256 expected, uint256 sent);
     error NothingToWithdraw();
     error WithdrawFailed();
+    /// @notice The Merkle request has an invalid root, count, or proof shape.
+    error InvalidTraitRequest();
+    /// @notice A requested token id is not in the collection-scoped Merkle set.
+    error InvalidTraitProof(uint256 tokenId);
 
     // ─────────────────────────────────────────────────────────────── Mutating
 
@@ -106,6 +123,19 @@ interface IChogSwap {
         uint64 expiry
     ) external payable returns (uint256 tradeId);
 
+    /// @notice Create a trade requesting any `requestedCount` tokens in a Merkle set.
+    /// @dev The leaf committed by `requestedRoot` is
+    ///      `keccak256(abi.encode(chog(), tokenId))`. Including the collection in the
+    ///      leaf prevents a root generated for another ERC-721 from being reused.
+    function createTrade(
+        uint256[] calldata offeredIds,
+        bytes32 requestedRoot,
+        uint8 requestedCount,
+        uint256 requestedMon,
+        address taker,
+        uint64 expiry
+    ) external payable returns (uint256 tradeId);
+
     /// @notice Atomically settle an open trade.
     /// @dev Requires `msg.value == requestedMon`, the caller owns every `requestedIds`
     ///      token and has approved this contract. In one transaction:
@@ -115,6 +145,16 @@ interface IChogSwap {
     ///        offeredMon    escrow  → caller
     ///      Failed MON pushes are credited via `WithdrawalCredited`, never reverted.
     function fillTrade(uint256 tradeId) external payable;
+
+    /// @notice Fill a Merkle trait request with one proof per supplied token id.
+    function fillTrade(
+        uint256 tradeId,
+        uint256[] calldata requestedIds,
+        bytes32[][] calldata proofs
+    ) external payable;
+
+    /// @notice Return the collection-scoped leaf committed for a token id.
+    function traitLeaf(uint256 tokenId) external view returns (bytes32);
 
     /// @notice Maker cancels an open trade (expired or not) and gets the escrow back.
     function cancelTrade(uint256 tradeId) external;
@@ -136,6 +176,11 @@ interface IChogSwap {
     function tradeCount() external view returns (uint256);
 
     function getTrade(uint256 tradeId) external view returns (Trade memory);
+
+    /// @notice Merkle root and number of tokens requested by a trait trade.
+    function requestedRoot(uint256 tradeId) external view returns (bytes32);
+
+    function requestedCount(uint256 tradeId) external view returns (uint256);
 
     /// @notice True if the trade has a non-zero expiry and `block.timestamp > expiry`.
     function isExpired(uint256 tradeId) external view returns (bool);

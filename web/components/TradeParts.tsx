@@ -5,6 +5,7 @@ import Image from "next/image";
 import { formatMon, shortAddress } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
 import { ChogThumb } from "./Chog";
+import { TraitRequestSummary } from "./TraitRequest";
 
 const BADGE: Record<DisplayStatus, string> = {
   open: "bg-mint/15 text-mint",
@@ -119,7 +120,9 @@ export function TradeCard({ trade, now, me }: { trade: Trade; now: number; me?: 
           <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
             wants
           </span>
-          <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />
+          {trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n
+            ? <TraitRequestSummary count={trade.requestedCount} root={trade.requestedRoot} />
+            : <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />}
         </div>
       </div>
 

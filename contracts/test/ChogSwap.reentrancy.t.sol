@@ -42,7 +42,10 @@ contract ChogSwapReentrancyTest is ChogSwapBase {
     function test_takerCannotRefillDuringFill() public {
         // Attacker is taker; receives offeredMon during fill and tries to fill again.
         uint256 id = _create(alice, _ids(A1), 2 ether, _ids(X1), 0);
-        attacker.arm(address(swap), abi.encodeCall(IChogSwap.fillTrade, (id)));
+        attacker.arm(
+            address(swap),
+            abi.encodeWithSelector(bytes4(keccak256("fillTrade(uint256)")), id)
+        );
 
         _fill(address(attacker), id);
 
@@ -90,7 +93,14 @@ contract ChogSwapReentrancyTest is ChogSwapBase {
         uint256 id = _create(address(attacker), _ids(X1), 1 ether, _ids(B1), 0, address(0), expiry);
         attacker.arm(
             address(swap),
-            abi.encodeCall(IChogSwap.createTrade, (_ids(X1), _ids(B1), 0, address(0), 0))
+            abi.encodeWithSelector(
+                bytes4(keccak256("createTrade(uint256[],uint256[],uint256,address,uint64)")),
+                _ids(X1),
+                _ids(B1),
+                0,
+                address(0),
+                uint64(0)
+            )
         );
         vm.warp(expiry + 1);
 

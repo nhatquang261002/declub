@@ -3,7 +3,10 @@
 ## `Deploy.s.sol`
 
 1. If `CHOG_ADDRESS` is empty, deploy `MockChog` and mint `DEMO_MINT_PER_WALLET` (default 5) to each address in `DEMO_WALLETS`.
-2. Deploy `ChogSwap(chog)`.
+2. Deploy the current trait-enabled `ChogSwap(chog)`.
+   The contract supports both exact token-ID requests and collection-scoped Merkle trait requests.
+   With `DEPLOY_CHOG_MIRROR=true`, the script deploys a `Chog Genesis` mirror using the real
+   collection's IPFS metadata base and mints the 1,969-token catalog in batches.
 3. Print ready-to-paste `NEXT_PUBLIC_*` lines (addresses and deploy block) for `.env`.
 
 A dry run (no key needed) against Monad testnet estimates about **4.07M gas, roughly 0.83 MON** at the worst-case max fee.
@@ -45,4 +48,8 @@ forge verify-contract <MockChog address> src/mocks/MockChog.sol:MockChog --chain
 
 Browse on [MonadVision](https://testnet.monadvision.com/) or [Monadscan](https://testnet.monadscan.com/).
 
-The broadcast log for testnet goes to `broadcast/Deploy.s.sol/10143/run-latest.json`. Commit it so there's a record of the deployed addresses. Local (31337) runs and dry runs are gitignored.
+The script is intentionally restricted to Monad testnet (`chainid == 10143`) for live
+deployments and local Anvil (`chainid == 31337`) for tests; it will revert on mainnet.
+The broadcast log for testnet goes to
+`broadcast/Deploy.s.sol/10143/run-latest.json`. Commit it so there's a record of the
+deployed addresses. Local (31337) runs and dry runs are gitignored.

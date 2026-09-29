@@ -20,26 +20,29 @@ contract DeployScriptTest is Test {
         address[] memory wallets = new address[](2);
         (wallets[0], wallets[1]) = (a, b);
 
-        Deploy.Result memory r = script.deploy(Deploy.Config(address(0), wallets, 3));
+        Deploy.Result memory r = script.deploy(Deploy.Config(address(0), wallets, 3, false, address(0), 20));
 
         assertTrue(r.deployedMock);
+        assertFalse(r.deployedMirror);
         assertEq(ChogSwap(r.swap).chog(), r.chog);
         assertEq(MockChog(r.chog).balanceOf(a), 3);
         assertEq(MockChog(r.chog).balanceOf(b), 3);
     }
 
     function test_deploysMockWithoutDemoWallets() public {
-        Deploy.Result memory r = script.deploy(Deploy.Config(address(0), new address[](0), 5));
+        Deploy.Result memory r = script.deploy(Deploy.Config(address(0), new address[](0), 5, false, address(0), 20));
         assertTrue(r.deployedMock);
+        assertFalse(r.deployedMirror);
         assertEq(MockChog(r.chog).totalSupply(), 0);
     }
 
     function test_usesExistingCollection() public {
         MockChog existing = new MockChog();
         Deploy.Result memory r =
-            script.deploy(Deploy.Config(address(existing), new address[](0), 5));
+            script.deploy(Deploy.Config(address(existing), new address[](0), 5, false, address(0), 20));
 
         assertFalse(r.deployedMock);
+        assertFalse(r.deployedMirror);
         assertEq(r.chog, address(existing));
         assertEq(ChogSwap(r.swap).chog(), address(existing));
     }

@@ -16,6 +16,8 @@ export type Trade = {
   offeredMon: bigint;
   requestedIds: readonly bigint[];
   requestedMon: bigint;
+  requestedRoot?: `0x${string}`;
+  requestedCount?: bigint;
 };
 
 /** The shape `getTrade` returns (IChogSwap.Trade). */
@@ -28,6 +30,8 @@ export type RawTrade = {
   requestedMon: bigint;
   offeredIds: readonly bigint[];
   requestedIds: readonly bigint[];
+  requestedRoot?: `0x${string}`;
+  requestedCount?: bigint;
 };
 
 // IChogSwap.Status: None = 0, Open = 1, Filled = 2, Cancelled = 3
@@ -47,6 +51,8 @@ export function toTrade(id: bigint, raw: RawTrade): Trade | null {
     offeredMon: raw.offeredMon,
     requestedIds: raw.requestedIds,
     requestedMon: raw.requestedMon,
+    requestedRoot: raw.requestedRoot,
+    requestedCount: raw.requestedCount,
   };
 }
 

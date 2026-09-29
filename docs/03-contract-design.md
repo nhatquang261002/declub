@@ -130,6 +130,7 @@ _sendMon(to, amt):
 | Event | Emitted by | Indexed |
 |---|---|---|
 | `TradeCreated(id, maker, taker, offeredIds, offeredMon, requestedIds, requestedMon, expiry)` | `createTrade` | id, maker, taker |
+| `TraitTradeCreated(id, maker, taker, offeredIds, offeredMon, requestedRoot, requestedCount, requestedMon, expiry)` | trait `createTrade` overload | id, maker, taker |
 | `TradeFilled(id, maker, taker)` | `fillTrade` | all |
 | `TradeCancelled(id, maker)` | `cancelTrade` | all |
 | `TradeReclaimed(id, maker, caller)` | `reclaimExpired` | all |
@@ -140,7 +141,7 @@ _sendMon(to, amt):
 
 ## Errors
 
-`EmptySide`, `MonOnBothSides`, `TooManyTokens(count, max)`, `ExpiryInPast(expiry)`, `TradeNotOpen(id)`, `TradeIsExpired(id)`, `TradeNotExpired(id)`, `NotMaker(id)`, `NotAllowedTaker(id)`, `SelfFill(id)`, `WrongMonAmount(expected, sent)`, `NothingToWithdraw`, `WithdrawFailed`.
+`EmptySide`, `MonOnBothSides`, `TooManyTokens(count, max)`, `ExpiryInPast(expiry)`, `TradeNotOpen(id)`, `TradeIsExpired(id)`, `TradeNotExpired(id)`, `NotMaker(id)`, `NotAllowedTaker(id)`, `SelfFill(id)`, `WrongMonAmount(expected, sent)`, `InvalidTraitRequest`, `InvalidTraitProof(tokenId)`, `NothingToWithdraw`, `WithdrawFailed`.
 
 Deploy-time only (declared on `ChogSwap`, not the interface): `InvalidCollection(chog)`, raised when the collection address has no code, which includes `address(0)`.
 
@@ -197,7 +198,13 @@ Traits live in off-chain metadata, so the contract can't read them. Options:
 | B. Signed attestation | A trusted signer signs `(tokenId, traitsHash)`. | Flexible | Adds a trusted party |
 | C. On-chain trait registry | A trait table is written on-chain once. | Fully on-chain | Needs a large upfront write, and only the collection owner can do it credibly |
 
-Shape of option A: add `bytes32 requestedRoot` and `uint8 requestedAnyCount` to `Trade`, and a `fillTrade(id, uint256[] anyIds, bytes32[][] proofs)` overload. The fill checks `MerkleProof.verify(proof, root, keccak256(abi.encode(id)))`.
+Implemented as a backward-compatible `createTrade` overload and `fillTrade` overload.
+Trait terms are exposed by the `requestedRoot(tradeId)` and `requestedCount(tradeId)`
+views (the legacy `Trade` tuple and exact-ID path are unchanged). Each leaf is
+`keccak256(abi.encode(chog(), tokenId))`, making roots collection-scoped; callers
+must provide one sorted-pair Merkle proof per requested token. The contract checks
+the count, rejects duplicate ids, verifies every proof before transferring anything,
+and enforces the same taker, expiry, MON, and ten-token bounds as exact-ID fills.
 
 "Up to 3 MON" becomes the taker's choice of payment within a bound. Keep it simple: the maker's `offeredMon` is an exact amount. Price negotiation stays off-chain for now.
 

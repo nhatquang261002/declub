@@ -37,17 +37,30 @@ export function useTrades({ limit = 200 }: { limit?: number } = {}) {
       placeholderData: (previous) => previous,
     },
   });
+  const traitResults = useReadContracts({
+    contracts: ids.flatMap((id) => [
+      { ...swap, functionName: "requestedRoot", args: [id] },
+      { ...swap, functionName: "requestedCount", args: [id] },
+    ]),
+    query: { enabled: ids.length > 0, refetchInterval: 8_000 },
+  });
 
   const trades = useMemo(() => {
     if (showDemoTrades) return demoTrades();
     const out: Trade[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
-      const trade = toTrade(ids[i], r.result);
+      const rootResult = traitResults.data?.[i * 2];
+      const countResult = traitResults.data?.[i * 2 + 1];
+      const trade = toTrade(ids[i], {
+        ...r.result,
+        requestedRoot: rootResult?.status === "success" ? rootResult.result as `0x${string}` : undefined,
+        requestedCount: countResult?.status === "success" ? countResult.result as bigint : undefined,
+      });
       if (trade) out.push(trade);
     });
     return out;
-  }, [results.data, ids, showDemoTrades]);
+  }, [results.data, traitResults.data, ids, showDemoTrades]);
 
   return {
     trades,

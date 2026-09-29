@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IChogSwap} from "./interfaces/IChogSwap.sol";
 
@@ -19,6 +20,8 @@ contract ChogSwap is IChogSwap, ReentrancyGuard {
     mapping(address account => uint256 amount) public pendingWithdrawal;
 
     mapping(uint256 tradeId => Trade) internal _trades;
+    mapping(uint256 tradeId => bytes32) public requestedRoot;
+    mapping(uint256 tradeId => uint256) public requestedCount;
 
     /// @notice `chog_` has no code.
     error InvalidCollection(address chog_);
@@ -76,6 +79,48 @@ contract ChogSwap is IChogSwap, ReentrancyGuard {
     }
 
     /// @inheritdoc IChogSwap
+    function createTrade(
+        uint256[] calldata offeredIds,
+        bytes32 root,
+        uint8 count,
+        uint256 requestedMon,
+        address taker,
+        uint64 expiry
+    ) external payable nonReentrant returns (uint256 tradeId) {
+        if (offeredIds.length == 0 && msg.value == 0) revert EmptySide();
+        if (root == bytes32(0) || count == 0) revert InvalidTraitRequest();
+        if (msg.value != 0 && requestedMon != 0) revert MonOnBothSides();
+        if (offeredIds.length > MAX_TOKENS_PER_SIDE) {
+            revert TooManyTokens(offeredIds.length, MAX_TOKENS_PER_SIDE);
+        }
+        if (count > MAX_TOKENS_PER_SIDE) revert TooManyTokens(count, MAX_TOKENS_PER_SIDE);
+        // forge-lint: disable-next-line(block-timestamp)
+        if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
+
+        tradeId = ++tradeCount;
+        Trade storage t = _trades[tradeId];
+        t.maker = msg.sender;
+        t.expiry = expiry;
+        t.status = Status.Open;
+        t.taker = taker;
+        t.offeredMon = msg.value;
+        t.requestedMon = requestedMon;
+        t.offeredIds = offeredIds;
+        requestedRoot[tradeId] = root;
+        requestedCount[tradeId] = count;
+
+        emit TraitTradeCreated(
+            tradeId, msg.sender, taker, offeredIds, msg.value, root, count, requestedMon, expiry
+        );
+
+        IERC721 nft = IERC721(chog);
+        for (uint256 i; i < offeredIds.length; ++i) {
+            // forge-lint: disable-next-line(calls-loop)
+            nft.transferFrom(msg.sender, address(this), offeredIds[i]);
+        }
+    }
+
+    /// @inheritdoc IChogSwap
     function fillTrade(uint256 tradeId) external payable nonReentrant {
         Trade storage t = _trades[tradeId];
         if (t.status != Status.Open) revert TradeNotOpen(tradeId);
@@ -92,6 +137,53 @@ contract ChogSwap is IChogSwap, ReentrancyGuard {
         IERC721 nft = IERC721(chog);
         uint256[] storage requestedIds = t.requestedIds;
         for (uint256 i; i < requestedIds.length; ++i) {
+            // forge-lint: disable-next-line(calls-loop)
+            nft.transferFrom(msg.sender, maker, requestedIds[i]);
+        }
+        uint256[] storage offeredIds = t.offeredIds;
+        for (uint256 i; i < offeredIds.length; ++i) {
+            // forge-lint: disable-next-line(calls-loop)
+            nft.transferFrom(address(this), msg.sender, offeredIds[i]);
+        }
+        _sendMon(maker, msg.value);
+        _sendMon(msg.sender, t.offeredMon);
+    }
+
+    /// @inheritdoc IChogSwap
+    function fillTrade(
+        uint256 tradeId,
+        uint256[] calldata requestedIds,
+        bytes32[][] calldata proofs
+    ) external payable nonReentrant {
+        Trade storage t = _trades[tradeId];
+        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        if (_isExpired(t)) revert TradeIsExpired(tradeId);
+        bytes32 root = requestedRoot[tradeId];
+        uint256 count = requestedCount[tradeId];
+        if (root == bytes32(0) || requestedIds.length != count || proofs.length != count) {
+            revert InvalidTraitRequest();
+        }
+        address maker = t.maker;
+        address taker = t.taker;
+        if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
+        if (msg.sender == maker) revert SelfFill(tradeId);
+        if (msg.value != t.requestedMon) revert WrongMonAmount(t.requestedMon, msg.value);
+
+        // Check every proof before changing status or transferring any token. This also
+        // gives callers a deterministic failure instead of a partial ERC-721 transfer.
+        for (uint256 i; i < count; ++i) {
+            if (!MerkleProof.verify(proofs[i], root, traitLeaf(requestedIds[i]))) {
+                revert InvalidTraitProof(requestedIds[i]);
+            }
+            for (uint256 j; j < i; ++j) {
+                if (requestedIds[j] == requestedIds[i]) revert InvalidTraitRequest();
+            }
+        }
+
+        t.status = Status.Filled;
+        emit TradeFilled(tradeId, maker, msg.sender);
+        IERC721 nft = IERC721(chog);
+        for (uint256 i; i < count; ++i) {
             // forge-lint: disable-next-line(calls-loop)
             nft.transferFrom(msg.sender, maker, requestedIds[i]);
         }
@@ -150,6 +242,10 @@ contract ChogSwap is IChogSwap, ReentrancyGuard {
     /// @inheritdoc IChogSwap
     function isExpired(uint256 tradeId) external view returns (bool) {
         return _isExpired(_trades[tradeId]);
+    }
+
+    function traitLeaf(uint256 tokenId) public view returns (bytes32) {
+        return keccak256(abi.encode(chog, tokenId));
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
