@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/Page";
-import { ChogSwapArt } from "@/components/ChogArt";
 
 const STEPS = [
   {
@@ -39,67 +37,93 @@ const FAQ = [
 
 export default function GuidePage() {
   return (
-    <div className="space-y-14">
-      <section className="max-w-3xl">
-        <div className="eyebrow">On Deal field guide</div>
-        <PageHeader title="Trade with confidence." />
-        <p className="max-w-2xl text-lg leading-8 text-muted">
-          Everything you need to make a safe Chog trade: how the flow works, what approval means,
-          and what happens to your assets at every step.
-        </p>
-      </section>
-
-      <section className="page-section overflow-hidden p-2 sm:p-3">
-        <ChogSwapArt compact />
-      </section>
-
-      <section>
-        <div className="mb-5 flex items-end justify-between gap-4">
+    <div className="pb-10">
+      <section className="border-b border-black/10 pb-10 pt-4 sm:pb-12">
+        <p className="text-sm font-semibold text-accent">Documentation / Guide</p>
+        <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
           <div>
-            <p className="label">The short version</p>
-            <h2 className="text-2xl font-bold">Four steps to a swap</h2>
+            <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">How to trade on On Deal</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
+              Everything you need to make a safe Chog trade, from connecting your wallet to receiving your assets.
+            </p>
           </div>
-          <Link href="/create" className="btn-primary hidden sm:inline-flex">Create a trade ↗</Link>
+          <Link href="/create" className="btn-primary shrink-0">Create a trade ↗</Link>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {STEPS.map((step) => (
-            <article key={step.number} className="card p-5">
-              <span className="font-mono text-sm font-bold text-accent">{step.number}</span>
-              <h3 className="mt-3 text-lg font-bold">{step.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">{step.body}</p>
-            </article>
-          ))}
-        </div>
+        <nav className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold">
+          <a href="#how-it-works" className="text-accent hover:underline">How it works</a>
+          <a href="#safety" className="text-accent hover:underline">Safety checklist</a>
+          <a href="#faq" className="text-accent hover:underline">FAQ</a>
+        </nav>
       </section>
 
-      <section className="page-section p-6 sm:p-8">
-        <p className="label">Safety checklist</p>
-        <h2 className="text-2xl font-bold">Before you confirm</h2>
-        <ul className="mt-5 grid gap-3 text-sm leading-6 text-muted sm:grid-cols-2">
-          <li>✓ Confirm you are on Monad testnet and using the expected wallet.</li>
-          <li>✓ Check every offered and requested token id before signing.</li>
-          <li>✓ Remember that a direct offer is visible only to its named wallet.</li>
-          <li>✓ Never approve or send assets to a contract address copied from an untrusted source.</li>
-        </ul>
-      </section>
+      <div className="grid gap-12 pt-10 lg:grid-cols-[12rem_1fr] lg:gap-16">
+        <aside className="hidden lg:block">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted">On this page</p>
+          <nav className="mt-4 space-y-3 border-l border-black/10 pl-4 text-sm">
+            <a href="#how-it-works" className="block text-muted hover:text-accent">How it works</a>
+            <a href="#safety" className="block text-muted hover:text-accent">Safety checklist</a>
+            <a href="#faq" className="block text-muted hover:text-accent">FAQ</a>
+          </nav>
+        </aside>
 
-      <section>
-        <div className="mb-5">
-          <p className="label">Questions, answered</p>
-          <h2 className="text-2xl font-bold">FAQ</h2>
+        <div className="min-w-0 space-y-14">
+          <section id="how-it-works" className="scroll-mt-24">
+            <div className="flex items-start gap-4">
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">1</span>
+              <div>
+                <p className="text-sm font-semibold text-accent">The short version</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Four steps to a swap</h2>
+              </div>
+            </div>
+            <div className="mt-7 divide-y divide-black/10 overflow-hidden rounded-xl border border-black/10 bg-white">
+              {STEPS.map((step) => (
+                <article key={step.number} className="grid gap-3 p-5 sm:grid-cols-[3rem_11rem_1fr] sm:items-start sm:gap-5 sm:p-6">
+                  <span className="font-mono text-sm font-bold text-accent">{step.number}</span>
+                  <h3 className="font-bold">{step.title}</h3>
+                  <p className="text-sm leading-6 text-muted">{step.body}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section id="safety" className="scroll-mt-24 rounded-xl border border-black/10 bg-white p-6 sm:p-8">
+            <div className="flex items-start gap-4">
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">2</span>
+              <div>
+                <p className="text-sm font-semibold text-accent">Before you confirm</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Safety checklist</h2>
+              </div>
+            </div>
+            <ul className="mt-7 grid gap-4 border-t border-black/10 pt-6 text-sm leading-6 text-muted sm:grid-cols-2">
+              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Confirm Monad testnet and the expected wallet.</li>
+              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Check every offered and requested token id.</li>
+              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Direct offers are visible only to their named wallet.</li>
+              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Never trust a contract address copied from an untrusted source.</li>
+            </ul>
+          </section>
+
+          <section id="faq" className="scroll-mt-24">
+            <div className="flex items-start gap-4">
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">3</span>
+              <div>
+                <p className="text-sm font-semibold text-accent">Questions, answered</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Frequently asked questions</h2>
+              </div>
+            </div>
+            <div className="mt-7 divide-y divide-black/10 rounded-xl border border-black/10 bg-white">
+              {FAQ.map(([question, answer]) => (
+                <details key={question} className="group px-5 sm:px-6">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-semibold">
+                    {question}
+                    <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
+                  </summary>
+                  <p className="pb-5 pr-8 text-sm leading-6 text-muted">{answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
         </div>
-        <div className="space-y-3">
-          {FAQ.map(([question, answer]) => (
-            <details key={question} className="card group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold">
-                {question}
-                <span className="text-xl text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
-              </summary>
-              <p className="border-t border-line px-5 py-4 text-sm leading-6 text-muted">{answer}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
