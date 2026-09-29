@@ -1,37 +1,135 @@
 "use client";
 
-import { useConnection } from "wagmi";
-import { EmptyState, PageHeader, RequireWallet } from "@/components/Page";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { EmptyState, PageHeader } from "@/components/Page";
 import { TradeGrid } from "@/components/TradeParts";
-import { TxButton, TxStatus } from "@/components/Tx";
-import { useLocalFills } from "@/hooks/useLocalFills";
-import { useTrades } from "@/hooks/useTrades";
-import { useTxFlow } from "@/hooks/useTxFlow";
 import { useNow } from "@/hooks/useNow";
-import { sameAddress } from "@/lib/trades";
-import { formatMon } from "@/lib/format";
-import { swap } from "@/lib/contracts";
-import { useReadContract } from "wagmi";
+import { useTrades } from "@/hooks/useTrades";
+import { errorMessage } from "@/lib/errors";
+import { displayStatus, type DisplayStatus } from "@/lib/trades";
+
+type HistoryFilter = "all" | "active" | "completed" | "expired";
+
+const FILTERS: Array<[HistoryFilter, string]> = [
+  ["all", "All activity"],
+  ["active", "Active"],
+  ["completed", "Completed"],
+  ["expired", "Expired"],
+];
 
 export default function HistoryPage() {
-  return <><PageHeader title="History" /><RequireWallet reason="Connect a wallet to see your history."><History /></RequireWallet></>;
+  const now = useNow();
+  const [filter, setFilter] = useState<HistoryFilter>("all");
+  const { trades, isLoading, error } = useTrades({ limit: 200 });
+
+  const statuses = useMemo(
+    () => trades.map((trade) => displayStatus(trade, now)),
+    [trades, now],
+  );
+  const counts = useMemo(
+    () => ({
+      active: statuses.filter((status) => status === "open").length,
+      completed: statuses.filter((status) => status === "filled").length,
+      expired: statuses.filter((status) => status === "expired").length,
+    }),
+    [statuses],
+  );
+  const visibleTrades = useMemo(
+    () =>
+      filter === "all"
+        ? trades
+        : trades.filter((trade) => displayStatus(trade, now) === filterStatus(filter)),
+    [filter, now, trades],
+  );
+
+  return (
+    <div className="space-y-10">
+      <section className="hero-panel overflow-hidden">
+        <div className="grid gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <div className="eyebrow">Your trade journal</div>
+            <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
+              Every deal,
+              <span className="block text-accent">all in one place.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
+              Keep an eye on offers, swaps, and expired deals. Your wallet activity will appear
+              here when wallet history is enabled.
+            </p>
+          </div>
+          <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] shadow-[0.3rem_0.3rem_0_#111318] lg:min-w-56">
+            <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">Preview mode</p>
+            <p className="mt-2 text-sm leading-6 text-[#4e5968]">
+              Wallet actions are paused while we shape the history experience.
+            </p>
+          </div>
+        </div>
+        <div className="grid border-t border-black/10 sm:grid-cols-3">
+          <HistoryStat label="Active deals" value={counts.active} tone="text-[#a9282f]" />
+          <HistoryStat label="Completed swaps" value={counts.completed} tone="text-[#a9282f]" />
+          <HistoryStat label="Expired offers" value={counts.expired} tone="text-[#a9282f]" />
+        </div>
+      </section>
+
+      <PageHeader title="Recent activity">
+        <Link href="/create" className="btn-primary">
+          Create a trade <span aria-hidden>↗</span>
+        </Link>
+      </PageHeader>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-xl border border-line bg-panel p-1 text-sm">
+          {FILTERS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
+                filter === key ? "bg-panel-2 text-white" : "text-muted hover:text-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-muted">
+          Showing <span className="font-semibold text-white">{visibleTrades.length}</span> trade
+          {visibleTrades.length === 1 ? "" : "s"}
+        </p>
+      </div>
+
+      {error ? (
+        <EmptyState>
+          <span className="text-danger">Couldn&apos;t load history: {errorMessage(error)}</span>
+        </EmptyState>
+      ) : isLoading ? (
+        <EmptyState>Loading activity…</EmptyState>
+      ) : visibleTrades.length === 0 ? (
+        <EmptyState>
+          No {filter === "all" ? "" : `${filter} `}trades yet.{" "}
+          <Link href="/create" className="text-accent underline">
+            Create one
+          </Link>
+        </EmptyState>
+      ) : (
+        <TradeGrid trades={visibleTrades} now={now} />
+      )}
+    </div>
+  );
 }
 
-function History() {
-  const { address } = useConnection();
-  const { trades, isLoading } = useTrades({ limit: 200 });
-  const { ids } = useLocalFills(address);
-  const withdrawal = useReadContract({ ...swap, functionName: "pendingWithdrawal", args: address ? [address] : undefined });
-  const tx = useTxFlow();
-  const now = useNow();
-  const mine = trades.filter((trade) => sameAddress(trade.maker, address) || sameAddress(trade.taker, address) || ids.some((id) => id === trade.id));
+function filterStatus(filter: Exclude<HistoryFilter, "all">): DisplayStatus {
+  if (filter === "active") return "open";
+  if (filter === "completed") return "filled";
+  return "expired";
+}
 
-  return <div className="space-y-6">
-    <div className="card flex flex-wrap items-center gap-3 p-4">
-      <div className="mr-auto"><div className="font-semibold">Pending withdrawal</div><div className="text-sm text-muted">{formatMon(withdrawal.data ?? 0n)}</div></div>
-      <TxButton state={tx.state} disabled={!withdrawal.data} onClick={() => tx.run({ ...swap, functionName: "withdraw", args: [] })}>Withdraw</TxButton>
-      <TxStatus state={tx.state} />
+function HistoryStat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="flex flex-col gap-1 border-black/10 px-6 py-4 sm:border-r sm:px-8">
+      <strong className={`text-2xl font-black ${tone}`}>{value}</strong>
+      <span className="text-xs text-[#4e5968]">{label}</span>
     </div>
-    {isLoading ? <EmptyState>Loading history…</EmptyState> : mine.length === 0 ? <EmptyState>No trades involving this wallet yet.</EmptyState> : <TradeGrid trades={mine} now={now} me={address} />}
-  </div>;
+  );
 }
