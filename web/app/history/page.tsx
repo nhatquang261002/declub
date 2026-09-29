@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useConnection } from "wagmi";
+import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { TradeGrid } from "@/components/TradeParts";
+import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
 import { useTrades } from "@/hooks/useTrades";
 import { errorMessage } from "@/lib/errors";
-import { displayStatus, type DisplayStatus } from "@/lib/trades";
+import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
 
@@ -19,13 +22,19 @@ const FILTERS: Array<[HistoryFilter, string]> = [
 ];
 
 export default function HistoryPage() {
+  const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const { trades, isLoading, error } = useTrades({ limit: 200 });
+  const { ids: localFillIds } = useLocalFills(address);
 
+  const walletTrades = useMemo(
+    () => trades.filter((trade) => isWalletTrade(trade, address, localFillIds)),
+    [address, localFillIds, trades],
+  );
   const statuses = useMemo(
-    () => trades.map((trade) => displayStatus(trade, now)),
-    [trades, now],
+    () => walletTrades.map((trade) => displayStatus(trade, now)),
+    [now, walletTrades],
   );
   const counts = useMemo(
     () => ({
@@ -38,9 +47,9 @@ export default function HistoryPage() {
   const visibleTrades = useMemo(
     () =>
       filter === "all"
-        ? trades
-        : trades.filter((trade) => displayStatus(trade, now) === filterStatus(filter)),
-    [filter, now, trades],
+        ? walletTrades
+        : walletTrades.filter((trade) => displayStatus(trade, now) === filterStatus(filter)),
+    [filter, now, walletTrades],
   );
 
   return (
@@ -54,15 +63,17 @@ export default function HistoryPage() {
               <span className="block text-accent">all in one place.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Keep an eye on offers, swaps, and expired deals. Your wallet activity will appear
-              here when wallet history is enabled.
+              Keep an eye on offers, swaps, and expired deals involving your wallet.
             </p>
           </div>
           <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] shadow-[0.3rem_0.3rem_0_#111318] lg:min-w-56">
-            <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">Preview mode</p>
-            <p className="mt-2 text-sm leading-6 text-[#4e5968]">
-              Wallet actions are paused while we shape the history experience.
+            <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">
+              {address ? "Wallet connected" : "Wallet required"}
             </p>
+            <p className="mt-2 text-sm leading-6 text-[#4e5968]">
+              {address ? "Showing your offers, fills, and direct requests." : "Connect to see your trade activity."}
+            </p>
+            {!address && <div className="mt-4"><ConnectButton /></div>}
           </div>
         </div>
         <div className="grid border-t border-black/10 sm:grid-cols-3">
@@ -105,6 +116,10 @@ export default function HistoryPage() {
         </EmptyState>
       ) : isLoading ? (
         <EmptyState>Loading activity…</EmptyState>
+      ) : !address ? (
+        <EmptyState>
+          Connect your wallet to view your trade activity. <ConnectButton />
+        </EmptyState>
       ) : visibleTrades.length === 0 ? (
         <EmptyState>
           No {filter === "all" ? "" : `${filter} `}trades yet.{" "}
@@ -117,6 +132,13 @@ export default function HistoryPage() {
       )}
     </div>
   );
+}
+
+function isWalletTrade(trade: Trade, address: string | undefined, localFillIds: readonly bigint[]) {
+  return !!address
+    && (sameAddress(trade.maker, address)
+      || sameAddress(trade.taker, address)
+      || localFillIds.some((id) => id === trade.id));
 }
 
 function filterStatus(filter: Exclude<HistoryFilter, "all">): DisplayStatus {

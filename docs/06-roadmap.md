@@ -41,7 +41,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Create Trade (approval step, form rules)
 - [x] Trade Detail (escrow panel, fill / cancel / reclaim)
 - [x] History + withdraw (local fill record until an indexer exists)
-- [~] `npm run build` + lint clean; manual pass on testnet remains
+- [x] `npm run build` + lint clean (Next.js 16.3.6, 7 routes)
+- [ ] Manual pass on Monad testnet (create → fill → withdraw with two wallets)
 - [ ] Rehearse the demo script ([01 · Product Spec §9](01-product-spec.md#9-demo-script))
 
 ## Phase 3: Differentiation
