@@ -64,9 +64,6 @@ export default function OpenTradesPage() {
               <Link href="/create" className="btn-primary">
                 Create a trade <span aria-hidden>↗</span>
               </Link>
-              <Link href="/my-chogs" className="btn-secondary">
-                See my Chogs
-              </Link>
             </div>
           </div>
           <ChogSwapArt />

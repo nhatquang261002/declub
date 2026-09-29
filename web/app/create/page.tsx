@@ -17,6 +17,7 @@ import { parseIds, parseMon } from "@/lib/format";
 import { buildMerkleSet } from "@/lib/merkle";
 import { CHOG_ADDRESS } from "@/lib/config";
 import type { ChogMetadata } from "@/lib/metadata";
+import { TraitRequestSummary } from "@/components/TraitRequest";
 
 type Expiry = "1h" | "24h" | "7d" | "none";
 const DURATIONS: Record<Exclude<Expiry, "none">, number> = { "1h": 3600, "24h": 86400, "7d": 604800 };
@@ -70,13 +71,13 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
     ? catalog.entries.filter(({ id }) => previewIds.includes(id))
     : catalog.entries;
   const previewCatalog = [
-    { id: 1159n, metadata: { name: "Chog #1159", image: null, attributes: [{ trait_type: "Hat", value: "Crown" }, { trait_type: "Eyes", value: "Blue" }] } },
-    { id: 1376n, metadata: { name: "Chog #1376", image: null, attributes: [{ trait_type: "Hat", value: "Wizard Hat" }, { trait_type: "Eyes", value: "Laser" }] } },
-    { id: 143n, metadata: { name: "Chog #143", image: null, attributes: [{ trait_type: "Hat", value: "Beanie" }, { trait_type: "Eyes", value: "Green" }] } },
-    { id: 67n, metadata: { name: "Chog #67", image: null, attributes: [{ trait_type: "Hat", value: "Crown" }, { trait_type: "Eyes", value: "Sleepy" }] } },
-    { id: 909n, metadata: { name: "Chog #909", image: null, attributes: [{ trait_type: "Hat", value: "Cowboy Hat" }, { trait_type: "Eyes", value: "Blue" }] } },
+    { id: 1159n, metadata: { name: "Chog #1159", image: null, attributes: [{ trait_type: "Hat", value: "Crown" }, { trait_type: "Eyes", value: "Blue" }, { trait_type: "Background", value: "Purple" }] } },
+    { id: 1376n, metadata: { name: "Chog #1376", image: null, attributes: [{ trait_type: "Hat", value: "Wizard Hat" }, { trait_type: "Eyes", value: "Laser" }, { trait_type: "Background", value: "Mint" }] } },
+    { id: 143n, metadata: { name: "Chog #143", image: null, attributes: [{ trait_type: "Hat", value: "Beanie" }, { trait_type: "Eyes", value: "Green" }, { trait_type: "Background", value: "Sunset" }] } },
+    { id: 67n, metadata: { name: "Chog #67", image: null, attributes: [{ trait_type: "Hat", value: "Crown" }, { trait_type: "Eyes", value: "Sleepy" }, { trait_type: "Background", value: "Night" }] } },
+    { id: 909n, metadata: { name: "Chog #909", image: null, attributes: [{ trait_type: "Hat", value: "Cowboy Hat" }, { trait_type: "Eyes", value: "Blue" }, { trait_type: "Background", value: "Mint" }] } },
   ] satisfies { id: bigint; metadata: ChogMetadata }[];
-  const traitCatalog = preview && catalogEntries.length === 0 ? previewCatalog : catalogEntries;
+  const traitCatalog = preview ? previewCatalog : catalogEntries;
   const traitOptions: { trait_type: string; value: string }[] = Array.from(new Map<string, { trait_type: string; value: string }>(traitCatalog.flatMap(({ metadata }: { metadata: ChogMetadata }) =>
     metadata.attributes.filter((attribute) => attribute.value !== "None")
       .map((attribute) => [`${attribute.trait_type}:${attribute.value}`, attribute] as [string, { trait_type: string; value: string }]),
@@ -129,7 +130,7 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
     <div className="space-y-8">
       <section>
         <label className="label">Chogs you offer</label>
-        <ChogPicker ids={preview ? previewIds : ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={!preview && isLoading} empty="No Chogs available. Mint or receive one first." />
+        <ChogPicker ids={preview ? previewIds : ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={!preview && isLoading} empty="No Chogs available. Mint or receive one first." preferLocalArtwork={preview} />
       </section>
       <section className="grid gap-6 md:grid-cols-2">
         <div>
@@ -141,7 +142,7 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
           <input id="requested-mon" className="input" inputMode="decimal" placeholder="0" value={requestedMonText} onChange={(e) => setRequestedMonText(e.target.value)} />
         </div>
       </section>
-      <section className="card space-y-4 p-4">
+      <section className="page-section space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
           {(["ids", "trait"] as const).map((mode) => (
             <button key={mode} type="button" className={requestMode === mode ? "btn-primary" : "btn-secondary"} onClick={() => setRequestMode(mode)}>
@@ -166,13 +167,19 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
                 <option value="">Trait type</option>
                 {[...new Set(traitOptions.map((option) => option.trait_type))].sort().map((type) => <option key={type} value={type}>{type}</option>)}
               </select>
-              <select className="input" value={traitValue} disabled={!traitType || catalog.isLoading} onChange={(e) => setTraitValue(e.target.value)}>
+              <select className="input" value={traitValue} disabled={!traitType || (!preview && catalog.isLoading)} onChange={(e) => setTraitValue(e.target.value)}>
                 <option value="">Trait value</option>
                 {traitOptions.filter((option) => option.trait_type === traitType).map((option) => <option key={option.value} value={option.value}>{option.value}</option>)}
               </select>
             </div>
-            {traitSet.count > 0 && <p className="font-mono text-xs text-muted">{traitSet.count} matching Chogs · root {traitSet.root}</p>}
-            {catalog.isLoading && <p className="text-xs text-muted">Loading the Chog catalog…</p>}
+            {traitSet.count > 0 && (
+              <TraitRequestSummary
+                filter={{ traitType, value: traitValue }}
+                count={traitSet.count}
+                root={traitSet.root}
+              />
+            )}
+            {!preview && catalog.isLoading && <p className="text-xs text-muted">Loading the Chog catalog…</p>}
           </>
         )}
       </section>
@@ -197,9 +204,9 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
         <p className="text-sm text-muted">On Deal locks your offered Chogs in escrow. The requested side is transferred only when someone accepts.</p>
         {validation && <p className="text-sm text-danger" role="alert">{validation}</p>}
         {!isApproved ? (
-          <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(approveCall)}>Approve On Deal</TxButton>
+          <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(approveCall)}>Create Trade</TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={preview} onClick={create}>Create trade</TxButton>
+          <TxButton state={tx.state} disabled={preview} onClick={create}>Create Trade</TxButton>
         )}
         <TxStatus state={approval.state} success="On Deal is approved." />
         <TxStatus state={tx.state} success="Trade created." />

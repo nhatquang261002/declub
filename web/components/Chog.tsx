@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useChogMetadata } from "@/hooks/useChogs";
 
 /** Square Chog artwork from tokenURI, with a placeholder while it loads. */
-export function ChogImage({ id, className = "" }: { id: bigint; className?: string }) {
+export function ChogImage({ id, className = "", preferLocal = false }: { id: bigint; className?: string; preferLocal?: boolean }) {
   const { metadata } = useChogMetadata(id);
   const localArtwork: Record<string, string> = {
     "1159": "/art/chogs/chog-01.png",
@@ -14,7 +14,7 @@ export function ChogImage({ id, className = "" }: { id: bigint; className?: stri
     "67": "/art/chogs/chog-04.png",
     "909": "/art/chogs/chog-05.png",
   };
-  const image = metadata?.image ?? localArtwork[id.toString()];
+  const image = preferLocal ? (localArtwork[id.toString()] ?? metadata?.image) : (metadata?.image ?? localArtwork[id.toString()]);
 
   return (
     <div className={`relative aspect-square overflow-hidden bg-panel-2 ${className}`}>
@@ -49,29 +49,31 @@ type ChogCardProps = {
   selected?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  preferLocalArtwork?: boolean;
   children?: ReactNode;
 };
 
 /** Full card with traits. Clickable when `onClick` is given (pickers). */
-export function ChogCard({ id, selected, disabled, onClick, children }: ChogCardProps) {
+export function ChogCard({ id, selected, disabled, onClick, preferLocalArtwork, children }: ChogCardProps) {
   const { metadata } = useChogMetadata(id);
   const traits = metadata?.attributes.filter((a) => a.value !== "None") ?? [];
 
   const body = (
     <>
-      <ChogImage id={id} />
-      <div className="p-3">
+      <ChogImage id={id} preferLocal={preferLocalArtwork} />
+      <div className="chog-card-body">
         <div className="flex items-center justify-between">
-          <span className="font-semibold">#{id.toString()}</span>
-          {selected && <span className="text-xs font-semibold text-accent">Selected</span>}
+          <span className="chog-card-id">#{id.toString()}</span>
+          {selected && <span className="chog-card-status">Selected</span>}
         </div>
-        <div className="mt-1.5 flex min-h-5 flex-wrap gap-1">
+        <div className="chog-card-traits">
           {traits.map((t) => (
             <span
-              key={t.trait_type}
+              key={`${t.trait_type}:${t.value}`}
               title={t.trait_type}
-              className="rounded-md bg-panel-2 px-1.5 py-0.5 text-[11px] text-muted"
+              className="chog-trait"
             >
+              <span className="chog-trait-type">{t.trait_type}</span>
               {t.value}
             </span>
           ))}
@@ -81,9 +83,7 @@ export function ChogCard({ id, selected, disabled, onClick, children }: ChogCard
     </>
   );
 
-  const frame = `card overflow-hidden text-left transition ${
-    selected ? "border-accent ring-2 ring-accent/40" : ""
-  }`;
+  const frame = `chog-card ${selected ? "chog-card-selected" : ""}`;
 
   if (!onClick) return <div className={frame}>{body}</div>;
   return (
@@ -92,7 +92,7 @@ export function ChogCard({ id, selected, disabled, onClick, children }: ChogCard
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
-      className={`${frame} hover:border-accent disabled:cursor-not-allowed disabled:opacity-40`}
+      className={`${frame} disabled:cursor-not-allowed disabled:opacity-40`}
     >
       {body}
     </button>
@@ -106,15 +106,16 @@ type ChogPickerProps = {
   max: number;
   isLoading?: boolean;
   empty: ReactNode;
+  preferLocalArtwork?: boolean;
 };
 
-export function ChogPicker({ ids, selected, onToggle, max, isLoading, empty }: ChogPickerProps) {
+export function ChogPicker({ ids, selected, onToggle, max, isLoading, empty, preferLocalArtwork }: ChogPickerProps) {
   if (isLoading) return <p className="text-sm text-muted">Loading Chogs…</p>;
   if (ids.length === 0) return <div className="text-sm text-muted">{empty}</div>;
 
   const full = selected.length >= max;
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-3 gap-3 p-1 sm:grid-cols-4 sm:gap-4 lg:grid-cols-5">
       {ids.map((id) => {
         const isSelected = selected.includes(id);
         return (
@@ -124,6 +125,7 @@ export function ChogPicker({ ids, selected, onToggle, max, isLoading, empty }: C
             selected={isSelected}
             disabled={!isSelected && full}
             onClick={() => onToggle(id)}
+            preferLocalArtwork={preferLocalArtwork}
           />
         );
       })}

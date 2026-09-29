@@ -18,28 +18,62 @@ export function ConnectButton() {
   if (status === "connected" && address) {
     if (chainId !== chain.id) {
       return (
-        <button
-          className="btn-danger"
-          disabled={switchChain.isPending}
-          onClick={() => switchChain.mutate({ chainId: chain.id })}
-        >
-          Switch to {chain.name}
-        </button>
+        <div className="relative">
+          <button
+            className="wallet-control wallet-control-warning"
+            disabled={switchChain.isPending}
+            onClick={() => switchChain.mutate({ chainId: chain.id })}
+          >
+            <span className="wallet-status-dot" aria-hidden />
+            <span>{switchChain.isPending ? "Switching network…" : `Switch to ${chain.name}`}</span>
+          </button>
+        </div>
       );
     }
     return (
-      <div className="flex items-center gap-2">
-        <a
-          href={explorerAddress(address)}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-xl border border-line bg-panel-2 px-3 py-2 font-mono text-sm hover:border-accent"
+      <div className="relative">
+        <button
+          className="wallet-control"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => setOpen((value) => !value)}
         >
-          {shortAddress(address)}
-        </a>
-        <button className="btn-secondary px-3" onClick={() => disconnect.mutate({})}>
-          Disconnect
+          <span className="wallet-status-dot" aria-hidden />
+          <span className="font-mono">{shortAddress(address)}</span>
+          <span className={`wallet-chevron ${open ? "wallet-chevron-open" : ""}`} aria-hidden>⌄</span>
         </button>
+        {open && (
+          <div className="wallet-menu" role="menu">
+            <div className="wallet-menu-account">
+              <span className="wallet-menu-label">Connected wallet</span>
+              <span className="truncate font-mono text-sm text-white">{address}</span>
+              <span className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-mint/10 px-2 py-1 text-xs font-semibold text-mint">
+                <span className="wallet-status-dot wallet-status-dot-small" aria-hidden />
+                {chain.name}
+              </span>
+            </div>
+            <a
+              href={explorerAddress(address)}
+              target="_blank"
+              rel="noreferrer"
+              className="wallet-menu-item"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+            >
+              <span>View on explorer</span><span aria-hidden>↗</span>
+            </a>
+            <button
+              className="wallet-menu-item wallet-menu-item-danger"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                disconnect.mutate({});
+              }}
+            >
+              <span>Disconnect wallet</span><span aria-hidden>↪</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -50,43 +84,63 @@ export function ConnectButton() {
   return (
     <div className="relative">
       <button
-        className="btn-primary"
+        className="wallet-control wallet-control-connect"
         disabled={status === "connecting" || status === "reconnecting"}
         onClick={() =>
           wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o)
         }
       >
-        {status === "connecting" ? "Connecting…" : "Connect wallet"}
+        <WalletIcon />
+        <span>{status === "connecting" || status === "reconnecting" ? "Connecting…" : "Connect wallet"}</span>
+        {wallets.length > 1 && <span className={`wallet-chevron ${open ? "wallet-chevron-open" : ""}`} aria-hidden>⌄</span>}
       </button>
 
       {open && wallets.length > 1 && (
-        <div className="card absolute right-0 z-20 mt-2 w-56 p-1.5 shadow-xl">
+        <div className="wallet-menu" role="menu">
+          <div className="wallet-menu-account">
+            <span className="wallet-menu-label">Connect a wallet</span>
+            <span className="text-xs leading-5 text-white/60">Choose an installed wallet to continue.</span>
+          </div>
           {wallets.map((connector) => (
             <button
               key={connector.uid}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-panel-2"
+              className="wallet-menu-item"
+              role="menuitem"
               onClick={() => {
                 setOpen(false);
                 connect.mutate({ connector });
               }}
             >
-              {connector.icon && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={connector.icon} alt="" className="size-5 rounded" />
-              )}
-              {connector.name}
+              <span className="flex items-center gap-3">
+                {connector.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={connector.icon} alt="" className="size-6 rounded-lg" />
+                ) : <WalletIcon />}
+                <span>{connector.name}</span>
+              </span>
+              <span aria-hidden>→</span>
             </button>
           ))}
         </div>
       )}
 
       {connect.error && (
-        <p className="absolute right-0 mt-2 w-64 text-right text-xs text-danger">
+        <p className="wallet-error">
           {String(connect.error.name) === "ProviderNotFoundError"
             ? "No wallet found. Install MetaMask, Rabby or another EVM wallet."
             : errorMessage(connect.error)}
         </p>
       )}
     </div>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7.5A2.5 2.5 0 0 1 6.5 5H19a1 1 0 0 1 1 1v2H7a3 3 0 0 0 0 6h13v3a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20 8H7a3 3 0 0 0 0 6h13v-6Z" />
+      <circle cx="16.5" cy="11" r=".8" fill="currentColor" stroke="none" />
+    </svg>
   );
 }

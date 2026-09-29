@@ -7,6 +7,17 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 import { chog } from "@/lib/contracts";
 import { loadMetadata } from "@/lib/metadata";
 
+type OnchainTraits = readonly [string, string, string];
+
+function traitAttributes(traits: OnchainTraits | undefined) {
+  if (!traits) return [];
+  return [
+    { trait_type: "Hat", value: traits[0] },
+    { trait_type: "Eyes", value: traits[1] },
+    { trait_type: "Background", value: traits[2] },
+  ];
+}
+
 /**
  * Token ids owned by `owner`, ascending. Uses ERC721Enumerable (MockChog has it).
  * The real collection may not; see docs/05-frontend.md#listing-a-wallets-chogs.
@@ -50,6 +61,10 @@ export function useOwnedChogMetadata(owner: Address | undefined) {
     contracts: ids.map((id) => ({ ...chog, functionName: "tokenURI", args: [id] }) as const),
     query: { enabled: ids.length > 0, staleTime: Infinity },
   });
+  const traits = useReadContracts({
+    contracts: ids.map((id) => ({ ...chog, functionName: "traitsOf", args: [id] }) as const),
+    query: { enabled: ids.length > 0, staleTime: Infinity },
+  });
   const queries = useQueries({
     queries: ids.map((id, index) => ({
       queryKey: ["ownedChogMetadata", chog.address, id.toString(), tokenUris.data?.[index]?.result],
@@ -61,10 +76,31 @@ export function useOwnedChogMetadata(owner: Address | undefined) {
   return {
     entries: ids.flatMap((id, index) => {
       const metadata = queries[index]?.data;
-      return metadata ? [{ id, metadata }] : [];
+      const result = traits.data?.[index];
+      const onchainAttributes = result?.status === "success"
+        ? traitAttributes(result.result as OnchainTraits)
+        : [];
+      if (metadata) {
+        return [{
+          id,
+          metadata: {
+            ...metadata,
+            attributes: onchainAttributes.length > 0 ? onchainAttributes : metadata.attributes,
+          },
+        }];
+      }
+      return onchainAttributes.length > 0
+        ? [{ id, metadata: { name: `Chog #${id}`, image: null, attributes: onchainAttributes } }]
+        : [];
     }),
-    isLoading: idsLoading || tokenUris.isLoading || queries.some((query: UseQueryResult) => query.isLoading),
-    error: idsError ?? tokenUris.error ?? queries.find((query: UseQueryResult) => query.error)?.error,
+    isLoading: idsLoading
+      || tokenUris.isLoading
+      || traits.isLoading
+      || queries.some((query: UseQueryResult) => query.isLoading),
+    error: idsError
+      ?? tokenUris.error
+      ?? traits.error
+      ?? queries.find((query: UseQueryResult) => query.error)?.error,
   };
 }
 
@@ -88,6 +124,12 @@ export function useChogOwners(ids: readonly bigint[]) {
 
 /** Name, image and traits from tokenURI. Token metadata never changes, so cache forever. */
 export function useChogMetadata(id: bigint) {
+  const traits = useReadContract({
+    ...chog,
+    functionName: "traitsOf",
+    args: [id],
+    query: { staleTime: Infinity, retry: 1 },
+  });
   const uri = useReadContract({
     ...chog,
     functionName: "tokenURI",
@@ -102,7 +144,15 @@ export function useChogMetadata(id: bigint) {
     staleTime: Infinity,
   });
 
-  return { metadata: metadata.data, isLoading: uri.isLoading || metadata.isLoading };
+  const onchainAttributes = traitAttributes(traits.data as OnchainTraits | undefined);
+  return {
+    metadata: metadata.data
+      ? { ...metadata.data, attributes: onchainAttributes.length > 0 ? onchainAttributes : metadata.data.attributes }
+      : traits.data
+        ? { name: `Chog #${id}`, image: null, attributes: onchainAttributes }
+        : undefined,
+    isLoading: traits.isLoading || uri.isLoading || metadata.isLoading,
+  };
 }
 
 /** Loads the complete enumerable MockChog catalog for trait-request creation. */
@@ -118,6 +168,10 @@ export function useChogCatalog() {
     contracts: ids.map((id) => ({ ...chog, functionName: "tokenURI", args: [id] }) as const),
     query: { enabled: count > 0, staleTime: 30_000 },
   });
+  const traits = useReadContracts({
+    contracts: ids.map((id) => ({ ...chog, functionName: "traitsOf", args: [id] }) as const),
+    query: { enabled: count > 0, staleTime: Infinity },
+  });
   const metadata = useQueries({
     queries: ids.map((id, index) => ({
       queryKey: ["chogCatalogMetadata", chog.address, id.toString(), tokenUris.data?.[index]?.result],
@@ -130,9 +184,27 @@ export function useChogCatalog() {
     ids,
     entries: ids.flatMap((id, index) => {
       const data = metadata[index]?.data;
-      return data ? [{ id, metadata: data }] : [];
+      const result = traits.data?.[index];
+      const onchainAttributes = result?.status === "success"
+        ? traitAttributes(result.result as OnchainTraits)
+        : [];
+      if (data) {
+        return [{
+          id,
+          metadata: {
+            ...data,
+            attributes: onchainAttributes.length > 0 ? onchainAttributes : data.attributes,
+          },
+        }];
+      }
+      return onchainAttributes.length > 0
+        ? [{ id, metadata: { name: `Chog #${id}`, image: null, attributes: onchainAttributes } }]
+        : [];
     }),
-    isLoading: supply.isLoading || tokenUris.isLoading || metadata.some((query: UseQueryResult) => query.isLoading),
+    isLoading: supply.isLoading
+      || tokenUris.isLoading
+      || traits.isLoading
+      || metadata.some((query: UseQueryResult) => query.isLoading),
     isEnumerable: true,
   };
 }

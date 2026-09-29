@@ -100,7 +100,11 @@ function TradeDetail({ id }: { id: bigint }) {
             <div className="label">Taker gives</div>
             {trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n
               ? <div className="space-y-3">
-                <TraitRequestSummary count={trade.requestedCount} root={trade.requestedRoot} />
+                <TraitRequestSummary
+                  filter={traitType && traitValue ? { traitType, value: traitValue } : undefined}
+                  count={trade.requestedCount}
+                  root={trade.requestedRoot}
+                />
                 <label className="block text-sm">
                   <span className="label">Trait</span>
                   <select className="input w-full" value={`${traitType}:${traitValue}`} onChange={(event) => {
@@ -133,7 +137,7 @@ function TradeDetail({ id }: { id: bigint }) {
         <div className="flex flex-wrap items-center gap-3">
           {status === "open" && maker && <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swap, functionName: "cancelTrade", args: [id] })}>Cancel trade</TxButton>}
           {status === "expired" && <TxButton state={action.state} onClick={() => action.run({ ...swap, functionName: "reclaimExpired", args: [id] })}>Reclaim to maker</TxButton>}
-          {canFill && !isApproved && <TxButton state={action.state} onClick={() => action.run(approveCall)}>Approve On Deal</TxButton>}
+          {canFill && !isApproved && <TxButton state={action.state} onClick={() => action.run(approveCall)}>Approve collection</TxButton>}
           {canFill && isApproved && (!trade.requestedRoot || traitReady) && <TxButton state={action.state} onClick={runFill}>Accept &amp; swap</TxButton>}
           {status === "open" && !maker && !canFill && <p className="text-sm text-muted">{isTraitTrade ? "Select the maker’s committed trait and matching Chogs to accept this trade." : trade.taker && !sameAddress(trade.taker, address) ? "This is a private offer for another wallet." : "You don’t own every requested Chog."}</p>}
           {status !== "open" && status !== "expired" && <p className="text-sm text-muted">This trade is settled and read-only.</p>}

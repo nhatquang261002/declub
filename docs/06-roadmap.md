@@ -46,9 +46,9 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ## Phase 3: Differentiation
 
-- [ ] Trait-based requests using a Merkle set ([design](03-contract-design.md#phase-3-trait-based-requests))
-- [ ] Trait metadata pipeline (off-chain traits → matching ids → root)
-- [ ] Direct-request inbox (filter `TradeCreated` by `taker = me`)
+- [x] Trait-based requests using a Merkle set ([design](03-contract-design.md#phase-3-trait-based-requests))
+- [x] Trait metadata pipeline (metadata traits → matching ids → root in the create flow)
+- [x] Direct-request inbox (the **For you** tab filters open trades by `taker = me`)
 - [ ] Search and filters, which probably triggers the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
 - [ ] Notifications
 
