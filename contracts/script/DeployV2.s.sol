@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {Script, console} from "forge-std/Script.sol";
+import {ChogSwapV2} from "../src/ChogSwapV2.sol";
+import {MockERC20} from "../src/mocks/MockERC20.sol";
+
+/// @notice Deploys the generic ChogSwapV2 (no constructor args, any token), and optionally a
+///         mock ERC-20 so the multi-asset flow can be demoed on testnet.
+/// @dev Env (all optional):
+///        DEPLOY_MOCK_ERC20  true → also deploy "Mock USD" (mUSD) with an open mint
+///        DEMO_WALLETS       comma-separated addresses to mint mUSD to
+///        DEMO_MINT_AMOUNT   mUSD (whole tokens) per demo wallet (default 1000)
+///      V1 (Deploy.s.sol) is untouched and keeps running; the two contracts are independent.
+contract DeployV2 is Script {
+    struct Config {
+        bool deployMockErc20;
+        address[] demoWallets;
+        uint256 mintAmount; // whole tokens
+    }
+
+    struct Result {
+        address swap;
+        address mockErc20;
+        uint256 deployBlock;
+    }
+
+    function run() external returns (Result memory r) {
+        r = deploy(configFromEnv());
+        console.log("NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS=%s", r.swap);
+        console.log("NEXT_PUBLIC_CHOG_SWAP_V2_DEPLOY_BLOCK=%s", r.deployBlock);
+        if (r.mockErc20 != address(0)) {
+            console.log("NEXT_PUBLIC_MOCK_ERC20_ADDRESS=%s", r.mockErc20);
+        }
+    }
+
+    function configFromEnv() public view returns (Config memory c) {
+        c.deployMockErc20 = vm.envOr("DEPLOY_MOCK_ERC20", false);
+        c.mintAmount = vm.envOr("DEMO_MINT_AMOUNT", uint256(1000));
+        string memory wallets = vm.trim(vm.envOr("DEMO_WALLETS", string("")));
+        if (bytes(wallets).length != 0) {
+            string[] memory parts = vm.split(wallets, ",");
+            c.demoWallets = new address[](parts.length);
+            for (uint256 i; i < parts.length; ++i) {
+                c.demoWallets[i] = vm.parseAddress(vm.trim(parts[i]));
+            }
+        }
+    }
+
+    function deploy(Config memory c) public returns (Result memory r) {
+        require(block.chainid == 10143 || block.chainid == 31337, "testnet deployment only");
+        r.deployBlock = block.number;
+        vm.startBroadcast();
+
+        r.swap = address(new ChogSwapV2());
+        if (c.deployMockErc20) {
+            MockERC20 token = new MockERC20("Mock USD", "mUSD");
+            r.mockErc20 = address(token);
+            for (uint256 i; i < c.demoWallets.length; ++i) {
+                token.mint(c.demoWallets[i], c.mintAmount * 1 ether);
+            }
+        }
+
+        vm.stopBroadcast();
+    }
+}

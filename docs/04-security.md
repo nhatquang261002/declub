@@ -98,3 +98,64 @@ contracts/test/
 `forge lint` is clean. Intentional patterns are suppressed inline with a reason, so any new finding stands out.
 
 Before any mainnet deploy with real Chogs: an external review, a re-run of Slither (triaged as above), and a public testnet period.
+
+## `ChogSwapV2` (Phase 4)
+
+Design: [ADR 0005](adr/0005-generic-asset-model.md). The guarantee is the same, and the trust model is v1's with `withdraw()` replaced by `claim()`. The differences that matter:
+
+### Invariants
+
+Recomputed from the trades themselves in `test/v2/invariant/`, over native, two ERC-20s (one with a blocklist that the handler toggles) and NFTs, with a MON-rejecting actor.
+
+| # | Invariant |
+|---|---|
+| V1 | `address(swap).balance == Σ native offered by Open trades + Σ native credits`. |
+| V2 | For every ERC-20 the escrow holds: `balanceOf(swap) == Σ offered amount over Open trades + Σ credits`. |
+| V3 | The escrow owns an NFT if and only if an Open trade offers it. |
+| V4–V5 | As I4 / I5: statuses only move `None → Open → {Filled, Cancelled}`, ids are contiguous. |
+| V6 | No fill after expiry. |
+| V7 | A fill or refund leaves each party holding (balance + credit) exactly what the terms say, and a reclaim caller who isn't the maker gets nothing. |
+| Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
+
+Mutation checks: removing the credit on a failed payout, redirecting reclaimed assets to the caller, and allowing fills after expiry each make the invariant suite fail.
+
+### Threats (additions to the table above)
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **Fee-on-transfer / rebasing / lying ERC-20** breaks escrow accounting | Balance-delta check on every ERC-20 deposit (`UnsupportedToken`) | `test_feeOnTransferTokenIsRejectedAsOffered`, `test_tokenThatLiesAboutTransferIsRejected` |
+| **Lying ERC-721** | `ownerOf(id) == escrow` after the deposit (`NftNotReceived`) | `test_nftThatLiesAboutTransferIsRejected` |
+| **Blocklisted recipient (USDC-style) locks a refund or fill** | Payouts out of escrow never revert: they become credits for `claim` | `ChogSwapV2.claim.t.sol` (native, ERC-20, ERC-721; fill, cancel, reclaim) |
+| **Token hook re-enters** (ERC-777 style) | `nonReentrant` on every mutating function, including `claim` | `test_tokenHookCannotReenterDuring{Deposit,Fill,Cancel}`, `test_nativeReceiver*` |
+| **USDT-style token with no return value** | `SafeERC20` | `test_noReturnTokenWorksOnBothSides` |
+| **Unfillable trade** (same asset both sides, duplicates) | Rejected at creation | `test_revertsSameAssetOnBothSides`, `test_revertsDuplicateAssetOnOneSide` |
+| **Partial fill** | One asset failing reverts the whole fill | `test_fillIsAtomic` |
+| **Unbounded gas per trade** | `MAX_ASSETS_PER_SIDE = 10`; worst case measured at 2.2M create / 0.9M fill | `test_worstCaseGas` |
+
+### Accepted limitations
+
+- **Any token can be listed.** A scam token only hurts whoever fills a trade that names it. The UI has to show the on-chain symbol, decimals and address.
+- **A fee-charging token can still be *requested*.** The maker receives less than the listed amount. It's their own choice of token.
+- **A permanently blocked recipient** (the token itself blacklists them) keeps the credit in the escrow forever. The escrow can't do more than offer the claim.
+- **Gas-burning token or receiver.** As with v1's MON receiver, one that burns all forwarded gas can make fills of *its own* trades fail. Takers lose gas, nobody loses assets.
+- **Approvals.** ERC-20 approvals to the escrow should be limited to the amount, not unlimited. The UI should ask for the exact amount.
+- No external review yet.
+
+### Test suite
+
+```text
+contracts/test/v2/
+├── ChogSwapV2Base.sol            fixture: 3 wallets with Chogs, two ERC-20s and MON; asset builders
+├── ChogSwapV2.create.t.sol       every validation error, escrow of each asset type, event, max size
+├── ChogSwapV2.fill.t.sol         every type pairing, mixed bundles, atomicity, boundaries, worst-case gas
+├── ChogSwapV2.cancel.t.sol       cancel and reclaim: refunds, access control, states
+├── ChogSwapV2.claim.t.sol        rejected payouts become credits: native, ERC-20, ERC-721
+├── ChogSwapV2.tokens.t.sol       fee / lying / no-return tokens, re-entry, stray deposits
+├── ChogSwapV2.fuzz.t.sol         conservation, exact refunds, wrong value, expiry boundary, access
+├── invariant/                    handler + invariants V1–V7 and liveness
+├── DeployV2.t.sol, MockERC20.t.sol
+contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook tokens
+```
+
+`forge test --match-path "test/v2/*"` runs 84 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapV2.sol` is 100% of lines, statements, branches and functions.
+

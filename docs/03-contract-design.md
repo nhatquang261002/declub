@@ -216,3 +216,59 @@ struct Asset { AssetType assetType; address token; uint256 tokenId; uint256 amou
 ```
 
 Replace `offeredIds/offeredMon` with `Asset[] offered` and do the same for the requested side. Add a token allowlist (or accept any token and warn in the UI). ERC-20 transfers use `SafeERC20`, and fee-on-transfer tokens are rejected by checking balances before and after. Multi-party ring swaps become an `n`-leg trade where every leg's assets are escrowed and settlement runs once all legs are funded, with refunds after expiry.
+
+## Phase 4: `ChogSwapV2` (generic assets)
+
+Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IChogSwapV2.sol`](../contracts/src/interfaces/IChogSwapV2.sol). Implementation: [`ChogSwapV2.sol`](../contracts/src/ChogSwapV2.sol). It's a separate contract with no constructor arguments, so it works with any token and v1 is untouched.
+
+```solidity
+enum AssetType { Native, ERC20, ERC721 }
+struct Asset { AssetType assetType; address token; uint256 id; uint256 amount; }
+struct Trade { address maker; uint64 expiry; Status status; address taker; Asset[] offered; Asset[] requested; }
+```
+
+### Functions
+
+| Function | What it does |
+|---|---|
+| `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` (or 0). |
+| `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested`. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker. |
+| `cancelTrade(id)` | Maker, while open. Refunds the offered side to the maker. |
+| `reclaimExpired(id)` | Anyone, once expired. Refunds to the maker. |
+| `claim(assetType, token, id)` | Collect a payout that was rejected earlier. |
+| `getTrade`, `isExpired`, `tradeCount`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE` | Views. |
+
+### Create-time checks
+
+| Check | Error |
+|---|---|
+| a side is empty | `EmptySide` |
+| more than 10 assets on a side | `TooManyAssets(count, max)` |
+| field rules per type (see the ADR): native has no token/id, ERC-20 has a contract and no id, ERC-721 has a contract and amount 1, amounts > 0 | `InvalidAsset(index)` |
+| same `(type, token, id)` twice on a side | `DuplicateAsset(index)` |
+| same `(type, token, id)` on both sides | `SameAssetBothSides(i, j)` |
+| `msg.value` ≠ native amount offered | `WrongNativeAmount(expected, sent)` |
+| `expiry` in the past | `ExpiryInPast` |
+| ERC-20 deposit delivered a different amount | `UnsupportedToken(token)` |
+| NFT not owned by the escrow after the transfer | `NftNotReceived(token, id)` |
+
+The fill, cancel and reclaim checks are the same as v1's (`TradeNotOpen`, `TradeIsExpired`, `NotAllowedTaker`, `SelfFill`, `NotMaker`, `TradeNotExpired`), with `WrongNativeAmount` in place of `WrongMonAmount`. `claim` reverts with `NothingToClaim` or, if the transfer fails again, `ClaimFailed` (the credit stays).
+
+### Payouts
+
+```text
+_payout(to, asset):                      // never reverts
+    ok = transferOut(asset, to)          // native: call · ERC-20: trySafeTransfer · ERC-721: transferFrom
+    if !ok: credits[to][key(type, token, id)] += amount; emit AssetCredited
+```
+
+`claim` zeroes the credit, emits `Claimed`, then transfers and reverts with `ClaimFailed` if that fails (which restores the credit).
+
+### Events
+
+`TradeCreated(id, maker, taker, offered[], requested[], expiry)`, `TradeFilled`, `TradeCancelled`, `TradeReclaimed` (same shape as v1), plus `AssetCredited(account, token, assetType, id, amount)` and `Claimed(...)`.
+
+### Gas (worst case: 10 NFTs each way)
+
+Create **2.2M**, fill **0.9M**. A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
+
