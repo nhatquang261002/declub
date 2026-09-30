@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     foundry({
       project: "../contracts",
-      include: ["ChogSwap.sol/**", "MockChog.sol/**"],
+      include: ["ChogSwap.sol/**", "ChogSwapV2.sol/**", "MockChog.sol/**"],
     }),
   ],
 });

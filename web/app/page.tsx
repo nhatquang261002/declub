@@ -6,12 +6,12 @@ const STEPS = [
   {
     number: "01",
     title: "Lock your offer",
-    body: "Pick the Chogs (and any MON) you want to give. Creating the trade escrows your side in the contract.",
+    body: "Pick the assets (and any MON) you want to give. Creating the trade escrows your side in the contract.",
   },
   {
     number: "02",
     title: "Name what you want",
-    body: "Ask for specific Chogs, a trait, or MON. Keep it public, or address it to a single wallet.",
+    body: "Ask for specific assets, a trait, or MON. Keep it public, or address it to a single wallet.",
   },
   {
     number: "03",
@@ -34,14 +34,14 @@ export default function HomePage() {
                 height={18}
                 className="size-[18px] rounded-full"
               />
-              Chog World Order · Monad testnet
+              Peer-to-peer trading · Monad testnet
             </div>
             <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
-              Find your next
-              <span className="block text-accent">perfect Chog.</span>
+              Trade what you have
+              <span className="block text-accent">for what you want.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Swap Chogs peer-to-peer. Lock your offer, find the one you want, and let the
+              Swap assets peer-to-peer. Lock your offer, find the one you want, and let the
               contract settle both sides together. No middlemen. Just a little chaos.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -56,7 +56,7 @@ export default function HomePage() {
           <ChogSwapArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>Non-custodial</strong><span>Your Chogs stay yours until a swap</span></div>
+          <div className="hero-stat"><strong>Non-custodial</strong><span>Your assets stay yours until a swap</span></div>
           <div className="hero-stat"><strong>Permissionless</strong><span>Public or direct offers, your choice</span></div>
           <div className="hero-stat"><strong>No platform fees</strong><span>Only the network transaction cost</span></div>
         </div>

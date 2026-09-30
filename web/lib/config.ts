@@ -8,6 +8,8 @@ const env = {
   chog: process.env.NEXT_PUBLIC_CHOG_ADDRESS,
   swap: process.env.NEXT_PUBLIC_CHOG_SWAP_ADDRESS,
   deployBlock: process.env.NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK,
+  swapV2: process.env.NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS,
+  mockErc20: process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS,
   chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
 };
 
@@ -22,6 +24,18 @@ export const EXPLORER_URL = "https://testnet.monadvision.com";
 export const CHOG_ADDRESS = address(env.chog, "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
 export const CHOG_SWAP_ADDRESS = address(env.swap, "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298");
 export const CHOG_SWAP_DEPLOY_BLOCK = BigInt(env.deployBlock || 66352698);
+
+/**
+ * The generic multi-asset contract (Phase 4, ADR 0005). Optional: it isn't in the Phase 1
+ * deployment, so V2 features stay off until NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS is set.
+ */
+export const CHOG_SWAP_V2_ADDRESS: Address | undefined = env.swapV2?.trim()
+  ? getAddress(env.swapV2.trim())
+  : undefined;
+/** Test ERC-20 with an open mint, for demoing V2 on testnet. */
+export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
+  ? getAddress(env.mockErc20.trim())
+  : undefined;
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";

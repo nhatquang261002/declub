@@ -13,11 +13,11 @@ import { demoTrades, toTrade, type Trade } from "@/lib/trades";
  * reads storage with one multicall instead of scanning `TradeCreated` logs. The public
  * Monad RPC caps eth_getLogs at 100 blocks, which rules out a scan from the deploy block.
  */
-export function useTrades({ limit = 200 }: { limit?: number } = {}) {
+export function useTrades({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
   const count = useReadContract({
     ...swap,
     functionName: "tradeCount",
-    query: { refetchInterval: 5_000 },
+    query: { enabled, refetchInterval: 5_000 },
   });
   const total = count.data ?? 0n;
   const showDemoTrades = DEMO_TRADES;

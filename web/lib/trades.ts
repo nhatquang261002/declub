@@ -57,11 +57,11 @@ export function toTrade(id: bigint, raw: RawTrade): Trade | null {
 }
 
 /** Mirrors ChogSwap.isExpired: expired strictly after `expiry`. */
-export function isExpired(trade: Trade, nowSec: number): boolean {
+export function isExpired(trade: Pick<Trade, "expiry">, nowSec: number): boolean {
   return trade.expiry !== 0n && BigInt(nowSec) > trade.expiry;
 }
 
-export function displayStatus(trade: Trade, nowSec: number): DisplayStatus {
+export function displayStatus(trade: Pick<Trade, "status" | "expiry">, nowSec: number): DisplayStatus {
   if (trade.status === "open" && isExpired(trade, nowSec)) return "expired";
   return trade.status;
 }

@@ -51,13 +51,20 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Trait metadata pipeline (metadata traits → matching ids → root in the create flow)
 - [x] Direct-request inbox (the **For you** tab filters open trades by `taker = me`)
 - [x] Search and filters on Open Trades, client-side (Chog / trade # / maker address, MON filter, sort by ending soon). Loads up to 200 trades while a filter is active
-- [ ] Trait search and server-side filtering, which probably triggers the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
-- [ ] Notifications
+- [x] Trait search on Open Trades: matches traits of Chogs on either side ("crown", "Hat: Crown"), and names trait-request trades by matching their Merkle root against the catalog
+- [ ] Server-side filtering across the whole book, which probably triggers the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
+- [ ] Trait lookups for the real Chog collection (search reads MockChog's `traitsOf`; the real one needs the metadata pipeline)
+- [x] Notifications: in-app bell + opt-in browser alerts, derived client-side from trade state. Push while no tab is open needs the indexer ([ADR 0003](adr/0003-no-indexer-in-v1.md))
 
 ## Phase 4: Protocol expansion
 
-- [ ] Generic `Asset[]` model: any ERC-721, ERC-20, native
-- [ ] Multi-asset trades
+- [x] Generic `Asset[]` model: any ERC-721, ERC-20, native. `ChogSwapV2`, a separate contract beside v1 ([ADR 0005](adr/0005-generic-asset-model.md)); 100% coverage, invariants V1–V7. Not deployed yet
+- [x] Multi-asset trades (up to 10 assets per side, any mix; same contract)
+- [ ] Deploy `ChogSwapV2` to testnet (`script/DeployV2.s.sol`) and verify
+- [x] Frontend for V2, plumbing: V2 ABI, optional config, `TradeV2` + `toLegacyTrade` adapter, `useTradesV2`, `useTokenInfo`, error copy
+- [x] Frontend for V2, create and detail screens (`/v2/create`, `/v2/trade/[id]`): asset editor, exact-amount ERC-20 approvals, NFT collection approvals, accept / cancel / reclaim, `claim`. Typechecked and built; not exercised against a deployed V2 yet
+- [ ] Frontend for V2, list: a V2 trades list and a v1/v2 switch on Trades and History
+- [ ] Trait requests in V2 (a new `AssetType`), so trait trades can move off v1
 - [ ] Trade intents + off-chain matcher
 - [ ] Multi-party ring swaps
 - [ ] Reputation

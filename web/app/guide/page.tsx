@@ -9,30 +9,30 @@ const STEPS = [
   {
     number: "02",
     title: "Create an offer",
-    body: "Choose the Chogs you want to give, then enter the Chog ids or MON you want in return. You can make the offer public or address it to one wallet.",
+    body: "Choose the assets you want to give, then enter the asset IDs or MON you want in return. You can make the offer public or address it to one wallet.",
   },
   {
     number: "03",
     title: "Approve and lock",
-    body: "Approve On Deal once so it can escrow your offered Chogs. Creating the trade then locks your side in the contract immediately.",
+    body: "Approve On Deal once so it can escrow your offered assets. Creating the trade then locks your side in the contract immediately.",
   },
   {
     number: "04",
     title: "Accept a trade",
-    body: "Open a trade where you own every requested Chog. Approve the collection if needed, then Accept & Swap. The contract settles both sides atomically.",
+    body: "Open a trade where you own every requested asset. Approve the collection if needed, then Accept & Swap. The contract settles both sides atomically.",
   },
 ];
 
 const FAQ = [
-  ["What is On Deal?", "On Deal is a peer-to-peer, non-custodial way to trade Chogs. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
+  ["What is On Deal?", "On Deal is a peer-to-peer, non-custodial way to trade digital assets. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
   ["Do I have to trust the other trader?", "No. The swap is atomic: either every NFT and MON transfer succeeds, or the transaction reverts. The other trader never receives your escrowed assets without sending their side."],
-  ["What does escrow mean here?", "When you create an open trade, the Chogs you offer move into the On Deal contract. They remain there until the trade is filled, cancelled by you, or reclaimed after expiry."],
-  ["Can I cancel my trade?", "Yes. The maker can cancel any open trade before it is filled. Your escrowed Chogs and offered MON are returned to your wallet."],
+  ["What does escrow mean here?", "When you create an open trade, the assets you offer move into the On Deal contract. They remain there until the trade is filled, cancelled by you, or reclaimed after expiry."],
+  ["Can I cancel my trade?", "Yes. The maker can cancel any open trade before it is filled. Your escrowed assets and offered MON are returned to your wallet."],
   ["What happens when a trade expires?", "An expired trade cannot be filled. The maker, or another wallet on the maker's behalf, can call Reclaim to return the escrowed assets."],
-  ["Who can accept a trade?", "Public trades can be accepted by any wallet that owns all requested Chogs. A direct trade can only be accepted by the wallet named by the maker."],
+  ["Who can accept a trade?", "Public trades can be accepted by any wallet that owns all requested assets. A direct trade can only be accepted by the wallet named by the maker."],
   ["Are there platform fees?", "On Deal has no platform fee. You only pay the Monad transaction cost, plus any MON intentionally included in the trade."],
   ["Why do I need to approve On Deal?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
-  ["Is this mainnet?", "The current demo runs on Monad testnet with MockChog. Treat test assets as disposable and never send valuable NFTs to an unfamiliar contract."],
+  ["Is this mainnet?", "The current demo runs on Monad testnet with test assets. Treat them as disposable and never send valuable assets to an unfamiliar contract."],
 ];
 
 export default function GuidePage() {
@@ -44,7 +44,7 @@ export default function GuidePage() {
           <div>
             <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">How to trade on On Deal</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Everything you need to make a safe Chog trade, from connecting your wallet to receiving your assets.
+              Everything you need to make a safe trade, from connecting your wallet to receiving your assets.
             </p>
           </div>
           <Link href="/create" className="btn-primary shrink-0">Create a trade ↗</Link>

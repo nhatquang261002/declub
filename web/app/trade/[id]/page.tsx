@@ -112,7 +112,7 @@ function TradeDetail({ id }: { id: bigint }) {
                     setTraitType(type);
                     setTraitValue(value.join(":"));
                   }}>
-                    <option value=":">Select a trait from your Chogs</option>
+                    <option value=":">Select a trait from your assets</option>
                     {traitOptions.map((option) => (
                       <option key={`${option.type}:${option.value}`} value={`${option.type}:${option.value}`}>
                         {option.type}: {option.value}
@@ -121,7 +121,7 @@ function TradeDetail({ id }: { id: bigint }) {
                   </select>
                 </label>
                 <p className="text-xs text-muted">
-                  Matching owned Chogs: {selectedTraitIds.length}. Select the trait committed by the maker.
+                  Matching owned assets: {selectedTraitIds.length}. Select the trait committed by the maker.
                 </p>
                 {traitType && !traitReady && <p className="text-xs text-warn">This selection does not match the maker’s committed set.</p>}
               </div>
@@ -139,7 +139,7 @@ function TradeDetail({ id }: { id: bigint }) {
           {status === "expired" && <TxButton state={action.state} onClick={() => action.run({ ...swap, functionName: "reclaimExpired", args: [id] })}>Reclaim to maker</TxButton>}
           {canFill && !isApproved && <TxButton state={action.state} onClick={() => action.run(approveCall)}>Approve collection</TxButton>}
           {canFill && isApproved && (!trade.requestedRoot || traitReady) && <TxButton state={action.state} onClick={runFill}>Accept &amp; swap</TxButton>}
-          {status === "open" && !maker && !canFill && <p className="text-sm text-muted">{isTraitTrade ? "Select the maker’s committed trait and matching Chogs to accept this trade." : trade.taker && !sameAddress(trade.taker, address) ? "This is a private offer for another wallet." : "You don’t own every requested Chog."}</p>}
+          {status === "open" && !maker && !canFill && <p className="text-sm text-muted">{isTraitTrade ? "Select the maker’s committed trait and matching assets to accept this trade." : trade.taker && !sameAddress(trade.taker, address) ? "This is a private offer for another wallet." : "You don’t own every requested asset."}</p>}
           {status !== "open" && status !== "expired" && <p className="text-sm text-muted">This trade is settled and read-only.</p>}
           <Link href="/trades" className="btn-secondary">Back to trades</Link>
         </div>

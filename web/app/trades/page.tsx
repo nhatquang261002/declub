@@ -7,11 +7,13 @@ import { EmptyState, PageHeader } from "@/components/Page";
 import { TradeGrid } from "@/components/TradeParts";
 import { useNow } from "@/hooks/useNow";
 import { useTrades } from "@/hooks/useTrades";
+import { useTradeTraits } from "@/hooks/useTraits";
 import { errorMessage } from "@/lib/errors";
 import {
   DEFAULT_FILTERS,
   applyTradeFilters,
   isFiltering,
+  traitSuggestions,
   type MonFilter,
   type TradeFilters,
   type TradeSort,
@@ -28,7 +30,7 @@ const MON_OPTIONS: Array<[MonFilter, string]> = [
   ["any", "Any MON"],
   ["offers-mon", "Offers MON"],
   ["wants-mon", "Wants MON"],
-  ["chogs-only", "Chogs only"],
+  ["no-mon", "No MON"],
 ];
 const SORT_OPTIONS: Array<[TradeSort, string]> = [
   ["newest", "Newest first"],
@@ -49,7 +51,8 @@ export default function TradesPage() {
   // Public offers plus private ones addressed to me.
   const visibleToMe = (t: Trade) => !t.taker || sameAddress(t.taker, address);
 
-  const matching = applyTradeFilters(trades, filters, now);
+  const traits = useTradeTraits(trades);
+  const matching = applyTradeFilters(trades, filters, now, traits);
   const lists: Record<Tab, Trade[]> = {
     open: matching.filter((t) => isLive(t) && visibleToMe(t)),
     "for-you": matching.filter((t) => isLive(t) && !!address && sameAddress(t.taker, address)),
@@ -98,11 +101,17 @@ export default function TradesPage() {
         <input
           type="search"
           className="input min-w-52 flex-1"
-          placeholder="Search Chog #, trade #, or 0x… maker"
+          placeholder="Search asset ID, trait, or maker 0x…"
           aria-label="Search trades"
+          list="trait-suggestions"
           value={filters.query}
           onChange={(e) => updateFilters({ query: e.target.value })}
         />
+        <datalist id="trait-suggestions">
+          {traitSuggestions(trades, traits).map((label) => (
+            <option key={label} value={label} />
+          ))}
+        </datalist>
         <select
           className="input w-auto!"
           aria-label="Filter by MON"
@@ -150,7 +159,7 @@ export default function TradesPage() {
           </Link>
         </EmptyState>
       ) : (
-        <TradeGrid trades={shown} now={now} me={address} />
+        <TradeGrid trades={shown} now={now} me={address} traitLabels={traits.byRoot} />
       )}
 
       {currentList.length > 0 && (

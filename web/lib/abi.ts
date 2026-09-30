@@ -16,22 +16,6 @@ export const chogSwapAbi = [
     stateMutability: 'view',
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'tradeId', internalType: 'uint256', type: 'uint256', indexed: true },
-      { name: 'maker', internalType: 'address', type: 'address', indexed: true },
-      { name: 'taker', internalType: 'address', type: 'address', indexed: true },
-      { name: 'offeredIds', internalType: 'uint256[]', type: 'uint256[]', indexed: false },
-      { name: 'offeredMon', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'requestedRoot', internalType: 'bytes32', type: 'bytes32', indexed: false },
-      { name: 'requestedCount', internalType: 'uint8', type: 'uint8', indexed: false },
-      { name: 'requestedMon', internalType: 'uint256', type: 'uint256', indexed: false },
-      { name: 'expiry', internalType: 'uint64', type: 'uint64', indexed: false },
-    ],
-    name: 'TraitTradeCreated',
-  },
-  {
     type: 'function',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'cancelTrade',
@@ -49,8 +33,8 @@ export const chogSwapAbi = [
     type: 'function',
     inputs: [
       { name: 'offeredIds', internalType: 'uint256[]', type: 'uint256[]' },
-      { name: 'requestedRoot', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'requestedCount', internalType: 'uint8', type: 'uint8' },
+      { name: 'root', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'count', internalType: 'uint8', type: 'uint8' },
       { name: 'requestedMon', internalType: 'uint256', type: 'uint256' },
       { name: 'taker', internalType: 'address', type: 'address' },
       { name: 'expiry', internalType: 'uint64', type: 'uint64' },
@@ -74,18 +58,18 @@ export const chogSwapAbi = [
   },
   {
     type: 'function',
-    inputs: [
-      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
-      { name: 'requestedIds', internalType: 'uint256[]', type: 'uint256[]' },
-      { name: 'proofs', internalType: 'bytes32[][]', type: 'bytes32[][]' },
-    ],
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'fillTrade',
     outputs: [],
     stateMutability: 'payable',
   },
   {
     type: 'function',
-    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'requestedIds', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'proofs', internalType: 'bytes32[][]', type: 'bytes32[][]' },
+    ],
     name: 'fillTrade',
     outputs: [],
     stateMutability: 'payable',
@@ -130,27 +114,6 @@ export const chogSwapAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
-    name: 'requestedCount',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
-    name: 'requestedRoot',
-    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'traitLeaf',
-    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
     name: 'pendingWithdrawal',
     outputs: [{ name: 'amount', internalType: 'uint256', type: 'uint256' }],
@@ -165,9 +128,30 @@ export const chogSwapAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'requestedCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'requestedRoot',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [],
     name: 'tradeCount',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'traitLeaf',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
     stateMutability: 'view',
   },
   {
@@ -306,6 +290,67 @@ export const chogSwapAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'taker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'offeredIds',
+        internalType: 'uint256[]',
+        type: 'uint256[]',
+        indexed: false,
+      },
+      {
+        name: 'offeredMon',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'requestedRoot',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: false,
+      },
+      {
+        name: 'requestedCount',
+        internalType: 'uint8',
+        type: 'uint8',
+        indexed: false,
+      },
+      {
+        name: 'requestedMon',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'expiry',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'TraitTradeCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'account',
         internalType: 'address',
         type: 'address',
@@ -350,6 +395,12 @@ export const chogSwapAbi = [
     inputs: [{ name: 'chog_', internalType: 'address', type: 'address' }],
     name: 'InvalidCollection',
   },
+  {
+    type: 'error',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidTraitProof',
+  },
+  { type: 'error', inputs: [], name: 'InvalidTraitRequest' },
   { type: 'error', inputs: [], name: 'MonOnBothSides' },
   {
     type: 'error',
@@ -399,6 +450,466 @@ export const chogSwapAbi = [
       { name: 'sent', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'WrongMonAmount',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ChogSwapV2
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const chogSwapV2Abi = [
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_ASSETS_PER_SIDE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'cancelTrade',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'assetType',
+        internalType: 'enum IChogSwapV2.AssetType',
+        type: 'uint8',
+      },
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'claim',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'account', internalType: 'address', type: 'address' },
+      {
+        name: 'assetType',
+        internalType: 'enum IChogSwapV2.AssetType',
+        type: 'uint8',
+      },
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'claimable',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'offered',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      {
+        name: 'requested',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      { name: 'taker', internalType: 'address', type: 'address' },
+      { name: 'expiry', internalType: 'uint64', type: 'uint64' },
+    ],
+    name: 'createTrade',
+    outputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'fillTrade',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getTrade',
+    outputs: [
+      {
+        name: '',
+        internalType: 'struct IChogSwapV2.Trade',
+        type: 'tuple',
+        components: [
+          { name: 'maker', internalType: 'address', type: 'address' },
+          { name: 'expiry', internalType: 'uint64', type: 'uint64' },
+          {
+            name: 'status',
+            internalType: 'enum IChogSwapV2.Status',
+            type: 'uint8',
+          },
+          { name: 'taker', internalType: 'address', type: 'address' },
+          {
+            name: 'offered',
+            internalType: 'struct IChogSwapV2.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapV2.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'requested',
+            internalType: 'struct IChogSwapV2.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapV2.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'isExpired',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'reclaimExpired',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'tradeCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'assetType',
+        internalType: 'enum IChogSwapV2.AssetType',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'AssetCredited',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'account',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'assetType',
+        internalType: 'enum IChogSwapV2.AssetType',
+        type: 'uint8',
+        indexed: false,
+      },
+      { name: 'id', internalType: 'uint256', type: 'uint256', indexed: false },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Claimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TradeCancelled',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'taker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'offered',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+        indexed: false,
+      },
+      {
+        name: 'requested',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+        indexed: false,
+      },
+      {
+        name: 'expiry',
+        internalType: 'uint64',
+        type: 'uint64',
+        indexed: false,
+      },
+    ],
+    name: 'TradeCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'taker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TradeFilled',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'caller',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'TradeReclaimed',
+  },
+  { type: 'error', inputs: [], name: 'ClaimFailed' },
+  {
+    type: 'error',
+    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
+    name: 'DuplicateAsset',
+  },
+  { type: 'error', inputs: [], name: 'EmptySide' },
+  {
+    type: 'error',
+    inputs: [{ name: 'expiry', internalType: 'uint64', type: 'uint64' }],
+    name: 'ExpiryInPast',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidAsset',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'NftNotReceived',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'NotAllowedTaker',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'NotMaker',
+  },
+  { type: 'error', inputs: [], name: 'NothingToClaim' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'offeredIndex', internalType: 'uint256', type: 'uint256' },
+      { name: 'requestedIndex', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'SameAssetBothSides',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'SelfFill',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyAssets',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'TradeIsExpired',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'TradeNotExpired',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'TradeNotOpen',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'UnsupportedToken',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'expected', internalType: 'uint256', type: 'uint256' },
+      { name: 'sent', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'WrongNativeAmount',
   },
 ] as const
 

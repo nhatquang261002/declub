@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatMon, shortAddress } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
+import type { TraitFilter } from "@/lib/traitRequests";
 import { ChogThumb } from "./Chog";
 import { TraitRequestSummary } from "./TraitRequest";
 
@@ -84,7 +85,18 @@ export function TradeSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint })
   );
 }
 
-export function TradeCard({ trade, now, me }: { trade: Trade; now: number; me?: string }) {
+export function TradeCard({
+  trade,
+  now,
+  me,
+  traitLabels,
+}: {
+  trade: Trade;
+  now: number;
+  me?: string;
+  /** Merkle root (lowercase) → trait, so trait requests can be named. */
+  traitLabels?: Map<string, TraitFilter>;
+}) {
   const status = displayStatus(trade, now);
   const forMe = sameAddress(trade.taker, me);
   const mine = sameAddress(trade.maker, me);
@@ -121,7 +133,11 @@ export function TradeCard({ trade, now, me }: { trade: Trade; now: number; me?: 
             wants
           </span>
           {trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n
-            ? <TraitRequestSummary count={trade.requestedCount} root={trade.requestedRoot} />
+            ? <TraitRequestSummary
+                filter={traitLabels?.get(trade.requestedRoot.toLowerCase())}
+                count={trade.requestedCount}
+                root={trade.requestedRoot}
+              />
             : <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />}
         </div>
       </div>
@@ -139,11 +155,21 @@ export function TradeCard({ trade, now, me }: { trade: Trade; now: number; me?: 
   );
 }
 
-export function TradeGrid({ trades, now, me }: { trades: Trade[]; now: number; me?: string }) {
+export function TradeGrid({
+  trades,
+  now,
+  me,
+  traitLabels,
+}: {
+  trades: Trade[];
+  now: number;
+  me?: string;
+  traitLabels?: Map<string, TraitFilter>;
+}) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {trades.map((t) => (
-        <TradeCard key={t.id.toString()} trade={t} now={now} me={me} />
+        <TradeCard key={t.id.toString()} trade={t} now={now} me={me} traitLabels={traitLabels} />
       ))}
     </div>
   );

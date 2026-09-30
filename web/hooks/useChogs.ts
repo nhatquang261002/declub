@@ -7,9 +7,9 @@ import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query
 import { chog } from "@/lib/contracts";
 import { loadMetadata } from "@/lib/metadata";
 
-type OnchainTraits = readonly [string, string, string];
+export type OnchainTraits = readonly [string, string, string];
 
-function traitAttributes(traits: OnchainTraits | undefined) {
+export function traitAttributes(traits: OnchainTraits | undefined) {
   if (!traits) return [];
   return [
     { trait_type: "Hat", value: traits[0] },

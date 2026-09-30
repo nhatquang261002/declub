@@ -78,11 +78,66 @@ scattering hex values through JSX or utility definitions.
 | **Trade #id** `/trade/[id]` | `getTrade`, `isExpired`, `ownerOf(requestedIds)`, `isApprovedForAll` | `fillTrade{value: requestedMon}` · `cancelTrade` · `reclaimExpired` | ✓ |
 | **History** `/history` | trades from `useTrades` filtered by `maker = me` / `taker = me`, plus local fills; `pendingWithdrawal(me)` | `withdraw` | ✓ |
 
+### Copy vocabulary
+
+The app isn't limited to Chogs (V2 trades any ERC-721, ERC-20 and MON), so UI text says **asset** for anything tradable, **NFT** only where it must mean an ERC-721, and **MON** for the native coin. "Chog" appears only where it is the actual thing on screen: Chog artwork, the Chog picker and trait names, and the MockChog mint panel. Error copy in `lib/errors.ts` follows the same rule.
+
+### Open Trades search
+
+Client-side over the loaded trades (up to 200 while a filter is active). A bare number matches the trade id or a Chog id on either side; other text matches the maker/taker address or a trait, as `Hat: Crown` or just `crown`. Traits come from one `traitsOf` multicall over the Chog ids in view. A trait request only stores a Merkle root on-chain, so the page also reads the catalog (`totalSupply` + `traitsOf`) and names the request by finding the trait whose set hashes to that root. That only resolves while the matching set is unchanged, the same condition the fill flow needs. The search box offers the trait labels in view as suggestions.
+
 ### Open Trades tabs
 
 - **Open**: status Open, not expired, and either public or addressed to me.
 - **For you**: open direct offers where `taker = me`.
 - **All**: everything loaded, any status.
+
+### Notifications
+
+A bell in the header (connected wallets only). There is no event stream to subscribe to ([ADR 0003](adr/0003-no-indexer-in-v1.md)), so `lib/notifications.ts` derives every notification from the trades `useTrades` already loads (up to 200, polled every 8s):
+
+| Kind | When |
+|---|---|
+| For you | an open direct offer with `taker = me` |
+| Accepted | a trade I made is Filled |
+| Ending soon | my open trade expires within 1h |
+| Expired | my open trade ran out and its escrow is still locked |
+
+Read state is a set of `kind:tradeId` keys in localStorage, per wallet. On the first visit of a wallet, existing Accepted items are marked read so old trades don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It can't reach a closed tab; that needs a server-side trigger.
+
+### ChogSwapV2 in the frontend (Phase 4)
+
+V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is optional: nothing changes until `NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS` is set, and `swapV2` in `lib/contracts.ts` is `undefined` before that.
+
+**Reused as is:** wallet, header, providers, `useTxFlow`, `TxButton`, `errors.ts` (V2 error copy added), `format.ts`, `useNow`, the Chog art and thumbnails, `useChogs`, and the notifications and trade-filter logic.
+
+**New, V2-specific:**
+
+| File | Purpose |
+|---|---|
+| `lib/assets.ts` | `Asset` (native / ERC-20 / ERC-721), `formatAsset`, `sameAsset` (the contract's duplicate rule) |
+| `lib/tradesV2.ts` | `TradeV2` (two `Asset[]`), `toTradeV2`, and `toLegacyTrade` |
+| `hooks/useTradesV2.ts` | `tradeCount` + multicall `getTrade`, like `useTrades` |
+| `hooks/useTokenInfo.ts` | symbol + decimals read from each ERC-20. Never show a maker-typed name |
+
+`toLegacyTrade` converts a V2 trade to the v1 `Trade` when it only holds Chogs and MON, so the existing cards, filters and notifications show those trades with no change. A trade that includes any other token returns `null` and needs the generic asset UI below.
+
+**Screens** (both hidden until V2 is configured; the header shows a "Multi-asset" link only then):
+
+| Route / file | Purpose |
+|---|---|
+| `/v2/create` | Two `AssetEditor`s (offer / request), optional taker, expiry. Redirects to the new trade |
+| `/v2/trade/[id]` | Both sides as `AssetList`, then cancel / reclaim / accept, and a "collect" panel for held payouts |
+| `lib/assetDraft.ts` | Typed rows → `Asset[]`, mirroring the contract's rules (size, duplicates, MON on both sides) |
+| `hooks/useAssetApprovals.ts` | The approvals still missing, one step at a time |
+| `hooks/useTradeV2.ts` | One trade by id |
+
+Choices worth knowing:
+
+- **Approvals are exact for tokens, collection-wide for NFTs.** An ERC-20 is approved for the amount in the trade, no more. An NFT collection uses `setApprovalForAll`, the only way to cover several ids in one transaction. The button shows the next missing approval ("1 of 3"), then turns into Create / Accept.
+- **Token names come from the token.** The editor shows the symbol and decimals read on-chain under each address, and amounts are parsed with those decimals. A row with more decimals than the token has is rejected instead of rounded.
+- **Held payouts:** the trade page reads `claimable` for every asset in the trade and offers a Claim button for what the connected wallet is owed.
+- **Not built yet:** a V2 trades list, and a v1/v2 switch on Trades and History. Until then V2 trades are reached by link (the create form redirects to one).
 
 ### Trade Detail: which button shows
 

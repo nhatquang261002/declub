@@ -97,18 +97,18 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
     if (!address) return;
     const taker = takerText.trim();
     const takerAddress = taker ? (isAddress(taker) ? (taker as Address) : null) : null;
-    if (offered.length === 0 && (offeredMon ?? 0n) === 0n) return setValidation("Offer at least one Chog or some MON.");
-    if (requestMode === "ids" && requested.length === 0 && (requestedMon ?? 0n) === 0n) return setValidation("Request at least one Chog, a trait, or some MON.");
-    if (requestMode === "trait" && traitSet.count === 0 && (requestedMon ?? 0n) === 0n) return setValidation("Choose a trait that matches at least one Chog.");
+    if (offered.length === 0 && (offeredMon ?? 0n) === 0n) return setValidation("Offer at least one asset or some MON.");
+    if (requestMode === "ids" && requested.length === 0 && (requestedMon ?? 0n) === 0n) return setValidation("Request at least one asset, a trait, or some MON.");
+    if (requestMode === "trait" && traitSet.count === 0 && (requestedMon ?? 0n) === 0n) return setValidation("Choose a trait that matches at least one asset.");
     if ((offeredMon ?? 0n) > 0n && (requestedMon ?? 0n) > 0n) return setValidation("MON can only be on one side.");
-    if (offered.length > MAX_TOKENS_PER_SIDE || requested.length > MAX_TOKENS_PER_SIDE) return setValidation(`Up to ${MAX_TOKENS_PER_SIDE} Chogs per side.`);
-    if (requestMode === "ids" && new Set(requested.map(String)).size !== requested.length) return setValidation("Requested Chog ids must be unique.");
-    if (offered.some((id) => requested.includes(id))) return setValidation("A Chog cannot be on both sides.");
+    if (offered.length > MAX_TOKENS_PER_SIDE || requested.length > MAX_TOKENS_PER_SIDE) return setValidation(`Up to ${MAX_TOKENS_PER_SIDE} assets per side.`);
+    if (requestMode === "ids" && new Set(requested.map(String)).size !== requested.length) return setValidation("Requested asset IDs must be unique.");
+    if (offered.some((id) => requested.includes(id))) return setValidation("An asset cannot be on both sides.");
     if (taker && !takerAddress) return setValidation("Enter a valid wallet address, or leave it empty.");
     if (takerAddress?.toLowerCase() === address.toLowerCase()) return setValidation("You cannot make a private offer to yourself.");
-    if (requestMode === "ids" && ownersLoading) return setValidation("Still checking requested Chogs.");
-    if (requestMode === "ids" && requestedOwners.some((owner) => owner === null)) return setValidation("Every requested Chog must exist.");
-    if (requestMode === "ids" && ownerHint > 0 && takerAddress) return setValidation("The private taker does not currently own every requested Chog.");
+    if (requestMode === "ids" && ownersLoading) return setValidation("Still checking requested assets.");
+    if (requestMode === "ids" && requestedOwners.some((owner) => owner === null)) return setValidation("Every requested asset must exist.");
+    if (requestMode === "ids" && ownerHint > 0 && takerAddress) return setValidation("The private taker does not currently own every requested asset.");
     if (offeredMon === null || requestedMon === null) return setValidation("Enter valid MON amounts.");
     const expiryValue = expiry === "none" ? 0n : BigInt(Math.floor(Date.now() / 1000) + DURATIONS[expiry]);
     setValidation(null);
@@ -129,8 +129,8 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
   return (
     <div className="space-y-8">
       <section>
-        <label className="label">Chogs you offer</label>
-        <ChogPicker ids={preview ? previewIds : ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={!preview && isLoading} empty="No Chogs available. Mint or receive one first." preferLocalArtwork={preview} />
+        <label className="label">Assets you offer</label>
+        <ChogPicker ids={preview ? previewIds : ids} selected={offered} onToggle={toggle} max={MAX_TOKENS_PER_SIDE} isLoading={!preview && isLoading} empty="No assets available. Mint or receive one first." preferLocalArtwork={preview} />
       </section>
       <section className="grid gap-6 md:grid-cols-2">
         <div>
@@ -146,20 +146,20 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
         <div className="flex flex-wrap gap-2">
           {(["ids", "trait"] as const).map((mode) => (
             <button key={mode} type="button" className={requestMode === mode ? "btn-primary" : "btn-secondary"} onClick={() => setRequestMode(mode)}>
-              {mode === "ids" ? "Request exact Chogs" : "Request by trait"}
+              {mode === "ids" ? "Request exact assets" : "Request by trait"}
             </button>
           ))}
         </div>
         {requestMode === "ids" ? (
           <>
-            <label className="label" htmlFor="requested-ids">Chog ids you request</label>
+            <label className="label" htmlFor="requested-ids">Asset IDs you request</label>
             <input id="requested-ids" className="input" placeholder="1, 2, #3" value={requestedText} onChange={(e) => setRequestedText(e.target.value)} />
             <p className="mt-1 text-xs text-muted">Separate ids with commas or spaces. {requestedOwners.length > 0 && `${requestedOwners.length} token${requestedOwners.length === 1 ? "" : "s"} checked.`}</p>
           </>
         ) : (
           <>
             <div>
-              <label className="label">Any Chog matching</label>
+              <label className="label">Any asset matching</label>
               <p className="text-xs text-muted">The contract will accept any token in the committed matching set.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -179,7 +179,7 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
                 root={traitSet.root}
               />
             )}
-            {!preview && catalog.isLoading && <p className="text-xs text-muted">Loading the Chog catalog…</p>}
+            {!preview && catalog.isLoading && <p className="text-xs text-muted">Loading the catalog…</p>}
           </>
         )}
       </section>
@@ -201,7 +201,7 @@ function CreateTrade({ preview = false }: { preview?: boolean }) {
             Preview mode — connect a wallet to approve and create a real trade.
           </p>
         )}
-        <p className="text-sm text-muted">On Deal locks your offered Chogs in escrow. The requested side is transferred only when someone accepts.</p>
+        <p className="text-sm text-muted">On Deal locks your offered assets in escrow. The requested side is transferred only when someone accepts.</p>
         {validation && <p className="text-sm text-danger" role="alert">{validation}</p>}
         {!isApproved ? (
           <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(approveCall)}>Create Trade</TxButton>
