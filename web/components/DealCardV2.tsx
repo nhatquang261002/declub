@@ -26,6 +26,16 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
       </span>
     );
   }
+  if (asset.kind === "trait") {
+    // Which traits is in the deal's description, which a list of cards doesn't load.
+    return (
+      <span className={chip}>
+        <span className="text-[10px] font-black tracking-wider text-[#a9282f] uppercase">By trait</span>
+        <span className="text-[11px] font-semibold">Any {asset.amount.toString()}</span>
+        <span className="font-mono text-[9px] text-[#4e5968]">{shortAddress(asset.token)}</span>
+      </span>
+    );
+  }
   const token = info.get(asset.token.toLowerCase());
   return (
     <span className={chip}>

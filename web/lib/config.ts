@@ -47,6 +47,8 @@ export const DEMO_CREATE =
 export const MAX_TOKENS_PER_SIDE = 10;
 /** ChogSwapV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
 export const MAX_NOTE_BYTES = 280;
+/** ChogSwapV2.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */
+export const MAX_SPEC_BYTES = 1024;
 
 export const explorerTx = (hash: string) => `${EXPLORER_URL}/tx/${hash}`;
 export const explorerAddress = (addr: string) => `${EXPLORER_URL}/address/${addr}`;

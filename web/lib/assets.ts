@@ -1,12 +1,18 @@
-import { formatUnits, zeroAddress, type Address } from "viem";
+import { formatUnits, toHex, zeroAddress, type Address, type Hex } from "viem";
 import { formatMon } from "./format";
 
 /** Mirrors IChogSwapV2.AssetType. */
-export const ASSET_TYPE = { native: 0, erc20: 1, erc721: 2 } as const;
-export type AssetKind = "native" | "erc20" | "erc721";
-const KIND: Record<number, AssetKind> = { 0: "native", 1: "erc20", 2: "erc721" };
+export const ASSET_TYPE = { native: 0, erc20: 1, erc721: 2, trait: 3 } as const;
+export type AssetKind = "native" | "erc20" | "erc721" | "trait";
+/** The kinds a maker can type into a row. A trait request has its own editor. */
+export type PlainKind = Exclude<AssetKind, "trait">;
+const KIND: Record<number, AssetKind> = { 0: "native", 1: "erc20", 2: "erc721", 3: "trait" };
 
-/** One line of a V2 deal side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1. */
+/**
+ * One line of a V2 deal side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1.
+ * A "trait" request (requested side only) names a collection: `id` is the Merkle root of the token
+ * ids that satisfy it and `amount` is how many of them the taker hands over (ADR 0006).
+ */
 export type Asset = {
   kind: AssetKind;
   token: Address;
@@ -49,6 +55,16 @@ export const nftAsset = (token: Address, id: bigint): Asset => ({
   amount: 1n,
 });
 
+export const traitAsset = (token: Address, root: Hex, amount: number): Asset => ({
+  kind: "trait",
+  token,
+  id: BigInt(root),
+  amount: BigInt(amount),
+});
+
+/** The Merkle root a trait request commits to, as the 32-byte hex the set builder produces. */
+export const traitRoot = (asset: Asset): Hex => toHex(asset.id, { size: 32 });
+
 /** On-chain token facts. Never use a name the maker typed: read these from the token. */
 export type TokenInfo = { symbol: string; decimals: number };
 
@@ -56,6 +72,7 @@ export type TokenInfo = { symbol: string; decimals: number };
 export function formatAsset(asset: Asset, info?: TokenInfo): string {
   if (asset.kind === "native") return formatMon(asset.amount);
   if (asset.kind === "erc721") return `#${asset.id}`;
+  if (asset.kind === "trait") return `Any ${asset.amount} matching NFT${asset.amount === 1n ? "" : "s"}`;
   const amount = info ? formatUnits(asset.amount, info.decimals) : asset.amount.toString();
   return `${amount} ${info?.symbol ?? `${asset.token.slice(0, 6)}…`}`;
 }

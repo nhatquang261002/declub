@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
 import { AssetList } from "@/components/AssetList";
 import { EmptyState, PageHeader } from "@/components/Page";
+import { TraitSlotView } from "@/components/TraitFillPanel";
 import { OfferNote, ProposalForm, ProposalList } from "@/components/Proposals";
 import { StatusBadge } from "@/components/DealParts";
 import { TxButton, TxStatus } from "@/components/Tx";
@@ -14,6 +15,7 @@ import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
 import { useProposalsV2 } from "@/hooks/useProposalsV2";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
+import { useTraitFill } from "@/hooks/useTraitFill";
 import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, sameAsset, type Asset } from "@/lib/assets";
@@ -21,6 +23,8 @@ import { swapV2 } from "@/lib/contracts";
 import { formatDate } from "@/lib/format";
 import { isOpenOffer } from "@/lib/dealsV2";
 import { displayStatus, sameAddress } from "@/lib/deals";
+
+const NO_ASSETS: readonly Asset[] = [];
 
 export default function DealV2Page() {
   const params = useParams<{ id: string }>();
@@ -31,7 +35,7 @@ export default function DealV2Page() {
 
 function DealDetailV2({ id }: { id: bigint }) {
   const { address } = useConnection();
-  const { deal, note, isLoading } = useDealV2(id);
+  const { deal, note, traitClauses, isLoading } = useDealV2(id);
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
@@ -61,6 +65,10 @@ function DealDetailV2({ id }: { id: bigint }) {
     if (acceptedMine) record(id);
   }, [acceptedMine, record, id]);
 
+  // Trait requests: the maker's description is checked against the deal's Merkle root before a
+  // taker is offered a fill (hooks/useTraitFill.ts).
+  const traitFill = useTraitFill(deal?.requested ?? NO_ASSETS, traitClauses);
+
   // What the taker must approve before filling. Only asked for once they could actually fill.
   const { steps } = useAssetApprovals(canFill ? address : undefined, deal?.requested ?? [], info);
 
@@ -82,6 +90,8 @@ function DealDetailV2({ id }: { id: bigint }) {
   if (!deal) return <EmptyState>This deal does not exist.</EmptyState>;
 
   const requestedNative = deal.requested.find((a) => a.kind === "native")?.amount ?? 0n;
+  const plainRequested = deal.requested.filter((a) => a.kind !== "trait");
+  const traitFillBlocked = traitFill.hasTraits && !traitFill.complete;
 
   return (
     <>
@@ -102,7 +112,22 @@ function DealDetailV2({ id }: { id: bigint }) {
           ) : (
             <div>
               <div className="label">Taker gives</div>
-              <AssetList assets={deal.requested} info={info} />
+              <div className="space-y-2">
+                {traitFill.hasTraits && !traitFill.aligned && (
+                  <p className="rounded-lg bg-white/5 px-3 py-2 text-sm text-warn">
+                    This deal asks for NFTs by trait, but its description can&apos;t be read here, so it can&apos;t be accepted from this app.
+                  </p>
+                )}
+                {traitFill.slots.map((slot, i) => (
+                  <TraitSlotView
+                    key={slot.asset.id.toString()}
+                    slot={slot}
+                    account={address}
+                    onToggle={canFill ? (tokenId) => traitFill.toggle(i, tokenId) : undefined}
+                  />
+                ))}
+                {plainRequested.length > 0 && <AssetList assets={plainRequested} info={info} />}
+              </div>
             </div>
           )}
           <div className="text-sm text-muted">Created by <span className="font-mono">{deal.maker}</span></div>
@@ -132,8 +157,11 @@ function DealDetailV2({ id }: { id: bigint }) {
           {canFill && !steps[0] && (
             <TxButton
               state={action.state}
+              disabled={traitFillBlocked}
               onClick={async () => {
-                const receipt = await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value: requestedNative });
+                const receipt = traitFill.hasTraits
+                  ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value: requestedNative }))
+                  : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value: requestedNative });
                 if (receipt) record(id);
               }}
             >

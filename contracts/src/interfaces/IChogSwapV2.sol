@@ -25,18 +25,29 @@ interface IChogSwapV2 {
     enum AssetType {
         Native,
         ERC20,
-        ERC721
+        ERC721,
+        ERC721Trait
     }
 
     /// @dev Field rules, enforced at creation:
     ///      Native: `token == 0`, `id == 0`, `amount > 0`.
     ///      ERC20:  `token` is a contract, `id == 0`, `amount > 0`.
     ///      ERC721: `token` is a contract, `amount == 1`.
+    ///      ERC721Trait (requested side of `createTraitTrade` only): `token` is a contract, `id`
+    ///      is the non-zero Merkle root of the token ids that satisfy the request, and `amount`
+    ///      (1..`MAX_ASSETS_PER_SIDE`) is how many of them the taker hands over.
     struct Asset {
         AssetType assetType;
         address token;
         uint256 id;
         uint256 amount;
+    }
+
+    /// @notice What a taker supplies for one `ERC721Trait` asset: `tokenIds[i]` with
+    ///         `proofs[i]`. Both arrays have exactly the asset's `amount` entries.
+    struct TraitFill {
+        uint256[] tokenIds;
+        bytes32[][] proofs;
     }
 
     enum ProposalStatus {
@@ -81,6 +92,10 @@ interface IChogSwapV2 {
         uint64 expiry
     );
     event TradeFilled(uint256 indexed tradeId, address indexed maker, address indexed taker);
+    /// @notice The maker's description of the trait sets behind a trade's `ERC721Trait` assets.
+    ///         Opaque to the contract: it proves only membership in each Merkle set, and clients
+    ///         rebuild the sets from this text and compare roots before filling.
+    event TraitSpec(uint256 indexed tradeId, string spec);
     /// @notice The maker's free-text hint on an open offer. Not binding.
     event OfferNote(uint256 indexed tradeId, string note);
     event ProposalCreated(
@@ -146,6 +161,17 @@ interface IChogSwapV2 {
     error UnknownProposal(uint256 tradeId, uint256 proposalId);
     error ProposalNotActive(uint256 tradeId, uint256 proposalId);
     error NotProposer(uint256 tradeId, uint256 proposalId);
+    /// @notice `createTraitTrade` needs an `ERC721Trait` asset in `requested`.
+    error NoTraitAsset();
+    /// @notice The trait spec is empty or longer than `MAX_SPEC_BYTES`.
+    error BadTraitSpec(uint256 length, uint256 max);
+    /// @notice The trade has an `ERC721Trait` asset, so `fillTrade` can't settle it.
+    error TraitFillRequired(uint256 tradeId);
+    /// @notice `fills` doesn't match the trade's trait assets: wrong count, wrong number of ids
+    ///         or proofs for one, or an id repeated within one.
+    error InvalidTraitFill(uint256 fillIndex);
+    /// @notice `tokenId` isn't in the Merkle set the trade asks for.
+    error InvalidTraitProof(uint256 fillIndex, uint256 tokenId);
     error NothingToClaim();
     /// @notice The transfer during `claim` failed; the credit is kept.
     error ClaimFailed();
@@ -171,6 +197,17 @@ interface IChogSwapV2 {
         string calldata note
     ) external payable returns (uint256 tradeId);
 
+    /// @notice `createTrade` for a `requested` side that includes `ERC721Trait` assets. `spec`
+    ///         (1..`MAX_SPEC_BYTES`) describes them for clients and is stored, so a deal can be
+    ///         named without event history. `offered` and `taker` follow `createTrade`.
+    function createTraitTrade(
+        Asset[] calldata offered,
+        Asset[] calldata requested,
+        address taker,
+        uint64 expiry,
+        string calldata spec
+    ) external payable returns (uint256 tradeId);
+
     /// @notice Escrow `assets` as a proposal on an open offer. Send exactly the native amount
     ///         listed in `assets` as `msg.value`.
     function propose(uint256 tradeId, Asset[] calldata assets)
@@ -193,6 +230,10 @@ interface IChogSwapV2 {
     ///         `requested` as `msg.value`.
     function fillTrade(uint256 tradeId) external payable;
 
+    /// @notice `fillTrade` for a trade with `ERC721Trait` assets: `fills[k]` answers the k-th
+    ///         trait asset in `requested`. Also fills a trade with none, given no `fills`.
+    function fillTraitTrade(uint256 tradeId, TraitFill[] calldata fills) external payable;
+
     /// @notice Maker takes the escrow back, at any time while the trade is open.
     function cancelTrade(uint256 tradeId) external;
 
@@ -207,10 +248,12 @@ interface IChogSwapV2 {
 
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
     function MAX_NOTE_BYTES() external view returns (uint256);
+    function MAX_SPEC_BYTES() external view returns (uint256);
     function tradeCount() external view returns (uint256);
     function getTrade(uint256 tradeId) external view returns (Trade memory);
     function isExpired(uint256 tradeId) external view returns (bool);
     function offerNote(uint256 tradeId) external view returns (string memory);
+    function traitSpec(uint256 tradeId) external view returns (string memory);
     function proposalCount(uint256 tradeId) external view returns (uint256);
     function getProposal(uint256 tradeId, uint256 proposalId)
         external

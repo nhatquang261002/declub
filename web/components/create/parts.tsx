@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Select } from "@/components/Select";
 import { EXPIRIES, expiryLabelOf, type Terms } from "@/lib/createFlow";
 import { shortAddress } from "@/lib/format";
 
@@ -55,16 +56,12 @@ export function TermsFields({ terms, onChange, takerLabel }: { terms: Terms; onC
       </div>
       <div>
         <label className="label" htmlFor="expiry">Expiry</label>
-        <select
+        <Select
           id="expiry"
-          className="input"
           value={terms.expiry}
-          onChange={(e) => onChange({ ...terms, expiry: e.target.value as Terms["expiry"] })}
-        >
-          {EXPIRIES.map(({ key, label }) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+          options={EXPIRIES.map(({ key, label }) => ({ value: key, label }))}
+          onChange={(expiry) => onChange({ ...terms, expiry })}
+        />
         <p className="mt-1 text-xs text-muted">After this you can take your assets back.</p>
       </div>
     </section>
@@ -103,5 +100,24 @@ export function ReviewTerms({ kindLabel, terms, whoLabel }: { kindLabel: string;
         ))}
       </dl>
     </ReviewCard>
+  );
+}
+
+/**
+ * The last card of the flow: a note, the tx status, and Back beside the main action, so the
+ * way back and the way forward sit on one row.
+ */
+export function ConfirmCard({ note, status, onBack, children }: { note: ReactNode; status?: ReactNode; onBack: () => void; children: ReactNode }) {
+  return (
+    <section className="page-section space-y-4 p-4">
+      <p className="text-sm text-muted">{note}</p>
+      {status && <div className="space-y-1">{status}</div>}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" className="btn-secondary" onClick={onBack}>
+          Back
+        </button>
+        {children}
+      </div>
+    </section>
   );
 }

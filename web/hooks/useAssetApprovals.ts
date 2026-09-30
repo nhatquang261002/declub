@@ -30,7 +30,7 @@ export function useAssetApprovals(
 
   const { erc20s, collections } = useMemo(() => {
     const erc20s = assets.filter((a) => a.kind === "erc20");
-    const collections = [...new Set(assets.filter((a) => a.kind === "erc721").map((a) => a.token))];
+    const collections = [...new Set(assets.filter((a) => a.kind === "erc721" || a.kind === "trait").map((a) => a.token))];
     return { erc20s, collections };
   }, [assets]);
 

@@ -1,4 +1,5 @@
 import type { ChogMetadata } from "@/lib/metadata";
+import { traitKey, type TraitCatalog } from "@/lib/traitSpec";
 
 /**
  * Stand-ins for the wallet and the catalog when NEXT_PUBLIC_DEMO_CREATE is on, so the create
@@ -26,3 +27,12 @@ export const PREVIEW_CATALOG = [
   chog(67n, "Crown", "Sleepy", "Night"),
   chog(909n, "Cowboy Hat", "Blue", "Mint"),
 ];
+
+/** The same catalog as a trait scan would return it, for the V2 trait picker. */
+export const PREVIEW_TRAIT_CATALOG: TraitCatalog = {
+  enumerable: true,
+  tokens: PREVIEW_CATALOG.map(({ id, metadata }) => ({
+    id,
+    keys: metadata.attributes.map((a) => traitKey({ traitType: a.trait_type, value: a.value })),
+  })),
+};

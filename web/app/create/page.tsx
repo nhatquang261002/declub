@@ -11,14 +11,14 @@ import { DEMO_CREATE } from "@/lib/config";
 import { swapV2 } from "@/lib/contracts";
 import { DEFAULT_TERMS, type Step, type Terms, type DealKind } from "@/lib/createFlow";
 
-// Open offers and V2 exact requests live on ChogSwapV2; trait requests only exist on the Chog
-// contract (ADR 0006). Without V2 configured, exact requests fall back to the Chog contract too.
+// Open offers, exact requests and trait requests live on ChogSwapV2 (ADR 0005–0007). Without V2
+// configured, exact and trait requests fall back to the original Chog contract.
 const AVAILABILITY: KindAvailability = {
   open: swapV2
     ? { scope: "Any tokens, NFTs and MON" }
     : { scope: "", unavailable: "Not available on this deployment yet" },
   exact: { scope: swapV2 ? "Any tokens, NFTs and MON" : "Chogs and MON" },
-  trait: { scope: "Chogs and MON" },
+  trait: { scope: swapV2 ? "Any collection with readable traits" : "Chogs and MON" },
 };
 
 export default function CreatePage() {
@@ -56,8 +56,8 @@ function CreateWizard({ preview = false }: { preview?: boolean }) {
       )}
 
       {/* Same key across kinds that share a contract, so switching between them keeps what you typed. */}
-      {(kind === "open" || (kind === "exact" && swapV2)) && <MultiFlow key="multi" kind={kind} {...flow} />}
-      {(kind === "trait" || (kind === "exact" && !swapV2)) && <ChogsFlow key="chogs" kind={kind} {...flow} />}
+      {swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
+      {!swapV2 && (kind === "trait" || kind === "exact") && <ChogsFlow key="chogs" kind={kind} {...flow} />}
     </div>
   );
 }

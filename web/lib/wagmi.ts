@@ -1,15 +1,9 @@
 import { http, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { defineChain } from "viem";
-import { monadTestnet as viemMonadTestnet } from "viem/chains";
-import { CHAIN_ID, EXPLORER_URL, RPC_URL } from "./config";
+import { RPC_URL } from "./config";
+import { chain } from "./chain";
 
-export const chain = defineChain({
-  ...viemMonadTestnet,
-  id: CHAIN_ID,
-  rpcUrls: { default: { http: [RPC_URL] } },
-  blockExplorers: { default: { name: "MonadVision", url: EXPLORER_URL } },
-});
+export { chain };
 
 export const wagmiConfig = createConfig({
   chains: [chain],

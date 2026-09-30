@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IChogSwapV2} from "./interfaces/IChogSwapV2.sol";
 
@@ -19,11 +20,13 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
 
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
     uint256 public constant MAX_NOTE_BYTES = 280;
+    uint256 public constant MAX_SPEC_BYTES = 1024;
 
     uint256 public tradeCount;
 
     mapping(uint256 tradeId => Trade) internal _trades;
     mapping(uint256 tradeId => string) internal _notes;
+    mapping(uint256 tradeId => string) internal _traitSpecs;
     mapping(uint256 tradeId => Proposal[]) internal _proposals;
     /// @dev account → keccak256(assetType, token, id) → amount. Native and ERC-20 amounts add
     ///      up; an NFT credit is 1.
@@ -38,22 +41,22 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         address taker,
         uint64 expiry
     ) external payable nonReentrant returns (uint256 tradeId) {
-        uint256 offeredNative = _validateSide(offered);
-        _validateSide(requested);
-        _validateNoOverlap(offered, requested);
-        if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
-        // forge-lint: disable-next-line(block-timestamp)
-        if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
+        tradeId = _create(offered, requested, taker, expiry, "");
+    }
 
-        tradeId = _newTrade(offered, taker, expiry);
-        Asset[] storage stored = _trades[tradeId].requested;
-        for (uint256 i; i < requested.length; ++i) {
-            stored.push(requested[i]);
+    /// @inheritdoc IChogSwapV2
+    function createTraitTrade(
+        Asset[] calldata offered,
+        Asset[] calldata requested,
+        address taker,
+        uint64 expiry,
+        string calldata spec
+    ) external payable nonReentrant returns (uint256 tradeId) {
+        uint256 specLength = bytes(spec).length;
+        if (specLength == 0 || specLength > MAX_SPEC_BYTES) {
+            revert BadTraitSpec(specLength, MAX_SPEC_BYTES);
         }
-
-        emit TradeCreated(tradeId, msg.sender, taker, offered, requested, expiry);
-
-        _depositAll(offered);
+        tradeId = _create(offered, requested, taker, expiry, spec);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -63,7 +66,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         uint64 expiry,
         string calldata note
     ) external payable nonReentrant returns (uint256 tradeId) {
-        uint256 offeredNative = _validateSide(offered);
+        uint256 offeredNative = _validateSide(offered, false);
         if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
@@ -96,7 +99,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == t.maker) revert SelfPropose(tradeId);
 
-        uint256 native = _validateSide(assets);
+        uint256 native = _validateSide(assets, false);
         _validateNoOverlap(t.offered, assets);
         if (msg.value != native) revert WrongNativeAmount(native, msg.value);
 
@@ -163,36 +166,16 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
 
     /// @inheritdoc IChogSwapV2
     function fillTrade(uint256 tradeId) external payable nonReentrant {
-        Trade storage t = _trades[tradeId];
-        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
-        // An open offer has no ask. Without this a caller would take the escrow for free.
-        if (t.requested.length == 0) revert OpenOfferNoFill(tradeId);
-        if (_isExpired(t)) revert TradeIsExpired(tradeId);
-        address maker = t.maker;
-        address taker = t.taker;
-        if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
-        if (msg.sender == maker) revert SelfFill(tradeId);
-        uint256 requestedNative = _nativeAmount(t.requested);
-        if (msg.value != requestedNative) revert WrongNativeAmount(requestedNative, msg.value);
+        _fill(tradeId, new TraitFill[](0));
+    }
 
-        t.status = Status.Filled;
-        emit TradeFilled(tradeId, maker, msg.sender);
-
-        // The taker's side goes straight to the maker. A failing transfer reverts the fill.
-        Asset[] storage requested = t.requested;
-        for (uint256 i; i < requested.length; ++i) {
-            Asset storage a = requested[i];
-            if (a.assetType == AssetType.Native) {
-                _payout(maker, a);
-            } else if (a.assetType == AssetType.ERC20) {
-                // forge-lint: disable-next-line(calls-loop)
-                IERC20(a.token).safeTransferFrom(msg.sender, maker, a.amount);
-            } else {
-                // forge-lint: disable-next-line(calls-loop)
-                IERC721(a.token).transferFrom(msg.sender, maker, a.id);
-            }
-        }
-        _payoutAll(t.offered, msg.sender);
+    /// @inheritdoc IChogSwapV2
+    function fillTraitTrade(uint256 tradeId, TraitFill[] calldata fills)
+        external
+        payable
+        nonReentrant
+    {
+        _fill(tradeId, fills);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -250,6 +233,11 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     }
 
     /// @inheritdoc IChogSwapV2
+    function traitSpec(uint256 tradeId) external view returns (string memory) {
+        return _traitSpecs[tradeId];
+    }
+
+    /// @inheritdoc IChogSwapV2
     function proposalCount(uint256 tradeId) external view returns (uint256) {
         return _proposals[tradeId].length;
     }
@@ -291,10 +279,15 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
 
     // ─────────────────────────────────────────────────────────────── Validation
 
-    /// @dev Checks size, field rules and duplicates. Returns the native amount on the side.
+    /// @dev Checks size, field rules and duplicates. `allowTrait` admits `ERC721Trait` assets (the
+    ///      requested side of a trait trade only). Returns the native amount on the side.
     // Reverting on the first bad asset is the point of this loop.
     // forge-lint: disable-next-item(require-revert-in-loop)
-    function _validateSide(Asset[] calldata assets) private view returns (uint256 native) {
+    function _validateSide(Asset[] calldata assets, bool allowTrait)
+        private
+        view
+        returns (uint256 native)
+    {
         uint256 n = assets.length;
         if (n == 0) revert EmptySide();
         if (n > MAX_ASSETS_PER_SIDE) revert TooManyAssets(n, MAX_ASSETS_PER_SIDE);
@@ -306,8 +299,14 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
                 native = a.amount;
             } else if (a.assetType == AssetType.ERC20) {
                 if (a.token.code.length == 0 || a.id != 0 || a.amount == 0) revert InvalidAsset(i);
-            } else {
+            } else if (a.assetType == AssetType.ERC721) {
                 if (a.token.code.length == 0 || a.amount != 1) revert InvalidAsset(i);
+            } else {
+                // A trait set is only ever something a taker can hand over.
+                if (
+                    !allowTrait || a.token.code.length == 0 || a.id == 0 || a.amount == 0
+                        || a.amount > MAX_ASSETS_PER_SIDE
+                ) revert InvalidAsset(i);
             }
             for (uint256 j; j < i; ++j) {
                 if (_same(assets[j], a)) revert DuplicateAsset(i);
@@ -345,6 +344,121 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
+
+    function _create(
+        Asset[] calldata offered,
+        Asset[] calldata requested,
+        address taker,
+        uint64 expiry,
+        string memory spec
+    ) private returns (uint256 tradeId) {
+        // Only `createTraitTrade` passes a spec (it rejects an empty one), and only it admits
+        // trait assets.
+        bool trait = bytes(spec).length != 0;
+        uint256 offeredNative = _validateSide(offered, false);
+        _validateSide(requested, trait);
+        if (trait && _countTrait(requested) == 0) revert NoTraitAsset();
+        _validateNoOverlap(offered, requested);
+        if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
+        // forge-lint: disable-next-line(block-timestamp)
+        if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
+
+        tradeId = _newTrade(offered, taker, expiry);
+        Asset[] storage stored = _trades[tradeId].requested;
+        for (uint256 i; i < requested.length; ++i) {
+            stored.push(requested[i]);
+        }
+
+        emit TradeCreated(tradeId, msg.sender, taker, offered, requested, expiry);
+        if (trait) {
+            _traitSpecs[tradeId] = spec;
+            emit TraitSpec(tradeId, spec);
+        }
+
+        _depositAll(offered);
+    }
+
+    function _fill(uint256 tradeId, TraitFill[] memory fills) private {
+        Trade storage t = _trades[tradeId];
+        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        // An open offer has no ask. Without this a caller would take the escrow for free.
+        if (t.requested.length == 0) revert OpenOfferNoFill(tradeId);
+        if (_isExpired(t)) revert TradeIsExpired(tradeId);
+        address maker = t.maker;
+        address taker = t.taker;
+        if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
+        if (msg.sender == maker) revert SelfFill(tradeId);
+        uint256 requestedNative = _nativeAmount(t.requested);
+        if (msg.value != requestedNative) revert WrongNativeAmount(requestedNative, msg.value);
+        // Every proof is checked before anything changes or moves.
+        _verifyTraitFills(tradeId, t.requested, fills);
+
+        t.status = Status.Filled;
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit TradeFilled(tradeId, maker, msg.sender);
+
+        // The taker's side goes straight to the maker. A failing transfer reverts the fill.
+        Asset[] storage requested = t.requested;
+        uint256 traitIndex = 0;
+        for (uint256 i; i < requested.length; ++i) {
+            Asset storage a = requested[i];
+            if (a.assetType == AssetType.Native) {
+                _payout(maker, a);
+            } else if (a.assetType == AssetType.ERC20) {
+                // forge-lint: disable-next-line(calls-loop)
+                IERC20(a.token).safeTransferFrom(msg.sender, maker, a.amount);
+            } else if (a.assetType == AssetType.ERC721) {
+                // forge-lint: disable-next-line(calls-loop)
+                IERC721(a.token).transferFrom(msg.sender, maker, a.id);
+            } else {
+                uint256[] memory ids = fills[traitIndex++].tokenIds;
+                for (uint256 k; k < ids.length; ++k) {
+                    // forge-lint: disable-next-line(calls-loop)
+                    IERC721(a.token).transferFrom(msg.sender, maker, ids[k]);
+                }
+            }
+        }
+        _payoutAll(t.offered, msg.sender);
+    }
+
+    /// @dev `fills[k]` must answer the k-th trait asset: `amount` distinct ids, each with a
+    ///      proof into the asset's Merkle root. Leaves are `keccak256(abi.encode(token, id))`
+    ///      and the tree is a sorted-pair tree. Owning the ids is proven later, by the transfer.
+    // forge-lint: disable-next-item(require-revert-in-loop)
+    function _verifyTraitFills(uint256 tradeId, Asset[] storage requested, TraitFill[] memory fills)
+        private
+        view
+    {
+        uint256 traitAssets = 0;
+        for (uint256 i; i < requested.length; ++i) {
+            Asset storage a = requested[i];
+            if (a.assetType != AssetType.ERC721Trait) continue;
+            if (fills.length == 0) revert TraitFillRequired(tradeId);
+            if (traitAssets >= fills.length) revert InvalidTraitFill(traitAssets);
+
+            TraitFill memory f = fills[traitAssets];
+            uint256 n = f.tokenIds.length;
+            if (n != a.amount || f.proofs.length != n) revert InvalidTraitFill(traitAssets);
+            for (uint256 k; k < n; ++k) {
+                uint256 id = f.tokenIds[k];
+                for (uint256 m; m < k; ++m) {
+                    if (f.tokenIds[m] == id) revert InvalidTraitFill(traitAssets);
+                }
+                bytes32 leaf = keccak256(abi.encode(a.token, id));
+                if (!MerkleProof.verify(f.proofs[k], bytes32(a.id), leaf)) {
+                    revert InvalidTraitProof(traitAssets, id);
+                }
+            }
+            ++traitAssets;
+        }
+        if (traitAssets != fills.length) revert InvalidTraitFill(traitAssets);
+    }
+
+    function _countTrait(Asset[] calldata assets) private pure returns (uint256 n) {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == AssetType.ERC721Trait) ++n;
+        }
+    }
 
     /// @dev Stores the trade header and the offered side. The caller adds `requested`, emits the
     ///      creation event and deposits, in that order.

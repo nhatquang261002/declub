@@ -2,7 +2,8 @@ import { isAddress, zeroAddress, type Address } from "viem";
 
 /**
  * The three ways to start a deal. "open" (makers list assets, takers send offers) and, when
- * ChogSwapV2 is configured, "exact" settle on V2. "trait" only exists on the Chog contract (ADR 0006).
+ * ChogSwapV2 is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
+ * and "trait" fall back to the Chog contract.
  */
 export type DealKind = "open" | "exact" | "trait";
 export type Step = 1 | 2 | 3;

@@ -474,6 +474,13 @@ export const chogSwapV2Abi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'MAX_SPEC_BYTES',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
       { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
@@ -588,8 +595,67 @@ export const chogSwapV2Abi = [
   },
   {
     type: 'function',
+    inputs: [
+      {
+        name: 'offered',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      {
+        name: 'requested',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      { name: 'taker', internalType: 'address', type: 'address' },
+      { name: 'expiry', internalType: 'uint64', type: 'uint64' },
+      { name: 'spec', internalType: 'string', type: 'string' },
+    ],
+    name: 'createTraitTrade',
+    outputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'fillTrade',
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'fills',
+        internalType: 'struct IChogSwapV2.TraitFill[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'tokenIds', internalType: 'uint256[]', type: 'uint256[]' },
+          { name: 'proofs', internalType: 'bytes32[][]', type: 'bytes32[][]' },
+        ],
+      },
+    ],
+    name: 'fillTraitTrade',
     outputs: [],
     stateMutability: 'payable',
   },
@@ -792,6 +858,13 @@ export const chogSwapV2Abi = [
     inputs: [],
     name: 'tradeCount',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'traitSpec',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
     stateMutability: 'view',
   },
   {
@@ -1112,6 +1185,28 @@ export const chogSwapV2Abi = [
     ],
     name: 'TradeReclaimed',
   },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      { name: 'spec', internalType: 'string', type: 'string', indexed: false },
+    ],
+    name: 'TraitSpec',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'length', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'BadTraitSpec',
+  },
   { type: 'error', inputs: [], name: 'ClaimFailed' },
   {
     type: 'error',
@@ -1131,12 +1226,26 @@ export const chogSwapV2Abi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'fillIndex', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidTraitFill',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'fillIndex', internalType: 'uint256', type: 'uint256' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'InvalidTraitProof',
+  },
+  {
+    type: 'error',
     inputs: [
       { name: 'token', internalType: 'address', type: 'address' },
       { name: 'id', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'NftNotReceived',
   },
+  { type: 'error', inputs: [], name: 'NoTraitAsset' },
   {
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
@@ -1228,6 +1337,11 @@ export const chogSwapV2Abi = [
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'TradeNotOpen',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'TraitFillRequired',
   },
   {
     type: 'error',

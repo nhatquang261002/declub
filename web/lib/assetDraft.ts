@@ -1,13 +1,13 @@
 import { isAddress, parseUnits, type Address } from "viem";
 import { MAX_TOKENS_PER_SIDE } from "./config";
-import { erc20Asset, nativeAsset, nftAsset, sameAsset, type Asset, type AssetKind } from "./assets";
+import { erc20Asset, nativeAsset, nftAsset, sameAsset, type Asset, type PlainKind } from "./assets";
 import { parseMon } from "./format";
 
 /** One row of the create form, as typed. `value` is an amount (MON, token) or a token id (NFT). */
-export type DraftRow = { key: string; kind: AssetKind; token: string; value: string };
+export type DraftRow = { key: string; kind: PlainKind; token: string; value: string };
 
 let counter = 0;
-export const newRow = (kind: AssetKind, token = "", value = ""): DraftRow => ({
+export const newRow = (kind: PlainKind, token = "", value = ""): DraftRow => ({
   key: `row-${++counter}`,
   kind,
   token,
@@ -51,11 +51,12 @@ export type SideResult = { assets: Asset[]; errors: string[] };
 export function draftToAssets(
   rows: readonly DraftRow[],
   decimalsOf: (token: Address) => number | undefined,
+  { optional = false }: { optional?: boolean } = {},
 ): SideResult {
   const assets: Asset[] = [];
   const errors: string[] = [];
 
-  if (rows.length === 0) errors.push("Add at least one asset.");
+  if (rows.length === 0 && !optional) errors.push("Add at least one asset.");
   if (rows.length > MAX_TOKENS_PER_SIDE) errors.push(`Up to ${MAX_TOKENS_PER_SIDE} assets per side.`);
 
   rows.forEach((row, i) => {

@@ -222,7 +222,7 @@ Replace `offeredIds/offeredMon` with `Asset[] offered` and do the same for the r
 Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IChogSwapV2.sol`](../contracts/src/interfaces/IChogSwapV2.sol). Implementation: [`ChogSwapV2.sol`](../contracts/src/ChogSwapV2.sol). It's a separate contract with no constructor arguments, so it works with any token and v1 is untouched.
 
 ```solidity
-enum AssetType { Native, ERC20, ERC721 }
+enum AssetType { Native, ERC20, ERC721, ERC721Trait }
 struct Asset { AssetType assetType; address token; uint256 id; uint256 amount; }
 struct Trade { address maker; uint64 expiry; Status status; address taker; Asset[] offered; Asset[] requested; }
 ```
@@ -233,10 +233,12 @@ struct Trade { address maker; uint64 expiry; Status status; address taker; Asset
 |---|---|
 | `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` (or 0). |
 | `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested`. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker. |
+| `createTraitTrade(offered, requested, taker, expiry, spec) payable` | `createTrade` for a `requested` side with `ERC721Trait` assets (a Merkle root of allowed ids and a count). `spec` (1–1024 bytes) describes them for clients. [ADR 0006](adr/0006-trait-requests-in-v2.md). |
+| `fillTraitTrade(id, fills) payable` | `fillTrade` for a trade with trait assets: `fills[k]` is `{tokenIds, proofs}` for the k-th trait asset. `fillTrade` reverts with `TraitFillRequired` on such a trade. |
 | `cancelTrade(id)` | Maker, while open. Refunds the offered side to the maker. |
 | `reclaimExpired(id)` | Anyone, once expired. Refunds to the maker. |
 | `claim(assetType, token, id)` | Collect a payout that was rejected earlier. |
-| `getTrade`, `isExpired`, `tradeCount`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE` | Views. |
+| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE`, `MAX_SPEC_BYTES` | Views. |
 
 ### Create-time checks
 
@@ -247,12 +249,14 @@ struct Trade { address maker; uint64 expiry; Status status; address taker; Asset
 | field rules per type (see the ADR): native has no token/id, ERC-20 has a contract and no id, ERC-721 has a contract and amount 1, amounts > 0 | `InvalidAsset(index)` |
 | same `(type, token, id)` twice on a side | `DuplicateAsset(index)` |
 | same `(type, token, id)` on both sides | `SameAssetBothSides(i, j)` |
+| trait asset on the offered side, in a proposal, or via `createTrade`; zero root, zero or > 10 `amount`, or non-contract token | `InvalidAsset(index)` |
+| `createTraitTrade` without a trait asset / with an empty or oversized spec | `NoTraitAsset` / `BadTraitSpec(length, max)` |
 | `msg.value` ≠ native amount offered | `WrongNativeAmount(expected, sent)` |
 | `expiry` in the past | `ExpiryInPast` |
 | ERC-20 deposit delivered a different amount | `UnsupportedToken(token)` |
 | NFT not owned by the escrow after the transfer | `NftNotReceived(token, id)` |
 
-The fill, cancel and reclaim checks are the same as v1's (`TradeNotOpen`, `TradeIsExpired`, `NotAllowedTaker`, `SelfFill`, `NotMaker`, `TradeNotExpired`), with `WrongNativeAmount` in place of `WrongMonAmount`. `claim` reverts with `NothingToClaim` or, if the transfer fails again, `ClaimFailed` (the credit stays).
+The fill, cancel and reclaim checks are the same as v1's (`TradeNotOpen`, `TradeIsExpired`, `NotAllowedTaker`, `SelfFill`, `NotMaker`, `TradeNotExpired`), with `WrongNativeAmount` in place of `WrongMonAmount`. `fillTraitTrade` adds `InvalidTraitFill(fillIndex)` (wrong number of fills, ids or proofs, or a repeated id) and `InvalidTraitProof(fillIndex, tokenId)`; all proofs are checked before anything moves. `claim` reverts with `NothingToClaim` or, if the transfer fails again, `ClaimFailed` (the credit stays).
 
 ### Payouts
 

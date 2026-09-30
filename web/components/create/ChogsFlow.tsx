@@ -17,7 +17,7 @@ import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from
 import { formatMon, parseIds, parseMon } from "@/lib/format";
 import { buildMerkleSet } from "@/lib/merkle";
 import { idsWithTrait, traitOptions } from "@/lib/traitRequests";
-import { NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { ConfirmCard, NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
 import { PREVIEW_CATALOG, PREVIEW_IDS } from "./previewData";
 import { TraitPicker } from "./TraitPicker";
 
@@ -208,8 +208,16 @@ export function ChogsFlow({ kind, step, onStep, terms, onTerms, preview }: Props
         </ReviewCard>
       </div>
       <ReviewTerms kindLabel={isTrait ? "Request by trait" : "Exact Chogs"} terms={terms} whoLabel="Who can accept" />
-      <div className="card space-y-3 p-4">
-        <p className="text-sm text-muted">On Deal locks your offered assets in escrow. The requested side is transferred only when someone accepts.</p>
+      <ConfirmCard
+        onBack={() => onStep(2)}
+        note="On Deal locks your offered assets in escrow. The requested side is transferred only when someone accepts."
+        status={
+          <>
+            <TxStatus state={approval.state} success="On Deal is approved." />
+            <TxStatus state={tx.state} success="Deal created." />
+          </>
+        }
+      >
         {needsApproval ? (
           <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(approveCall)}>
             Approve your Chogs
@@ -219,10 +227,7 @@ export function ChogsFlow({ kind, step, onStep, terms, onTerms, preview }: Props
             Create deal
           </TxButton>
         )}
-        <TxStatus state={approval.state} success="On Deal is approved." />
-        <TxStatus state={tx.state} success="Deal created." />
-      </div>
-      <StepNav onBack={() => onStep(2)} />
+      </ConfirmCard>
     </div>
   );
 }

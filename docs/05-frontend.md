@@ -25,6 +25,8 @@ web/
 │   ├── ConnectButton.tsx       ✓ injected wallets (EIP-6963 list), wrong-network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb · ChogCard · ChogPicker
 │   ├── DealParts.tsx          ✓ StatusBadge · MonPill · DealSide · DealCard · DealGrid
+│   ├── Tabs.tsx                ✓ the one tab bar (`tabbar` / `tab` styles; Pagination reuses them)
+│   ├── Select.tsx              ✓ the one dropdown: accessible listbox, replaces native <select>
 │   ├── Tx.tsx                  ✓ TxButton (shows the tx stage) · TxStatus (error / explorer link)
 │   ├── Page.tsx                ✓ PageHeader · RequireWallet · EmptyState
 │   ├── ChogArt.tsx             ✓ Angel/Devil swap illustration
@@ -142,7 +144,7 @@ Choices worth knowing:
 - **Held payouts:** the deal page reads `claimable` for every asset in the deal and offers a Claim button for what the connected wallet is owed.
 - **Lists:** Deals and History show a **Chogs / Multi-asset** switch (only when V2 is configured). Each version has its own book: `/deals` renders `DealsV1` or `DealsV2`, and History reads whichever `useDeals` / `useDealsV2` matches. The switch is page state, not a URL param, and it defaults to Chogs.
 - **V2 cards:** `DealCardV2` reuses `DealCardFrame` (the chrome `DealCard` also uses) and fills the two sides with `AssetSide`: Chog art for the Chog collection, a plain tile for any other NFT, a token tile with the on-chain symbol, and the MON pill.
-- **V2 search:** `lib/dealFiltersV2.ts` matches deal id, NFT id, maker / taker, token address and on-chain symbol, with the same MON filter and sort as v1. There are no trait lookups for V2 yet (traits need a V2 request type).
+- **V2 search:** `lib/dealFiltersV2.ts` matches deal id, NFT id, maker / taker, token address and on-chain symbol, with the same MON filter and sort as v1. V2 search doesn't look inside trait requests yet: their traits are in the deal's spec, which only the deal page reads.
 - **Fills are per contract:** `useLocalFills(account, contract)` keys the record by swap contract, so a v1 deal #3 and a V2 deal #3 don't collide. The V2 detail page records a fill after Accept confirms.
 - **Open offers ([ADR 0007](adr/0007-open-offers.md)):** a deal with an empty ask (`isOpenOffer`). The card's "wants" side reads *Open to offers*. On the detail page the right-hand panel shows the maker's note as plain text (never linked or rendered as markup) with a "not verified" line, and below the actions come the offers, newest first. The maker sees **Accept & swap** and **Reject** on each active one; whoever made an offer sees **Withdraw my offer** while it is active, even after the deal settled or was cancelled. Anyone else who is allowed to (not the maker, and the private-offer wallet if one is set) gets the **Send offer** form: an `AssetEditor` whose assets are locked in escrow, with the same one-at-a-time approvals. Closed offers sit in a collapsed list. The Accept button and the direct `fillTrade` path are never shown together: `canFill` is false for an open offer.
 - **Offers and History:** a wallet whose offer was accepted is the taker, but nothing on the deal says so without reading the offers. The detail page records it like a fill (`useLocalFills`) when it sees an accepted offer from the connected wallet, so History picks it up after that visit.
@@ -229,13 +231,21 @@ The header has no Create tab, but a Create button sits beside the wallet. `/crea
 2. **Your assets.** What you give, plus the optional "only this wallet" address and the expiry (1h / 24h / 7d / never, default 24h).
 3. **Confirm.** Both sides, the terms, then the approval and Create buttons.
 
-The kinds don't all live on one contract, so the wizard picks one per kind ([ADR 0006](adr/0006-trait-requests-in-v2.md): trait requests are still V1-only):
+The wizard picks a contract per kind. With `ChogSwapV2` configured, all three kinds use it; without it, exact and trait requests fall back to the Chog contract ([ADR 0006](adr/0006-trait-requests-in-v2.md)):
 
 | Kind | Contract | Assets | Component |
 |---|---|---|---|
 | Open offer | `ChogSwapV2` | any | `MultiFlow` |
 | Exact request | `ChogSwapV2`, or the Chog contract when V2 isn't configured | any, or Chogs + MON | `MultiFlow` / `ChogsFlow` |
-| By trait | Chog contract | Chogs + MON | `ChogsFlow` |
+| By trait | `ChogSwapV2`, or the Chog contract when V2 isn't configured | any collection with readable traits (+ optional exact assets), or Chogs + MON | `MultiFlow` / `ChogsFlow` |
+
+### Trait requests on V2
+
+`components/create/TraitRequests.tsx` (used by `MultiFlow`, kind `trait`). The maker pastes a collection address (or taps Chog). `hooks/useCollectionTraits.ts` polls `/api/collection-traits`, which scans the collection once on the server (`lib/server/collectionScan.ts`); while it runs the row shows progress, and if the collection can't be read (not an ERC-721, no `totalSupply`, no metadata, over 10,000 tokens) it says why and the request can't continue. When it's ready, traits are grouped by type; the maker picks up to 5 values, and with two or more chooses **any one of them** (OR) or **all of them** (AND), and how many NFTs the taker must send. The count that matches today is shown live. Several trait requests, and ordinary assets ("Also request"), can sit on one deal (10 in all).
+
+`lib/traitSpec.ts` holds the pure logic (matching, spec encoding, validation), `lib/traitDraft.ts` the form state. The Merkle root, ids and proofs are always derived from the scan, never typed. The create call is `createTraitTrade(..., spec)`, with the spec JSON stored on-chain.
+
+On the deal page (`app/v2/deal/[id]`), `hooks/useTraitFill.ts` rebuilds each set from the published spec and only offers a fill when its root equals the deal's ("Checked" / "doesn't match" under each request). `components/TraitFillPanel.tsx` lists the taker's NFTs that match (`hooks/useOwnedInSet.ts`: their token list if the collection is enumerable, otherwise `ownerOf` over the set), they choose the required number, and `fillTraitTrade` is called with the proofs. A deal with no readable spec can't be accepted from the app.
 
 Files: `app/create/page.tsx` (stepper, kind picker, shared `Terms`), `components/create/` (`Stepper`, `KindPicker`, `MultiFlow`, `ChogsFlow`, `TraitPicker`, `parts`), `lib/createFlow.ts` (kinds, expiries, taker check). Each flow owns its own drafts and renders all three steps.
 

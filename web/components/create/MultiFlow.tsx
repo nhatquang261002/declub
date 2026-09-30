@@ -6,20 +6,26 @@ import { parseEventLogs, type Address } from "viem";
 import { useConnection } from "wagmi";
 import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
+import { TraitClauseSummary } from "@/components/TraitClause";
 import { TxButton, TxStatus } from "@/components/Tx";
+import { statusOf, useCollectionCatalogs } from "@/hooks/useCollectionTraits";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
-import { toRawAsset } from "@/lib/assets";
-import { MAX_NOTE_BYTES } from "@/lib/config";
+import { toRawAsset, traitAsset } from "@/lib/assets";
+import { MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
 import { swapV2, swapV2Abi } from "@/lib/contracts";
 import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from "@/lib/createFlow";
 import { noteBytes } from "@/lib/dealsV2";
-import { NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { draftClause, newTraitDraft, resolveDrafts, type TraitDraft } from "@/lib/traitDraft";
+import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
+import { ConfirmCard, NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { PREVIEW_TRAIT_CATALOG } from "./previewData";
+import { TraitRequests } from "./TraitRequests";
 
 type Props = {
-  kind: "open" | "exact";
+  kind: "open" | "exact" | "trait";
   step: Step;
   onStep: (step: Step) => void;
   terms: Terms;
@@ -28,7 +34,8 @@ type Props = {
 };
 
 /**
- * Open offers and exact requests on ChogSwapV2: any mix of MON, ERC-20s and NFTs on each side.
+ * Open offers, exact requests and trait requests on ChogSwapV2: any mix of MON, ERC-20s and NFTs
+ * on each side (ADR 0005, 0006, 0007).
  * Owns the asset rows, so going back a step or switching between the two kinds keeps them.
  */
 export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props) {
@@ -40,24 +47,68 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   const [offeredRows, setOfferedRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
   const [requestedRows, setRequestedRows] = useState<DraftRow[]>(() => [newRow("native")]);
   const [note, setNote] = useState("");
+  // Trait requests: a trait draft or two, plus optional exact assets to ask for alongside them.
+  const [traitDrafts, setTraitDrafts] = useState<TraitDraft[]>(() => [newTraitDraft()]);
+  const [extraRows, setExtraRows] = useState<DraftRow[]>([]);
 
   // Decimals and symbols come from the token contracts, for both sides at once.
-  const tokens = useMemo(() => draftTokens([...offeredRows, ...requestedRows]), [offeredRows, requestedRows]);
+  const isTrait = kind === "trait";
+  const tokens = useMemo(
+    () => draftTokens([...offeredRows, ...(isTrait ? extraRows : requestedRows)]),
+    [offeredRows, requestedRows, extraRows, isTrait],
+  );
   const { info } = useTokenInfo(tokens);
   const decimalsOf = (token: Address) => info.get(token.toLowerCase())?.decimals;
 
   const isOpen = kind === "open";
   const offered = draftToAssets(offeredRows, decimalsOf);
-  const requested = draftToAssets(requestedRows, decimalsOf);
+  const plain = draftToAssets(isTrait ? extraRows : requestedRows, decimalsOf, { optional: isTrait });
   const bytes = noteBytes(note);
+
+  // Trait requests: each draft's collection is scanned server-side (once), then its set is
+  // rebuilt here so the root, the count and the proofs are never typed by anyone.
+  const statuses = useCollectionCatalogs(
+    isTrait ? traitDrafts.map((d) => d.collection) : [],
+    preview ? PREVIEW_TRAIT_CATALOG : undefined,
+  );
+  const resolved = useMemo(
+    () => resolveDrafts(traitDrafts, (collection) => statusOf(statuses, collection)),
+    [traitDrafts, statuses],
+  );
+  const traitError = ((): string | null => {
+    if (!isTrait) return null;
+    for (const [i, draft] of traitDrafts.entries()) {
+      const status = statusOf(statuses, draft.collection);
+      const label = traitDrafts.length > 1 ? `Trait request ${i + 1}: ` : "";
+      if (!draftClause(draft)) return `${label}enter the collection address.`;
+      if (status.state === "unsupported") return `${label}${status.reason}`;
+      if (status.state !== "ready") return `${label}reading the collection's traits…`;
+    }
+    const clauses = traitDrafts.map((d) => draftClause(d)!);
+    const ready = resolved.filter((r): r is NonNullable<typeof r> => r !== null);
+    return clausesError(clauses, ready) ?? (clauses.length + plain.assets.length > MAX_TOKENS_PER_SIDE ? `Up to ${MAX_TOKENS_PER_SIDE} requests and assets on this side.` : null);
+  })();
+  const clauses = useMemo<TraitClause[]>(() => traitDrafts.flatMap((d) => draftClause(d) ?? []), [traitDrafts]);
+  // What the contract is asked for: trait assets first (the spec lists them in this order), then the rest.
+  const requested = {
+    errors: plain.errors,
+    assets: [
+      ...(isTrait
+        ? resolved.flatMap((r) => (r && r.set.count > 0 ? [traitAsset(r.clause.token, r.set.root, r.clause.amount)] : []))
+        : []),
+      ...plain.assets,
+    ],
+  };
 
   // What blocks "Continue" on step 1 (the ask) and step 2 (the offer and terms).
   const askError = isOpen
     ? bytes > MAX_NOTE_BYTES ? `The note is ${bytes} bytes; the limit is ${MAX_NOTE_BYTES}.` : null
-    : (requested.errors[0] ?? null);
+    : isTrait
+      ? (traitError ?? plain.errors[0] ?? null)
+      : (requested.errors[0] ?? null);
   const offerError =
     offered.errors[0] ??
-    (isOpen ? null : overlapError(offered.assets, requested.assets)) ??
+    (isOpen ? null : overlapError(offered.assets, plain.assets)) ??
     takerError(terms.taker, address);
 
   const { steps } = useAssetApprovals(address, offered.assets, info);
@@ -75,7 +126,14 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
           args: [offered.assets.map(toRawAsset), to, expiry, note.trim()],
           value: native,
         })
-      : await tx.run({
+      : isTrait
+        ? await tx.run({
+            ...swapV2,
+            functionName: "createTraitTrade",
+            args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry, encodeSpec(clauses)],
+            value: native,
+          })
+        : await tx.run({
           ...swapV2,
           functionName: "createTrade",
           args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry],
@@ -90,7 +148,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
     return (
       <div className="space-y-6">
         <StepHeading
-          title={isOpen ? "What are you looking for?" : "What do you want in return?"}
+          title={isOpen ? "What are you looking for?" : isTrait ? "Which traits do you want?" : "What do you want in return?"}
           blurb={isOpen ? "Describe it in a few words. Offers are sent to you on the deal page." : undefined}
         />
         {isOpen ? (
@@ -112,6 +170,23 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
               {bytes} / {MAX_NOTE_BYTES}
             </p>
           </section>
+        ) : isTrait ? (
+          <>
+            <TraitRequests
+              drafts={traitDrafts}
+              onChange={setTraitDrafts}
+              statuses={statuses}
+              resolved={resolved}
+              room={MAX_TOKENS_PER_SIDE - traitDrafts.length - plain.assets.length}
+            />
+            <AssetEditor
+              title="Also request (optional)"
+              hint="MON, tokens or exact NFTs the taker sends along with the trait request."
+              rows={extraRows}
+              onChange={setExtraRows}
+              info={info}
+            />
+          </>
         ) : (
           <AssetEditor
             title="You request"
@@ -160,20 +235,29 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
           </ReviewCard>
         ) : (
           <ReviewCard title="You get" note="Sent straight to you when someone accepts.">
-            <AssetList assets={requested.assets} info={info} />
+            <div className="space-y-2">
+              {isTrait &&
+                resolved.map((r) => r && <TraitClauseSummary key={r.clause.token + r.set.root} clause={r.clause} matches={r.ids.length} />)}
+              {plain.assets.length > 0 && <AssetList assets={plain.assets} info={info} />}
+            </div>
           </ReviewCard>
         )}
       </div>
       <ReviewTerms
-        kindLabel={isOpen ? "Open offer" : "Exact assets"}
+        kindLabel={isOpen ? "Open offer" : isTrait ? "Request by trait" : "Exact assets"}
         terms={terms}
         whoLabel={isOpen ? "Who can send offers" : "Who can accept"}
       />
-      <div className="card space-y-3 p-4">
-        <p className="text-sm text-muted">
-          On Deal locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own,
-          aren&apos;t supported and the deal will be refused.
-        </p>
+      <ConfirmCard
+        onBack={() => onStep(2)}
+        note="On Deal locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
+        status={
+          <>
+            <TxStatus state={approval.state} success="Approved." />
+            <TxStatus state={tx.state} success="Deal created." />
+          </>
+        }
+      >
         {nextApproval ? (
           <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(nextApproval.call)}>
             {nextApproval.label}
@@ -184,10 +268,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
             {isOpen ? "Post open offer" : "Create deal"}
           </TxButton>
         )}
-        <TxStatus state={approval.state} success="Approved." />
-        <TxStatus state={tx.state} success="Deal created." />
-      </div>
-      <StepNav onBack={() => onStep(2)} />
+      </ConfirmCard>
     </div>
   );
 }

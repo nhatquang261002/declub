@@ -64,7 +64,7 @@ export function AssetEditor({ title, hint, rows, onChange, info }: Props) {
                 />
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-danger btn-sm"
                   aria-label={`Remove row ${i + 1}`}
                   onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
                 >
@@ -82,21 +82,21 @@ export function AssetEditor({ title, hint, rows, onChange, info }: Props) {
       </ul>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-secondary" disabled={full || hasNative} onClick={() => onChange([...rows, newRow("native")])}>
+        <button type="button" className="btn-secondary btn-sm" disabled={full || hasNative} onClick={() => onChange([...rows, newRow("native")])}>
           + MON
         </button>
-        <button type="button" className="btn-secondary" disabled={full} onClick={() => onChange([...rows, newRow("erc20")])}>
+        <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc20")])}>
           + Token
         </button>
-        <button type="button" className="btn-secondary" disabled={full} onClick={() => onChange([...rows, newRow("erc721")])}>
+        <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc721")])}>
           + NFT
         </button>
         {MOCK_ERC20_ADDRESS && (
-          <button type="button" className="btn-secondary" disabled={full} onClick={() => onChange([...rows, newRow("erc20", MOCK_ERC20_ADDRESS)])}>
+          <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc20", MOCK_ERC20_ADDRESS)])}>
             + Test token
           </button>
         )}
-        <button type="button" className="btn-secondary" disabled={full} onClick={() => onChange([...rows, newRow("erc721", CHOG_ADDRESS)])}>
+        <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc721", CHOG_ADDRESS)])}>
           + Chog
         </button>
       </div>
