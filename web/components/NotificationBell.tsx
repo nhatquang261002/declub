@@ -82,7 +82,7 @@ export function NotificationBell() {
 
           {shown.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-white/60">
-              You&apos;re all caught up. Direct offers, accepted trades and expiries show up here.
+              You&apos;re all caught up. Direct offers, accepted deals and expiries show up here.
             </p>
           ) : (
             <ul className="max-h-96 overflow-y-auto">

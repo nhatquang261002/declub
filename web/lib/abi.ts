@@ -467,6 +467,23 @@ export const chogSwapV2Abi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'MAX_NOTE_BYTES',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'acceptProposal',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'cancelTrade',
     outputs: [],
@@ -521,6 +538,32 @@ export const chogSwapV2Abi = [
           { name: 'amount', internalType: 'uint256', type: 'uint256' },
         ],
       },
+      { name: 'taker', internalType: 'address', type: 'address' },
+      { name: 'expiry', internalType: 'uint64', type: 'uint64' },
+      { name: 'note', internalType: 'string', type: 'string' },
+    ],
+    name: 'createOpenOffer',
+    outputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'offered',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
       {
         name: 'requested',
         internalType: 'struct IChogSwapV2.Asset[]',
@@ -549,6 +592,85 @@ export const chogSwapV2Abi = [
     name: 'fillTrade',
     outputs: [],
     stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getProposal',
+    outputs: [
+      {
+        name: '',
+        internalType: 'struct IChogSwapV2.Proposal',
+        type: 'tuple',
+        components: [
+          { name: 'proposer', internalType: 'address', type: 'address' },
+          {
+            name: 'status',
+            internalType: 'enum IChogSwapV2.ProposalStatus',
+            type: 'uint8',
+          },
+          {
+            name: 'assets',
+            internalType: 'struct IChogSwapV2.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapV2.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'offset', internalType: 'uint256', type: 'uint256' },
+      { name: 'limit', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'getProposals',
+    outputs: [
+      {
+        name: 'page',
+        internalType: 'struct IChogSwapV2.Proposal[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'proposer', internalType: 'address', type: 'address' },
+          {
+            name: 'status',
+            internalType: 'enum IChogSwapV2.ProposalStatus',
+            type: 'uint8',
+          },
+          {
+            name: 'assets',
+            internalType: 'struct IChogSwapV2.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapV2.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -613,7 +735,55 @@ export const chogSwapV2Abi = [
   {
     type: 'function',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'offerNote',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'proposalCount',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'assets',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+    ],
+    name: 'propose',
+    outputs: [{ name: 'proposalId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'reclaimExpired',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'rejectProposal',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -623,6 +793,16 @@ export const chogSwapV2Abi = [
     name: 'tradeCount',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'withdrawProposal',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'event',
@@ -687,6 +867,118 @@ export const chogSwapV2Abi = [
       },
     ],
     name: 'Claimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      { name: 'note', internalType: 'string', type: 'string', indexed: false },
+    ],
+    name: 'OfferNote',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'ProposalAccepted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'proposer',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'assets',
+        internalType: 'struct IChogSwapV2.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IChogSwapV2.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+        indexed: false,
+      },
+    ],
+    name: 'ProposalCreated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'ProposalRejected',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'proposalId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'ProposalWithdrawn',
   },
   {
     type: 'event',
@@ -855,7 +1147,41 @@ export const chogSwapV2Abi = [
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'NotMaker',
   },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'NotOpenOffer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'NotProposer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'length', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'NoteTooLong',
+  },
   { type: 'error', inputs: [], name: 'NothingToClaim' },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'OpenOfferNoFill',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ProposalNotActive',
+  },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   {
     type: 'error',
@@ -874,6 +1200,11 @@ export const chogSwapV2Abi = [
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'SelfFill',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
+    name: 'SelfPropose',
   },
   {
     type: 'error',
@@ -897,6 +1228,14 @@ export const chogSwapV2Abi = [
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'TradeNotOpen',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
+      { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'UnknownProposal',
   },
   {
     type: 'error',

@@ -1,85 +1,121 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
 import { AssetList } from "@/components/AssetList";
 import { EmptyState, PageHeader } from "@/components/Page";
-import { StatusBadge } from "@/components/TradeParts";
+import { OfferNote, ProposalForm, ProposalList } from "@/components/Proposals";
+import { StatusBadge } from "@/components/DealParts";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
+import { useProposalsV2 } from "@/hooks/useProposalsV2";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
-import { useTradeV2 } from "@/hooks/useTradeV2";
+import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
 import { formatDate } from "@/lib/format";
-import { displayStatus, sameAddress } from "@/lib/trades";
+import { isOpenOffer } from "@/lib/dealsV2";
+import { displayStatus, sameAddress } from "@/lib/deals";
 
-export default function TradeV2Page() {
+export default function DealV2Page() {
   const params = useParams<{ id: string }>();
-  if (!swapV2) return <EmptyState>Multi-asset trades aren&apos;t enabled on this deployment yet.</EmptyState>;
-  if (!/^\d+$/.test(params.id)) return <EmptyState>Invalid trade id.</EmptyState>;
-  return <TradeDetailV2 id={BigInt(params.id)} />;
+  if (!swapV2) return <EmptyState>Multi-asset deals aren&apos;t enabled on this deployment yet.</EmptyState>;
+  if (!/^\d+$/.test(params.id)) return <EmptyState>Invalid deal id.</EmptyState>;
+  return <DealDetailV2 id={BigInt(params.id)} />;
 }
 
-function TradeDetailV2({ id }: { id: bigint }) {
+function DealDetailV2({ id }: { id: bigint }) {
   const { address } = useConnection();
-  const { trade, isLoading } = useTradeV2(id);
+  const { deal, note, isLoading } = useDealV2(id);
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
-  // History can't see who filled a public trade without an indexer, so remember this browser's fills.
+  // History can't see who filled a public deal without an indexer, so remember this browser's fills.
   const { record } = useLocalFills(address, swapV2!.address);
 
-  const assets = useMemo(() => [...(trade?.offered ?? []), ...(trade?.requested ?? [])], [trade]);
+  // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
+  const openOffer = !!deal && isOpenOffer(deal);
+  const { proposals, total, hasMore, loadMore } = useProposalsV2(id, openOffer);
+
+  const assets = useMemo(
+    () => [...(deal?.offered ?? []), ...(deal?.requested ?? []), ...proposals.flatMap((p) => p.assets)],
+    [deal, proposals],
+  );
   const tokens = useMemo(() => erc20Tokens(assets), [assets]);
   const { info } = useTokenInfo(tokens);
 
-  const status = trade ? displayStatus(trade, now) : "open";
-  const isMaker = sameAddress(trade?.maker, address);
-  const allowed = !!trade && !isMaker && (!trade.taker || sameAddress(trade.taker, address));
-  const canFill = status === "open" && allowed && !!address;
+  const status = deal ? displayStatus(deal, now) : "open";
+  const isMaker = sameAddress(deal?.maker, address);
+  const allowed = !!deal && !isMaker && (!deal.taker || sameAddress(deal.taker, address));
+  const canFill = status === "open" && allowed && !!address && !openOffer;
+  const canPropose = status === "open" && allowed && !!address && openOffer;
+
+  // The wallet whose offer was accepted is the taker. Remember it, like a fill, for History.
+  const acceptedMine = proposals.some((p) => p.status === "accepted" && sameAddress(p.proposer, address));
+  useEffect(() => {
+    if (acceptedMine) record(id);
+  }, [acceptedMine, record, id]);
 
   // What the taker must approve before filling. Only asked for once they could actually fill.
-  const { steps } = useAssetApprovals(canFill ? address : undefined, trade?.requested ?? [], info);
+  const { steps } = useAssetApprovals(canFill ? address : undefined, deal?.requested ?? [], info);
 
-  const credits = useCredits(address, assets);
+  // A rejected payout can come from the deal itself, or from the offer that settled it or that
+  // this wallet made. Reading claimable() for every other wallet's offers would be wasted calls.
+  const creditAssets = useMemo(
+    () => [
+      ...(deal?.offered ?? []),
+      ...(deal?.requested ?? []),
+      ...proposals
+        .filter((p) => p.status === "accepted" || sameAddress(p.proposer, address))
+        .flatMap((p) => p.assets),
+    ],
+    [deal, proposals, address],
+  );
+  const credits = useCredits(address, creditAssets);
 
-  if (isLoading) return <EmptyState>Loading trade…</EmptyState>;
-  if (!trade) return <EmptyState>This trade does not exist.</EmptyState>;
+  if (isLoading) return <EmptyState>Loading deal…</EmptyState>;
+  if (!deal) return <EmptyState>This deal does not exist.</EmptyState>;
 
-  const requestedNative = trade.requested.find((a) => a.kind === "native")?.amount ?? 0n;
+  const requestedNative = deal.requested.find((a) => a.kind === "native")?.amount ?? 0n;
 
   return (
     <>
-      <PageHeader title={`Trade #${id.toString()}`}>
+      <PageHeader title={`Deal #${id.toString()}`}>
         <StatusBadge status={status} />
       </PageHeader>
       <div className="space-y-6">
         <div className="card grid gap-6 p-5 md:grid-cols-2">
           <div>
             <div className="label">Maker gives</div>
-            <AssetList assets={trade.offered} info={info} />
+            <AssetList assets={deal.offered} info={info} />
           </div>
-          <div>
-            <div className="label">Taker gives</div>
-            <AssetList assets={trade.requested} info={info} />
-          </div>
-          <div className="text-sm text-muted">Created by <span className="font-mono">{trade.maker}</span></div>
+          {openOffer ? (
+            <div className="space-y-2">
+              <div className="label">Open to offers</div>
+              <OfferNote note={note} />
+            </div>
+          ) : (
+            <div>
+              <div className="label">Taker gives</div>
+              <AssetList assets={deal.requested} info={info} />
+            </div>
+          )}
+          <div className="text-sm text-muted">Created by <span className="font-mono">{deal.maker}</span></div>
           <div className="text-sm text-muted">
-            {trade.expiry === 0n ? "No expiry" : `Expires ${formatDate(trade.expiry)}`}
-            {trade.taker && <> · private offer for <span className="font-mono">{trade.taker}</span></>}
+            {deal.expiry === 0n ? "No expiry" : `Expires ${formatDate(deal.expiry)}`}
+            {deal.taker && <> · private offer for <span className="font-mono">{deal.taker}</span></>}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {status === "open" && isMaker && (
             <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapV2!, functionName: "cancelTrade", args: [id] })}>
-              Cancel trade
+              Cancel deal
             </TxButton>
           )}
           {status === "expired" && (
@@ -107,11 +143,31 @@ function TradeDetailV2({ id }: { id: bigint }) {
           {status === "open" && !isMaker && !allowed && (
             <p className="text-sm text-muted">This is a private offer for another wallet.</p>
           )}
-          {status === "open" && !address && <p className="text-sm text-muted">Connect a wallet to accept this trade.</p>}
-          {(status === "filled" || status === "cancelled") && <p className="text-sm text-muted">This trade is settled and read-only.</p>}
-          <Link href="/trades" className="btn-secondary">Back to trades</Link>
+          {status === "open" && !address && (
+            <p className="text-sm text-muted">Connect a wallet to {openOffer ? "send an offer" : "accept this deal"}.</p>
+          )}
+          {(status === "filled" || status === "cancelled") && (
+            <p className="text-sm text-muted">
+              This deal is settled and read-only.
+              {openOffer && " Offers that weren't accepted can still be withdrawn by whoever made them."}
+            </p>
+          )}
+          <Link href="/deals" className="btn-secondary">Back to deals</Link>
         </div>
         <TxStatus state={action.state} />
+
+        {openOffer && (
+          <ProposalList
+            proposals={proposals}
+            total={total}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            info={info}
+            dealId={id}
+            canDecide={isMaker && status === "open"}
+          />
+        )}
+        {canPropose && <ProposalForm dealId={id} offered={deal.offered} />}
 
         {credits.length > 0 && (
           <div className="card space-y-3 p-5">
@@ -140,7 +196,7 @@ function TradeDetailV2({ id }: { id: bigint }) {
   );
 }
 
-/** Amounts ChogSwapV2 is holding for `account` from this trade's assets (rejected payouts). */
+/** Amounts ChogSwapV2 is holding for `account` from this deal's assets (rejected payouts). */
 function useCredits(account: `0x${string}` | undefined, assets: readonly Asset[]) {
   const unique = useMemo(() => {
     const out: Asset[] = [];

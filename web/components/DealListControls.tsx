@@ -4,11 +4,11 @@ import {
   DEFAULT_FILTERS,
   isFiltering,
   type MonFilter,
-  type TradeFilters,
-  type TradeSort,
-} from "@/lib/tradeFilters";
+  type DealFilters,
+  type DealSort,
+} from "@/lib/dealFilters";
 
-export type TradeTab = "open" | "for-you" | "all";
+export type DealTab = "open" | "for-you" | "all";
 
 const MON_OPTIONS: Array<[MonFilter, string]> = [
   ["any", "Any MON"],
@@ -16,24 +16,24 @@ const MON_OPTIONS: Array<[MonFilter, string]> = [
   ["wants-mon", "Wants MON"],
   ["no-mon", "No MON"],
 ];
-const SORT_OPTIONS: Array<[TradeSort, string]> = [
+const SORT_OPTIONS: Array<[DealSort, string]> = [
   ["newest", "Newest first"],
   ["ending-soon", "Ending soon"],
 ];
 
 /** Open · For you · All, with live counts on the first two. */
-export function TradeTabs({
+export function DealTabs({
   tab,
   onTab,
   openCount,
   forYouCount,
 }: {
-  tab: TradeTab;
-  onTab: (tab: TradeTab) => void;
+  tab: DealTab;
+  onTab: (tab: DealTab) => void;
   openCount: number;
   forYouCount: number;
 }) {
-  const tabs: Array<[TradeTab, string]> = [
+  const tabs: Array<[DealTab, string]> = [
     ["open", `Open (${openCount})`],
     ["for-you", `For you (${forYouCount})`],
     ["all", "All"],
@@ -56,14 +56,14 @@ export function TradeTabs({
 }
 
 /** Search box, MON filter, sort, and a Clear button while any of them is set. */
-export function TradeFilterBar({
+export function DealFilterBar({
   filters,
   onChange,
   placeholder,
   suggestions,
 }: {
-  filters: TradeFilters;
-  onChange: (patch: Partial<TradeFilters>) => void;
+  filters: DealFilters;
+  onChange: (patch: Partial<DealFilters>) => void;
   placeholder: string;
   /** Optional search suggestions (v1 offers trait labels). */
   suggestions?: string[];
@@ -74,13 +74,13 @@ export function TradeFilterBar({
         type="search"
         className="input min-w-52 flex-1"
         placeholder={placeholder}
-        aria-label="Search trades"
-        list={suggestions ? "trade-suggestions" : undefined}
+        aria-label="Search deals"
+        list={suggestions ? "deal-suggestions" : undefined}
         value={filters.query}
         onChange={(e) => onChange({ query: e.target.value })}
       />
       {suggestions && (
-        <datalist id="trade-suggestions">
+        <datalist id="deal-suggestions">
           {suggestions.map((label) => (
             <option key={label} value={label} />
           ))}
@@ -98,9 +98,9 @@ export function TradeFilterBar({
       </select>
       <select
         className="input w-auto!"
-        aria-label="Sort trades"
+        aria-label="Sort deals"
         value={filters.sort}
-        onChange={(e) => onChange({ sort: e.target.value as TradeSort })}
+        onChange={(e) => onChange({ sort: e.target.value as DealSort })}
       >
         {SORT_OPTIONS.map(([value, label]) => (
           <option key={value} value={value}>{label}</option>

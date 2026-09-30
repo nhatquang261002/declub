@@ -3,9 +3,9 @@
 import { CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 
 /** "v1" = ChogSwap (Chogs + MON, trait requests). "v2" = ChogSwapV2 (any ERC-721 / ERC-20 / MON). */
-export type TradeVersion = "v1" | "v2";
+export type DealVersion = "v1" | "v2";
 
-const OPTIONS: Array<[TradeVersion, string]> = [
+const OPTIONS: Array<[DealVersion, string]> = [
   ["v1", "Chogs"],
   ["v2", "Multi-asset"],
 ];
@@ -15,8 +15,8 @@ export function VersionSwitch({
   value,
   onChange,
 }: {
-  value: TradeVersion;
-  onChange: (version: TradeVersion) => void;
+  value: DealVersion;
+  onChange: (version: DealVersion) => void;
 }) {
   if (!CHOG_SWAP_V2_ADDRESS) return null;
   return (

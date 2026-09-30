@@ -17,7 +17,7 @@ type Props = {
 };
 
 /**
- * One side of a V2 trade: a list of MON / token / NFT rows. A token's name always comes from the
+ * One side of a V2 deal: a list of MON / token / NFT rows. A token's name always comes from the
  * token contract (`info`), never from the user, so a lookalike can't pass for a real one.
  */
 export function AssetEditor({ title, hint, rows, onChange, info }: Props) {

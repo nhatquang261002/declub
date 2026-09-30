@@ -6,11 +6,11 @@ import { useReadContracts } from "wagmi";
 import { erc20Abi } from "viem";
 import { CHAIN_ID } from "@/lib/config";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
-import type { TradeV2 } from "@/lib/tradesV2";
+import type { DealV2 } from "@/lib/dealsV2";
 
 /**
  * Symbol and decimals read from each token contract. Anyone can list any ERC-20 in V2, so the
- * UI must show what the token says about itself, never a label chosen by the trade's maker.
+ * UI must show what the token says about itself, never a label chosen by the deal's maker.
  * Tokens that don't answer are left out, and the UI falls back to the short address.
  */
 export function useTokenInfo(tokens: readonly Address[]) {
@@ -40,11 +40,11 @@ export function useTokenInfo(tokens: readonly Address[]) {
   return { info, isLoading: result.isLoading };
 }
 
-/** `useTokenInfo` for every ERC-20 that appears in a list of V2 trades. */
-export function useTradesTokenInfo(trades: readonly TradeV2[]) {
+/** `useTokenInfo` for every ERC-20 that appears in a list of V2 deals. */
+export function useDealsTokenInfo(deals: readonly DealV2[]) {
   const tokens = useMemo(
-    () => erc20Tokens(trades.flatMap((t) => [...t.offered, ...t.requested])),
-    [trades],
+    () => erc20Tokens(deals.flatMap((t) => [...t.offered, ...t.requested])),
+    [deals],
   );
   return useTokenInfo(tokens);
 }

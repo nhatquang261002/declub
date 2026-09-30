@@ -2,10 +2,10 @@
 
 import { useReadContract, useReadContracts } from "wagmi";
 import { swap } from "@/lib/contracts";
-import { toTrade } from "@/lib/trades";
+import { toDeal } from "@/lib/deals";
 
-/** One trade with live status. `trade` is null when the id doesn't exist. */
-export function useTrade(id: bigint) {
+/** One deal with live status. `deal` is null when the id doesn't exist. */
+export function useDeal(id: bigint) {
   const result = useReadContract({
     ...swap,
     functionName: "getTrade",
@@ -31,7 +31,7 @@ export function useTrade(id: bigint) {
   const requestedCount = trait.data?.[1]?.status === "success" ? trait.data[1].result : undefined;
 
   return {
-    trade: raw ? toTrade(id, { ...raw, requestedRoot, requestedCount }) : undefined,
+    deal: raw ? toDeal(id, { ...raw, requestedRoot, requestedCount }) : undefined,
     isExpired: expired.data ?? false,
     isLoading: result.isLoading,
     error: result.error,

@@ -3,14 +3,14 @@
 import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { swapV2 } from "@/lib/contracts";
-import { toTradeV2, type TradeV2 } from "@/lib/tradesV2";
+import { toDealV2, type DealV2 } from "@/lib/dealsV2";
 
 /**
- * The newest `limit` ChogSwapV2 trades, newest first. Same approach as `useTrades` (ADR 0004):
+ * The newest `limit` ChogSwapV2 deals, newest first. Same approach as `useDeals` (ADR 0004):
  * `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
  * Returns nothing while V2 isn't configured.
  */
-export function useTradesV2({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
+export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
   const active = enabled && !!swapV2;
   const count = useReadContract({
     ...swapV2!,
@@ -34,21 +34,21 @@ export function useTradesV2({ limit = 200, enabled = true }: { limit?: number; e
     },
   });
 
-  const trades = useMemo(() => {
-    const out: TradeV2[] = [];
+  const deals = useMemo(() => {
+    const out: DealV2[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
-      const trade = toTradeV2(ids[i], r.result);
-      if (trade) out.push(trade);
+      const deal = toDealV2(ids[i], r.result);
+      if (deal) out.push(deal);
     });
     return out;
   }, [results.data, ids]);
 
   return {
     enabled: active,
-    trades,
+    deals,
     total,
-    hasMore: BigInt(trades.length) < total,
+    hasMore: BigInt(deals.length) < total,
     isLoading: active && (count.isLoading || (ids.length > 0 && results.isLoading)),
     error: count.error ?? results.error,
   };

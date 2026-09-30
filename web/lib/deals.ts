@@ -1,17 +1,17 @@
 import { zeroAddress, type Address } from "viem";
 
-export type TradeStatus = "open" | "filled" | "cancelled";
+export type DealStatus = "open" | "filled" | "cancelled";
 /** What the UI shows. "expired" is derived from `expiry`, the contract still stores Open. */
-export type DisplayStatus = TradeStatus | "expired";
+export type DisplayStatus = DealStatus | "expired";
 
-export type Trade = {
+export type Deal = {
   id: bigint;
   maker: Address;
   /** Only this wallet may fill. null = public offer. */
   taker: Address | null;
   /** Unix seconds. 0n = never expires. */
   expiry: bigint;
-  status: TradeStatus;
+  status: DealStatus;
   offeredIds: readonly bigint[];
   offeredMon: bigint;
   requestedIds: readonly bigint[];
@@ -20,8 +20,8 @@ export type Trade = {
   requestedCount?: bigint;
 };
 
-/** The shape `getTrade` returns (IChogSwap.Trade). */
-export type RawTrade = {
+/** The shape `getTrade` returns (IChogSwap.Deal). */
+export type RawDeal = {
   maker: Address;
   expiry: bigint;
   status: number;
@@ -35,10 +35,10 @@ export type RawTrade = {
 };
 
 // IChogSwap.Status: None = 0, Open = 1, Filled = 2, Cancelled = 3
-const STATUS: Record<number, TradeStatus> = { 1: "open", 2: "filled", 3: "cancelled" };
+const STATUS: Record<number, DealStatus> = { 1: "open", 2: "filled", 3: "cancelled" };
 
 /** null for unknown ids (status None). */
-export function toTrade(id: bigint, raw: RawTrade): Trade | null {
+export function toDeal(id: bigint, raw: RawDeal): Deal | null {
   const status = STATUS[raw.status];
   if (!status) return null;
   return {
@@ -57,20 +57,20 @@ export function toTrade(id: bigint, raw: RawTrade): Trade | null {
 }
 
 /** Mirrors ChogSwap.isExpired: expired strictly after `expiry`. */
-export function isExpired(trade: Pick<Trade, "expiry">, nowSec: number): boolean {
-  return trade.expiry !== 0n && BigInt(nowSec) > trade.expiry;
+export function isExpired(deal: Pick<Deal, "expiry">, nowSec: number): boolean {
+  return deal.expiry !== 0n && BigInt(nowSec) > deal.expiry;
 }
 
-export function displayStatus(trade: Pick<Trade, "status" | "expiry">, nowSec: number): DisplayStatus {
-  if (trade.status === "open" && isExpired(trade, nowSec)) return "expired";
-  return trade.status;
+export function displayStatus(deal: Pick<Deal, "status" | "expiry">, nowSec: number): DisplayStatus {
+  if (deal.status === "open" && isExpired(deal, nowSec)) return "expired";
+  return deal.status;
 }
 
 export const sameAddress = (a?: string | null, b?: string | null) =>
   !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
-/** Local-only showcase data for reviewing the trades UI without a wallet or testnet state. */
-export function demoTrades(nowSec = Math.floor(Date.now() / 1000)): Trade[] {
+/** Local-only showcase data for reviewing the deals UI without a wallet or testnet state. */
+export function demoDeals(nowSec = Math.floor(Date.now() / 1000)): Deal[] {
   return [
     {
       id: 1006n,

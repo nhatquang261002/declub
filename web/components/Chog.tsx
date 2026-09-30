@@ -34,7 +34,7 @@ export function ChogImage({ id, className = "", preferLocal = false }: { id: big
   );
 }
 
-/** Small tile used inside trade summaries. */
+/** Small tile used inside deal summaries. */
 export function ChogThumb({ id, large = false }: { id: bigint; large?: boolean }) {
   return (
     <div className={`${large ? "w-20" : "w-14"} shrink-0 text-center`}>

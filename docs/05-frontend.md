@@ -12,19 +12,19 @@ web/
 ├── app/
 │   ├── layout.tsx              ✓ providers, header, footer
 │   ├── globals.css             ✓ Tailwind theme tokens + card/btn/input utilities
-│   ├── page.tsx                ✓ Home: hero, how it works, links to Trades / Create / Guide
-│   ├── trades/page.tsx         ✓ Open Trades: Chogs / Multi-asset switch → TradesV1 · TradesV2 (tabs, search + filters)
-│   ├── my-chogs/page.tsx       ✓ wallet's Chogs → "Trade this", MockChog mint panel
-│   ├── create/page.tsx         ✓ Create Trade form
-│   ├── trade/[id]/page.tsx     ✓ Trade Detail + actions
-│   ├── history/page.tsx        ✓ my trades + withdraw
-│   └── guide/page.tsx          ✓ trading guide + FAQ
+│   ├── page.tsx                ✓ Home: hero, how it works, links to Deals / Create / Guide
+│   ├── deals/page.tsx         ✓ Open Deals: Chogs / Multi-asset switch → DealsV1 · DealsV2 (tabs, search + filters)
+│   ├── my-chogs/page.tsx       ✓ wallet's Chogs → "Deal this", MockChog mint panel
+│   ├── create/page.tsx         ✓ Create a deal: three-step wizard (deal type → assets → confirm). /v2/create redirects here
+│   ├── deal/[id]/page.tsx     ✓ Deal Detail + actions
+│   ├── history/page.tsx        ✓ my deals + withdraw
+│   └── guide/page.tsx          ✓ deal guide + FAQ
 ├── components/
 │   ├── Providers.tsx           ✓ WagmiProvider + QueryClientProvider
 │   ├── Header.tsx              ✓ nav + ConnectButton
 │   ├── ConnectButton.tsx       ✓ injected wallets (EIP-6963 list), wrong-network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb · ChogCard · ChogPicker
-│   ├── TradeParts.tsx          ✓ StatusBadge · MonPill · TradeSide · TradeCard · TradeGrid
+│   ├── DealParts.tsx          ✓ StatusBadge · MonPill · DealSide · DealCard · DealGrid
 │   ├── Tx.tsx                  ✓ TxButton (shows the tx stage) · TxStatus (error / explorer link)
 │   ├── Page.tsx                ✓ PageHeader · RequireWallet · EmptyState
 │   ├── ChogArt.tsx             ✓ Angel/Devil swap illustration
@@ -34,17 +34,17 @@ web/
 │   ├── config.ts               ✓ env → addresses, RPC, explorer; defaults = Phase 1 deployment
 │   ├── wagmi.ts                ✓ chain (viem's monadTestnet + MonadVision), injected, multicall batching
 │   ├── contracts.ts            ✓ `swap` / `chog` spreadables; swap ABI carries Chog errors for decoding
-│   ├── trades.ts               ✓ Trade type, getTrade → Trade, derived "expired"
+│   ├── deals.ts               ✓ Deal type, getTrade → Deal, derived "expired"
 │   ├── errors.ts               ✓ custom error → UI copy
 │   ├── metadata.ts             ✓ tokenURI → name/image/traits (data: URI, IPFS, HTTP)
 │   └── format.ts               ✓ MON, addresses, expiry labels, id parsing
 ├── hooks/
-│   ├── useTrades.ts            ✓ tradeCount + multicall getTrade → Trade[] (newest first, paged)
-│   ├── useTrade.ts             ✓ one trade + contract isExpired, polled
+│   ├── useDeals.ts            ✓ tradeCount + multicall getTrade → Deal[] (newest first, paged)
+│   ├── useDeal.ts             ✓ one deal + contract isExpired, polled
 │   ├── useChogs.ts             ✓ useOwnedChogs · useChogOwners · useChogMetadata
 │   ├── useChogApproval.ts      ✓ isApprovedForAll + the setApprovalForAll call
 │   ├── useTxFlow.ts            ✓ switch chain → simulate → estimate → sign → receipt → refetch
-│   ├── useLocalFills.ts        ✓ trades this browser filled (localStorage), for History
+│   ├── useLocalFills.ts        ✓ deals this browser filled (localStorage), for History
 │   └── useNow.ts               ✓ ticking clock for expiry labels
 └── wagmi.config.ts             ✓ `npm run abi` config (Foundry plugin)
 ```
@@ -72,21 +72,21 @@ scattering hex values through JSX or utility definitions.
 
 | Screen | Reads | Writes | Status |
 |---|---|---|---|
-| **Open Trades** `/trades` | `tradeCount`, multicall `getTrade` | — | ✓ |
+| **Open Deals** `/deals` | `tradeCount`, multicall `getTrade` | — | ✓ |
 | **My Chogs** `/my-chogs` | `balanceOf`, `tokenOfOwnerByIndex`, `tokenURI`, `isApprovedForAll` | `mint` (MockChog only) | ✓ |
-| **Create** `/create` | owned Chogs, `isApprovedForAll(me, swap)`, `ownerOf(requested)` as a hint | `setApprovalForAll` (once), `createTrade{value: offeredMon}` | ✓ |
-| **Trade #id** `/trade/[id]` | `getTrade`, `isExpired`, `ownerOf(requestedIds)`, `isApprovedForAll` | `fillTrade{value: requestedMon}` · `cancelTrade` · `reclaimExpired` | ✓ |
-| **History** `/history` | trades from `useTrades` filtered by `maker = me` / `taker = me`, plus local fills; `pendingWithdrawal(me)` | `withdraw` | ✓ |
+| **Create** `/create` | one wizard, two contracts (see *Create wizard*). Chog contract: owned Chogs, `isApprovedForAll(me, swap)`, `ownerOf(requested)` as a hint | `setApprovalForAll` (once), `createTrade{value: offeredMon}` | ✓ |
+| **Deal #id** `/deal/[id]` | `getTrade`, `isExpired`, `ownerOf(requestedIds)`, `isApprovedForAll` | `fillTrade{value: requestedMon}` · `cancelTrade` · `reclaimExpired` | ✓ |
+| **History** `/history` | deals from `useDeals` filtered by `maker = me` / `taker = me`, plus local fills; `pendingWithdrawal(me)` | `withdraw` | ✓ |
 
 ### Copy vocabulary
 
-The app isn't limited to Chogs (V2 trades any ERC-721, ERC-20 and MON), so UI text says **asset** for anything tradable, **NFT** only where it must mean an ERC-721, and **MON** for the native coin. "Chog" appears only where it is the actual thing on screen: Chog artwork, the Chog picker and trait names, and the MockChog mint panel. Error copy in `lib/errors.ts` follows the same rule.
+The app isn't limited to Chogs (V2 handles any ERC-721, ERC-20 and MON), so UI text says **asset** for anything in a deal, **NFT** only where it must mean an ERC-721, and **MON** for the native coin. "Chog" appears only where it is the actual thing on screen: Chog artwork, the Chog picker and trait names, and the MockChog mint panel. Error copy in `lib/errors.ts` follows the same rule.
 
-### Open Trades search
+### Open Deals search
 
-Client-side over the loaded trades (up to 200 while a filter is active). A bare number matches the trade id or a Chog id on either side; other text matches the maker/taker address or a trait, as `Hat: Crown` or just `crown`. Traits come from one `traitsOf` multicall over the Chog ids in view. A trait request only stores a Merkle root on-chain, so the page also reads the catalog (`totalSupply` + `traitsOf`) and names the request by finding the trait whose set hashes to that root. That only resolves while the matching set is unchanged, the same condition the fill flow needs. The search box offers the trait labels in view as suggestions.
+Client-side over the loaded deals (up to 200 while a filter is active). A bare number matches the deal id or a Chog id on either side; other text matches the maker/taker address or a trait, as `Hat: Crown` or just `crown`. Traits come from one `traitsOf` multicall over the Chog ids in view. A trait request only stores a Merkle root on-chain, so the page also reads the catalog (`totalSupply` + `traitsOf`) and names the request by finding the trait whose set hashes to that root. That only resolves while the matching set is unchanged, the same condition the fill flow needs. The search box offers the trait labels in view as suggestions.
 
-### Open Trades tabs
+### Open Deals tabs
 
 - **Open**: status Open, not expired, and either public or addressed to me.
 - **For you**: open direct offers where `taker = me`.
@@ -94,61 +94,67 @@ Client-side over the loaded trades (up to 200 while a filter is active). A bare 
 
 ### Notifications
 
-A bell in the header (connected wallets only). There is no event stream to subscribe to ([ADR 0003](adr/0003-no-indexer-in-v1.md)), so `lib/notifications.ts` derives every notification from the trades `useTrades` already loads (up to 200, polled every 8s):
+A bell in the header (connected wallets only). There is no event stream to subscribe to ([ADR 0003](adr/0003-no-indexer-in-v1.md)), so `lib/notifications.ts` derives every notification from the deals `useDeals` already loads (up to 200, polled every 8s):
 
 | Kind | When |
 |---|---|
 | For you | an open direct offer with `taker = me` |
-| Accepted | a trade I made is Filled |
-| Ending soon | my open trade expires within 1h |
-| Expired | my open trade ran out and its escrow is still locked |
+| Accepted | a deal I made is Filled |
+| Ending soon | my open deal expires within 1h |
+| Expired | my open deal ran out and its escrow is still locked |
 
-Read state is a set of `kind:tradeId` keys in localStorage, per wallet. On the first visit of a wallet, existing Accepted items are marked read so old trades don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It can't reach a closed tab; that needs a server-side trigger.
+Read state is a set of `kind:dealId` keys in localStorage, per wallet. On the first visit of a wallet, existing Accepted items are marked read so old deals don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It can't reach a closed tab; that needs a server-side trigger.
 
 ### ChogSwapV2 in the frontend (Phase 4)
 
 V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is optional: nothing changes until `NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS` is set, and `swapV2` in `lib/contracts.ts` is `undefined` before that.
 
-**Reused as is:** wallet, header, providers, `useTxFlow`, `TxButton`, `errors.ts` (V2 error copy added), `format.ts`, `useNow`, the Chog art and thumbnails, `useChogs`, and the notifications and trade-filter logic.
+**Reused as is:** wallet, header, providers, `useTxFlow`, `TxButton`, `errors.ts` (V2 error copy added), `format.ts`, `useNow`, the Chog art and thumbnails, `useChogs`, and the notifications and deal-filter logic.
 
 **New, V2-specific:**
 
 | File | Purpose |
 |---|---|
 | `lib/assets.ts` | `Asset` (native / ERC-20 / ERC-721), `formatAsset`, `sameAsset` (the contract's duplicate rule) |
-| `lib/tradesV2.ts` | `TradeV2` (two `Asset[]`), `toTradeV2`, and `toLegacyTrade` |
-| `hooks/useTradesV2.ts` | `tradeCount` + multicall `getTrade`, like `useTrades` |
+| `lib/dealsV2.ts` | `DealV2` (two `Asset[]`), `toDealV2`, and `toLegacyDeal` |
+| `hooks/useDealsV2.ts` | `tradeCount` + multicall `getTrade`, like `useDeals` |
 | `hooks/useTokenInfo.ts` | symbol + decimals read from each ERC-20. Never show a maker-typed name |
 
-`toLegacyTrade` converts a V2 trade to the v1 `Trade` when it only holds Chogs and MON, so the existing cards, filters and notifications show those trades with no change. A trade that includes any other token returns `null` and needs the generic asset UI below.
+`toLegacyDeal` converts a V2 deal to the v1 `Deal` when it only holds Chogs and MON, so the existing cards, filters and notifications show those deals with no change. A deal that includes any other token returns `null` and needs the generic asset UI below.
 
-**Screens** (both hidden until V2 is configured; the header shows a "Multi-asset" link only then):
+**Screens** (hidden until V2 is configured):
 
 | Route / file | Purpose |
 |---|---|
-| `/v2/create` | Two `AssetEditor`s (offer / request), optional taker, expiry. Redirects to the new trade |
-| `/v2/trade/[id]` | Both sides as `AssetList`, then cancel / reclaim / accept, and a "collect" panel for held payouts |
+| `/create` (V2 half) | `components/create/MultiFlow.tsx`: exact request = two `AssetEditor`s (request / offer); open offer = a note (byte counter, limit 280) plus one editor. Both take an optional taker and an expiry, and redirect to the new deal. `/v2/create` redirects to `/create` |
+| `/v2/deal/[id]` | Both sides as `AssetList`, then cancel / reclaim / accept, and a "collect" panel for held payouts. An open offer shows the note and the offers instead of an ask (see below) |
 | `lib/assetDraft.ts` | Typed rows → `Asset[]`, mirroring the contract's rules (size, duplicates, MON on both sides) |
 | `hooks/useAssetApprovals.ts` | The approvals still missing, one step at a time |
-| `hooks/useTradeV2.ts` | One trade by id |
+| `hooks/useDealV2.ts` | One deal by id, plus its note (`getTrade` + `offerNote` in one multicall) |
+| `hooks/useProposalsV2.ts` | The newest offers on an open offer: `proposalCount` then one `getProposals` page, newest first, with `loadMore` |
+| `lib/proposals.ts` | `ProposalV2`, `toProposal` |
+| `components/Proposals.tsx` | `OfferNote`, `ProposalList` (accept / reject / withdraw per row) and `ProposalForm` |
 
 Choices worth knowing:
 
-- **Approvals are exact for tokens, collection-wide for NFTs.** An ERC-20 is approved for the amount in the trade, no more. An NFT collection uses `setApprovalForAll`, the only way to cover several ids in one transaction. The button shows the next missing approval ("1 of 3"), then turns into Create / Accept.
+- **Approvals are exact for tokens, collection-wide for NFTs.** An ERC-20 is approved for the amount in the deal, no more. An NFT collection uses `setApprovalForAll`, the only way to cover several ids in one transaction. The button shows the next missing approval ("1 of 3"), then turns into Create / Accept.
 - **Token names come from the token.** The editor shows the symbol and decimals read on-chain under each address, and amounts are parsed with those decimals. A row with more decimals than the token has is rejected instead of rounded.
-- **Held payouts:** the trade page reads `claimable` for every asset in the trade and offers a Claim button for what the connected wallet is owed.
-- **Lists:** Trades and History show a **Chogs / Multi-asset** switch (only when V2 is configured). Each version has its own book: `/trades` renders `TradesV1` or `TradesV2`, and History reads whichever `useTrades` / `useTradesV2` matches. The switch is page state, not a URL param, and it defaults to Chogs.
-- **V2 cards:** `TradeCardV2` reuses `TradeCardFrame` (the chrome `TradeCard` also uses) and fills the two sides with `AssetSide`: Chog art for the Chog collection, a plain tile for any other NFT, a token tile with the on-chain symbol, and the MON pill.
-- **V2 search:** `lib/tradeFiltersV2.ts` matches trade id, NFT id, maker / taker, token address and on-chain symbol, with the same MON filter and sort as v1. There are no trait lookups for V2 yet (traits need a V2 request type).
-- **Fills are per contract:** `useLocalFills(account, contract)` keys the record by swap contract, so a v1 trade #3 and a V2 trade #3 don't collide. The V2 detail page records a fill after Accept confirms.
-- **Not built yet:** V2 in the notifications bell, and the `?v=` deep link.
+- **Held payouts:** the deal page reads `claimable` for every asset in the deal and offers a Claim button for what the connected wallet is owed.
+- **Lists:** Deals and History show a **Chogs / Multi-asset** switch (only when V2 is configured). Each version has its own book: `/deals` renders `DealsV1` or `DealsV2`, and History reads whichever `useDeals` / `useDealsV2` matches. The switch is page state, not a URL param, and it defaults to Chogs.
+- **V2 cards:** `DealCardV2` reuses `DealCardFrame` (the chrome `DealCard` also uses) and fills the two sides with `AssetSide`: Chog art for the Chog collection, a plain tile for any other NFT, a token tile with the on-chain symbol, and the MON pill.
+- **V2 search:** `lib/dealFiltersV2.ts` matches deal id, NFT id, maker / taker, token address and on-chain symbol, with the same MON filter and sort as v1. There are no trait lookups for V2 yet (traits need a V2 request type).
+- **Fills are per contract:** `useLocalFills(account, contract)` keys the record by swap contract, so a v1 deal #3 and a V2 deal #3 don't collide. The V2 detail page records a fill after Accept confirms.
+- **Open offers ([ADR 0007](adr/0007-open-offers.md)):** a deal with an empty ask (`isOpenOffer`). The card's "wants" side reads *Open to offers*. On the detail page the right-hand panel shows the maker's note as plain text (never linked or rendered as markup) with a "not verified" line, and below the actions come the offers, newest first. The maker sees **Accept & swap** and **Reject** on each active one; whoever made an offer sees **Withdraw my offer** while it is active, even after the deal settled or was cancelled. Anyone else who is allowed to (not the maker, and the private-offer wallet if one is set) gets the **Send offer** form: an `AssetEditor` whose assets are locked in escrow, with the same one-at-a-time approvals. Closed offers sit in a collapsed list. The Accept button and the direct `fillTrade` path are never shown together: `canFill` is false for an open offer.
+- **Offers and History:** a wallet whose offer was accepted is the taker, but nothing on the deal says so without reading the offers. The detail page records it like a fill (`useLocalFills`) when it sees an accepted offer from the connected wallet, so History picks it up after that visit.
+- **Held payouts on open offers:** `claimable` is read for the deal's assets, the accepted offer's assets, and the connected wallet's own offers, not for every offer on the deal.
+- **Not built yet:** V2 in the notifications bell (so no "you got an offer" alert yet), offer counts on the list cards, the offer note in list search, and the `?v=` deep link.
 
-### Trade Detail: which button shows
+### Deal Detail: which button shows
 
 ```text
 status == Filled / Cancelled                → read-only badge
 status == Open && expired                   → [ Reclaim to maker ] (anyone)   + [ Cancel ] if maker
-status == Open && me == maker               → [ Cancel trade ]
+status == Open && me == maker               → [ Cancel deal ]
 status == Open && (taker == 0 || me == taker)
       && I own all requestedIds             → [ Approve ] → [ Accept & Swap ]
 otherwise                                   → "You don't own the requested Chogs"
@@ -163,16 +169,16 @@ The **Escrow panel** keeps the spec's picture: `Maker ✓ deposited` (always tru
 - Concurrent reads (one `tokenURI` per card) are merged into one multicall by the wagmi config's `batch.multicall`.
 - **Real Chog:** if it isn't enumerable, fall back to an NFT API or an indexer. Scanning `Transfer` logs isn't practical on the public RPC (see below). Check this first once the real address is known.
 
-## Loading trades without an indexer
+## Loading deals without an indexer
 
-The public Monad testnet RPC caps `eth_getLogs` at **100 blocks** per request, so the log scan planned earlier isn't feasible. Trades are read from storage instead ([ADR 0004](adr/0004-read-trades-from-storage.md)):
+The public Monad testnet RPC caps `eth_getLogs` at **100 blocks** per request, so the log scan planned earlier isn't feasible. Deals are read from storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)):
 
 1. `tradeCount()` → ids `tradeCount … 1`, newest first, `limit` at a time (100 per "Load older" click).
-2. One `useReadContracts` multicall of `getTrade(id)` gives terms and live status. `toTrade` drops unknown ids.
+2. One `useReadContracts` multicall of `getTrade(id)` gives terms and live status. `toDeal` drops unknown ids.
 3. `tradeCount` is polled every 5s and the batch every 8s, and the previous list is kept while a new batch loads. Every confirmed transaction invalidates all queries.
 4. "Expired" is computed from the local clock for lists. The detail page uses the contract's `isExpired`, which is judged against the latest block.
 
-**Known gap:** who filled a *public* trade is only recorded in `TradeFilled`. History shows fills made from this browser (`useLocalFills`) until an indexer exists.
+**Known gap:** who filled a *public* deal is only recorded in `TradeFilled`. History shows fills made from this browser (`useLocalFills`) until an indexer exists.
 
 ## Transaction flow (`useTxFlow`)
 
@@ -195,13 +201,13 @@ idle ─run─► switching-chain? ─► simulating ─► awaiting-signature �
 
 | Contract error | UI copy |
 |---|---|
-| `TradeNotOpen` | This trade was already filled or cancelled. |
-| `TradeIsExpired` | This trade has expired. |
-| `TradeNotExpired` | This trade hasn't expired yet. |
+| `TradeNotOpen` | This deal was already filled or cancelled. |
+| `TradeIsExpired` | This deal has expired. |
+| `TradeNotExpired` | This deal hasn't expired yet. |
 | `NotAllowedTaker` | This is a private offer for another wallet. |
-| `SelfFill` | You can't accept your own trade. |
-| `WrongMonAmount` | The MON amount doesn't match the trade. |
-| `NotMaker` | Only the creator can cancel this trade. |
+| `SelfFill` | You can't accept your own deal. |
+| `WrongMonAmount` | The MON amount doesn't match the deal. |
+| `NotMaker` | Only the creator can cancel this deal. |
 | `EmptySide` | Add at least one Chog or some MON to each side. |
 | `MonOnBothSides` | Put MON on one side only. |
 | `TooManyTokens` | Up to 10 Chogs per side. |
@@ -209,18 +215,36 @@ idle ─run─► switching-chain? ─► simulating ─► awaiting-signature �
 | `NothingToWithdraw` | There's nothing to withdraw. |
 | `WithdrawFailed` | Your wallet couldn't receive the MON. |
 | ERC-721 `ERC721InsufficientApproval` | Approve Chog Swap to move your Chogs first. |
-| ERC-721 `ERC721IncorrectOwner` | A Chog in this trade isn't owned by the wallet sending it. |
+| ERC-721 `ERC721IncorrectOwner` | A Chog in this deal isn't owned by the wallet sending it. |
 | ERC-721 `ERC721NonexistentToken` | One of these Chogs doesn't exist. |
 | MockChog `InvalidQuantity` | Mint between 1 and 20 at a time. |
 
 The ERC-721 errors are raised by the Chog contract and bubble up through ChogSwap. `lib/contracts.ts` appends them to the swap ABI so viem can decode them by name.
 
-## Create Trade form rules (client-side, planned)
+## Create wizard
+
+The header has no Create tab, but a Create button sits beside the wallet. `/create` is also reached from the Create buttons on Home, Deals, History and the Guide, and is one flow with three steps. The stepper only lets you go back; each step has to pass its own checks to Continue, and going back keeps what you typed.
+
+1. **Deal type, and what you want.** Open offer (a note, no ask), request exact assets, or request by trait. The fields below the choice depend on it: a note, an asset list, or a trait picker.
+2. **Your assets.** What you give, plus the optional "only this wallet" address and the expiry (1h / 24h / 7d / never, default 24h).
+3. **Confirm.** Both sides, the terms, then the approval and Create buttons.
+
+The kinds don't all live on one contract, so the wizard picks one per kind ([ADR 0006](adr/0006-trait-requests-in-v2.md): trait requests are still V1-only):
+
+| Kind | Contract | Assets | Component |
+|---|---|---|---|
+| Open offer | `ChogSwapV2` | any | `MultiFlow` |
+| Exact request | `ChogSwapV2`, or the Chog contract when V2 isn't configured | any, or Chogs + MON | `MultiFlow` / `ChogsFlow` |
+| By trait | Chog contract | Chogs + MON | `ChogsFlow` |
+
+Files: `app/create/page.tsx` (stepper, kind picker, shared `Terms`), `components/create/` (`Stepper`, `KindPicker`, `MultiFlow`, `ChogsFlow`, `TraitPicker`, `parts`), `lib/createFlow.ts` (kinds, expiries, taker check). Each flow owns its own drafts and renders all three steps.
+
+Rules on the Chog-contract side (client-side):
 
 - At least one Chog or some MON on each side, and MON on only one side.
 - Up to 10 Chogs per side, no duplicates, and nothing on both sides.
-- Offered Chogs must be owned by the connected wallet (picked from My Chogs; `/create?offer=<id>` preselects one).
-- Requested Chogs are added by id, or picked from the counterparty's wallet once an address is entered. `ownerOf` shows the current owner as a hint and blocks ids that don't exist.
-- Expiry presets: 1h / 24h / 7d / none. Default 24h.
-- Optional "Only this wallet can accept" address field (direct request).
-- On confirm, read the new id from the receipt's `TradeCreated` log and go to `/trade/<id>`.
+- Offered Chogs are picked from the wallet. Requested Chogs are added by id; `ownerOf` blocks ids that don't exist.
+- A private taker must currently own every requested Chog.
+- A trait request needs a trait that matches at least one Chog.
+- The approval step only appears when a Chog is offered (a MON-only offer needs none).
+- On confirm, read the new id from the receipt's `TradeCreated` / `TraitTradeCreated` log and go to `/deal/<id>`.

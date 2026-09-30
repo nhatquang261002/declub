@@ -23,22 +23,23 @@ export function buildMerkleSet(ids: readonly bigint[], collection: Address): Mer
   const proofs = new Map(unique.map((id) => [id, [] as Hex[]]));
   if (unique.length === 0) return { root: "0x" as Hex, proofs, count: 0 };
 
+  // Every id under a node needs that node's sibling in its proof, not just the leftmost one.
   let level = unique.map((id) => tokenLeaf(collection, id));
-  let levelIds = unique;
+  let members = unique.map((id) => [id]);
   while (level.length > 1) {
     const next: Hex[] = [];
-    const nextIds: bigint[] = [];
+    const nextMembers: bigint[][] = [];
     for (let i = 0; i < level.length; i += 2) {
       const sibling = level[i + 1];
       if (sibling) {
-        proofs.get(levelIds[i])!.push(sibling);
-        proofs.get(levelIds[i + 1])!.push(level[i]);
+        for (const id of members[i]) proofs.get(id)!.push(sibling);
+        for (const id of members[i + 1]) proofs.get(id)!.push(level[i]);
       }
       next.push(sibling ? pair(level[i], sibling) : level[i]);
-      nextIds.push(levelIds[i]);
+      nextMembers.push(sibling ? [...members[i], ...members[i + 1]] : members[i]);
     }
     level = next;
-    levelIds = nextIds;
+    members = nextMembers;
   }
   return { root: level[0], proofs, count: unique.length };
 }

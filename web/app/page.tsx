@@ -6,7 +6,7 @@ const STEPS = [
   {
     number: "01",
     title: "Lock your offer",
-    body: "Pick the assets (and any MON) you want to give. Creating the trade escrows your side in the contract.",
+    body: "Pick the assets (and any MON) you want to give. Creating the deal escrows your side in the contract.",
   },
   {
     number: "02",
@@ -34,10 +34,10 @@ export default function HomePage() {
                 height={18}
                 className="size-[18px] rounded-full"
               />
-              Peer-to-peer trading · Monad testnet
+              Peer-to-peer deals · Monad testnet
             </div>
             <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
-              Trade what you have
+              Swap what you have
               <span className="block text-accent">for what you want.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
@@ -45,11 +45,11 @@ export default function HomePage() {
               contract settle both sides together. No middlemen. Just a little chaos.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/trades" className="btn-primary">
-                Browse trades <span aria-hidden>↗</span>
+              <Link href="/deals" className="btn-primary">
+                Browse deals <span aria-hidden>↗</span>
               </Link>
               <Link href="/create" className="btn-secondary">
-                Create a trade
+                Create a deal
               </Link>
             </div>
           </div>

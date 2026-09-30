@@ -4,9 +4,9 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { Address } from "viem";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
 
-// Who filled a public trade is only recorded in the TradeFilled event, and the public RPC
+// Who filled a public deal is only recorded in the TradeFilled event, and the public RPC
 // can't scan logs from the deploy block (100-block cap). Until an indexer exists
-// (ADR 0003), remember the trades this browser filled.
+// (ADR 0003), remember the deals this browser filled.
 
 const EVENT = "chogswap:fills";
 const key = (contract: string, account: string) =>
@@ -30,7 +30,7 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** Fills are recorded per swap contract, so v1 and V2 trade ids don't mix. Defaults to v1. */
+/** Fills are recorded per swap contract, so v1 and V2 deal ids don't mix. Defaults to v1. */
 export function useLocalFills(account: Address | undefined, contract: Address = CHOG_SWAP_ADDRESS) {
   // Snapshot is the raw string so React can compare it by value.
   const raw = useSyncExternalStore(
@@ -42,10 +42,10 @@ export function useLocalFills(account: Address | undefined, contract: Address = 
   const ids = parse(raw);
 
   const record = useCallback(
-    (tradeId: bigint) => {
+    (dealId: bigint) => {
       if (!account) return;
       const next = new Set(parse(read(contract, account)).map(String));
-      next.add(tradeId.toString());
+      next.add(dealId.toString());
       try {
         localStorage.setItem(key(contract, account), JSON.stringify([...next]));
         window.dispatchEvent(new Event(EVENT));

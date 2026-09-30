@@ -34,7 +34,7 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] `create-next-app web` (Next.js 16, TS, Tailwind 4, App Router; npm)
 - [x] wagmi 3 config + Monad testnet chain + connect button (injected / EIP-6963)
 - [x] ABI generation (`@wagmi/cli` Foundry plugin → `web/lib/abi.ts`, `npm run abi`)
-- [x] Trade loading from storage: `tradeCount` + multicall `getTrade` ([ADR 0004](adr/0004-read-trades-from-storage.md); the public RPC caps `eth_getLogs` at 100 blocks)
+- [x] Trade loading from storage: `tradeCount` + multicall `getTrade` ([ADR 0004](adr/0004-read-deals-from-storage.md); the public RPC caps `eth_getLogs` at 100 blocks)
 - [x] `useTxFlow` states + error mapping
 - [x] Open Trades (Open / For you / All tabs, paging)
 - [x] My Chogs (+ MockChog mint panel for demo wallets)
@@ -64,7 +64,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Frontend for V2, plumbing: V2 ABI, optional config, `TradeV2` + `toLegacyTrade` adapter, `useTradesV2`, `useTokenInfo`, error copy
 - [x] Frontend for V2, create and detail screens (`/v2/create`, `/v2/trade/[id]`): asset editor, exact-amount ERC-20 approvals, NFT collection approvals, accept / cancel / reclaim, `claim`. Typechecked and built; not exercised against a deployed V2 yet
 - [x] Frontend for V2, list: a Chogs / Multi-asset switch on Trades and History, V2 cards and filters (search by NFT id, token symbol or address, maker; MON filter; sort), fills remembered per contract. Typechecked, linted and built; the filter logic was checked with sample trades, but the list has not been exercised against the deployed V2 yet
-- [ ] Trait requests in V2 (a new `AssetType`), so trait trades can move off v1
+- [ ] Trait requests in V2 (a new `AssetType`), so trait trades can move off v1. Deferred: a design exists ([ADR 0006](adr/0006-trait-requests-in-v2.md)), but it needs a per-collection trait source first
+- [ ] Open offers ("make me an offer"): the maker lists assets with a text note and takers escrow proposals. Contract, tests and frontend (create mode, offers list, send / accept / reject / withdraw) done. Not deployed: needs a redeploy of `ChogSwapV2`, and the frontend's `NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS` pointed at it ([ADR 0007](adr/0007-open-offers.md))
 - [ ] Trade intents + off-chain matcher
 - [ ] Multi-party ring swaps
 - [ ] Reputation

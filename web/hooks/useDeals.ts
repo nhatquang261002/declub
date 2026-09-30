@@ -3,24 +3,24 @@
 import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
 import { swap } from "@/lib/contracts";
-import { DEMO_TRADES } from "@/lib/config";
-import { demoTrades, toTrade, type Trade } from "@/lib/trades";
+import { DEMO_DEALS } from "@/lib/config";
+import { demoDeals, toDeal, type Deal } from "@/lib/deals";
 
 /**
- * The newest `limit` trades, newest first.
+ * The newest `limit` deals, newest first.
  *
- * Trade ids are sequential (1..tradeCount) and `getTrade` returns the full terms, so this
+ * Deal ids are sequential (1..tradeCount) and `getTrade` returns the full terms, so this
  * reads storage with one multicall instead of scanning `TradeCreated` logs. The public
  * Monad RPC caps eth_getLogs at 100 blocks, which rules out a scan from the deploy block.
  */
-export function useTrades({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
+export function useDeals({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
   const count = useReadContract({
     ...swap,
     functionName: "tradeCount",
     query: { enabled, refetchInterval: 5_000 },
   });
   const total = count.data ?? 0n;
-  const showDemoTrades = DEMO_TRADES;
+  const showDemoDeals = DEMO_DEALS;
 
   const ids = useMemo(() => {
     const out: bigint[] = [];
@@ -45,28 +45,28 @@ export function useTrades({ limit = 200, enabled = true }: { limit?: number; ena
     query: { enabled: ids.length > 0, refetchInterval: 8_000 },
   });
 
-  const trades = useMemo(() => {
-    if (showDemoTrades) return demoTrades();
-    const out: Trade[] = [];
+  const deals = useMemo(() => {
+    if (showDemoDeals) return demoDeals();
+    const out: Deal[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
       const rootResult = traitResults.data?.[i * 2];
       const countResult = traitResults.data?.[i * 2 + 1];
-      const trade = toTrade(ids[i], {
+      const deal = toDeal(ids[i], {
         ...r.result,
         requestedRoot: rootResult?.status === "success" ? rootResult.result as `0x${string}` : undefined,
         requestedCount: countResult?.status === "success" ? countResult.result as bigint : undefined,
       });
-      if (trade) out.push(trade);
+      if (deal) out.push(deal);
     });
     return out;
-  }, [results.data, traitResults.data, ids, showDemoTrades]);
+  }, [results.data, traitResults.data, ids, showDemoDeals]);
 
   return {
-    trades,
-    total: showDemoTrades ? BigInt(demoTrades().length) : total,
-    hasMore: BigInt(trades.length) < (showDemoTrades ? BigInt(demoTrades().length) : total),
-    isLoading: !showDemoTrades && (count.isLoading || (ids.length > 0 && results.isLoading)),
-    error: showDemoTrades ? undefined : count.error ?? results.error,
+    deals,
+    total: showDemoDeals ? BigInt(demoDeals().length) : total,
+    hasMore: BigInt(deals.length) < (showDemoDeals ? BigInt(demoDeals().length) : total),
+    isLoading: !showDemoDeals && (count.isLoading || (ids.length > 0 && results.isLoading)),
+    error: showDemoDeals ? undefined : count.error ?? results.error,
   };
 }

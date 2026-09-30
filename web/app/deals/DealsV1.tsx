@@ -5,43 +5,43 @@ import { useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { Pagination } from "@/components/Pagination";
-import { TradeFilterBar, TradeTabs, type TradeTab } from "@/components/TradeListControls";
-import { TradeGrid } from "@/components/TradeParts";
+import { DealFilterBar, DealTabs, type DealTab } from "@/components/DealListControls";
+import { DealGrid } from "@/components/DealParts";
 import { useNow } from "@/hooks/useNow";
-import { useTrades } from "@/hooks/useTrades";
-import { useTradeTraits } from "@/hooks/useTraits";
+import { useDeals } from "@/hooks/useDeals";
+import { useDealTraits } from "@/hooks/useTraits";
 import { errorMessage } from "@/lib/errors";
 import {
   DEFAULT_FILTERS,
-  applyTradeFilters,
+  applyDealFilters,
   isFiltering,
   traitSuggestions,
-  type TradeFilters,
-} from "@/lib/tradeFilters";
-import { isExpired, sameAddress, type Trade } from "@/lib/trades";
+  type DealFilters,
+} from "@/lib/dealFilters";
+import { isExpired, sameAddress, type Deal } from "@/lib/deals";
 
 export const PAGE = 4;
 /** Searching needs the whole book, not just the pages the reader has opened so far. */
 export const SEARCH_LIMIT = 200;
 
 /** The ChogSwap (v1) book: Chogs and MON, plus trait requests. */
-export function TradesV1({ switcher }: { switcher: ReactNode }) {
+export function DealsV1({ switcher }: { switcher: ReactNode }) {
   const { address } = useConnection();
   const now = useNow();
-  const [tab, setTab] = useState<TradeTab>("open");
+  const [tab, setTab] = useState<DealTab>("open");
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<TradeFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<DealFilters>(DEFAULT_FILTERS);
   const filtering = isFiltering(filters);
   const limit = filtering ? SEARCH_LIMIT : page * PAGE;
-  const { trades, total, hasMore, isLoading, error } = useTrades({ limit });
+  const { deals, total, hasMore, isLoading, error } = useDeals({ limit });
 
-  const isLive = (t: Trade) => t.status === "open" && !isExpired(t, now);
+  const isLive = (t: Deal) => t.status === "open" && !isExpired(t, now);
   // Public offers plus private ones addressed to me.
-  const visibleToMe = (t: Trade) => !t.taker || sameAddress(t.taker, address);
+  const visibleToMe = (t: Deal) => !t.taker || sameAddress(t.taker, address);
 
-  const traits = useTradeTraits(trades);
-  const matching = applyTradeFilters(trades, filters, now, traits);
-  const lists: Record<TradeTab, Trade[]> = {
+  const traits = useDealTraits(deals);
+  const matching = applyDealFilters(deals, filters, now, traits);
+  const lists: Record<DealTab, Deal[]> = {
     open: matching.filter((t) => isLive(t) && visibleToMe(t)),
     "for-you": matching.filter((t) => isLive(t) && !!address && sameAddress(t.taker, address)),
     all: matching,
@@ -52,7 +52,7 @@ export function TradesV1({ switcher }: { switcher: ReactNode }) {
     Math.ceil((filtering ? currentList.length : Number(total)) / PAGE),
   );
 
-  const updateFilters = (patch: Partial<TradeFilters>) => {
+  const updateFilters = (patch: Partial<DealFilters>) => {
     setFilters((current) => ({ ...current, ...patch }));
     setPage(1);
   };
@@ -60,10 +60,10 @@ export function TradesV1({ switcher }: { switcher: ReactNode }) {
 
   return (
     <>
-      <PageHeader title="Open trades">
+      <PageHeader title="Open deals">
         <div className="flex flex-wrap items-center gap-2">
           {switcher}
-          <TradeTabs
+          <DealTabs
             tab={tab}
             onTab={(next) => {
               setTab(next);
@@ -72,37 +72,40 @@ export function TradesV1({ switcher }: { switcher: ReactNode }) {
             openCount={lists.open.length}
             forYouCount={lists["for-you"].length}
           />
+          <Link href="/create" className="btn-primary">
+            Create deal
+          </Link>
         </div>
       </PageHeader>
 
-      <TradeFilterBar
+      <DealFilterBar
         filters={filters}
         onChange={updateFilters}
         placeholder="Search asset ID, trait, or maker 0x…"
-        suggestions={traitSuggestions(trades, traits)}
+        suggestions={traitSuggestions(deals, traits)}
       />
 
       {error ? (
         <EmptyState>
-          <span className="text-danger">Couldn&apos;t load trades: {errorMessage(error)}</span>
+          <span className="text-danger">Couldn&apos;t load deals: {errorMessage(error)}</span>
         </EmptyState>
       ) : isLoading ? (
-        <EmptyState>Loading trades…</EmptyState>
+        <EmptyState>Loading deals…</EmptyState>
       ) : shown.length === 0 && filtering ? (
-        <EmptyState>No trades match your search or filters.</EmptyState>
+        <EmptyState>No deals match your search or filters.</EmptyState>
       ) : shown.length === 0 ? (
         <EmptyState>
           {tab === "for-you"
             ? address
               ? "No private offers addressed to you right now."
               : "Connect a wallet to see offers made to you."
-            : "No open trades yet."}{" "}
+            : "No open deals yet."}{" "}
           <Link href="/create" className="text-accent underline">
             Create one
           </Link>
         </EmptyState>
       ) : (
-        <TradeGrid trades={shown} now={now} me={address} traitLabels={traits.byRoot} />
+        <DealGrid deals={shown} now={now} me={address} traitLabels={traits.byRoot} />
       )}
 
       {currentList.length > 0 && (
@@ -111,7 +114,7 @@ export function TradesV1({ switcher }: { switcher: ReactNode }) {
           totalPages={totalPages}
           onPage={setPage}
           loading={isLoading}
-          nextDisabled={!hasMore && page >= Math.ceil(trades.length / PAGE)}
+          nextDisabled={!hasMore && page >= Math.ceil(deals.length / PAGE)}
         />
       )}
     </>

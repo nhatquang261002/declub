@@ -39,12 +39,14 @@ export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";
-export const DEMO_TRADES =
-  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_TRADES !== "false";
+export const DEMO_DEALS =
+  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_DEALS !== "false";
 export const DEMO_CREATE =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_CREATE === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
+/** ChogSwapV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
+export const MAX_NOTE_BYTES = 280;
 
 export const explorerTx = (hash: string) => `${EXPLORER_URL}/tx/${hash}`;
 export const explorerAddress = (addr: string) => `${EXPLORER_URL}/address/${addr}`;

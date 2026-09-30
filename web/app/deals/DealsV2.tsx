@@ -5,40 +5,40 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { Pagination } from "@/components/Pagination";
-import { TradeFilterBar, TradeTabs, type TradeTab } from "@/components/TradeListControls";
-import { TradeGridV2 } from "@/components/TradeCardV2";
+import { DealFilterBar, DealTabs, type DealTab } from "@/components/DealListControls";
+import { DealGridV2 } from "@/components/DealCardV2";
 import { useNow } from "@/hooks/useNow";
-import { useTradesTokenInfo } from "@/hooks/useTokenInfo";
-import { useTradesV2 } from "@/hooks/useTradesV2";
+import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
+import { useDealsV2 } from "@/hooks/useDealsV2";
 import { errorMessage } from "@/lib/errors";
-import { DEFAULT_FILTERS, isFiltering, type TradeFilters } from "@/lib/tradeFilters";
-import { applyTradeFiltersV2 } from "@/lib/tradeFiltersV2";
-import type { TradeV2 } from "@/lib/tradesV2";
-import { isExpired, sameAddress } from "@/lib/trades";
-import { PAGE, SEARCH_LIMIT } from "./TradesV1";
+import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
+import { applyDealFiltersV2 } from "@/lib/dealFiltersV2";
+import type { DealV2 } from "@/lib/dealsV2";
+import { isExpired, sameAddress } from "@/lib/deals";
+import { PAGE, SEARCH_LIMIT } from "./DealsV1";
 
 /** The ChogSwapV2 book: any mix of ERC-721, ERC-20 and MON on each side. */
-export function TradesV2({ switcher }: { switcher: ReactNode }) {
+export function DealsV2({ switcher }: { switcher: ReactNode }) {
   const { address } = useConnection();
   const now = useNow();
-  const [tab, setTab] = useState<TradeTab>("open");
+  const [tab, setTab] = useState<DealTab>("open");
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<TradeFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<DealFilters>(DEFAULT_FILTERS);
   const filtering = isFiltering(filters);
   const limit = filtering ? SEARCH_LIMIT : page * PAGE;
-  const { trades, total, hasMore, isLoading, error } = useTradesV2({ limit });
-  const { info } = useTradesTokenInfo(trades);
+  const { deals, total, hasMore, isLoading, error } = useDealsV2({ limit });
+  const { info } = useDealsTokenInfo(deals);
 
   const lists = useMemo(() => {
-    const isLive = (t: TradeV2) => t.status === "open" && !isExpired(t, now);
-    const matching = applyTradeFiltersV2(trades, filters, now, info);
+    const isLive = (t: DealV2) => t.status === "open" && !isExpired(t, now);
+    const matching = applyDealFiltersV2(deals, filters, now, info);
     return {
       // Public offers plus private ones addressed to me.
       open: matching.filter((t) => isLive(t) && (!t.taker || sameAddress(t.taker, address))),
       "for-you": matching.filter((t) => isLive(t) && !!address && sameAddress(t.taker, address)),
       all: matching,
-    } satisfies Record<TradeTab, TradeV2[]>;
-  }, [trades, filters, now, info, address]);
+    } satisfies Record<DealTab, DealV2[]>;
+  }, [deals, filters, now, info, address]);
 
   const currentList = lists[tab];
   const totalPages = Math.max(
@@ -47,17 +47,17 @@ export function TradesV2({ switcher }: { switcher: ReactNode }) {
   );
   const shown = currentList.slice((page - 1) * PAGE, page * PAGE);
 
-  const updateFilters = (patch: Partial<TradeFilters>) => {
+  const updateFilters = (patch: Partial<DealFilters>) => {
     setFilters((current) => ({ ...current, ...patch }));
     setPage(1);
   };
 
   return (
     <>
-      <PageHeader title="Open trades">
+      <PageHeader title="Open deals">
         <div className="flex flex-wrap items-center gap-2">
           {switcher}
-          <TradeTabs
+          <DealTabs
             tab={tab}
             onTab={(next) => {
               setTab(next);
@@ -66,10 +66,13 @@ export function TradesV2({ switcher }: { switcher: ReactNode }) {
             openCount={lists.open.length}
             forYouCount={lists["for-you"].length}
           />
+          <Link href="/create" className="btn-primary">
+            Create deal
+          </Link>
         </div>
       </PageHeader>
 
-      <TradeFilterBar
+      <DealFilterBar
         filters={filters}
         onChange={updateFilters}
         placeholder="Search NFT ID, token symbol or address, or maker 0x…"
@@ -77,25 +80,25 @@ export function TradesV2({ switcher }: { switcher: ReactNode }) {
 
       {error ? (
         <EmptyState>
-          <span className="text-danger">Couldn&apos;t load trades: {errorMessage(error)}</span>
+          <span className="text-danger">Couldn&apos;t load deals: {errorMessage(error)}</span>
         </EmptyState>
       ) : isLoading ? (
-        <EmptyState>Loading trades…</EmptyState>
+        <EmptyState>Loading deals…</EmptyState>
       ) : shown.length === 0 && filtering ? (
-        <EmptyState>No trades match your search or filters.</EmptyState>
+        <EmptyState>No deals match your search or filters.</EmptyState>
       ) : shown.length === 0 ? (
         <EmptyState>
           {tab === "for-you"
             ? address
               ? "No private offers addressed to you right now."
               : "Connect a wallet to see offers made to you."
-            : "No open multi-asset trades yet."}{" "}
-          <Link href="/v2/create" className="text-accent underline">
+            : "No open multi-asset deals yet."}{" "}
+          <Link href="/create" className="text-accent underline">
             Create one
           </Link>
         </EmptyState>
       ) : (
-        <TradeGridV2 trades={shown} now={now} me={address} info={info} />
+        <DealGridV2 deals={shown} now={now} me={address} info={info} />
       )}
 
       {currentList.length > 0 && (
@@ -104,7 +107,7 @@ export function TradesV2({ switcher }: { switcher: ReactNode }) {
           totalPages={totalPages}
           onPage={setPage}
           loading={isLoading}
-          nextDisabled={!hasMore && page >= Math.ceil(trades.length / PAGE)}
+          nextDisabled={!hasMore && page >= Math.ceil(deals.length / PAGE)}
         />
       )}
     </>

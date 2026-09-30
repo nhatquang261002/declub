@@ -2,16 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 import { ConnectButton } from "./ConnectButton";
 import { Logo } from "./Logo";
 import { NotificationBell } from "./NotificationBell";
 
+// Create is a button beside the wallet, not a tab: it starts an action rather than showing a list.
 const NAV = [
-  { href: "/trades", label: "Trades" },
-  { href: "/create", label: "Create" },
-  // Multi-asset trades need the V2 contract to be configured (ADR 0005).
-  ...(CHOG_SWAP_V2_ADDRESS ? [{ href: "/v2/create", label: "Multi-asset" }] : []),
+  { href: "/deals", label: "Deals" },
   { href: "/history", label: "History" },
   { href: "/guide", label: "Guide" },
 ];
@@ -19,7 +16,7 @@ const NAV = [
 export function Header() {
   const pathname = usePathname();
   const active = (href: string) =>
-    href === "/trades" ? pathname.startsWith("/trade") : pathname.startsWith(href);
+    href === "/deals" ? pathname.startsWith("/deal") : pathname.startsWith(href);
 
   return (
     <header
@@ -44,6 +41,12 @@ export function Header() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <Link href="/create" className="btn-create">
+            <span className="btn-create-plus" aria-hidden>+</span>
+            <span>
+              Create<span className="hidden sm:inline">&nbsp;deal</span>
+            </span>
+          </Link>
           <NotificationBell />
           <ConnectButton />
         </div>

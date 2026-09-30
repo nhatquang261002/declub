@@ -5,18 +5,18 @@ import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState, PageHeader } from "@/components/Page";
-import { TradeGridV2 } from "@/components/TradeCardV2";
-import { TradeGrid } from "@/components/TradeParts";
-import { VersionSwitch, type TradeVersion } from "@/components/VersionSwitch";
+import { DealGridV2 } from "@/components/DealCardV2";
+import { DealGrid } from "@/components/DealParts";
+import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
 import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
-import { useTradesTokenInfo } from "@/hooks/useTokenInfo";
-import { useTrades } from "@/hooks/useTrades";
-import { useTradesV2 } from "@/hooks/useTradesV2";
+import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
+import { useDeals } from "@/hooks/useDeals";
+import { useDealsV2 } from "@/hooks/useDealsV2";
 import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 import { errorMessage } from "@/lib/errors";
-import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
-import type { TradeV2 } from "@/lib/tradesV2";
+import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
+import type { DealV2 } from "@/lib/dealsV2";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
 
@@ -31,26 +31,25 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const [version, setVersion] = useState<TradeVersion>("v1");
+  const [version, setVersion] = useState<DealVersion>("v1");
   const isV2 = version === "v2";
-  const v1 = useTrades({ limit: 200, enabled: !isV2 });
-  const v2 = useTradesV2({ limit: 200, enabled: isV2 });
-  const { info } = useTradesTokenInfo(v2.trades);
+  const v1 = useDeals({ limit: 200, enabled: !isV2 });
+  const v2 = useDealsV2({ limit: 200, enabled: isV2 });
+  const { info } = useDealsTokenInfo(v2.deals);
   // Fills are remembered per contract, so each version reads its own record.
   const v1Fills = useLocalFills(address, CHOG_SWAP_ADDRESS);
   const v2Fills = useLocalFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
   const { isLoading, error } = isV2 ? v2 : v1;
-  const trades: Array<Trade | TradeV2> = isV2 ? v2.trades : v1.trades;
+  const deals: Array<Deal | DealV2> = isV2 ? v2.deals : v1.deals;
   const localFillIds = isV2 ? v2Fills.ids : v1Fills.ids;
-  const createHref = isV2 ? "/v2/create" : "/create";
 
-  const walletTrades = useMemo(
-    () => trades.filter((trade) => isWalletTrade(trade, address, localFillIds)),
-    [address, localFillIds, trades],
+  const walletDeals = useMemo(
+    () => deals.filter((deal) => isWalletDeal(deal, address, localFillIds)),
+    [address, localFillIds, deals],
   );
   const statuses = useMemo(
-    () => walletTrades.map((trade) => displayStatus(trade, now)),
-    [now, walletTrades],
+    () => walletDeals.map((deal) => displayStatus(deal, now)),
+    [now, walletDeals],
   );
   const counts = useMemo(
     () => ({
@@ -60,12 +59,12 @@ export default function HistoryPage() {
     }),
     [statuses],
   );
-  const visibleTrades = useMemo(
+  const visibleDeals = useMemo(
     () =>
       filter === "all"
-        ? walletTrades
-        : walletTrades.filter((trade) => displayStatus(trade, now) === filterStatus(filter)),
-    [filter, now, walletTrades],
+        ? walletDeals
+        : walletDeals.filter((deal) => displayStatus(deal, now) === filterStatus(filter)),
+    [filter, now, walletDeals],
   );
 
   return (
@@ -73,7 +72,7 @@ export default function HistoryPage() {
       <section className="hero-panel overflow-hidden">
         <div className="grid gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <div className="eyebrow">Your trade journal</div>
+            <div className="eyebrow">Your deal journal</div>
             <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
               Every deal,
               <span className="block text-accent">all in one place.</span>
@@ -87,7 +86,7 @@ export default function HistoryPage() {
               {address ? "Wallet connected" : "Wallet required"}
             </p>
             <p className="mt-2 text-sm leading-6 text-[#4e5968]">
-              {address ? "Showing your offers, fills, and direct requests." : "Connect to see your trade activity."}
+              {address ? "Showing your offers, fills, and direct requests." : "Connect to see your deal activity."}
             </p>
             {!address && <div className="mt-4"><ConnectButton /></div>}
           </div>
@@ -102,8 +101,8 @@ export default function HistoryPage() {
       <PageHeader title="Recent activity">
         <div className="flex flex-wrap items-center gap-2">
           <VersionSwitch value={version} onChange={setVersion} />
-          <Link href={createHref} className="btn-primary">
-            Create a trade <span aria-hidden>↗</span>
+          <Link href="/create" className="btn-primary">
+            Create a deal <span aria-hidden>↗</span>
           </Link>
         </div>
       </PageHeader>
@@ -124,8 +123,8 @@ export default function HistoryPage() {
           ))}
         </div>
         <p className="text-sm text-muted">
-          Showing <span className="font-semibold text-white">{visibleTrades.length}</span> trade
-          {visibleTrades.length === 1 ? "" : "s"}
+          Showing <span className="font-semibold text-white">{visibleDeals.length}</span> deal
+          {visibleDeals.length === 1 ? "" : "s"}
         </p>
       </div>
 
@@ -137,31 +136,31 @@ export default function HistoryPage() {
         <EmptyState>Loading activity…</EmptyState>
       ) : !address ? (
         <EmptyState>
-          Connect your wallet to view your trade activity. <ConnectButton />
+          Connect your wallet to view your deal activity. <ConnectButton />
         </EmptyState>
-      ) : visibleTrades.length === 0 ? (
+      ) : visibleDeals.length === 0 ? (
         <EmptyState>
-          No {filter === "all" ? "" : `${filter} `}trades yet.{" "}
-          <Link href={createHref} className="text-accent underline">
+          No {filter === "all" ? "" : `${filter} `}deals yet.{" "}
+          <Link href="/create" className="text-accent underline">
             Create one
           </Link>
         </EmptyState>
       ) : (
         isV2 ? (
-          <TradeGridV2 trades={visibleTrades as TradeV2[]} now={now} me={address} info={info} />
+          <DealGridV2 deals={visibleDeals as DealV2[]} now={now} me={address} info={info} />
         ) : (
-          <TradeGrid trades={visibleTrades as Trade[]} now={now} />
+          <DealGrid deals={visibleDeals as Deal[]} now={now} />
         )
       )}
     </div>
   );
 }
 
-function isWalletTrade(trade: Pick<Trade, "id" | "maker" | "taker">, address: string | undefined, localFillIds: readonly bigint[]) {
+function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, localFillIds: readonly bigint[]) {
   return !!address
-    && (sameAddress(trade.maker, address)
-      || sameAddress(trade.taker, address)
-      || localFillIds.some((id) => id === trade.id));
+    && (sameAddress(deal.maker, address)
+      || sameAddress(deal.taker, address)
+      || localFillIds.some((id) => id === deal.id));
 }
 
 function filterStatus(filter: Exclude<HistoryFilter, "all">): DisplayStatus {

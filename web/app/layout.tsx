@@ -13,7 +13,7 @@ const brand = Bricolage_Grotesque({ variable: "--font-brand", subsets: ["latin"]
 // The favicon is app/icon.svg, picked up by Next automatically.
 export const metadata: Metadata = {
   title: "On Deal",
-  description: "Trustless peer-to-peer trading and escrow for digital assets on Monad.",
+  description: "Trustless peer-to-peer deals and escrow for digital assets on Monad.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

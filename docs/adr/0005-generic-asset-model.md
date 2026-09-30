@@ -43,6 +43,6 @@ The taker's assets are different: they move straight to the maker, and a failure
 ## Consequences
 
 - Storage per trade grows: 3 slots per asset, up to 60 to create the largest trade. Measured worst case (10 NFTs each way): **2.2M gas to create, 0.9M to fill.** Fine on Monad; tight on chains with a 30M block limit only if MAX is raised a lot.
-- The frontend needs a second ABI, a second trade reader, and a v1/v2 switch. No indexer is needed: `getTrade` returns the full terms as before ([ADR 0004](0004-read-trades-from-storage.md)).
+- The frontend needs a second ABI, a second trade reader, and a v1/v2 switch. No indexer is needed: `getTrade` returns the full terms as before ([ADR 0004](0004-read-deals-from-storage.md)).
 - Any ERC-20 can be listed, including scam tokens. The UI must show the token address, symbol and decimals from the chain, never a name the maker typed.
 - Needs its own external review before mainnet, like v1.

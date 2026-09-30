@@ -1,6 +1,6 @@
 "use client";
 
-/** Numbered page buttons with previous / next, shared by the trade lists. */
+/** Numbered page buttons with previous / next, shared by the deal lists. */
 export function Pagination({
   page,
   totalPages,
@@ -16,7 +16,7 @@ export function Pagination({
   nextDisabled?: boolean;
 }) {
   return (
-    <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Trade pages">
+    <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Deal pages">
       <button
         className="btn-secondary border-[#d83b45] bg-[#d83b45] text-white hover:bg-[#b92f3a] disabled:cursor-not-allowed disabled:opacity-40"
         onClick={() => onPage(page - 1)}

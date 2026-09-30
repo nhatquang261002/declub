@@ -4,9 +4,9 @@ import { formatUnits } from "viem";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { CHOG_ADDRESS } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
-import type { TradeV2 } from "@/lib/tradesV2";
+import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
 import { ChogThumb } from "./Chog";
-import { MonPill, TradeCardFrame } from "./TradeParts";
+import { MonPill, DealCardFrame } from "./DealParts";
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
@@ -39,7 +39,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
   );
 }
 
-/** One side of a V2 trade as tiles: Chog art, plain NFT tiles, token amounts and a MON pill. */
+/** One side of a V2 deal as tiles: Chog art, plain NFT tiles, token amounts and a MON pill. */
 export function AssetSide({ assets, info }: { assets: readonly Asset[]; info: Info }) {
   if (assets.length === 0) return <span className="text-sm text-muted">Nothing</span>;
   return (
@@ -53,24 +53,38 @@ export function AssetSide({ assets, info }: { assets: readonly Asset[]; info: In
   );
 }
 
-export function TradeCardV2({ trade, now, me, info }: { trade: TradeV2; now: number; me?: string; info: Info }) {
+/** The "wants" side of an open offer: no ask, takers send offers. */
+function OpenToOffers() {
   return (
-    <TradeCardFrame
-      href={`/v2/trade/${trade.id}`}
-      trade={trade}
+    <div className="flex min-h-20 items-center justify-center">
+      <span className={chip}>
+        <span className="text-lg leading-none" aria-hidden>
+          ?
+        </span>
+        <span className="text-[10px] font-black tracking-wider text-[#a9282f] uppercase">Open to offers</span>
+      </span>
+    </div>
+  );
+}
+
+export function DealCardV2({ deal, now, me, info }: { deal: DealV2; now: number; me?: string; info: Info }) {
+  return (
+    <DealCardFrame
+      href={`/v2/deal/${deal.id}`}
+      deal={deal}
       now={now}
       me={me}
-      gives={<AssetSide assets={trade.offered} info={info} />}
-      wants={<AssetSide assets={trade.requested} info={info} />}
+      gives={<AssetSide assets={deal.offered} info={info} />}
+      wants={isOpenOffer(deal) ? <OpenToOffers /> : <AssetSide assets={deal.requested} info={info} />}
     />
   );
 }
 
-export function TradeGridV2({ trades, now, me, info }: { trades: TradeV2[]; now: number; me?: string; info: Info }) {
+export function DealGridV2({ deals, now, me, info }: { deals: DealV2[]; now: number; me?: string; info: Info }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {trades.map((t) => (
-        <TradeCardV2 key={t.id.toString()} trade={t} now={now} me={me} info={info} />
+      {deals.map((t) => (
+        <DealCardV2 key={t.id.toString()} deal={t} now={now} me={me} info={info} />
       ))}
     </div>
   );

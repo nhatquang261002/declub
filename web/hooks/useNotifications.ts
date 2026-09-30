@@ -5,9 +5,9 @@ import { useConnection } from "wagmi";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
 import { deriveNotifications, type AppNotification } from "@/lib/notifications";
 import { useNow } from "./useNow";
-import { useTrades } from "./useTrades";
+import { useDeals } from "./useDeals";
 
-// Notifications are derived from trade state (lib/notifications.ts). All that is stored is
+// Notifications are derived from deal state (lib/notifications.ts). All that is stored is
 // which ones this browser has already seen, and whether the user wants browser alerts.
 
 const EVENT = "chogswap:notifications";
@@ -56,11 +56,11 @@ const canAlert = () => typeof window !== "undefined" && "Notification" in window
 export function useNotifications() {
   const { address } = useConnection();
   const now = useNow(30_000);
-  const { trades, isLoading } = useTrades({ limit: 200, enabled: !!address });
+  const { deals, isLoading } = useDeals({ limit: 200, enabled: !!address });
 
   const notifications = useMemo(
-    () => deriveNotifications(trades, address, now),
-    [trades, address, now],
+    () => deriveNotifications(deals, address, now),
+    [deals, address, now],
   );
 
   // The snapshot is the raw string so React can compare it by value. "" = never opened.
@@ -68,7 +68,7 @@ export function useNotifications() {
   const alertsRaw = useSyncExternalStore(subscribe, () => readStore(ALERTS_KEY), () => "");
   const read = useMemo(() => parseKeys(raw), [raw]);
 
-  // First visit for this wallet: accepted trades from before now are history, not news.
+  // First visit for this wallet: accepted deals from before now are history, not news.
   // Actionable items (direct offers, reclaims) stay unread.
   const seeded = raw !== "";
   useEffect(() => {

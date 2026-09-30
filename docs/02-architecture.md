@@ -58,7 +58,7 @@ Next.js + wagmi + viem + Tailwind. It talks to the chain directly and has no bac
 
 ### Indexer (deferred)
 
-Not in v1. The frontend reads trades straight from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks. Add an indexer when loading gets slow, when search and filters are needed, or to show who filled public trades. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-trades-from-storage.md).
+Not in v1. The frontend reads trades straight from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks. Add an indexer when loading gets slow, when search and filters are needed, or to show who filled public trades. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
 
 ## Key flows
 
@@ -131,4 +131,4 @@ A few Monad specifics that affect the design:
 
 - **Fast blocks:** the UI can wait for the transaction receipt instead of showing long "pending" states.
 - **Gas is charged on the gas limit, not gas used:** give fills sensible explicit limits rather than inflated defaults. Confirm this against Monad's docs.
-- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-trades-from-storage.md)).
+- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)).

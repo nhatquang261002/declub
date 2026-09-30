@@ -149,7 +149,7 @@ body {
   text-transform: uppercase;
 }
 
-.trade-card {
+.deal-card {
   border: 2px solid #111318;
   border-radius: 0.75rem;
   background: #fdf6cd;
@@ -157,12 +157,12 @@ body {
   box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
 }
 
-.trade-card:hover {
+.deal-card:hover {
   border-color: #315ea8;
   background: #fff8dc;
 }
 
-.trade-card .text-muted {
+.deal-card .text-muted {
   color: #4e5968;
 }
 
@@ -448,27 +448,36 @@ body {
 }
 
 .chog-art-chog-left {
-  left: 7%;
+  left: 4%;
   transform: rotate(-8deg);
 }
 
 .chog-art-chog-right {
-  right: 7%;
+  right: 4%;
   transform: rotate(8deg);
 }
 
 .chog-art-arrows {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  top: 43%;
+  left: 50%;
   z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
+.chog-art-arrow-left {
+  transform: rotate(-6deg);
+}
+
+.chog-art-arrow-right {
+  transform: rotate(6deg);
+}
+
 .chog-art-arrow {
-  position: absolute;
   display: grid;
   width: 2rem;
   height: 2rem;
@@ -476,24 +485,11 @@ body {
   border: 2px solid var(--chog-purple-950);
   border-radius: 999px;
   background: var(--chog-pink-500);
-  color: var(--chog-pink-500);
   color: var(--chog-purple-950);
   font-size: 1.35rem;
   font-weight: 900;
   line-height: 1;
   box-shadow: 0.15rem 0.15rem 0 var(--chog-purple-950);
-}
-
-.chog-art-arrow-left {
-  top: 34%;
-  left: 43%;
-  transform: rotate(-8deg);
-}
-
-.chog-art-arrow-right {
-  top: 53%;
-  left: 50%;
-  transform: rotate(8deg);
 }
 
 .chog-art-token {
@@ -541,7 +537,7 @@ body {
   bottom: 2%;
   left: 50%;
   transform: translateX(-50%) rotate(-3deg);
-  color: var(--chog-cream-500);
+  color: var(--action-primary);
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 700;
@@ -571,6 +567,68 @@ body {
 }
 @utility btn-danger {
   @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+}
+
+/* The header's Create button: a sticker with a hard shadow that lifts and tilts on hover. */
+.btn-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem 0.5rem 0.6rem;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: var(--radius-control);
+  background: var(--chog-peach-500);
+  color: var(--chog-purple-950);
+  font-size: 0.875rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0.2rem 0.2rem 0 var(--chog-pink-500);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.btn-create:hover {
+  box-shadow: 0.32rem 0.32rem 0 var(--chog-pink-500);
+  transform: translate(-0.1rem, -0.1rem) rotate(-2deg);
+}
+
+.btn-create:active {
+  box-shadow: 0 0 0 var(--chog-pink-500);
+  transform: translate(0.2rem, 0.2rem);
+}
+
+.btn-create:focus-visible {
+  outline: 3px solid var(--chog-cream-500);
+  outline-offset: 3px;
+}
+
+.btn-create-plus {
+  display: grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--chog-purple-950);
+  color: var(--chog-peach-500);
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-create:hover .btn-create-plus {
+  transform: rotate(180deg) scale(1.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-create,
+  .btn-create-plus {
+    transition: none;
+  }
+
+  .btn-create:hover,
+  .btn-create:active,
+  .btn-create:hover .btn-create-plus {
+    transform: none;
+  }
 }
 
 .wallet-control {

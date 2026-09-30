@@ -6,7 +6,7 @@ export const ASSET_TYPE = { native: 0, erc20: 1, erc721: 2 } as const;
 export type AssetKind = "native" | "erc20" | "erc721";
 const KIND: Record<number, AssetKind> = { 0: "native", 1: "erc20", 2: "erc721" };
 
-/** One line of a V2 trade side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1. */
+/** One line of a V2 deal side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1. */
 export type Asset = {
   kind: AssetKind;
   token: Address;

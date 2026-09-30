@@ -4,7 +4,7 @@ import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 
-/** A read-only side of a V2 trade. Token names come from the token contracts (`info`). */
+/** A read-only side of a V2 deal. Token names come from the token contracts (`info`). */
 export function AssetList({ assets, info }: { assets: readonly Asset[]; info: ReadonlyMap<string, TokenInfo> }) {
   return (
     <ul className="space-y-2">

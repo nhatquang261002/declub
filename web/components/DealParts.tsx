@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { formatMon, shortAddress } from "@/lib/format";
-import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
+import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { TraitFilter } from "@/lib/traitRequests";
 import { ChogThumb } from "./Chog";
 import { TraitRequestSummary } from "./TraitRequest";
@@ -73,8 +73,8 @@ function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: number;
   );
 }
 
-/** One side of a trade: Chog thumbnails plus a MON pill. */
-export function TradeSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint }) {
+/** One side of a deal: Chog thumbnails plus a MON pill. */
+export function DealSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint }) {
   if (ids.length === 0 && mon === 0n) return <span className="text-sm text-muted">Nothing</span>;
   return (
     <div className="flex min-h-20 flex-wrap items-start justify-center gap-2">
@@ -86,43 +86,43 @@ export function TradeSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint })
   );
 }
 
-/** The card chrome shared by v1 and V2 trades: header row, gives / wants panels, maker line. */
-export function TradeCardFrame({
+/** The card chrome shared by v1 and V2 deals: header row, gives / wants panels, maker line. */
+export function DealCardFrame({
   href,
-  trade,
+  deal,
   now,
   me,
   gives,
   wants,
 }: {
   href: string;
-  trade: Pick<Trade, "id" | "maker" | "taker" | "expiry" | "status">;
+  deal: Pick<Deal, "id" | "maker" | "taker" | "expiry" | "status">;
   now: number;
   me?: string;
   gives: ReactNode;
   wants: ReactNode;
 }) {
-  const status = displayStatus(trade, now);
-  const forMe = sameAddress(trade.taker, me);
-  const mine = sameAddress(trade.maker, me);
+  const status = displayStatus(deal, now);
+  const forMe = sameAddress(deal.taker, me);
+  const mine = sameAddress(deal.maker, me);
 
   return (
     <Link
       href={href}
-      className="trade-card group relative block overflow-hidden p-4 transition-colors duration-200"
+      className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200"
     >
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold tracking-tight">Trade #{trade.id.toString()}</span>
+        <span className="font-semibold tracking-tight">Deal #{deal.id.toString()}</span>
         <StatusBadge status={status} />
         {forMe && (
           <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold">For you</span>
         )}
-        {trade.taker && !forMe && (
+        {deal.taker && !forMe && (
           <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
             Private
           </span>
         )}
-        <span className="ml-auto"><ExpiryCountdown expiry={trade.expiry} now={now} status={status} /></span>
+        <span className="ml-auto"><ExpiryCountdown expiry={deal.expiry} now={now} status={status} /></span>
       </div>
 
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
@@ -142,11 +142,11 @@ export function TradeCardFrame({
       </div>
 
       <div className="mt-4 text-xs text-muted">
-        by <span className="font-mono">{mine ? "you" : shortAddress(trade.maker)}</span>
-        {trade.taker && !forMe && (
+        by <span className="font-mono">{mine ? "you" : shortAddress(deal.maker)}</span>
+        {deal.taker && !forMe && (
           <>
             {" "}
-            · only <span className="font-mono">{shortAddress(trade.taker)}</span> can accept
+            · only <span className="font-mono">{shortAddress(deal.taker)}</span> can accept
           </>
         )}
       </div>
@@ -154,55 +154,55 @@ export function TradeCardFrame({
   );
 }
 
-export function TradeCard({
-  trade,
+export function DealCard({
+  deal,
   now,
   me,
   traitLabels,
 }: {
-  trade: Trade;
+  deal: Deal;
   now: number;
   me?: string;
   /** Merkle root (lowercase) → trait, so trait requests can be named. */
   traitLabels?: Map<string, TraitFilter>;
 }) {
   return (
-    <TradeCardFrame
-      href={`/trade/${trade.id}`}
-      trade={trade}
+    <DealCardFrame
+      href={`/deal/${deal.id}`}
+      deal={deal}
       now={now}
       me={me}
-      gives={<TradeSide ids={trade.offeredIds} mon={trade.offeredMon} />}
+      gives={<DealSide ids={deal.offeredIds} mon={deal.offeredMon} />}
       wants={
-        trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n ? (
+        deal.requestedRoot && deal.requestedCount && deal.requestedCount > 0n ? (
           <TraitRequestSummary
-            filter={traitLabels?.get(trade.requestedRoot.toLowerCase())}
-            count={trade.requestedCount}
-            root={trade.requestedRoot}
+            filter={traitLabels?.get(deal.requestedRoot.toLowerCase())}
+            count={deal.requestedCount}
+            root={deal.requestedRoot}
           />
         ) : (
-          <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />
+          <DealSide ids={deal.requestedIds} mon={deal.requestedMon} />
         )
       }
     />
   );
 }
 
-export function TradeGrid({
-  trades,
+export function DealGrid({
+  deals,
   now,
   me,
   traitLabels,
 }: {
-  trades: Trade[];
+  deals: Deal[];
   now: number;
   me?: string;
   traitLabels?: Map<string, TraitFilter>;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {trades.map((t) => (
-        <TradeCard key={t.id.toString()} trade={t} now={now} me={me} traitLabels={traitLabels} />
+      {deals.map((t) => (
+        <DealCard key={t.id.toString()} deal={t} now={now} me={me} traitLabels={traitLabels} />
       ))}
     </div>
   );

@@ -155,12 +155,15 @@ export function useChogMetadata(id: bigint) {
   };
 }
 
-/** Loads the complete enumerable MockChog catalog for trait-request creation. */
-export function useChogCatalog() {
+/**
+ * Loads the complete enumerable MockChog catalog for trait-request creation.
+ * Pass `enabled: false` to skip the reads until a screen actually needs the catalog.
+ */
+export function useChogCatalog({ enabled = true }: { enabled?: boolean } = {}) {
   const supply = useReadContract({
     ...chog,
     functionName: "totalSupply",
-    query: { staleTime: 30_000 },
+    query: { enabled, staleTime: 30_000 },
   });
   const count = Number(supply.data ?? 0n);
   const ids = Array.from({ length: count }, (_, index) => BigInt(index + 1));

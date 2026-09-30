@@ -31,3 +31,28 @@ export function traitRootIndex(
   }
   return index;
 }
+
+type CatalogEntry = {
+  id: bigint;
+  metadata: { attributes: readonly { trait_type: string; value: string }[] };
+};
+
+/** Every trait/value pair in the catalog that a request can name. "None" is skipped. */
+export function traitOptions(entries: readonly CatalogEntry[]): TraitFilter[] {
+  const options = new Map<string, TraitFilter>();
+  for (const { metadata } of entries) {
+    for (const { trait_type, value } of metadata.attributes) {
+      if (value !== "None") options.set(`${trait_type}:${value}`, { traitType: trait_type, value });
+    }
+  }
+  return [...options.values()];
+}
+
+/** The ids whose metadata has `filter`'s trait: the set a trait request commits to. */
+export function idsWithTrait(entries: readonly CatalogEntry[], filter: TraitFilter): bigint[] {
+  return entries
+    .filter(({ metadata }) =>
+      metadata.attributes.some((a) => a.trait_type === filter.traitType && a.value === filter.value),
+    )
+    .map(({ id }) => id);
+}
