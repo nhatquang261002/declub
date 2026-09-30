@@ -9,7 +9,8 @@ import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 import {MonReceiver} from "../../utils/Actors.sol";
 import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 
-/// @dev Random create / fill / cancel / reclaim / claim / block / warp sequences over 3 EOAs and
+/// @dev Random create / open offer / propose / accept / reject / withdraw / fill / cancel / reclaim /
+///      claim / block / warp sequences over 3 EOAs and
 ///      1 MON-rejecting contract, trading native + two ERC-20s (one with a blocklist) + Chogs.
 ///      The invariants recompute escrow from the trades themselves, so the only ghost state is
 ///      the expected status per trade and a few counters that must stay 0.
@@ -21,12 +22,16 @@ contract Handler is Test {
 
     address[] public actors;
     mapping(uint256 tradeId => IChogSwapV2.Status) public expectedStatus;
+    mapping(uint256 tradeId => mapping(uint256 proposalId => IChogSwapV2.ProposalStatus)) public
+        expectedProposal;
 
     uint256 public ghost_expiredFills; // I6
     uint256 public ghost_badSettlements; // fill moved assets to the wrong place
     uint256 public ghost_badRefunds; // I7
     uint256 public ghost_validFillReverted; // liveness: a valid fill must not revert
     uint256 public ghost_validCancelReverted; // a maker can always cancel
+    uint256 public ghost_openOfferFilled; // V8: fillTrade must never settle an open offer
+    uint256 public ghost_validProposalOpReverted; // valid propose / accept / reject / withdraw
 
     mapping(bytes32 => uint256) public calls;
 
@@ -103,6 +108,14 @@ contract Handler is Test {
         if (!ok) return;
 
         address taker = t.taker != address(0) ? t.taker : _actor(takerSeed);
+        if (t.requested.length == 0) {
+            // V8: an open offer has no ask, so filling it must always revert.
+            vm.prank(taker == t.maker ? _actor(takerSeed + 1) : taker);
+            try swap.fillTrade(id) {
+                ghost_openOfferFilled++;
+            } catch {}
+            return;
+        }
         if (taker == t.maker || !_canPay(taker, t)) return;
 
         bool expired = swap.isExpired(id);
@@ -123,6 +136,130 @@ contract Handler is Test {
             calls["fill"]++;
         } catch {
             if (!expired) ghost_validFillReverted++;
+        }
+    }
+
+    function createOffer(
+        uint256 makerSeed,
+        uint256 offeredMask,
+        uint256 nftSeed,
+        uint256 amountSeed,
+        uint256 expirySeed,
+        bool restrictTaker
+    ) external {
+        address maker = _actor(makerSeed);
+        address counterparty = _actor(makerSeed + 1 + (offeredMask >> 8) % 3);
+        IChogSwapV2.Asset[] memory offered =
+            _side(maker, offeredMask & 7, bound(nftSeed, 0, 2), amountSeed);
+        if (offered.length == 0) return;
+
+        uint64 expiry =
+            expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
+        vm.prank(maker);
+        uint256 id = swap.createOpenOffer{value: _sum(offered, 0)}(
+            offered, restrictTaker ? counterparty : address(0), expiry, "note"
+        );
+        expectedStatus[id] = IChogSwapV2.Status.Open;
+        calls["offer"]++;
+    }
+
+    function propose(
+        uint256 tradeSeed,
+        uint256 proposerSeed,
+        uint256 mask,
+        uint256 nftSeed,
+        uint256 amountSeed
+    ) external {
+        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        if (!ok || t.requested.length != 0 || swap.isExpired(id)) return;
+
+        address proposer = t.taker != address(0) ? t.taker : _actor(proposerSeed);
+        if (proposer == t.maker) return;
+        // A proposal never repeats an asset the maker offers (SameAssetBothSides).
+        mask = (mask & 7) & ~_maskOf(t.offered);
+        IChogSwapV2.Asset[] memory assets = _side(proposer, mask, bound(nftSeed, 0, 2), amountSeed);
+        if (assets.length == 0) return;
+
+        vm.prank(proposer);
+        try swap.propose{value: _sum(assets, 0)}(id, assets) returns (uint256 pid) {
+            if (pid != swap.proposalCount(id) - 1) ghost_validProposalOpReverted++;
+            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Active;
+            calls["propose"]++;
+        } catch {
+            ghost_validProposalOpReverted++;
+        }
+    }
+
+    function acceptProposal(uint256 tradeSeed, uint256 proposalSeed) external {
+        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        if (!ok || t.requested.length != 0 || swap.isExpired(id)) return;
+        uint256 n = swap.proposalCount(id);
+        if (n == 0) return;
+        uint256 pid = proposalSeed % n;
+        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+
+        uint256[3] memory makerBefore = _holdings(t.maker);
+        uint256[3] memory proposerBefore = _holdings(p.proposer);
+        vm.prank(t.maker);
+        try swap.acceptProposal(id, pid) {
+            expectedStatus[id] = IChogSwapV2.Status.Filled;
+            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Accepted;
+            _checkNfts(p.assets, t.maker);
+            _checkNfts(t.offered, p.proposer);
+            IChogSwapV2.Asset[] memory none = new IChogSwapV2.Asset[](0);
+            if (!_gained(t.maker, makerBefore, p.assets, none)) ghost_badSettlements++;
+            if (!_gained(p.proposer, proposerBefore, t.offered, none)) ghost_badSettlements++;
+            calls["accept"]++;
+        } catch {
+            ghost_validProposalOpReverted++;
+        }
+    }
+
+    function rejectProposal(uint256 tradeSeed, uint256 proposalSeed) external {
+        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        if (!ok || t.requested.length != 0) return;
+        uint256 n = swap.proposalCount(id);
+        if (n == 0) return;
+        uint256 pid = proposalSeed % n;
+        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+
+        uint256[3] memory before = _holdings(p.proposer);
+        vm.prank(t.maker);
+        try swap.rejectProposal(id, pid) {
+            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Rejected;
+            _checkNfts(p.assets, p.proposer);
+            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0))) {
+                ghost_badRefunds++;
+            }
+            calls["reject"]++;
+        } catch {
+            ghost_validProposalOpReverted++;
+        }
+    }
+
+    function withdrawProposal(uint256 tradeSeed, uint256 proposalSeed) external {
+        uint256 count = swap.tradeCount();
+        if (count == 0) return;
+        uint256 id = (tradeSeed % count) + 1;
+        uint256 n = swap.proposalCount(id);
+        if (n == 0) return;
+        uint256 pid = proposalSeed % n;
+        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+
+        uint256[3] memory before = _holdings(p.proposer);
+        vm.prank(p.proposer);
+        try swap.withdrawProposal(id, pid) {
+            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Withdrawn;
+            _checkNfts(p.assets, p.proposer);
+            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0))) {
+                ghost_badRefunds++;
+            }
+            calls["withdraw"]++;
+        } catch {
+            ghost_validProposalOpReverted++;
         }
     }
 
@@ -240,6 +377,16 @@ contract Handler is Test {
             ) {
                 ghost_badSettlements++;
             }
+        }
+    }
+
+    /// @dev Bitmask (bit0 native, bit1 usdc, bit2 blk) of the fungibles in `assets`.
+    function _maskOf(IChogSwapV2.Asset[] memory assets) internal view returns (uint256 mask) {
+        for (uint256 i; i < assets.length; ++i) {
+            IChogSwapV2.Asset memory a = assets[i];
+            if (a.assetType == IChogSwapV2.AssetType.Native) mask |= 1;
+            else if (a.token == address(usdc)) mask |= 2;
+            else if (a.token == address(blk)) mask |= 4;
         }
     }
 

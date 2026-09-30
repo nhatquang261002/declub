@@ -134,6 +134,33 @@ abstract contract ChogSwapV2Base is Test {
         id = swap.createTrade{value: _nativeOf(offered)}(offered, requested, taker, expiry);
     }
 
+    /// @dev `maker` opens a public, no-expiry open offer with `note`.
+    function _openOffer(address maker, IChogSwapV2.Asset[] memory offered, string memory note)
+        internal
+        returns (uint256)
+    {
+        return _openOffer(maker, offered, note, address(0), 0);
+    }
+
+    function _openOffer(
+        address maker,
+        IChogSwapV2.Asset[] memory offered,
+        string memory note,
+        address taker,
+        uint64 expiry
+    ) internal returns (uint256 id) {
+        vm.prank(maker);
+        id = swap.createOpenOffer{value: _nativeOf(offered)}(offered, taker, expiry, note);
+    }
+
+    function _propose(address who, uint256 id, IChogSwapV2.Asset[] memory assets)
+        internal
+        returns (uint256 proposalId)
+    {
+        vm.prank(who);
+        proposalId = swap.propose{value: _nativeOf(assets)}(id, assets);
+    }
+
     function _fill(address taker, uint256 id) internal {
         uint256 value = _nativeOf(swap.getTrade(id).requested);
         vm.prank(taker);

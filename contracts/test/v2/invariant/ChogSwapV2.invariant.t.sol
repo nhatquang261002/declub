@@ -9,8 +9,9 @@ import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 import {Handler} from "./Handler.sol";
 
-/// @dev The escrow is always exactly what open trades hold plus what is credited for `claim`,
-///      for native, every ERC-20 and every NFT, however the calls interleave.
+/// @dev The escrow is always exactly what open trades and `Active` proposals hold plus what is
+///      credited for `claim`, for native, every ERC-20 and every NFT, however the calls
+///      interleave.
 contract ChogSwapV2InvariantTest is Test {
     ChogSwapV2 internal swap;
     MockChog internal chog;
@@ -26,7 +27,7 @@ contract ChogSwapV2InvariantTest is Test {
         handler = new Handler(swap, chog, usdc, blk);
 
         targetContract(address(handler));
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = Handler.create.selector;
         selectors[1] = Handler.fill.selector;
         selectors[2] = Handler.cancel.selector;
@@ -35,6 +36,11 @@ contract ChogSwapV2InvariantTest is Test {
         selectors[5] = Handler.setBlocked.selector;
         selectors[6] = Handler.acceptMon.selector;
         selectors[7] = Handler.warp.selector;
+        selectors[8] = Handler.createOffer.selector;
+        selectors[9] = Handler.propose.selector;
+        selectors[10] = Handler.acceptProposal.selector;
+        selectors[11] = Handler.rejectProposal.selector;
+        selectors[12] = Handler.withdrawProposal.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
@@ -48,6 +54,17 @@ contract ChogSwapV2InvariantTest is Test {
         }
     }
 
+    function _sumOf(IChogSwapV2.Asset[] memory assets, IChogSwapV2.AssetType t, address token)
+        internal
+        pure
+        returns (uint256 sum)
+    {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == t && assets[i].token == token) sum += assets[i].amount;
+        }
+    }
+
+    /// @dev What escrow holds of a fungible: open trades' offered sides plus `Active` proposals.
     function _openOffered(IChogSwapV2.AssetType t, address token)
         internal
         view
@@ -55,13 +72,27 @@ contract ChogSwapV2InvariantTest is Test {
     {
         for (uint256 id = 1; id <= swap.tradeCount(); ++id) {
             IChogSwapV2.Trade memory trade = swap.getTrade(id);
-            if (trade.status != IChogSwapV2.Status.Open) continue;
-            for (uint256 i; i < trade.offered.length; ++i) {
-                if (trade.offered[i].assetType == t && trade.offered[i].token == token) {
-                    sum += trade.offered[i].amount;
+            if (trade.status == IChogSwapV2.Status.Open) {
+                sum += _sumOf(trade.offered, t, token);
+            }
+            for (uint256 pid; pid < swap.proposalCount(id); ++pid) {
+                IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
+                if (p.status == IChogSwapV2.ProposalStatus.Active) {
+                    sum += _sumOf(p.assets, t, token);
                 }
             }
         }
+    }
+
+    function _holdsNft(IChogSwapV2.Asset[] memory assets, address token, uint256 tokenId)
+        internal
+        pure
+        returns (bool)
+    {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].token == token && assets[i].id == tokenId) return true;
+        }
+        return false;
     }
 
     /// I1: native balance == Σ open native offered + Σ native credits.
@@ -87,16 +118,26 @@ contract ChogSwapV2InvariantTest is Test {
         );
     }
 
-    /// I3: the contract owns an NFT iff an open trade offers it (Chogs are never credited).
+    /// I3: the contract owns an NFT iff an open trade offers it or an `Active` proposal holds it
+    ///     (Chogs are never credited).
     function invariant_nftsAreFullyAccounted() public view {
         uint256 minted = chog.nextTokenId();
         for (uint256 tokenId = 1; tokenId < minted; ++tokenId) {
             bool escrowed;
             for (uint256 id = 1; id <= swap.tradeCount() && !escrowed; ++id) {
                 IChogSwapV2.Trade memory t = swap.getTrade(id);
-                if (t.status != IChogSwapV2.Status.Open) continue;
-                for (uint256 i; i < t.offered.length; ++i) {
-                    if (t.offered[i].token == address(chog) && t.offered[i].id == tokenId) {
+                if (
+                    t.status == IChogSwapV2.Status.Open
+                        && _holdsNft(t.offered, address(chog), tokenId)
+                ) {
+                    escrowed = true;
+                }
+                for (uint256 pid; pid < swap.proposalCount(id) && !escrowed; ++pid) {
+                    IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
+                    if (
+                        p.status == IChogSwapV2.ProposalStatus.Active
+                            && _holdsNft(p.assets, address(chog), tokenId)
+                    ) {
                         escrowed = true;
                     }
                 }
@@ -112,6 +153,26 @@ contract ChogSwapV2InvariantTest is Test {
             assertEq(uint8(swap.getTrade(id).status), uint8(handler.expectedStatus(id)), "status");
             assertTrue(swap.getTrade(id).status != IChogSwapV2.Status.None);
         }
+    }
+
+    /// Proposal statuses only move Active → terminal, match what the handler did, and a
+    /// proposal that was accepted belongs to a filled trade.
+    function invariant_proposalStatusesMatchHistory() public view {
+        for (uint256 id = 1; id <= swap.tradeCount(); ++id) {
+            for (uint256 pid; pid < swap.proposalCount(id); ++pid) {
+                IChogSwapV2.ProposalStatus s = swap.getProposal(id, pid).status;
+                assertEq(uint8(s), uint8(handler.expectedProposal(id, pid)), "proposal status");
+                if (s == IChogSwapV2.ProposalStatus.Accepted) {
+                    assertEq(uint8(swap.getTrade(id).status), uint8(IChogSwapV2.Status.Filled));
+                }
+            }
+        }
+    }
+
+    /// V8: `fillTrade` never settles an open offer, and every valid proposal call succeeds.
+    function invariant_openOffersAreOnlySettledByAccept() public view {
+        assertEq(handler.ghost_openOfferFilled(), 0, "open offer filled");
+        assertEq(handler.ghost_validProposalOpReverted(), 0, "valid proposal call reverted");
     }
 
     /// I6, I7 and liveness: a valid fill / cancel never reverts, an expired trade never fills,
@@ -130,5 +191,10 @@ contract ChogSwapV2InvariantTest is Test {
         emit log_named_uint("cancel", handler.calls("cancel"));
         emit log_named_uint("reclaim", handler.calls("reclaim"));
         emit log_named_uint("claim", handler.calls("claim"));
+        emit log_named_uint("offer", handler.calls("offer"));
+        emit log_named_uint("propose", handler.calls("propose"));
+        emit log_named_uint("accept", handler.calls("accept"));
+        emit log_named_uint("reject", handler.calls("reject"));
+        emit log_named_uint("withdraw", handler.calls("withdraw"));
     }
 }

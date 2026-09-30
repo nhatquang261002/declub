@@ -8,8 +8,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IChogSwapV2} from "./interfaces/IChogSwapV2.sol";
 
 /// @title ChogSwapV2: generic multi-asset OTC escrow
-/// @notice See IChogSwapV2 for the behaviour spec and docs/adr/0005-generic-asset-model.md for
-///         the reasoning.
+/// @notice See IChogSwapV2 for the behaviour spec, docs/adr/0005-generic-asset-model.md and
+///         docs/adr/0007-open-offers.md for the reasoning.
 /// @dev No admin, no fees, no upgradeability, no token allowlist. Every mutating function is
 ///      nonReentrant and follows checks → effects → interactions. Payouts out of escrow never
 ///      revert: a recipient or token that rejects one gets a credit to `claim` instead.
@@ -18,10 +18,13 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
+    uint256 public constant MAX_NOTE_BYTES = 280;
 
     uint256 public tradeCount;
 
     mapping(uint256 tradeId => Trade) internal _trades;
+    mapping(uint256 tradeId => string) internal _notes;
+    mapping(uint256 tradeId => Proposal[]) internal _proposals;
     /// @dev account → keccak256(assetType, token, id) → amount. Native and ERC-20 amounts add
     ///      up; an NFT credit is 1.
     mapping(address account => mapping(bytes32 assetKey => uint256 amount)) internal _credits;
@@ -42,30 +45,128 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
 
-        tradeId = ++tradeCount;
-        Trade storage t = _trades[tradeId];
-        t.maker = msg.sender;
-        t.expiry = expiry;
-        t.status = Status.Open;
-        t.taker = taker;
-        for (uint256 i; i < offered.length; ++i) {
-            t.offered.push(offered[i]);
-        }
+        tradeId = _newTrade(offered, taker, expiry);
+        Asset[] storage stored = _trades[tradeId].requested;
         for (uint256 i; i < requested.length; ++i) {
-            t.requested.push(requested[i]);
+            stored.push(requested[i]);
         }
 
         emit TradeCreated(tradeId, msg.sender, taker, offered, requested, expiry);
 
-        for (uint256 i; i < offered.length; ++i) {
-            _deposit(offered[i]);
+        _depositAll(offered);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function createOpenOffer(
+        Asset[] calldata offered,
+        address taker,
+        uint64 expiry,
+        string calldata note
+    ) external payable nonReentrant returns (uint256 tradeId) {
+        uint256 offeredNative = _validateSide(offered);
+        if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
+        // forge-lint: disable-next-line(block-timestamp)
+        if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
+        uint256 noteLength = bytes(note).length;
+        if (noteLength > MAX_NOTE_BYTES) revert NoteTooLong(noteLength, MAX_NOTE_BYTES);
+
+        tradeId = _newTrade(offered, taker, expiry);
+
+        emit TradeCreated(tradeId, msg.sender, taker, offered, new Asset[](0), expiry);
+        if (noteLength != 0) {
+            _notes[tradeId] = note;
+            emit OfferNote(tradeId, note);
         }
+
+        _depositAll(offered);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function propose(uint256 tradeId, Asset[] calldata assets)
+        external
+        payable
+        nonReentrant
+        returns (uint256 proposalId)
+    {
+        Trade storage t = _trades[tradeId];
+        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        if (t.requested.length != 0) revert NotOpenOffer(tradeId);
+        if (_isExpired(t)) revert TradeIsExpired(tradeId);
+        address taker = t.taker;
+        if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
+        if (msg.sender == t.maker) revert SelfPropose(tradeId);
+
+        uint256 native = _validateSide(assets);
+        _validateNoOverlap(t.offered, assets);
+        if (msg.value != native) revert WrongNativeAmount(native, msg.value);
+
+        Proposal[] storage all = _proposals[tradeId];
+        proposalId = all.length;
+        Proposal storage p = all.push();
+        p.proposer = msg.sender;
+        p.status = ProposalStatus.Active;
+        for (uint256 i; i < assets.length; ++i) {
+            p.assets.push(assets[i]);
+        }
+
+        emit ProposalCreated(tradeId, proposalId, msg.sender, assets);
+
+        _depositAll(assets);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function withdrawProposal(uint256 tradeId, uint256 proposalId) external nonReentrant {
+        Proposal storage p = _proposal(tradeId, proposalId);
+        if (msg.sender != p.proposer) revert NotProposer(tradeId, proposalId);
+        if (p.status != ProposalStatus.Active) revert ProposalNotActive(tradeId, proposalId);
+
+        p.status = ProposalStatus.Withdrawn;
+        emit ProposalWithdrawn(tradeId, proposalId);
+
+        _payoutAll(p.assets, msg.sender);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function rejectProposal(uint256 tradeId, uint256 proposalId) external nonReentrant {
+        Trade storage t = _trades[tradeId];
+        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        if (msg.sender != t.maker) revert NotMaker(tradeId);
+        Proposal storage p = _proposal(tradeId, proposalId);
+        if (p.status != ProposalStatus.Active) revert ProposalNotActive(tradeId, proposalId);
+
+        p.status = ProposalStatus.Rejected;
+        emit ProposalRejected(tradeId, proposalId);
+
+        _payoutAll(p.assets, p.proposer);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function acceptProposal(uint256 tradeId, uint256 proposalId) external nonReentrant {
+        Trade storage t = _trades[tradeId];
+        if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        if (msg.sender != t.maker) revert NotMaker(tradeId);
+        if (_isExpired(t)) revert TradeIsExpired(tradeId);
+        Proposal storage p = _proposal(tradeId, proposalId);
+        if (p.status != ProposalStatus.Active) revert ProposalNotActive(tradeId, proposalId);
+
+        address proposer = p.proposer;
+        t.status = Status.Filled;
+        p.status = ProposalStatus.Accepted;
+        emit TradeFilled(tradeId, msg.sender, proposer);
+        emit ProposalAccepted(tradeId, proposalId);
+
+        // Both sides are already in escrow, so neither payout can revert: a rejected one is
+        // credited for `claim`.
+        _payoutAll(p.assets, msg.sender);
+        _payoutAll(t.offered, proposer);
     }
 
     /// @inheritdoc IChogSwapV2
     function fillTrade(uint256 tradeId) external payable nonReentrant {
         Trade storage t = _trades[tradeId];
         if (t.status != Status.Open) revert TradeNotOpen(tradeId);
+        // An open offer has no ask. Without this a caller would take the escrow for free.
+        if (t.requested.length == 0) revert OpenOfferNoFill(tradeId);
         if (_isExpired(t)) revert TradeIsExpired(tradeId);
         address maker = t.maker;
         address taker = t.taker;
@@ -144,6 +245,42 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     }
 
     /// @inheritdoc IChogSwapV2
+    function offerNote(uint256 tradeId) external view returns (string memory) {
+        return _notes[tradeId];
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function proposalCount(uint256 tradeId) external view returns (uint256) {
+        return _proposals[tradeId].length;
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function getProposal(uint256 tradeId, uint256 proposalId)
+        external
+        view
+        returns (Proposal memory)
+    {
+        return _proposal(tradeId, proposalId);
+    }
+
+    /// @inheritdoc IChogSwapV2
+    function getProposals(uint256 tradeId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (Proposal[] memory page)
+    {
+        Proposal[] storage all = _proposals[tradeId];
+        uint256 total = all.length;
+        if (offset >= total) return page;
+        uint256 n = total - offset;
+        if (limit < n) n = limit;
+        page = new Proposal[](n);
+        for (uint256 i; i < n; ++i) {
+            page[i] = all[offset + i];
+        }
+    }
+
+    /// @inheritdoc IChogSwapV2
     function claimable(address account, AssetType assetType, address token, uint256 id)
         external
         view
@@ -189,11 +326,58 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         }
     }
 
+    /// @dev A proposal can't contain an asset the maker offers, for the same reason as above.
+    // forge-lint: disable-next-item(require-revert-in-loop)
+    function _validateNoOverlap(Asset[] storage offered, Asset[] calldata proposed) private view {
+        for (uint256 i; i < offered.length; ++i) {
+            for (uint256 j; j < proposed.length; ++j) {
+                Asset storage a = offered[i];
+                Asset calldata b = proposed[j];
+                if (a.assetType == b.assetType && a.token == b.token && a.id == b.id) {
+                    revert SameAssetBothSides(i, j);
+                }
+            }
+        }
+    }
+
     function _same(Asset calldata a, Asset calldata b) private pure returns (bool) {
         return a.assetType == b.assetType && a.token == b.token && a.id == b.id;
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
+
+    /// @dev Stores the trade header and the offered side. The caller adds `requested`, emits the
+    ///      creation event and deposits, in that order.
+    function _newTrade(Asset[] calldata offered, address taker, uint64 expiry)
+        private
+        returns (uint256 tradeId)
+    {
+        tradeId = ++tradeCount;
+        Trade storage t = _trades[tradeId];
+        t.maker = msg.sender;
+        t.expiry = expiry;
+        t.status = Status.Open;
+        t.taker = taker;
+        for (uint256 i; i < offered.length; ++i) {
+            t.offered.push(offered[i]);
+        }
+    }
+
+    function _proposal(uint256 tradeId, uint256 proposalId)
+        private
+        view
+        returns (Proposal storage)
+    {
+        Proposal[] storage all = _proposals[tradeId];
+        if (proposalId >= all.length) revert UnknownProposal(tradeId, proposalId);
+        return all[proposalId];
+    }
+
+    function _depositAll(Asset[] calldata assets) private {
+        for (uint256 i; i < assets.length; ++i) {
+            _deposit(assets[i]);
+        }
+    }
 
     function _isExpired(Trade storage t) private view returns (bool) {
         uint64 expiry = t.expiry;
