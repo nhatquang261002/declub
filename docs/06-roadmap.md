@@ -58,12 +58,12 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ## Phase 4: Protocol expansion
 
-- [x] Generic `Asset[]` model: any ERC-721, ERC-20, native. `ChogSwapV2`, a separate contract beside v1 ([ADR 0005](adr/0005-generic-asset-model.md)); 100% coverage, invariants V1–V7. Not deployed yet
+- [x] Generic `Asset[]` model: any ERC-721, ERC-20, native. `ChogSwapV2`, a separate contract beside v1 ([ADR 0005](adr/0005-generic-asset-model.md)); 100% coverage, invariants V1–V7. Deployed to testnet (see the README)
 - [x] Multi-asset trades (up to 10 assets per side, any mix; same contract)
-- [ ] Deploy `ChogSwapV2` to testnet (`script/DeployV2.s.sol`) and verify
+- [x] Deploy `ChogSwapV2` to testnet (`script/DeployV2.s.sol`) and verify. `0x8a05…CC75` and a MockERC20 (mUSD) `0xd300…6F6c`, blocks 66874644 / 66874652, both on Sourcify
 - [x] Frontend for V2, plumbing: V2 ABI, optional config, `TradeV2` + `toLegacyTrade` adapter, `useTradesV2`, `useTokenInfo`, error copy
 - [x] Frontend for V2, create and detail screens (`/v2/create`, `/v2/trade/[id]`): asset editor, exact-amount ERC-20 approvals, NFT collection approvals, accept / cancel / reclaim, `claim`. Typechecked and built; not exercised against a deployed V2 yet
-- [ ] Frontend for V2, list: a V2 trades list and a v1/v2 switch on Trades and History
+- [x] Frontend for V2, list: a Chogs / Multi-asset switch on Trades and History, V2 cards and filters (search by NFT id, token symbol or address, maker; MON filter; sort), fills remembered per contract. Typechecked, linted and built; the filter logic was checked with sample trades, but the list has not been exercised against the deployed V2 yet
 - [ ] Trait requests in V2 (a new `AssetType`), so trait trades can move off v1
 - [ ] Trade intents + off-chain matcher
 - [ ] Multi-party ring swaps

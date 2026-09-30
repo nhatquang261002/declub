@@ -73,7 +73,7 @@ function matchesMon(trade: Trade, mon: MonFilter): boolean {
 }
 
 /** Live trades with a deadline first (soonest first), then no-expiry, then the rest. */
-function endingSoonRank(trade: Trade, now: number): number {
+export function endingSoonRank(trade: Pick<Trade, "status" | "expiry">, now: number): number {
   if (trade.status !== "open" || isExpired(trade, now)) return 2;
   return trade.expiry === 0n ? 1 : 0;
 }

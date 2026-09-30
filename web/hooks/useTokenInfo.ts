@@ -5,7 +5,8 @@ import type { Address } from "viem";
 import { useReadContracts } from "wagmi";
 import { erc20Abi } from "viem";
 import { CHAIN_ID } from "@/lib/config";
-import type { TokenInfo } from "@/lib/assets";
+import { erc20Tokens, type TokenInfo } from "@/lib/assets";
+import type { TradeV2 } from "@/lib/tradesV2";
 
 /**
  * Symbol and decimals read from each token contract. Anyone can list any ERC-20 in V2, so the
@@ -37,4 +38,13 @@ export function useTokenInfo(tokens: readonly Address[]) {
   }, [result.data, tokens]);
 
   return { info, isLoading: result.isLoading };
+}
+
+/** `useTokenInfo` for every ERC-20 that appears in a list of V2 trades. */
+export function useTradesTokenInfo(trades: readonly TradeV2[]) {
+  const tokens = useMemo(
+    () => erc20Tokens(trades.flatMap((t) => [...t.offered, ...t.requested])),
+    [trades],
+  );
+  return useTokenInfo(tokens);
 }

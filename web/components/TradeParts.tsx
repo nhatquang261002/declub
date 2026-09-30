@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { formatMon, shortAddress } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
 import type { TraitFilter } from "@/lib/traitRequests";
@@ -85,17 +86,21 @@ export function TradeSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint })
   );
 }
 
-export function TradeCard({
+/** The card chrome shared by v1 and V2 trades: header row, gives / wants panels, maker line. */
+export function TradeCardFrame({
+  href,
   trade,
   now,
   me,
-  traitLabels,
+  gives,
+  wants,
 }: {
-  trade: Trade;
+  href: string;
+  trade: Pick<Trade, "id" | "maker" | "taker" | "expiry" | "status">;
   now: number;
   me?: string;
-  /** Merkle root (lowercase) → trait, so trait requests can be named. */
-  traitLabels?: Map<string, TraitFilter>;
+  gives: ReactNode;
+  wants: ReactNode;
 }) {
   const status = displayStatus(trade, now);
   const forMe = sameAddress(trade.taker, me);
@@ -103,7 +108,7 @@ export function TradeCard({
 
   return (
     <Link
-      href={`/trade/${trade.id}`}
+      href={href}
       className="trade-card group relative block overflow-hidden p-4 transition-colors duration-200"
     >
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -125,20 +130,14 @@ export function TradeCard({
           <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
             gives
           </span>
-          <TradeSide ids={trade.offeredIds} mon={trade.offeredMon} />
+          {gives}
         </div>
         <div className="flex items-center text-lg text-muted">↔</div>
         <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
           <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
             wants
           </span>
-          {trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n
-            ? <TraitRequestSummary
-                filter={traitLabels?.get(trade.requestedRoot.toLowerCase())}
-                count={trade.requestedCount}
-                root={trade.requestedRoot}
-              />
-            : <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />}
+          {wants}
         </div>
       </div>
 
@@ -152,6 +151,40 @@ export function TradeCard({
         )}
       </div>
     </Link>
+  );
+}
+
+export function TradeCard({
+  trade,
+  now,
+  me,
+  traitLabels,
+}: {
+  trade: Trade;
+  now: number;
+  me?: string;
+  /** Merkle root (lowercase) → trait, so trait requests can be named. */
+  traitLabels?: Map<string, TraitFilter>;
+}) {
+  return (
+    <TradeCardFrame
+      href={`/trade/${trade.id}`}
+      trade={trade}
+      now={now}
+      me={me}
+      gives={<TradeSide ids={trade.offeredIds} mon={trade.offeredMon} />}
+      wants={
+        trade.requestedRoot && trade.requestedCount && trade.requestedCount > 0n ? (
+          <TraitRequestSummary
+            filter={traitLabels?.get(trade.requestedRoot.toLowerCase())}
+            count={trade.requestedCount}
+            root={trade.requestedRoot}
+          />
+        ) : (
+          <TradeSide ids={trade.requestedIds} mon={trade.requestedMon} />
+        )
+      }
+    />
   );
 }
 

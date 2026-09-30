@@ -9,13 +9,13 @@ import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
 // (ADR 0003), remember the trades this browser filled.
 
 const EVENT = "chogswap:fills";
-const key = (account: string) =>
-  `chogswap:fills:${CHAIN_ID}:${CHOG_SWAP_ADDRESS}:${account.toLowerCase()}`;
+const key = (contract: string, account: string) =>
+  `chogswap:fills:${CHAIN_ID}:${contract}:${account.toLowerCase()}`;
 
-function read(account: string | undefined): string {
+function read(contract: string, account: string | undefined): string {
   if (!account) return "[]";
   try {
-    return localStorage.getItem(key(account)) ?? "[]";
+    return localStorage.getItem(key(contract, account)) ?? "[]";
   } catch {
     return "[]";
   }
@@ -30,11 +30,12 @@ function subscribe(onChange: () => void) {
   };
 }
 
-export function useLocalFills(account: Address | undefined) {
+/** Fills are recorded per swap contract, so v1 and V2 trade ids don't mix. Defaults to v1. */
+export function useLocalFills(account: Address | undefined, contract: Address = CHOG_SWAP_ADDRESS) {
   // Snapshot is the raw string so React can compare it by value.
   const raw = useSyncExternalStore(
     subscribe,
-    () => read(account),
+    () => read(contract, account),
     () => "[]",
   );
 
@@ -43,16 +44,16 @@ export function useLocalFills(account: Address | undefined) {
   const record = useCallback(
     (tradeId: bigint) => {
       if (!account) return;
-      const next = new Set(parse(read(account)).map(String));
+      const next = new Set(parse(read(contract, account)).map(String));
       next.add(tradeId.toString());
       try {
-        localStorage.setItem(key(account), JSON.stringify([...next]));
+        localStorage.setItem(key(contract, account), JSON.stringify([...next]));
         window.dispatchEvent(new Event(EVENT));
       } catch {
         // Storage unavailable (private mode); history just won't list this fill.
       }
     },
-    [account],
+    [account, contract],
   );
 
   return { ids, record };

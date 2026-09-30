@@ -13,7 +13,7 @@ web/
 │   ├── layout.tsx              ✓ providers, header, footer
 │   ├── globals.css             ✓ Tailwind theme tokens + card/btn/input utilities
 │   ├── page.tsx                ✓ Home: hero, how it works, links to Trades / Create / Guide
-│   ├── trades/page.tsx         ✓ Open Trades (tabs: Open · For you · All, search + filters)
+│   ├── trades/page.tsx         ✓ Open Trades: Chogs / Multi-asset switch → TradesV1 · TradesV2 (tabs, search + filters)
 │   ├── my-chogs/page.tsx       ✓ wallet's Chogs → "Trade this", MockChog mint panel
 │   ├── create/page.tsx         ✓ Create Trade form
 │   ├── trade/[id]/page.tsx     ✓ Trade Detail + actions
@@ -137,7 +137,11 @@ Choices worth knowing:
 - **Approvals are exact for tokens, collection-wide for NFTs.** An ERC-20 is approved for the amount in the trade, no more. An NFT collection uses `setApprovalForAll`, the only way to cover several ids in one transaction. The button shows the next missing approval ("1 of 3"), then turns into Create / Accept.
 - **Token names come from the token.** The editor shows the symbol and decimals read on-chain under each address, and amounts are parsed with those decimals. A row with more decimals than the token has is rejected instead of rounded.
 - **Held payouts:** the trade page reads `claimable` for every asset in the trade and offers a Claim button for what the connected wallet is owed.
-- **Not built yet:** a V2 trades list, and a v1/v2 switch on Trades and History. Until then V2 trades are reached by link (the create form redirects to one).
+- **Lists:** Trades and History show a **Chogs / Multi-asset** switch (only when V2 is configured). Each version has its own book: `/trades` renders `TradesV1` or `TradesV2`, and History reads whichever `useTrades` / `useTradesV2` matches. The switch is page state, not a URL param, and it defaults to Chogs.
+- **V2 cards:** `TradeCardV2` reuses `TradeCardFrame` (the chrome `TradeCard` also uses) and fills the two sides with `AssetSide`: Chog art for the Chog collection, a plain tile for any other NFT, a token tile with the on-chain symbol, and the MON pill.
+- **V2 search:** `lib/tradeFiltersV2.ts` matches trade id, NFT id, maker / taker, token address and on-chain symbol, with the same MON filter and sort as v1. There are no trait lookups for V2 yet (traits need a V2 request type).
+- **Fills are per contract:** `useLocalFills(account, contract)` keys the record by swap contract, so a v1 trade #3 and a V2 trade #3 don't collide. The V2 detail page records a fill after Accept confirms.
+- **Not built yet:** V2 in the notifications bell, and the `?v=` deep link.
 
 ### Trade Detail: which button shows
 

@@ -27,8 +27,10 @@ See the [roadmap](docs/06-roadmap.md).
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | ChogSwap | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
 | MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
+| ChogSwapV2 | [`0x8a05E4e89aB1B57C0Ff73Ff61267aC6D6936CC75`](https://testnet.monadvision.com/address/0x8a05E4e89aB1B57C0Ff73Ff61267aC6D6936CC75) | 66874644 |
+| MockERC20 (mUSD) | [`0xd300f095f456D59AAc122B0100833fE195136F6c`](https://testnet.monadvision.com/address/0xd300f095f456D59AAc122B0100833fE195136F6c) | 66874652 |
 
-Both are source-verified on Sourcify (full match). Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction record: [`contracts/broadcast/Deploy.s.sol/10143/run-latest.json`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json).
+All four are source-verified on Sourcify. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction records: [`Deploy.s.sol`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) (v1) and [`DeployV2.s.sol`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) (V2).
 
 ## Repo map
 

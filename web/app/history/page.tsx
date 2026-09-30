@@ -5,12 +5,18 @@ import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState, PageHeader } from "@/components/Page";
+import { TradeGridV2 } from "@/components/TradeCardV2";
 import { TradeGrid } from "@/components/TradeParts";
+import { VersionSwitch, type TradeVersion } from "@/components/VersionSwitch";
 import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
+import { useTradesTokenInfo } from "@/hooks/useTokenInfo";
 import { useTrades } from "@/hooks/useTrades";
+import { useTradesV2 } from "@/hooks/useTradesV2";
+import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 import { errorMessage } from "@/lib/errors";
 import { displayStatus, sameAddress, type DisplayStatus, type Trade } from "@/lib/trades";
+import type { TradeV2 } from "@/lib/tradesV2";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
 
@@ -25,8 +31,18 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const { trades, isLoading, error } = useTrades({ limit: 200 });
-  const { ids: localFillIds } = useLocalFills(address);
+  const [version, setVersion] = useState<TradeVersion>("v1");
+  const isV2 = version === "v2";
+  const v1 = useTrades({ limit: 200, enabled: !isV2 });
+  const v2 = useTradesV2({ limit: 200, enabled: isV2 });
+  const { info } = useTradesTokenInfo(v2.trades);
+  // Fills are remembered per contract, so each version reads its own record.
+  const v1Fills = useLocalFills(address, CHOG_SWAP_ADDRESS);
+  const v2Fills = useLocalFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
+  const { isLoading, error } = isV2 ? v2 : v1;
+  const trades: Array<Trade | TradeV2> = isV2 ? v2.trades : v1.trades;
+  const localFillIds = isV2 ? v2Fills.ids : v1Fills.ids;
+  const createHref = isV2 ? "/v2/create" : "/create";
 
   const walletTrades = useMemo(
     () => trades.filter((trade) => isWalletTrade(trade, address, localFillIds)),
@@ -84,9 +100,12 @@ export default function HistoryPage() {
       </section>
 
       <PageHeader title="Recent activity">
-        <Link href="/create" className="btn-primary">
-          Create a trade <span aria-hidden>↗</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <VersionSwitch value={version} onChange={setVersion} />
+          <Link href={createHref} className="btn-primary">
+            Create a trade <span aria-hidden>↗</span>
+          </Link>
+        </div>
       </PageHeader>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -123,18 +142,22 @@ export default function HistoryPage() {
       ) : visibleTrades.length === 0 ? (
         <EmptyState>
           No {filter === "all" ? "" : `${filter} `}trades yet.{" "}
-          <Link href="/create" className="text-accent underline">
+          <Link href={createHref} className="text-accent underline">
             Create one
           </Link>
         </EmptyState>
       ) : (
-        <TradeGrid trades={visibleTrades} now={now} />
+        isV2 ? (
+          <TradeGridV2 trades={visibleTrades as TradeV2[]} now={now} me={address} info={info} />
+        ) : (
+          <TradeGrid trades={visibleTrades as Trade[]} now={now} />
+        )
       )}
     </div>
   );
 }
 
-function isWalletTrade(trade: Trade, address: string | undefined, localFillIds: readonly bigint[]) {
+function isWalletTrade(trade: Pick<Trade, "id" | "maker" | "taker">, address: string | undefined, localFillIds: readonly bigint[]) {
   return !!address
     && (sameAddress(trade.maker, address)
       || sameAddress(trade.taker, address)

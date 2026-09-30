@@ -9,6 +9,7 @@ import { EmptyState, PageHeader } from "@/components/Page";
 import { StatusBadge } from "@/components/TradeParts";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
+import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTradeV2 } from "@/hooks/useTradeV2";
@@ -31,6 +32,8 @@ function TradeDetailV2({ id }: { id: bigint }) {
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
+  // History can't see who filled a public trade without an indexer, so remember this browser's fills.
+  const { record } = useLocalFills(address, swapV2!.address);
 
   const assets = useMemo(() => [...(trade?.offered ?? []), ...(trade?.requested ?? [])], [trade]);
   const tokens = useMemo(() => erc20Tokens(assets), [assets]);
@@ -91,7 +94,13 @@ function TradeDetailV2({ id }: { id: bigint }) {
             </TxButton>
           )}
           {canFill && !steps[0] && (
-            <TxButton state={action.state} onClick={() => action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value: requestedNative })}>
+            <TxButton
+              state={action.state}
+              onClick={async () => {
+                const receipt = await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value: requestedNative });
+                if (receipt) record(id);
+              }}
+            >
               Accept &amp; swap
             </TxButton>
           )}
