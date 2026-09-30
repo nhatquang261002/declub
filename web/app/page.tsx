@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ChogSwapArt } from "@/components/ChogArt";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 const STEPS = [
   {
@@ -48,9 +49,7 @@ export default function HomePage() {
               <Link href="/deals" className="btn-primary">
                 Browse deals <span aria-hidden>↗</span>
               </Link>
-              <Link href="/create" className="btn-secondary">
-                Create a deal
-              </Link>
+              <CreateDealButton />
             </div>
           </div>
           <ChogSwapArt />

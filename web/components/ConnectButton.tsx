@@ -84,7 +84,7 @@ export function ConnectButton() {
   return (
     <div className="relative">
       <button
-        className="wallet-control wallet-control-connect"
+        className="btn-secondary"
         disabled={status === "connecting" || status === "reconnecting"}
         onClick={() =>
           wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o)

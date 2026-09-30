@@ -15,6 +15,7 @@ import { useDeal } from "@/hooks/useDeal";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { useNow } from "@/hooks/useNow";
 import { displayStatus, sameAddress } from "@/lib/deals";
+import { Select } from "@/components/Select";
 import { formatDate } from "@/lib/format";
 import { chog, swap } from "@/lib/contracts";
 import { buildMerkleSet } from "@/lib/merkle";
@@ -105,21 +106,26 @@ function DealDetail({ id }: { id: bigint }) {
                   count={deal.requestedCount}
                   root={deal.requestedRoot}
                 />
-                <label className="block text-sm">
-                  <span className="label">Trait</span>
-                  <select className="input w-full" value={`${traitType}:${traitValue}`} onChange={(event) => {
-                    const [type, ...value] = event.target.value.split(":");
-                    setTraitType(type);
-                    setTraitValue(value.join(":"));
-                  }}>
-                    <option value=":">Select a trait from your assets</option>
-                    {traitOptions.map((option) => (
-                      <option key={`${option.type}:${option.value}`} value={`${option.type}:${option.value}`}>
-                        {option.type}: {option.value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="text-sm">
+                  <label className="label" htmlFor="accept-trait">Trait</label>
+                  <Select
+                    id="accept-trait"
+                    value={traitType ? `${traitType}:${traitValue}` : ""}
+                    placeholder="Select a trait from your assets"
+                    options={[
+                      { value: "", label: "Select a trait from your assets" },
+                      ...traitOptions.map((option) => ({
+                        value: `${option.type}:${option.value}`,
+                        label: `${option.type}: ${option.value}`,
+                      })),
+                    ]}
+                    onChange={(picked) => {
+                      const [type = "", ...value] = picked.split(":");
+                      setTraitType(type);
+                      setTraitValue(value.join(":"));
+                    }}
+                  />
+                </div>
                 <p className="text-xs text-muted">
                   Matching owned assets: {selectedTraitIds.length}. Select the trait committed by the maker.
                 </p>

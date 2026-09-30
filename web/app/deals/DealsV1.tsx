@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
 import { EmptyState, PageHeader } from "@/components/Page";
@@ -19,6 +18,7 @@ import {
   type DealFilters,
 } from "@/lib/dealFilters";
 import { isExpired, sameAddress, type Deal } from "@/lib/deals";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 export const PAGE = 4;
 /** Searching needs the whole book, not just the pages the reader has opened so far. */
@@ -72,9 +72,7 @@ export function DealsV1({ switcher }: { switcher: ReactNode }) {
             openCount={lists.open.length}
             forYouCount={lists["for-you"].length}
           />
-          <Link href="/create" className="btn-primary">
-            Create deal
-          </Link>
+          <CreateDealButton />
         </div>
       </PageHeader>
 
@@ -95,14 +93,14 @@ export function DealsV1({ switcher }: { switcher: ReactNode }) {
         <EmptyState>No deals match your search or filters.</EmptyState>
       ) : shown.length === 0 ? (
         <EmptyState>
-          {tab === "for-you"
-            ? address
-              ? "No private offers addressed to you right now."
-              : "Connect a wallet to see offers made to you."
-            : "No open deals yet."}{" "}
-          <Link href="/create" className="text-accent underline">
-            Create one
-          </Link>
+          <p>
+            {tab === "for-you"
+              ? address
+                ? "No private offers addressed to you right now."
+                : "Connect a wallet to see offers made to you."
+              : "No open deals yet."}
+          </p>
+          <CreateDealButton className="mt-5" />
         </EmptyState>
       ) : (
         <DealGrid deals={shown} now={now} me={address} traitLabels={traits.byRoot} />

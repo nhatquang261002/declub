@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs } from "@/components/Tabs";
 import { CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 
 /** "v1" = ChogSwap (Chogs + MON, trait requests). "v2" = ChogSwapV2 (any ERC-721 / ERC-20 / MON). */
@@ -20,20 +21,11 @@ export function VersionSwitch({
 }) {
   if (!CHOG_SWAP_V2_ADDRESS) return null;
   return (
-    <div className="flex gap-1 rounded-xl border border-line bg-panel p-1 text-sm" role="group" aria-label="Contract version">
-      {OPTIONS.map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          aria-pressed={value === key}
-          onClick={() => onChange(key)}
-          className={`rounded-lg px-3 py-1.5 font-medium ${
-            value === key ? "bg-panel-2 text-white" : "text-muted hover:text-white"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <Tabs
+      label="Contract version"
+      value={value}
+      options={OPTIONS.map(([key, label]) => ({ value: key, label }))}
+      onChange={onChange}
+    />
   );
 }

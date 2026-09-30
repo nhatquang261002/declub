@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { DealGridV2 } from "@/components/DealCardV2";
 import { DealGrid } from "@/components/DealParts";
+import { Tabs } from "@/components/Tabs";
 import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
 import { useLocalFills } from "@/hooks/useLocalFills";
 import { useNow } from "@/hooks/useNow";
@@ -17,6 +17,7 @@ import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 import { errorMessage } from "@/lib/errors";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
 
@@ -101,29 +102,19 @@ export default function HistoryPage() {
       <PageHeader title="Recent activity">
         <div className="flex flex-wrap items-center gap-2">
           <VersionSwitch value={version} onChange={setVersion} />
-          <Link href="/create" className="btn-primary">
-            Create a deal <span aria-hidden>↗</span>
-          </Link>
+          <CreateDealButton />
         </div>
       </PageHeader>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-xl border border-line bg-panel p-1 text-sm">
-          {FILTERS.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
-                filter === key ? "bg-panel-2 text-white" : "text-muted hover:text-white"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          label="Filter deals"
+          value={filter}
+          options={FILTERS.map(([key, label]) => ({ value: key, label }))}
+          onChange={setFilter}
+        />
         <p className="text-sm text-muted">
-          Showing <span className="font-semibold text-white">{visibleDeals.length}</span> deal
+          Showing <span className="font-semibold text-[#111318]">{visibleDeals.length}</span> deal
           {visibleDeals.length === 1 ? "" : "s"}
         </p>
       </div>
@@ -140,10 +131,8 @@ export default function HistoryPage() {
         </EmptyState>
       ) : visibleDeals.length === 0 ? (
         <EmptyState>
-          No {filter === "all" ? "" : `${filter} `}deals yet.{" "}
-          <Link href="/create" className="text-accent underline">
-            Create one
-          </Link>
+          <p>No {filter === "all" ? "" : `${filter} `}deals yet.</p>
+          <CreateDealButton className="mt-5" />
         </EmptyState>
       ) : (
         isV2 ? (

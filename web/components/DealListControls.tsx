@@ -1,5 +1,7 @@
 "use client";
 
+import { Select, type SelectOption } from "@/components/Select";
+import { Tabs, type TabOption } from "@/components/Tabs";
 import {
   DEFAULT_FILTERS,
   isFiltering,
@@ -10,15 +12,15 @@ import {
 
 export type DealTab = "open" | "for-you" | "all";
 
-const MON_OPTIONS: Array<[MonFilter, string]> = [
-  ["any", "Any MON"],
-  ["offers-mon", "Offers MON"],
-  ["wants-mon", "Wants MON"],
-  ["no-mon", "No MON"],
+const MON_OPTIONS: Array<SelectOption<MonFilter>> = [
+  { value: "any", label: "Any MON" },
+  { value: "offers-mon", label: "Offers MON" },
+  { value: "wants-mon", label: "Wants MON" },
+  { value: "no-mon", label: "No MON" },
 ];
-const SORT_OPTIONS: Array<[DealSort, string]> = [
-  ["newest", "Newest first"],
-  ["ending-soon", "Ending soon"],
+const SORT_OPTIONS: Array<SelectOption<DealSort>> = [
+  { value: "newest", label: "Newest first" },
+  { value: "ending-soon", label: "Ending soon" },
 ];
 
 /** Open · For you · All, with live counts on the first two. */
@@ -33,26 +35,12 @@ export function DealTabs({
   openCount: number;
   forYouCount: number;
 }) {
-  const tabs: Array<[DealTab, string]> = [
-    ["open", `Open (${openCount})`],
-    ["for-you", `For you (${forYouCount})`],
-    ["all", "All"],
+  const tabs: Array<TabOption<DealTab>> = [
+    { value: "open", label: `Open (${openCount})` },
+    { value: "for-you", label: `For you (${forYouCount})` },
+    { value: "all", label: "All" },
   ];
-  return (
-    <div className="flex gap-1 rounded-xl border border-line bg-panel p-1 text-sm">
-      {tabs.map(([key, label]) => (
-        <button
-          key={key}
-          onClick={() => onTab(key)}
-          className={`rounded-lg px-3 py-1.5 font-medium ${
-            tab === key ? "bg-panel-2 text-white" : "text-muted hover:text-white"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Tabs label="Show deals" value={tab} options={tabs} onChange={onTab} />;
 }
 
 /** Search box, MON filter, sort, and a Clear button while any of them is set. */
@@ -86,26 +74,20 @@ export function DealFilterBar({
           ))}
         </datalist>
       )}
-      <select
-        className="input w-auto!"
+      <Select
+        className="w-auto"
         aria-label="Filter by MON"
         value={filters.mon}
-        onChange={(e) => onChange({ mon: e.target.value as MonFilter })}
-      >
-        {MON_OPTIONS.map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
-        ))}
-      </select>
-      <select
-        className="input w-auto!"
+        options={MON_OPTIONS}
+        onChange={(mon) => onChange({ mon })}
+      />
+      <Select
+        className="w-auto"
         aria-label="Sort deals"
         value={filters.sort}
-        onChange={(e) => onChange({ sort: e.target.value as DealSort })}
-      >
-        {SORT_OPTIONS.map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
-        ))}
-      </select>
+        options={SORT_OPTIONS}
+        onChange={(sort) => onChange({ sort })}
+      />
       {isFiltering(filters) && (
         <button type="button" className="btn-secondary" onClick={() => onChange(DEFAULT_FILTERS)}>
           Clear

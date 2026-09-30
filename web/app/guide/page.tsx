@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 const STEPS = [
   {
@@ -47,7 +47,7 @@ export default function GuidePage() {
               Everything you need to make a safe deal, from connecting your wallet to receiving your assets.
             </p>
           </div>
-          <Link href="/create" className="btn-primary shrink-0">Create a deal ↗</Link>
+          <CreateDealButton className="shrink-0" />
         </div>
         <nav className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold">
           <a href="#how-it-works" className="text-accent hover:underline">How it works</a>

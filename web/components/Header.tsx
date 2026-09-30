@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "./ConnectButton";
 import { Logo } from "./Logo";
 import { NotificationBell } from "./NotificationBell";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 // Create is a button beside the wallet, not a tab: it starts an action rather than showing a list.
 const NAV = [
@@ -41,12 +42,7 @@ export function Header() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/create" className="btn-create">
-            <span className="btn-create-plus" aria-hidden>+</span>
-            <span>
-              Create<span className="hidden sm:inline">&nbsp;deal</span>
-            </span>
-          </Link>
+          <CreateDealButton short />
           <NotificationBell />
           <ConnectButton />
         </div>

@@ -190,11 +190,23 @@ body {
   color: #4e5968;
 }
 
-.page-section a:not(.btn-primary):not(.btn-secondary) {
+.page-section .text-danger {
   color: #a9282f;
 }
 
-.page-section a:not(.btn-primary):not(.btn-secondary):hover {
+.page-section .text-mint {
+  color: #1f7a55;
+}
+
+.page-section .text-warn {
+  color: #8a5a00;
+}
+
+.page-section a:not(.btn-primary):not(.btn-secondary):not(.btn-danger) {
+  color: #a9282f;
+}
+
+.page-section a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):hover {
   color: #315ea8;
 }
 
@@ -554,54 +566,70 @@ body {
     min-height: 14rem;
   }
 }
+/*
+ * Buttons are stickers: a dark outline and a hard shadow that lifts and tilts on hover and
+ * squashes when pressed. The variants only change colours (--btn-shadow drives the shadow).
+ */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
-  border-radius: var(--radius-control);
-}
-@utility btn-primary {
-  @apply btn text-white hover:bg-accent-strong;
-  background: var(--action-primary);
-}
-@utility btn-secondary {
-  @apply btn border border-line bg-panel-2 text-white hover:border-accent;
-}
-@utility btn-danger {
-  @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
-}
-
-/* The header's Create button: a sticker with a hard shadow that lifts and tilts on hover. */
-.btn-create {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.5rem 0.9rem 0.5rem 0.6rem;
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-extrabold;
   border: 2px solid var(--chog-purple-950);
   border-radius: var(--radius-control);
+  box-shadow: 0.2rem 0.2rem 0 var(--btn-shadow, var(--chog-purple-950));
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+
+  &:hover:not(:disabled) {
+    box-shadow: 0.32rem 0.32rem 0 var(--btn-shadow, var(--chog-purple-950));
+    transform: translate(-0.1rem, -0.1rem) rotate(-1.5deg);
+  }
+
+  &:active:not(:disabled) {
+    box-shadow: 0 0 0 var(--btn-shadow, var(--chog-purple-950));
+    transform: translate(0.2rem, 0.2rem);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--chog-pink-500);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+@utility btn-primary {
+  @apply btn;
+  --btn-shadow: var(--chog-pink-500);
   background: var(--chog-peach-500);
   color: var(--chog-purple-950);
-  font-size: 0.875rem;
-  font-weight: 800;
-  white-space: nowrap;
-  box-shadow: 0.2rem 0.2rem 0 var(--chog-pink-500);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+@utility btn-secondary {
+  @apply btn;
+  background: var(--chog-white);
+  color: var(--chog-purple-950);
+
+  &:hover:not(:disabled) {
+    background: var(--chog-cream-500);
+  }
+}
+@utility btn-danger {
+  @apply btn;
+  --btn-shadow: var(--chog-pink-700);
+  border-color: var(--chog-pink-700);
+  background: var(--chog-white);
+  color: var(--chog-pink-700);
+
+  &:hover:not(:disabled) {
+    background: #fde8ea;
+  }
+}
+@utility btn-sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
 }
 
-.btn-create:hover {
-  box-shadow: 0.32rem 0.32rem 0 var(--chog-pink-500);
-  transform: translate(-0.1rem, -0.1rem) rotate(-2deg);
-}
-
-.btn-create:active {
-  box-shadow: 0 0 0 var(--chog-pink-500);
-  transform: translate(0.2rem, 0.2rem);
-}
-
-.btn-create:focus-visible {
-  outline: 3px solid var(--chog-cream-500);
-  outline-offset: 3px;
-}
-
-.btn-create-plus {
+/* The "+" disc in the Create deal button: spins when the button is hovered. */
+.btn-plus {
   display: grid;
   width: 1.4rem;
   height: 1.4rem;
@@ -614,19 +642,25 @@ body {
   transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.btn-create:hover .btn-create-plus {
+.btn-primary:hover:not(:disabled) .btn-plus {
   transform: rotate(180deg) scale(1.1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-create,
-  .btn-create-plus {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-plus {
     transition: none;
   }
 
-  .btn-create:hover,
-  .btn-create:active,
-  .btn-create:hover .btn-create-plus {
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled),
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-danger:active:not(:disabled),
+  .btn-primary:hover:not(:disabled) .btn-plus {
     transform: none;
   }
 }
@@ -653,17 +687,6 @@ body {
 
 .wallet-control:active {
   transform: translateY(1px);
-}
-
-.wallet-control-connect {
-  border-color: var(--action-primary);
-  background: var(--action-primary);
-  box-shadow: 0 0.2rem 0 rgb(17 19 24 / 0.25);
-}
-
-.wallet-control-connect:hover {
-  border-color: var(--action-primary-hover);
-  background: var(--action-primary-hover);
 }
 
 .wallet-control-warning {
@@ -769,6 +792,99 @@ body {
   @apply w-full border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-muted/60 focus:border-accent;
   border-radius: var(--radius-control);
 }
+/* Tab bar: a white sticker tray holding pill tabs. The active tab is a peach sticker. */
+@utility tabbar {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  overflow-x: auto;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: var(--radius-control);
+  background: var(--chog-white);
+  box-shadow: 0.2rem 0.2rem 0 var(--chog-purple-950);
+  scrollbar-width: none;
+}
+@utility tab {
+  padding: 0.4rem 0.85rem;
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+  color: #4e5968;
+  font-size: 0.875rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+  &:hover:not(:is([aria-pressed="true"], [aria-current])) {
+    background: var(--chog-cream-500);
+    color: var(--chog-purple-950);
+  }
+  &:is([aria-pressed="true"], [aria-current]) {
+    border-color: var(--chog-purple-950);
+    background: var(--chog-peach-500);
+    box-shadow: 0.12rem 0.12rem 0 var(--chog-pink-500);
+    color: var(--chog-purple-950);
+  }
+  &:active:not(:disabled) { transform: scale(0.96); }
+  &:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: -3px; }
+}
+
+/* Dropdown: a white sticker trigger that opens a cream menu (see components/Select.tsx). */
+@utility select-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: var(--radius-control);
+  background: var(--chog-white);
+  box-shadow: 0.2rem 0.2rem 0 var(--chog-purple-950);
+  color: var(--chog-purple-950);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: left;
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  &:hover:not(:disabled) { background: var(--chog-cream-500); }
+  &[aria-expanded="true"] {
+    background: var(--chog-cream-500);
+    box-shadow: 0.1rem 0.1rem 0 var(--chog-purple-950);
+    transform: translate(0.1rem, 0.1rem);
+  }
+  &:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 3px; }
+  &:disabled { cursor: not-allowed; opacity: 0.5; }
+}
+@utility select-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(22rem, 90vw);
+  max-height: 15rem;
+  padding: 0.25rem;
+  overflow-y: auto;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: var(--radius-control);
+  background: var(--chog-cream-500);
+  box-shadow: 0.3rem 0.3rem 0 var(--chog-purple-950);
+  color: var(--chog-purple-950);
+}
+@utility select-option {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  &[data-active="true"] { background: var(--chog-white); }
+  &[aria-selected="true"] { background: var(--chog-peach-500); }
+}
+
 @utility label {
   @apply mb-1.5 block text-xs font-medium tracking-wide text-muted uppercase;
 }

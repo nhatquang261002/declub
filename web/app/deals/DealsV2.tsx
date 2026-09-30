@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
 import { EmptyState, PageHeader } from "@/components/Page";
@@ -16,6 +15,7 @@ import { applyDealFiltersV2 } from "@/lib/dealFiltersV2";
 import type { DealV2 } from "@/lib/dealsV2";
 import { isExpired, sameAddress } from "@/lib/deals";
 import { PAGE, SEARCH_LIMIT } from "./DealsV1";
+import { CreateDealButton } from "@/components/CreateDealButton";
 
 /** The ChogSwapV2 book: any mix of ERC-721, ERC-20 and MON on each side. */
 export function DealsV2({ switcher }: { switcher: ReactNode }) {
@@ -66,9 +66,7 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
             openCount={lists.open.length}
             forYouCount={lists["for-you"].length}
           />
-          <Link href="/create" className="btn-primary">
-            Create deal
-          </Link>
+          <CreateDealButton />
         </div>
       </PageHeader>
 
@@ -88,14 +86,14 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
         <EmptyState>No deals match your search or filters.</EmptyState>
       ) : shown.length === 0 ? (
         <EmptyState>
-          {tab === "for-you"
-            ? address
-              ? "No private offers addressed to you right now."
-              : "Connect a wallet to see offers made to you."
-            : "No open multi-asset deals yet."}{" "}
-          <Link href="/create" className="text-accent underline">
-            Create one
-          </Link>
+          <p>
+            {tab === "for-you"
+              ? address
+                ? "No private offers addressed to you right now."
+                : "Connect a wallet to see offers made to you."
+              : "No open multi-asset deals yet."}
+          </p>
+          <CreateDealButton className="mt-5" />
         </EmptyState>
       ) : (
         <DealGridV2 deals={shown} now={now} me={address} info={info} />
