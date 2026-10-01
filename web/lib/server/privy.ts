@@ -1,4 +1,5 @@
-import { PrivyClient, type User } from "@privy-io/node";
+import { NotFoundError, PrivyClient, type User } from "@privy-io/node";
+import { Webhook } from "svix";
 import { PRIVY_APP_ID } from "../config";
 
 /**
@@ -31,5 +32,42 @@ export async function authenticate(request: Request): Promise<User | null> {
     return await client().users()._get(claims.user_id);
   } catch {
     return null;
+  }
+}
+
+/**
+ * The signing secret of the webhook endpoint (PRIVY_WEBHOOK_SIGNING_SECRET, `whsec_…`, shown in the
+ * dashboard under Configuration > Webhooks once the endpoint is added). Without it the webhook
+ * route is off and nothing else changes.
+ */
+const webhookSecret = process.env.PRIVY_WEBHOOK_SIGNING_SECRET?.trim() || undefined;
+
+export const privyWebhookConfigured = Boolean(privyServerConfigured && webhookSecret);
+
+/**
+ * The parsed event if `body` carries a valid Svix signature from Privy (and a timestamp within five
+ * minutes), else `null`. `body` must be the raw request text: parsing and re-serializing it first
+ * would change the bytes that were signed.
+ */
+export function verifyWebhook(body: string, headers: Headers): unknown | null {
+  if (!webhookSecret) return null;
+  try {
+    return new Webhook(webhookSecret).verify(body, {
+      "svix-id": headers.get("svix-id") ?? "",
+      "svix-timestamp": headers.get("svix-timestamp") ?? "",
+      "svix-signature": headers.get("svix-signature") ?? "",
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** A user's current linked accounts, read from Privy by id. `null` if the user no longer exists. */
+export async function loadLinkedAccounts(userId: string): Promise<User["linked_accounts"] | null> {
+  try {
+    return (await client().users()._get(userId)).linked_accounts;
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
   }
 }

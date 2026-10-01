@@ -26,5 +26,5 @@ That an X account and a wallet belong to the same person. Not that the person is
 
 - New server secrets: `PRIVY_APP_SECRET` and the Upstash REST URL and token. They go in `web/.env.local` or the host's environment, not the root `.env` (only `NEXT_PUBLIC_*` is read from there).
 - Losing the store loses profiles and nothing else. Nothing in it can move assets or alter a trade.
-- Handles are refreshed when the owner opens `/account`, not on every sign-in, so a renamed X account can show the old handle until then.
+- Handles are refreshed when the owner opens `/account`, not on every sign-in, so a renamed X account can show the old handle until then. [ADR 0013](0013-privy-webhooks.md) adds a Privy webhook that does the same refresh as soon as an account is linked, unlinked or transferred, when it is configured.
 - The store is now available for other small server-side state. [ADR 0012](0012-server-side-saves.md) uses it for fill history, notification read markers and recent collections. Still unbuilt: a cache for finished trait scans (today in process memory, so lost on a cold start) and per-user caps.

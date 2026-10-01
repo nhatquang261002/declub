@@ -1,13 +1,6 @@
-import {
-  linkedEthereumWallets,
-  pickProfile,
-  profileKey,
-  userWalletsKey,
-  type Profile,
-  type StoredProfile,
-} from "@/lib/profiles";
+import { linkedEthereumWallets, pickProfile, profileKey, userWalletsKey, type Profile } from "@/lib/profiles";
 import { fail, gateUser, json } from "@/lib/server/gate";
-import type { Store } from "@/lib/server/store";
+import { ownedRows, syncProfile } from "@/lib/server/profileSync";
 
 /**
  * The signed-in user's own shared profile (ADR 0011). Every call needs their Privy access token
@@ -18,14 +11,6 @@ import type { Store } from "@/lib/server/store";
  *   PUT     share it (`{ refresh: true }`: only re-sync a profile that is already shared)
  *   DELETE  stop sharing
  */
-
-/** The rows this user has written, whichever of their wallets they were for. */
-async function ownedRows(store: Store, userId: string, wallets: string[]) {
-  const addresses = new Set([...(await store.members(userWalletsKey(userId))), ...wallets.map((w) => w.toLowerCase())]);
-  const list = [...addresses];
-  const rows = await store.getMany<StoredProfile>(list.map(profileKey));
-  return list.map((address, i) => ({ address, row: rows[i] })).filter((entry) => entry.row?.userId === userId);
-}
 
 export async function GET(request: Request) {
   const g = await gateUser(request, "profile", 30);
@@ -58,29 +43,11 @@ export async function PUT(request: Request) {
   const { store, user } = g;
 
   const body = (await request.json().catch(() => ({}))) as { refresh?: unknown };
-  const refresh = body.refresh === true;
+  const result = await syncProfile(store, user.id, user.linked_accounts, body.refresh === true);
 
-  const wallets = linkedEthereumWallets(user.linked_accounts);
-  const profile = pickProfile(user.linked_accounts);
-  const owned = await ownedRows(store, user.id, wallets);
-
-  // Rows for wallets that are no longer linked, or that have nothing left to show, go away.
-  const keep = profile ? new Set(wallets.map((w) => w.toLowerCase())) : new Set<string>();
-  const stale = owned.filter((entry) => !keep.has(entry.address));
-  await store.del(...stale.map((entry) => profileKey(entry.address)));
-
-  if (!profile || wallets.length === 0) {
-    await store.setMembers(userWalletsKey(user.id), []);
-    if (refresh) return json({ enabled: true, shared: false });
-    return fail(422, "nothing_to_share", "Link an X or Discord account and a wallet first.");
-  }
-  // A refresh keeps an existing share up to date; it never starts one.
-  if (refresh && owned.length === 0) return json({ enabled: true, shared: false });
-
-  const row: StoredProfile = { ...profile, userId: user.id, updatedAt: Date.now() };
-  await Promise.all(wallets.map((wallet) => store.set(profileKey(wallet), row)));
-  await store.setMembers(userWalletsKey(user.id), wallets.map((w) => w.toLowerCase()));
-  return json({ enabled: true, shared: true, profile });
+  if (result.shared) return json({ enabled: true, shared: true, profile: result.profile });
+  if (result.reason) return fail(422, result.reason, "Link an X or Discord account and a wallet first.");
+  return json({ enabled: true, shared: false });
 }
 
 export async function DELETE(request: Request) {
