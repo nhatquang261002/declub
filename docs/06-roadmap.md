@@ -68,6 +68,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Open offers ("make me an offer"): the maker lists assets with a text note and takers escrow proposals. Contract, tests and frontend (create mode, offers list, send / accept / reject / withdraw) done. Deployed: `ChogSwapV2` `0x7359…E1bB` at block 67163690 (Sourcify full match), frontend pointed at it. The screens still need a pass against it ([ADR 0007](adr/0007-open-offers.md))
 - [~] Trade intents + off-chain matcher ([ADR 0008](adr/0008-trade-intents.md), accepted): signed EIP-712 intents, `ChogSwapIntents` settles wallet to wallet, off-chain pool and matcher. Contract done (65 tests, 100% coverage) and deployed to testnet with `script/DeployIntents.s.sol`: `0x54B6…0Fd2` at block 67194397 (Sourcify full match; its domain separator and intent digest match the matcher's). Pool and local matcher done in [`matcher/`](../matcher/) (58 tests against a local anvil: pairs, rings, revoked approvals, ERC-1271 makers, the HTTP API, the process). Frontend built and merged into the deal screens: a *Sign only* choice on `/create` (EIP-712 signing, approvals, short-deadline default, consent notice), signed swaps tagged **Signed** in the `/deals` and `/history` lists beside locked deals, `/intent/[hash]` (status, cancel, settled cycle), and bell notifications; typechecked, linted and built, the library layer cross-checked against the contract and a live pool, but not yet clicked through with a real wallet on testnet
 - [ ] Multi-party ring swaps ([ADR 0009](adr/0009-ring-swaps.md), accepted, `MAX_CYCLE = 4`): cycles of the same signed intents through the same `settle`, so no separate contract. Contract side done (rings of 2–4, worst case 3.3M gas) and the matcher's cycle search is built and tested (three-way ring settled end to end); the "matched in a ring" display is built (`CycleView`), not yet seen with a real ring on testnet
+- [x] Privy sign-in, wallet-first (Google / X / Discord / wallet; socials link to a wallet in either order; embedded wallets opt-in) and an account screen to link, unlink and switch wallets ([ADR 0010](adr/0010-privy-sign-in.md)). Optional behind `NEXT_PUBLIC_PRIVY_APP_ID`; typechecked, linted and built in both modes, but not yet signed in with a real Privy app
+- [ ] Privy smart wallets: gas sponsorship and batched approvals (needs a paymaster and a check of escrow and `withdraw` with a contract wallet)
 - [ ] Reputation
 - [ ] External audit before mainnet with real Chogs
 
@@ -76,6 +78,6 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 | Question | Needed by |
 |---|---|
 | Real Chog contract address, and is it `ERC721Enumerable`? | Mainnet / Phase 2 "My Chogs" |
-| WalletConnect (needs a project id + `@walletconnect/ethereum-provider`)? | Mobile wallets |
+| WalletConnect (needs a project id + `@walletconnect/ethereum-provider`)? Privy's sign-in covers most mobile users, so maybe not | Mobile wallets |
 | Where do Chog traits live (IPFS JSON? API?), and are they final? | Phase 3 |
 | Protocol fee, ever? (v1: none) | Phase 4 |

@@ -47,6 +47,7 @@
   --color-mint: var(--feedback-success);
   --color-danger: var(--feedback-danger);
   --color-warn: var(--feedback-warning);
+  --color-peach: var(--chog-peach-500);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -665,112 +666,301 @@ body {
   }
 }
 
-.wallet-control {
+/*
+ * Header controls: dark stickers that echo the Create deal button (outline, hard shadow, lift on
+ * hover, squash on press). The wallet button, the bell and their dropdowns share these.
+ */
+.hdr-btn {
+  position: relative;
   display: inline-flex;
   min-height: 2.65rem;
   align-items: center;
-  gap: 0.55rem;
-  border: 1px solid rgb(255 244 207 / 0.22);
-  border-radius: 0.8rem;
-  background: rgb(32 39 53 / 0.92);
-  padding: 0.55rem 0.75rem;
+  gap: 0.6rem;
+  border: 2px solid rgb(255 244 207 / 0.3);
+  border-radius: var(--radius-control);
+  background: var(--chog-purple-800);
+  padding: 0.3rem 0.7rem 0.3rem 0.35rem;
   color: white;
   font-size: 0.8rem;
-  font-weight: 700;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0.2rem 0.2rem 0 rgb(0 0 0 / 0.5);
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
-.wallet-control:hover {
-  border-color: rgb(255 244 207 / 0.5);
-  background: #26344a;
+.hdr-btn:hover:not(:disabled) {
+  border-color: rgb(255 244 207 / 0.55);
+  background: var(--chog-purple-700);
+  box-shadow: 0.3rem 0.3rem 0 rgb(0 0 0 / 0.5);
+  transform: translate(-0.1rem, -0.1rem);
 }
 
-.wallet-control:active {
-  transform: translateY(1px);
+.hdr-btn:active:not(:disabled) {
+  box-shadow: 0 0 0 rgb(0 0 0 / 0.5);
+  transform: translate(0.2rem, 0.2rem);
 }
 
-.wallet-control-warning {
+.hdr-btn[aria-expanded="true"] {
+  border-color: var(--chog-peach-500);
+}
+
+.hdr-btn:focus-visible {
+  outline: 3px solid var(--chog-pink-500);
+  outline-offset: 3px;
+}
+
+.hdr-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The bell: a square icon button the same height as the wallet button. */
+.hdr-btn-icon {
+  width: 2.65rem;
+  justify-content: center;
+  padding: 0;
+}
+
+.hdr-btn-warn {
   border-color: var(--feedback-warning);
   color: var(--feedback-warning);
 }
 
-.wallet-status-dot {
-  display: inline-block;
-  width: 0.45rem;
-  height: 0.45rem;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--feedback-success);
-  box-shadow: 0 0 0 3px rgb(120 199 165 / 0.12);
+.hdr-btn-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
 }
 
-.wallet-status-dot-small {
-  width: 0.35rem;
-  height: 0.35rem;
-  box-shadow: none;
-}
-
-.wallet-chevron {
+.hdr-btn-sub {
+  max-width: 9rem;
+  overflow: hidden;
   color: rgb(255 255 255 / 0.55);
-  font-size: 1rem;
-  line-height: 0.7;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hdr-chevron {
+  color: rgb(255 255 255 / 0.55);
   transition: transform 160ms ease;
 }
 
-.wallet-chevron-open {
+.hdr-btn[aria-expanded="true"] .hdr-chevron {
   transform: rotate(180deg);
 }
 
-.wallet-menu {
-  position: absolute;
-  top: calc(100% + 0.6rem);
-  right: 0;
-  z-index: 30;
-  width: min(18rem, calc(100vw - 2rem));
-  overflow: hidden;
-  border: 1px solid rgb(255 244 207 / 0.2);
-  border-radius: 1rem;
-  background: #171a22;
-  box-shadow: var(--shadow-float);
+.avatar {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: 9999px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
-.wallet-menu-account {
+/* Online dot on the corner of an avatar: the wallet is connected. */
+.avatar-dot {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 2px solid var(--chog-purple-800);
+  border-radius: 9999px;
+  background: var(--feedback-success);
+}
+
+.hdr-badge {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  display: grid;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: 9999px;
+  background: var(--chog-pink-500);
+  padding: 0 0.25rem;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Dropdowns hang from their button on wide screens and from the whole header on phones, where a
+   button deep in the row would push the panel off the left edge. */
+.hdr-anchor {
+  position: relative;
+}
+
+@media (max-width: 639px) {
+  .hdr-anchor {
+    position: static;
+  }
+
+  .hdr-pop {
+    right: 1rem;
+    left: 1rem;
+    width: auto !important;
+    top: calc(100% + 0.5rem);
+    transform-origin: top center;
+  }
+}
+
+.hdr-pop {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  right: 0;
+  z-index: 30;
+  width: min(19rem, calc(100vw - 2rem));
+  overflow: hidden;
+  border: 2px solid rgb(255 244 207 / 0.3);
+  border-radius: 1.1rem;
+  background: var(--chog-purple-900);
+  box-shadow: 0.35rem 0.4rem 0 rgb(0 0 0 / 0.5), var(--shadow-float);
+  animation: pop-in 140ms ease-out;
+  transform-origin: top right;
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-0.4rem) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hdr-btn { transition: none; }
+  .hdr-btn:hover:not(:disabled),
+  .hdr-btn:active:not(:disabled) { transform: none; }
+  .hdr-pop { animation: none; }
+}
+
+.hdr-pop-head {
   display: flex;
   flex-direction: column;
+  gap: 0.15rem;
   padding: 1rem;
   border-bottom: 1px solid rgb(255 244 207 / 0.12);
 }
 
-.wallet-menu-label {
-  margin-bottom: 0.35rem;
-  color: rgb(255 255 255 / 0.52);
+.hdr-pop-label {
+  color: rgb(255 255 255 / 0.5);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.wallet-menu-item {
+.hdr-chip {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  background: rgb(120 199 165 / 0.12);
+  padding: 0.2rem 0.55rem;
+  color: var(--feedback-success);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.hdr-chip::before {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: currentColor;
+  content: "";
+}
+
+.hdr-pop-item {
   display: flex;
   width: 100%;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
-  color: rgb(255 255 255 / 0.86);
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  color: rgb(255 255 255 / 0.88);
   font-size: 0.82rem;
+  font-weight: 600;
   text-align: left;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
-.wallet-menu-item:hover {
-  background: #202735;
+.hdr-pop-item:hover:not(:disabled),
+.hdr-pop-item:focus-visible {
+  background: var(--chog-purple-800);
   color: white;
+  outline: none;
 }
 
-.wallet-menu-item-danger {
-  border-top: 1px solid rgb(255 244 207 / 0.08);
+.hdr-pop-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.hdr-pop-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: rgb(255 255 255 / 0.07);
+}
+
+.hdr-pop-item-danger {
   color: var(--feedback-danger);
+}
+
+.hdr-pop-item-danger .hdr-pop-icon {
+  background: rgb(239 105 112 / 0.14);
+}
+
+.hdr-pop-sep {
+  height: 1px;
+  background: rgb(255 244 207 / 0.12);
+}
+
+/* A small on/off switch for settings rows. */
+.switch {
+  position: relative;
+  width: 2.2rem;
+  height: 1.3rem;
+  flex: 0 0 auto;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.18);
+  transition: background-color 160ms ease;
+}
+
+.switch::after {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: white;
+  transition: transform 160ms ease;
+  content: "";
+}
+
+.switch[aria-checked="true"] {
+  background: var(--feedback-success);
+}
+
+.switch[aria-checked="true"]::after {
+  transform: translateX(0.9rem);
+}
+
+.switch:focus-visible {
+  outline: 3px solid var(--chog-pink-500);
+  outline-offset: 2px;
 }
 
 @utility input {

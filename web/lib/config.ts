@@ -14,6 +14,8 @@ const env = {
   poolUrl: process.env.NEXT_PUBLIC_POOL_URL,
   chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
   knownCollections: process.env.NEXT_PUBLIC_KNOWN_COLLECTIONS,
+  privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+  privyEmbedded: process.env.NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS,
 };
 
 function address(value: string | undefined, fallback: Address): Address {
@@ -70,6 +72,19 @@ export const DEMO_DEALS =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_DEALS !== "false";
 export const DEMO_CREATE =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_CREATE === "true";
+
+/**
+ * Privy app id (ADR 0010). Optional: blank keeps the plain injected-wallet connect, so the app
+ * runs without a Privy account. Set it to add email / Google / X / Discord sign-in, embedded
+ * wallets and linked accounts.
+ */
+export const PRIVY_APP_ID = env.privyAppId?.trim() || undefined;
+/**
+ * Whether Privy makes a wallet for people who sign in with a social account. Off by default: the
+ * app is wallet-first, so a social sign-in is another way into a wallet you already own. Turn on
+ * (NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true) only after enabling embedded wallets in the Privy dashboard.
+ */
+export const PRIVY_EMBEDDED_WALLETS = env.privyEmbedded === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
 /** ChogSwapV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */

@@ -1,150 +1,394 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain } from "wagmi";
+import {
+  CheckIcon,
+  ChevronIcon,
+  CopyIcon,
+  ExternalIcon,
+  PlusIcon,
+  SignOutIcon,
+  UserIcon,
+  WalletIcon,
+} from "@/components/Icons";
+import { usePopover } from "@/components/Popover";
 import { useToast } from "@/components/Toast";
-import { explorerAddress } from "@/lib/config";
+import { WalletAvatar } from "@/components/WalletAvatar";
+import { linkedRows, signedInAs } from "@/lib/accounts";
+import { explorerAddress, PRIVY_APP_ID, PRIVY_EMBEDDED_WALLETS } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { chain } from "@/lib/wagmi";
 
+/**
+ * PRIVY_APP_ID is fixed at build time, so exactly one of these renders for the life of the app and
+ * the hooks inside each keep a stable order. Privy's hooks only work under its provider.
+ */
 export function ConnectButton() {
-  const { address, chainId, status } = useConnection();
-  const connectors = useConnectors();
-  const connect = useConnect();
-  const disconnect = useDisconnect();
+  return PRIVY_APP_ID ? <PrivyConnect /> : <InjectedConnect />;
+}
+
+function MenuItem({
+  icon,
+  children,
+  danger,
+  ...props
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  danger?: boolean;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button role="menuitem" className={`hdr-pop-item ${danger ? "hdr-pop-item-danger" : ""}`} {...props}>
+      <span className="hdr-pop-icon">{icon}</span>
+      <span className="flex-1">{children}</span>
+    </button>
+  );
+}
+
+/** Copies text, and says so for a moment. */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/20 px-2 py-1 text-[0.7rem] font-bold text-white/80 hover:bg-white/10 hover:text-white"
+      onClick={() => navigator.clipboard?.writeText(text).then(() => setCopied(true), () => {})}
+    >
+      {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+/** The connected state both modes share: the network switch, the address menu and sign out. */
+export function ConnectedWallet({
+  address,
+  chainId,
+  onDisconnect,
+  disconnectLabel,
+  signedInAs: who,
+  accountLink,
+}: {
+  address: `0x${string}`;
+  chainId: number | undefined;
+  onDisconnect: () => void;
+  disconnectLabel: string;
+  /** Privy mode: the email or handle the user signed in with. */
+  signedInAs?: string;
+  /** Privy mode: show the link to the account screen. */
+  accountLink?: boolean;
+}) {
   const switchChain = useSwitchChain();
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref } = usePopover();
   const toast = useToast();
 
-  // Wallet failures (no wallet installed, a refused prompt, a failed network switch) toast at the
-  // top of the screen instead of hanging off the button until the next click.
-  const connectError = connect.error;
+  // A refused network switch toasts at the top of the screen instead of hanging off the button.
   const switchError = switchChain.error;
-  useEffect(() => {
-    if (connectError) toast.error(connectError);
-  }, [connectError, toast]);
   useEffect(() => {
     if (switchError) toast.error(switchError);
   }, [switchError, toast]);
 
-  if (status === "connected" && address) {
-    if (chainId !== chain.id) {
-      return (
-        <div className="relative">
-          <button
-            className="wallet-control wallet-control-warning"
-            disabled={switchChain.isPending}
-            onClick={() => switchChain.mutate({ chainId: chain.id })}
-          >
-            <span className="wallet-status-dot" aria-hidden />
-            <span>{switchChain.isPending ? "Switching network…" : `Switch to ${chain.name}`}</span>
-          </button>
-        </div>
-      );
-    }
+  if (chainId !== chain.id) {
     return (
-      <div className="relative">
-        <button
-          className="wallet-control"
-          aria-expanded={open}
-          aria-haspopup="menu"
-          onClick={() => setOpen((value) => !value)}
-        >
-          <span className="wallet-status-dot" aria-hidden />
-          <span className="font-mono">{shortAddress(address)}</span>
-          <span className={`wallet-chevron ${open ? "wallet-chevron-open" : ""}`} aria-hidden>⌄</span>
-        </button>
-        {open && (
-          <div className="wallet-menu" role="menu">
-            <div className="wallet-menu-account">
-              <span className="wallet-menu-label">Connected wallet</span>
-              <span className="truncate font-mono text-sm text-white">{address}</span>
-              <span className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-mint/10 px-2 py-1 text-xs font-semibold text-mint">
-                <span className="wallet-status-dot wallet-status-dot-small" aria-hidden />
-                {chain.name}
-              </span>
-            </div>
-            <a
-              href={explorerAddress(address)}
-              target="_blank"
-              rel="noreferrer"
-              className="wallet-menu-item"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-            >
-              <span>View on explorer</span><span aria-hidden>↗</span>
-            </a>
-            <button
-              className="wallet-menu-item wallet-menu-item-danger"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                disconnect.mutate({});
-              }}
-            >
-              <span>Disconnect wallet</span><span aria-hidden>↪</span>
-            </button>
-          </div>
-        )}
-      </div>
+      <button
+        className="hdr-btn hdr-btn-warn !pl-3"
+        disabled={switchChain.isPending}
+        onClick={() => switchChain.mutate({ chainId: chain.id })}
+      >
+        <span>
+          {switchChain.isPending ? "Switching…" : (
+            <>Switch<span className="hidden sm:inline"> to {chain.name}</span><span className="sm:hidden"> network</span></>
+          )}
+        </span>
+      </button>
     );
   }
 
-  // EIP-6963 lists every installed wallet; the generic "Injected" one is a fallback.
-  const wallets = connectors.length > 1 ? connectors.filter((c) => c.id !== "injected") : connectors;
-
   return (
-    <div className="relative">
+    <div className="hdr-anchor" ref={ref}>
       <button
-        className="btn-secondary"
-        disabled={status === "connecting" || status === "reconnecting"}
-        onClick={() =>
-          wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o)
-        }
+        className="hdr-btn"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
       >
-        <WalletIcon />
-        <span>{status === "connecting" || status === "reconnecting" ? "Connecting…" : "Connect wallet"}</span>
-        {wallets.length > 1 && <span className={`wallet-chevron ${open ? "wallet-chevron-open" : ""}`} aria-hidden>⌄</span>}
+        <WalletAvatar seed={address}>
+          <span className="avatar-dot" />
+        </WalletAvatar>
+        <span className="hdr-btn-text">
+          {who && <span className="hdr-btn-sub hidden sm:block">{who}</span>}
+          <span className="font-mono">{shortAddress(address)}</span>
+        </span>
+        <ChevronIcon className="hdr-chevron size-4" />
       </button>
 
-      {open && wallets.length > 1 && (
-        <div className="wallet-menu" role="menu">
-          <div className="wallet-menu-account">
-            <span className="wallet-menu-label">Connect a wallet</span>
-            <span className="text-xs leading-5 text-white/60">Choose an installed wallet to continue.</span>
+      {open && (
+        <div className="hdr-pop" role="menu">
+          <div className="hdr-pop-head">
+            {who && <span className="text-sm font-bold text-white">{who}</span>}
+            <span className="hdr-pop-label mt-1">Wallet</span>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="truncate font-mono text-sm text-white" title={address}>{shortAddress(address)}</span>
+              <CopyButton text={address} />
+            </div>
+            <span className="hdr-chip mt-2.5">{chain.name}</span>
           </div>
-          {wallets.map((connector) => (
-            <button
-              key={connector.uid}
-              className="wallet-menu-item"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                connect.mutate({ connector });
-              }}
-            >
-              <span className="flex items-center gap-3">
-                {connector.icon ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={connector.icon} alt="" className="size-6 rounded-lg" />
-                ) : <WalletIcon />}
-                <span>{connector.name}</span>
-              </span>
-              <span aria-hidden>→</span>
-            </button>
-          ))}
+          {accountLink && (
+            <Link href="/account" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+              <span className="hdr-pop-icon"><UserIcon /></span>
+              <span className="flex-1">Account &amp; linked accounts</span>
+            </Link>
+          )}
+          <a
+            href={explorerAddress(address)}
+            target="_blank"
+            rel="noreferrer"
+            className="hdr-pop-item"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            <span className="hdr-pop-icon"><ExternalIcon /></span>
+            <span className="flex-1">View on explorer</span>
+          </a>
+          <div className="hdr-pop-sep" />
+          <MenuItem
+            danger
+            icon={<SignOutIcon />}
+            onClick={() => {
+              setOpen(false);
+              onDisconnect();
+            }}
+          >
+            {disconnectLabel}
+          </MenuItem>
         </div>
       )}
     </div>
   );
 }
 
-function WalletIcon() {
+/**
+ * Signed in, but no wallet reached wagmi. Either the account has a wallet linked that isn't
+ * connected in this browser yet (the usual case for a returning Google / X / Discord sign-in), or
+ * it has none. Either way the header needs a way forward and a way out, so this menu offers
+ * connecting or linking a wallet, and always sign out.
+ */
+export function NoWalletMenu({
+  who,
+  settingUp,
+  linkedWallets,
+  canCreate,
+  creating,
+  onConnect,
+  onLink,
+  onCreate,
+  onSignOut,
+}: {
+  who?: string;
+  /** Privy is still loading the user's wallets: a wallet may arrive on its own. */
+  settingUp: boolean;
+  /** Addresses already linked to this account. */
+  linkedWallets: string[];
+  /** Embedded wallets are on, so one can be created here. */
+  canCreate: boolean;
+  creating: boolean;
+  onConnect: () => void;
+  onLink: () => void;
+  onCreate: () => void;
+  onSignOut: () => void;
+}) {
+  const { open, setOpen, ref } = usePopover();
+  const hasLinked = linkedWallets.length > 0;
   return (
-    <svg aria-hidden="true" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7.5A2.5 2.5 0 0 1 6.5 5H19a1 1 0 0 1 1 1v2H7a3 3 0 0 0 0 6h13v3a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20 8H7a3 3 0 0 0 0 6h13v-6Z" />
-      <circle cx="16.5" cy="11" r=".8" fill="currentColor" stroke="none" />
-    </svg>
+    <div className="hdr-anchor" ref={ref}>
+      <button className="hdr-btn" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+        <WalletAvatar>
+          <UserIcon className="size-3.5 text-white/80" />
+        </WalletAvatar>
+        <span className="hdr-btn-text">
+          {who && <span className="hdr-btn-sub hidden sm:block">{who}</span>}
+          <span>{settingUp ? "Setting up…" : hasLinked ? "Connect wallet" : "Link a wallet"}</span>
+        </span>
+        <ChevronIcon className="hdr-chevron size-4" />
+      </button>
+      {open && (
+        <div className="hdr-pop" role="menu">
+          <div className="hdr-pop-head">
+            {who && <span className="text-sm font-bold text-white">{who}</span>}
+            <p className="mt-1 text-xs leading-5 text-white/65">
+              {settingUp
+                ? "Loading your wallets. This takes a moment."
+                : hasLinked
+                  ? "You're signed in. Connect the wallet linked to your account to trade."
+                  : "You're signed in, but no wallet is linked to this account yet. Link the wallet you trade with."}
+            </p>
+          </div>
+          {linkedWallets.map((address) => (
+            <MenuItem key={address} icon={<WalletIcon />} onClick={onConnect}>
+              Connect <span className="font-mono">{shortAddress(address as `0x${string}`)}</span>
+            </MenuItem>
+          ))}
+          <MenuItem icon={hasLinked ? <PlusIcon /> : <WalletIcon />} onClick={onLink}>
+            {hasLinked ? "Link another wallet" : "Link a wallet"}
+          </MenuItem>
+          {canCreate && !hasLinked && (
+            <MenuItem icon={<PlusIcon />} disabled={creating} onClick={onCreate}>
+              {creating ? "Creating wallet…" : "Create an embedded wallet"}
+            </MenuItem>
+          )}
+          <div className="hdr-pop-sep" />
+          <MenuItem danger icon={<SignOutIcon />} onClick={onSignOut}>Sign out</MenuItem>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Sign in with Privy (Google, X, Discord or a wallet); the wallet reaches wagmi from there. */
+function PrivyConnect() {
+  const { ready, authenticated, user, login, logout, linkWallet, connectWallet } = usePrivy();
+  const wallets = useWallets();
+  const { createWallet } = useCreateWallet();
+  const { address, chainId, status } = useConnection();
+  const disconnect = useDisconnect();
+  const toast = useToast();
+  const [creating, setCreating] = useState(false);
+
+  // Privy's wagmi bridge drops its connectors when the wallet list empties but leaves wagmi's own
+  // connection in place, so after a logout the header would still show the old address. Disconnect
+  // wagmi first (while its connector still exists), then sign out of Privy.
+  const signOut = async () => {
+    try {
+      await disconnect.mutateAsync({});
+    } catch {
+      // Already gone (the wallet was removed or locked): signing out of Privy is what matters.
+    }
+    if (authenticated) await logout().catch(toast.error);
+  };
+
+  if (status === "connected" && address) {
+    return (
+      <ConnectedWallet
+        address={address}
+        chainId={chainId}
+        onDisconnect={signOut}
+        disconnectLabel="Sign out"
+        signedInAs={signedInAs(user)}
+        accountLink
+      />
+    );
+  }
+
+  if (authenticated) {
+    return (
+      <NoWalletMenu
+        who={signedInAs(user)}
+        settingUp={!wallets.ready || status === "connecting" || status === "reconnecting"}
+        linkedWallets={linkedRows(user).filter((row) => row.kind === "wallet" && !row.embedded).map((row) => row.id)}
+        canCreate={PRIVY_EMBEDDED_WALLETS}
+        creating={creating}
+        onConnect={() => connectWallet()}
+        onLink={() => linkWallet()}
+        onCreate={() => {
+          setCreating(true);
+          createWallet()
+            .catch(toast.error)
+            .finally(() => setCreating(false));
+        }}
+        onSignOut={signOut}
+      />
+    );
+  }
+
+  return (
+    <button className="btn-secondary" disabled={!ready} onClick={() => login()}>
+      <WalletIcon />
+      <span>{ready ? "Sign in" : "Loading…"}</span>
+    </button>
+  );
+}
+
+/** No Privy: connect any injected wallet. */
+function InjectedConnect() {
+  const { address, chainId, status } = useConnection();
+  const connectors = useConnectors();
+  const connect = useConnect();
+  const disconnect = useDisconnect();
+  const { open, setOpen, ref } = usePopover();
+  const toast = useToast();
+
+  // Wallet failures (no wallet installed, a refused prompt) toast at the top of the screen
+  // instead of hanging off the button until the next click.
+  const connectError = connect.error;
+  useEffect(() => {
+    if (connectError) toast.error(connectError);
+  }, [connectError, toast]);
+
+  if (status === "connected" && address) {
+    return (
+      <ConnectedWallet
+        address={address}
+        chainId={chainId}
+        onDisconnect={() => disconnect.mutate({})}
+        disconnectLabel="Disconnect wallet"
+      />
+    );
+  }
+
+  // EIP-6963 lists every installed wallet; the generic "Injected" one is a fallback.
+  const wallets = connectors.length > 1 ? connectors.filter((c) => c.id !== "injected") : connectors;
+  const connecting = status === "connecting" || status === "reconnecting";
+
+  return (
+    <div className="hdr-anchor" ref={ref}>
+      <button
+        className="btn-secondary"
+        aria-expanded={wallets.length > 1 ? open : undefined}
+        disabled={connecting}
+        onClick={() =>
+          wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o)
+        }
+      >
+        <WalletIcon />
+        <span>{connecting ? "Connecting…" : "Connect wallet"}</span>
+        {wallets.length > 1 && <ChevronIcon className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />}
+      </button>
+
+      {open && wallets.length > 1 && (
+        <div className="hdr-pop" role="menu">
+          <div className="hdr-pop-head">
+            <span className="hdr-pop-label">Connect a wallet</span>
+            <span className="text-xs leading-5 text-white/60">Choose an installed wallet to continue.</span>
+          </div>
+          {wallets.map((connector) => (
+            <button
+              key={connector.uid}
+              className="hdr-pop-item"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                connect.mutate({ connector });
+              }}
+            >
+              <span className="hdr-pop-icon">
+                {connector.icon ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={connector.icon} alt="" className="size-5 rounded" />
+                ) : <WalletIcon />}
+              </span>
+              <span className="flex-1">{connector.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

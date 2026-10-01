@@ -22,7 +22,7 @@ web/
 ├── components/
 │   ├── Providers.tsx           ✓ WagmiProvider + QueryClientProvider
 │   ├── Header.tsx              ✓ nav + ConnectButton
-│   ├── ConnectButton.tsx       ✓ injected wallets (EIP-6963 list), wrong-network switch
+│   ├── ConnectButton.tsx       ✓ Privy sign-in, or injected wallets (EIP-6963 list); wrong-network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb · ChogCard · ChogPicker
 │   ├── DealParts.tsx          ✓ StatusBadge · MonPill · DealSide · DealCard · DealGrid
 │   ├── Tabs.tsx                ✓ the one tab bar (`tabbar` / `tab` styles; Pagination reuses them)
@@ -59,7 +59,7 @@ web/
 - `next.config.ts` loads the **repo-root `.env`**, so the web app and the Foundry scripts share one file. `web/.env*` still overrides it.
 - Every value has a default pointing at the Phase 1 testnet deployment, so `npm run dev` works with no `.env` at all.
 - `NEXT_PUBLIC_CHOG_MINTABLE=false` hides the mint panel; set it for the real collection.
-- Only injected wallets for now (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963). WalletConnect in wagmi 3 needs `@walletconnect/ethereum-provider` and a project id, so it was left out of v1.
+- With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (email, Google, X, Discord or a wallet), embedded wallets are created for people without one, and `/account` links and unlinks accounts ([ADR 0010](adr/0010-privy-sign-in.md)). Without it, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963). WalletConnect in wagmi 3 needs `@walletconnect/ethereum-provider` and a project id, so it was left out of v1.
 
 ### Design tokens
 
