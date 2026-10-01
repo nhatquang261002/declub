@@ -1,4 +1,4 @@
-import { getAddress, type Address } from "viem";
+import { getAddress, isAddress, type Address } from "viem";
 
 // NEXT_PUBLIC_* values are inlined at build time, so each must be read by its full name.
 // The defaults are the Phase 1 Monad testnet deployment (see the root README).
@@ -10,7 +10,10 @@ const env = {
   deployBlock: process.env.NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK,
   swapV2: process.env.NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS,
   mockErc20: process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS,
+  intents: process.env.NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS,
+  poolUrl: process.env.NEXT_PUBLIC_POOL_URL,
   chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
+  knownCollections: process.env.NEXT_PUBLIC_KNOWN_COLLECTIONS,
 };
 
 function address(value: string | undefined, fallback: Address): Address {
@@ -36,6 +39,30 @@ export const CHOG_SWAP_V2_ADDRESS: Address | undefined = env.swapV2?.trim()
 export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
   ? getAddress(env.mockErc20.trim())
   : undefined;
+
+/**
+ * ChogSwapIntents (ADR 0008): signed swap intents settled by an off-chain matcher. Optional:
+ * the intent screens stay off until NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS is set.
+ */
+export const CHOG_SWAP_INTENTS_ADDRESS: Address | undefined = env.intents?.trim()
+  ? getAddress(env.intents.trim())
+  : undefined;
+/** The intent pool's HTTP API (matcher/). The matcher binds to loopback by default. */
+export const POOL_URL = (env.poolUrl?.trim() || "http://127.0.0.1:8787").replace(/\/+$/, "");
+/** The pool refuses intents that end sooner or later than this (matcher/src/pool.ts). */
+export const POOL_MIN_TTL_SEC = 60;
+export const POOL_MAX_TTL_SEC = 7 * 86_400;
+
+/**
+ * Collections the NFT picker offers first, besides the Chog collection (comma-separated
+ * addresses in NEXT_PUBLIC_KNOWN_COLLECTIONS). Anything else is found by pasting its address, or
+ * from the open deals. Entries that aren't addresses are ignored.
+ */
+export const KNOWN_COLLECTIONS: Address[] = (env.knownCollections ?? "")
+  .split(",")
+  .map((a) => a.trim())
+  .filter((a) => isAddress(a))
+  .map((a) => getAddress(a));
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";

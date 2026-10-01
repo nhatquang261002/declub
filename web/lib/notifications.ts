@@ -1,13 +1,25 @@
 import { expiryLabel, formatIds, formatMon } from "./format";
 import { displayStatus, sameAddress, type Deal } from "./deals";
+import { reasonText, type PoolIntent } from "./intents";
 
-export type NotificationKind = "request" | "filled" | "expiring" | "expired";
+export type NotificationKind =
+  | "request"
+  | "filled"
+  | "expiring"
+  | "expired"
+  | "intent-settled"
+  | "intent-paused"
+  | "intent-dropped";
+
+/** Kinds that report something that already happened and need nothing from the user. */
+export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped"];
 
 export type AppNotification = {
-  /** Stable per (kind, deal), so read state survives reloads. */
+  /** Stable per (kind, deal or intent), so read state survives reloads. */
   key: string;
   kind: NotificationKind;
-  dealId: bigint;
+  /** Newest first within a group: a deal's id, or an intent's creation time. */
+  recency: bigint;
   title: string;
   body: string;
   href: string;
@@ -53,7 +65,7 @@ export function deriveNotifications(
       out.push({
         key: `request:${deal.id}`,
         kind: "request",
-        dealId: deal.id,
+        recency: deal.id,
         title: `Direct offer #${deal.id} for you`,
         body: `Offering ${offerSummary(deal)}. ${expiryLabel(deal.expiry, nowSec)}.`,
         href,
@@ -67,7 +79,7 @@ export function deriveNotifications(
       out.push({
         key: `filled:${deal.id}`,
         kind: "filled",
-        dealId: deal.id,
+        recency: deal.id,
         title: `Deal #${deal.id} was accepted`,
         body: `Your ${offerSummary(deal)} was swapped.`,
         href,
@@ -77,7 +89,7 @@ export function deriveNotifications(
       out.push({
         key: `expired:${deal.id}`,
         kind: "expired",
-        dealId: deal.id,
+        recency: deal.id,
         title: `Deal #${deal.id} expired`,
         body: "Nobody accepted it. Reclaim your assets from escrow.",
         href,
@@ -87,7 +99,7 @@ export function deriveNotifications(
       out.push({
         key: `expiring:${deal.id}`,
         kind: "expiring",
-        dealId: deal.id,
+        recency: deal.id,
         title: `Deal #${deal.id} is about to expire`,
         body: `${expiryLabel(deal.expiry, nowSec)}. Cancel or let it lapse and reclaim.`,
         href,
@@ -96,8 +108,42 @@ export function deriveNotifications(
     }
   }
 
-  // Actionable first, then newest deal first.
-  return out.sort(
-    (a, b) => Number(b.actionable) - Number(a.actionable) || (a.dealId < b.dealId ? 1 : -1),
+  return sortNotifications(out);
+}
+
+/** Actionable first, then newest first. */
+export function sortNotifications(list: AppNotification[]): AppNotification[] {
+  return list.sort(
+    (a, b) => Number(b.actionable) - Number(a.actionable) || (a.recency < b.recency ? 1 : a.recency > b.recency ? -1 : 0),
   );
+}
+
+/**
+ * What the wallet should hear about its signed intents, derived from the pool the same way:
+ * - intent-settled: matched and swapped (the one a maker is waiting for)
+ * - intent-paused:  the matcher skips it because the wallet can't honour it; fixing that revives it
+ * - intent-dropped: the matcher gave up on it after repeated on-chain failures
+ */
+export function deriveIntentNotifications(
+  rows: readonly PoolIntent[],
+  account: string | undefined,
+  nowSec: number,
+): AppNotification[] {
+  if (!account) return [];
+  const out: AppNotification[] = [];
+
+  for (const row of rows) {
+    if (!sameAddress(row.intent.maker, account)) continue;
+    const id = `${row.hash.slice(0, 8)}…`;
+    const base = { href: `/intent/${row.hash}`, recency: BigInt(row.createdAt) };
+
+    if (row.status === "settled") {
+      out.push({ ...base, key: `intent-settled:${row.hash}`, kind: "intent-settled", title: `Intent ${id} settled`, body: "It was matched and swapped on-chain.", actionable: false });
+    } else if (row.status === "stale" && row.intent.deadline >= BigInt(nowSec)) {
+      out.push({ ...base, key: `intent-paused:${row.hash}`, kind: "intent-paused", title: `Intent ${id} is paused`, body: reasonText(row.reason) ?? "Your wallet can't honour it right now.", actionable: true });
+    } else if (row.status === "rejected") {
+      out.push({ ...base, key: `intent-dropped:${row.hash}`, kind: "intent-dropped", title: `Intent ${id} was dropped`, body: reasonText(row.reason) ?? "It failed on-chain checks too often.", actionable: false });
+    }
+  }
+  return out;
 }

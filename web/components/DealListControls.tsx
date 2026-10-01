@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Select, type SelectOption } from "@/components/Select";
 import { Tabs, type TabOption } from "@/components/Tabs";
 import {
@@ -49,12 +50,15 @@ export function DealFilterBar({
   onChange,
   placeholder,
   suggestions,
+  extra,
 }: {
   filters: DealFilters;
   onChange: (patch: Partial<DealFilters>) => void;
   placeholder: string;
   /** Optional search suggestions (v1 offers trait labels). */
   suggestions?: string[];
+  /** More controls, placed before the Clear button. */
+  extra?: ReactNode;
 }) {
   return (
     <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -88,6 +92,7 @@ export function DealFilterBar({
         options={SORT_OPTIONS}
         onChange={(sort) => onChange({ sort })}
       />
+      {extra}
       {isFiltering(filters) && (
         <button type="button" className="btn-secondary" onClick={() => onChange(DEFAULT_FILTERS)}>
           Clear

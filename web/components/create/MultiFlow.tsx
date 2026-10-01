@@ -207,7 +207,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
     return (
       <div className="space-y-6">
         <StepHeading title="What are you giving?" blurb="These are locked in escrow until someone accepts or you cancel." />
-        <AssetEditor title="You offer" rows={offeredRows} onChange={setOfferedRows} info={info} />
+        <AssetEditor title="You offer" rows={offeredRows} onChange={setOfferedRows} info={info} owner={address} />
         <TermsFields
           terms={terms}
           onChange={onTerms}

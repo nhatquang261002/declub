@@ -4,12 +4,14 @@ import { useState } from "react";
 import { ChogsFlow } from "@/components/create/ChogsFlow";
 import { KindPicker, type KindAvailability } from "@/components/create/KindPicker";
 import { MultiFlow } from "@/components/create/MultiFlow";
+import { SettlementPicker } from "@/components/create/SettlementPicker";
+import { SignedFlow } from "@/components/create/SignedFlow";
 import { StepHeading } from "@/components/create/parts";
 import { Stepper } from "@/components/create/Stepper";
 import { PageHeader, RequireWallet } from "@/components/Page";
 import { DEMO_CREATE } from "@/lib/config";
-import { swapV2 } from "@/lib/contracts";
-import { DEFAULT_TERMS, type Step, type Terms, type DealKind } from "@/lib/createFlow";
+import { swapIntents, swapV2 } from "@/lib/contracts";
+import { DEFAULT_TERMS, type Step, type Terms, type DealKind, type Settlement } from "@/lib/createFlow";
 
 // Open offers, exact requests and trait requests live on ChogSwapV2 (ADR 0005–0007). Without V2
 // configured, exact and trait requests fall back to the original Chog contract.
@@ -39,6 +41,8 @@ export default function CreatePage() {
 function CreateWizard({ preview = false }: { preview?: boolean }) {
   const [step, setStep] = useState<Step>(1);
   const [kind, setKind] = useState<DealKind | null>(null);
+  const [settlement, setSettlement] = useState<Settlement>("escrow");
+  const signed = settlement === "signed" && !!swapIntents;
   const [terms, setTerms] = useState<Terms>(DEFAULT_TERMS);
 
   const flow = { step, onStep: setStep, terms, onTerms: setTerms, preview };
@@ -49,15 +53,27 @@ function CreateWizard({ preview = false }: { preview?: boolean }) {
 
       {step === 1 && (
         <section className="space-y-4">
-          <StepHeading title="What kind of deal?" blurb="You'll choose what you give on the next step." />
-          <KindPicker value={kind} onChange={setKind} availability={AVAILABILITY} />
-          {!kind && <p className="text-sm text-muted">Choose a deal type to continue.</p>}
+          {swapIntents && (
+            <>
+              <StepHeading title="How should it settle?" blurb="Lock your assets for a guaranteed swap, or just sign for free." />
+              <SettlementPicker value={settlement} onChange={setSettlement} />
+            </>
+          )}
+          {!signed && (
+            <>
+              <StepHeading title="What kind of deal?" blurb="You'll choose what you give on the next step." />
+              <KindPicker value={kind} onChange={setKind} availability={AVAILABILITY} />
+              {!kind && <p className="text-sm text-muted">Choose a deal type to continue.</p>}
+            </>
+          )}
         </section>
       )}
 
+      {signed && <SignedFlow key="signed" step={step} onStep={setStep} onUseEscrow={() => { setSettlement("escrow"); setStep(1); }} />}
+
       {/* Same key across kinds that share a contract, so switching between them keeps what you typed. */}
-      {swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
-      {!swapV2 && (kind === "trait" || kind === "exact") && <ChogsFlow key="chogs" kind={kind} {...flow} />}
+      {!signed && swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
+      {!signed && !swapV2 && (kind === "trait" || kind === "exact") && <ChogsFlow key="chogs" kind={kind} {...flow} />}
     </div>
   );
 }

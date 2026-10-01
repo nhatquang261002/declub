@@ -180,6 +180,7 @@ export function ProposalForm({ dealId, offered }: { dealId: bigint; offered: rea
         rows={rows}
         onChange={setRows}
         info={info}
+        owner={address}
       />
       <div className="card space-y-3 p-4">
         {(validation ?? overlap) && <p className="text-sm text-danger" role="alert">{validation ?? overlap}</p>}

@@ -16,8 +16,9 @@ const NAV = [
 
 export function Header() {
   const pathname = usePathname();
+  // Signed swaps live in the deals list, so their pages belong to the Deals tab.
   const active = (href: string) =>
-    href === "/deals" ? pathname.startsWith("/deal") : pathname.startsWith(href);
+    href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/intent") : pathname.startsWith(href);
 
   return (
     <header

@@ -28,6 +28,8 @@ export type TxState =
   | { status: "switching-chain" }
   | { status: "simulating" }
   | { status: "awaiting-signature" }
+  // Signed intents only (useSignFlow): the signature is made, the pool is being told.
+  | { status: "posting" }
   | { status: "pending"; hash: Hash }
   | { status: "confirmed"; hash: Hash }
   | { status: "error"; message: string; hash?: Hash };

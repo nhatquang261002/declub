@@ -47,12 +47,12 @@ function matchesMon(deal: DealV2, mon: MonFilter): boolean {
 }
 
 /** Same query, MON filter and sorting as `applyDealFilters`, for V2 deals. */
-export function applyDealFiltersV2(
-  deals: DealV2[],
+export function applyDealFiltersV2<T extends DealV2>(
+  deals: T[],
   filters: DealFilters,
   now: number,
   info: ReadonlyMap<string, TokenInfo>,
-): DealV2[] {
+): T[] {
   const out = deals.filter(
     (t) => matchesQueryV2(t, filters.query, info) && matchesMon(t, filters.mon),
   );
@@ -61,7 +61,7 @@ export function applyDealFiltersV2(
       const rank = endingSoonRank(a, now) - endingSoonRank(b, now);
       if (rank !== 0) return rank;
       if (a.expiry !== b.expiry && endingSoonRank(a, now) === 0) return a.expiry < b.expiry ? -1 : 1;
-      return a.id < b.id ? 1 : -1;
+      return a.id === b.id ? 0 : a.id < b.id ? 1 : -1;
     });
   }
   return out;

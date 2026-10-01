@@ -8,6 +8,7 @@ const BUSY_LABEL: Partial<Record<TxState["status"], string>> = {
   "switching-chain": "Switching network…",
   simulating: "Checking…",
   "awaiting-signature": "Confirm in wallet…",
+  posting: "Sending to the pool…",
   pending: "Waiting for block…",
 };
 

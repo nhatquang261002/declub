@@ -151,6 +151,63 @@ Choices worth knowing:
 - **Held payouts on open offers:** `claimable` is read for the deal's assets, the accepted offer's assets, and the connected wallet's own offers, not for every offer on the deal.
 - **Not built yet:** V2 in the notifications bell (so no "you got an offer" alert yet), offer counts on the list cards, the offer note in list search, and the `?v=` deep link.
 
+### Choosing NFTs (NFT picker)
+
+An NFT row is no longer a collection address plus a typed id. **+ NFT** (and **Change** on a row) opens `components/NftPicker.tsx`:
+
+1. **Collection.** A search box over the collections the app can know about without an indexer: the Chog collection and `NEXT_PUBLIC_KNOWN_COLLECTIONS` (*Featured*), the ones this browser used before (*Recent*, localStorage), and the ones open deals and signed swaps use (*In open deals*, from `useMarketCollections`). Search matches name, symbol or address. **Pasting a contract address** reads it on-chain first (`supportsInterface` for ERC-721, then name, symbol, supply) and refuses anything that isn't an NFT collection.
+2. **Tokens.** On the side the wallet is giving (the editor gets `owner`), the wallet's own NFTs in a grid with art, via `tokenOfOwnerByIndex` (first 100). On the side it is asking for, the collection is browsed a page at a time via `tokenByIndex`, with the holder under each token. Tick several and add them in one go.
+3. **Typed id.** Below the grid, for collections that can't list tokens or ids the grid doesn't show. The id is checked with `ownerOf`: it must exist, and on the giving side must be the wallet's.
+
+| File | Purpose |
+|---|---|
+| `lib/collections.ts` | The read ABI, featured and recent collections, `safeImage` |
+| `hooks/useCollection.ts` | `useCollectionInfos`, `useOwnedTokenIds`, `useBrowseTokenIds`, `useTokenViews` (art and name from `tokenURI`), `useTokenOwner` |
+| `hooks/useMarketCollections.ts` | Collections used by open deals and signed swaps, most used first |
+| `components/NftPicker.tsx` | The dialog |
+
+Choices worth knowing:
+
+- **No indexer, so no "all collections" and no "everything I own".** A collection that isn't enumerable can't list a wallet's tokens, so the picker falls back to the typed, checked id. Finding a collection you hold means pasting its address, unless it's featured, recent or already in a deal.
+- **Names are the contract's own words.** Any contract can call itself "Chog", so every collection is shown with its short address, and only the configured ones are tagged *Featured*.
+- **Token art is an image URL from metadata**, so only `http(s)` and inline `data:image/` are shown (`safeImage`), in a plain `<img>` with no referrer.
+- Draft rows are unchanged (`token`, `value`), so `assetDraft`, approvals and the contracts see nothing new. Not done: the same search for ERC-20 tokens (a pasted address still shows its on-chain symbol and decimals).
+
+### Intents in the frontend (Phase 4)
+
+Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) are optional: the screens appear once `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS` is set, and `swapIntents` in `lib/contracts.ts` is `undefined` before that. They are not a separate product in the UI: a signed swap is a **deal that settles differently**, so it shares the Create wizard, the deals list and History with locked deals. They read and write the matcher's pool over HTTP (`NEXT_PUBLIC_POOL_URL`, default `http://127.0.0.1:8787`), so the matcher has to be running ([matcher/README.md](../matcher/README.md)). A pool that is down only costs the signed swaps (a notice in the list, an error on the sign step); locked deals read straight from the chain.
+
+| Where | What |
+|---|---|
+| `/create` | Step 1 opens with **How should it settle?**: *Lock assets now* (the three deal kinds, as before) or *Sign only*. Sign only runs `SignedFlow`: want (no MON), give plus a deadline (default 1 hour), then review, the consent notice, **approve** and **Sign and post**. Both steps link back to *Lock assets* for a deal that needs MON or a trait request |
+| `/deals` (Multi-asset) | Locked deals and open signed swaps in one grid, each tagged **Locked** or **Signed**. A *Type* filter (All / Locked / Signed) sits beside the MON and sort filters. Search, MON and sort apply to both. The page opens on Multi-asset once V2 and intents are both configured |
+| `/history` (Multi-asset) | The wallet's signed swaps in every status beside its locked deals, with the same Active / Completed / Expired filters |
+| `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain** |
+| `/intents`, `/intents/new` | Redirect to `/deals` and `/create`, for old links |
+
+| File | Purpose |
+|---|---|
+| `lib/intents.ts` | The EIP-712 types and domain, the struct hash (the intent's id), the pool's JSON shapes and their parsers, status copy, deadline presets, `nonceBit`, and `intentAsListing` (a signed swap shaped like a V2 deal, so the list and filters treat both alike) |
+| `lib/pool.ts` | The HTTP client. Pool rejections become readable copy; rows whose recomputed hash doesn't match are dropped |
+| `hooks/usePool.ts` | `usePoolInfo` (also flags a pool for another chain or contract), `useIntents`, `useIntent`, `useSettlements` |
+| `hooks/useIntentReadiness.ts` | What stands between a wallet and an intent that can settle: balance and ownership problems, and the approvals still missing |
+| `hooks/useSignFlow.ts` | Sign and post an intent, or sign a cancel. Free, no gas; reuses `TxState` with an added `posting` stage so `TxButton` works unchanged |
+| `components/create/SettlementPicker.tsx` | The *Lock assets now* / *Sign only* choice |
+| `components/create/SignedFlow.tsx` | Steps 1 to 3 of a signed swap |
+| `components/IntentParts.tsx` | Status badge, `IntentCard`, `ListingGrid` (deals and signed swaps in one grid), `CycleView`, and `ConsentNotice` |
+
+Choices worth knowing:
+
+- **Approvals are the narrowest that work.** An ERC-20 is approved for exactly the amount given, an NFT with `approve(id)`. A checkbox switches to `setApprovalForAll` per collection for fewer transactions, with the wider permission spelled out. Approving is what lets a signed intent execute later without another confirmation, so the consent notice says it.
+- **The deadline is short by default** (10 minutes to 7 days, default 1 hour) because a signature that has left the pool can't be recalled.
+- **Nonces** are chosen at signing time: above everything this wallet has posted to the pool (cancelled intents included, since their signatures could still settle), skipping any the contract marks used. Keeping them in one 256-bit word keeps settlement cheap.
+- **Two kinds of cancel.** *Remove from pool* is a signed `CancelIntent` message, free, but only this pool forgets it. *Cancel on-chain* sends `invalidateNonces`, costs gas, and is the only way to be certain. The detail page says which is which.
+- **Paused intents** (the pool's `stale`) show why in plain words and, for the maker, the approval to fix it. The matcher revives it on its next 30s pass.
+- **Matched in a ring.** `CycleView` lists each wallet's whole `give` and who got it. A pair reads "Swap", three or four wallets "Ring of N". The maker's detail page also shows what they received, surplus included.
+- **Notifications.** The bell also lists the wallet's intents: settled, paused (needs action) and dropped, derived from the pool like the deal ones. Settled and dropped ones from before a wallet's first visit are marked read.
+- **Ordering in the merged list:** deals have an id but no timestamp, and a signed swap has a timestamp but no id, so there is no honest "newest" across both. Signed swaps come first; *Ending soon* sorts the two together by expiry or deadline.
+- **Not built:** counterparty restriction and trait wants (the contract has neither), a wallet NFT picker in the sign flow (ids are typed, as on the V2 create screen), per-token info beyond symbol and decimals, and push alerts while no tab is open.
+
 ### Deal Detail: which button shows
 
 ```text

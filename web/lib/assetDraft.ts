@@ -51,7 +51,7 @@ export type SideResult = { assets: Asset[]; errors: string[] };
 export function draftToAssets(
   rows: readonly DraftRow[],
   decimalsOf: (token: Address) => number | undefined,
-  { optional = false }: { optional?: boolean } = {},
+  { optional = false, noNative = false }: { optional?: boolean; noNative?: boolean } = {},
 ): SideResult {
   const assets: Asset[] = [];
   const errors: string[] = [];
@@ -64,12 +64,14 @@ export function draftToAssets(
     const token = row.token.trim();
 
     if (row.kind === "native") {
+      if (noNative) return errors.push(`${label}: MON can't be used here. Wrap it as WMON and use that token.`);
       const amount = parseMon(row.value);
       if (!amount) return errors.push(`${label}: enter a MON amount above zero.`);
       assets.push(nativeAsset(amount));
       return;
     }
 
+    if (row.kind === "erc721" && token === "" && row.value.trim() === "") return errors.push(`${label}: choose an NFT.`);
     if (!isAddress(token)) return errors.push(`${label}: enter a valid ${row.kind === "erc20" ? "token" : "collection"} address.`);
 
     if (row.kind === "erc20") {
@@ -81,7 +83,7 @@ export function draftToAssets(
       return;
     }
 
-    if (!/^\d+$/.test(row.value.trim())) return errors.push(`${label}: enter a token id.`);
+    if (!/^\d+$/.test(row.value.trim())) return errors.push(`${label}: choose an NFT.`);
     assets.push(nftAsset(token, BigInt(row.value.trim())));
   });
 

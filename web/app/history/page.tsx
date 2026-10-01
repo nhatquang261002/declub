@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { EmptyState, PageHeader } from "@/components/Page";
-import { DealGridV2 } from "@/components/DealCardV2";
+import { ListingGrid } from "@/components/IntentParts";
 import { DealGrid } from "@/components/DealParts";
 import { Tabs } from "@/components/Tabs";
 import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
@@ -13,7 +13,10 @@ import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useDeals } from "@/hooks/useDeals";
 import { useDealsV2 } from "@/hooks/useDealsV2";
+import { useIntents } from "@/hooks/usePool";
 import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
+import { swapIntents, swapV2 } from "@/lib/contracts";
+import { intentAsListing } from "@/lib/intents";
 import { errorMessage } from "@/lib/errors";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
@@ -32,16 +35,21 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const [version, setVersion] = useState<DealVersion>("v1");
+  const [version, setVersion] = useState<DealVersion>(swapV2 && swapIntents ? "v2" : "v1");
   const isV2 = version === "v2";
   const v1 = useDeals({ limit: 200, enabled: !isV2 });
   const v2 = useDealsV2({ limit: 200, enabled: isV2 });
-  const { info } = useDealsTokenInfo(v2.deals);
+  // Signed swaps (ADR 0008) sit beside locked deals in the multi-asset view, every status.
+  const signed = useIntents({ status: "all", maker: address, enabled: isV2 && !!swapIntents && !!address });
+  const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
+  const v2Deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
+  const { info } = useDealsTokenInfo(v2Deals);
   // Fills are remembered per contract, so each version reads its own record.
   const v1Fills = useLocalFills(address, CHOG_SWAP_ADDRESS);
   const v2Fills = useLocalFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
-  const { isLoading, error } = isV2 ? v2 : v1;
-  const deals: Array<Deal | DealV2> = isV2 ? v2.deals : v1.deals;
+  const { error } = isV2 ? v2 : v1;
+  const isLoading = (isV2 ? v2.isLoading || signed.isLoading : v1.isLoading) && !error;
+  const deals: Array<Deal | DealV2> = isV2 ? v2Deals : v1.deals;
   const localFillIds = isV2 ? v2Fills.ids : v1Fills.ids;
 
   const walletDeals = useMemo(
@@ -136,7 +144,7 @@ export default function HistoryPage() {
         </EmptyState>
       ) : (
         isV2 ? (
-          <DealGridV2 deals={visibleDeals as DealV2[]} now={now} me={address} info={info} />
+          <ListingGrid listings={visibleDeals as DealV2[]} now={now} me={address} info={info} />
         ) : (
           <DealGrid deals={visibleDeals as Deal[]} now={now} />
         )

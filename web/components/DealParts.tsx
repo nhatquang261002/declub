@@ -28,6 +28,22 @@ export function StatusBadge({ status }: { status: DisplayStatus }) {
   );
 }
 
+/** Which settlement a card is, where locked deals and signed swaps share one list. */
+export function SettlementTag({ signed }: { signed: boolean }) {
+  return (
+    <span
+      className="rounded-full border border-line px-2 py-0.5 text-xs text-muted"
+      title={
+        signed
+          ? "Signed, not locked. A matcher settles it when something fits, and it can fail if the assets move."
+          : "The maker's side is locked in the contract, so accepting it can't fail."
+      }
+    >
+      {signed ? "Signed" : "Locked"}
+    </span>
+  );
+}
+
 export function MonPill({ wei }: { wei: bigint }) {
   return (
     <span className="inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-[#836ef9] bg-[#eeeaff] px-1.5 text-center font-semibold leading-tight text-[#111318] shadow-[0.18rem_0.18rem_0_#111318]">
@@ -52,7 +68,7 @@ function countdown(expiry: bigint, now: number): string {
   return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
 }
 
-function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: number; status: DisplayStatus }) {
+export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: number; status: DisplayStatus }) {
   if (status !== "open" && status !== "expired") return null;
   if (expiry === 0n) {
     return <span className="text-xs text-muted">∞ no expiry</span>;
@@ -86,6 +102,27 @@ export function DealSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint }) 
   );
 }
 
+/** The gives / wants pair every deal-like card shows. */
+export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
+  return (
+    <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
+      <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+        <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
+          gives
+        </span>
+        {gives}
+      </div>
+      <div className="flex items-center text-lg text-muted">↔</div>
+      <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+        <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
+          wants
+        </span>
+        {wants}
+      </div>
+    </div>
+  );
+}
+
 /** The card chrome shared by v1 and V2 deals: header row, gives / wants panels, maker line. */
 export function DealCardFrame({
   href,
@@ -94,6 +131,7 @@ export function DealCardFrame({
   me,
   gives,
   wants,
+  tag,
 }: {
   href: string;
   deal: Pick<Deal, "id" | "maker" | "taker" | "expiry" | "status">;
@@ -101,6 +139,8 @@ export function DealCardFrame({
   me?: string;
   gives: ReactNode;
   wants: ReactNode;
+  /** Shown beside the status, e.g. a `SettlementTag` where deal kinds share a list. */
+  tag?: ReactNode;
 }) {
   const status = displayStatus(deal, now);
   const forMe = sameAddress(deal.taker, me);
@@ -114,6 +154,7 @@ export function DealCardFrame({
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-semibold tracking-tight">Deal #{deal.id.toString()}</span>
         <StatusBadge status={status} />
+        {tag}
         {forMe && (
           <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold">For you</span>
         )}
@@ -125,21 +166,7 @@ export function DealCardFrame({
         <span className="ml-auto"><ExpiryCountdown expiry={deal.expiry} now={now} status={status} /></span>
       </div>
 
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
-        <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-          <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
-            gives
-          </span>
-          {gives}
-        </div>
-        <div className="flex items-center text-lg text-muted">↔</div>
-        <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-          <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
-            wants
-          </span>
-          {wants}
-        </div>
-      </div>
+      <SwapPanels gives={gives} wants={wants} />
 
       <div className="mt-4 text-xs text-muted">
         by <span className="font-mono">{mine ? "you" : shortAddress(deal.maker)}</span>

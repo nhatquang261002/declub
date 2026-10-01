@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { formatUnits } from "viem";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { CHOG_ADDRESS } from "@/lib/config";
@@ -77,13 +78,26 @@ function OpenToOffers() {
   );
 }
 
-export function DealCardV2({ deal, now, me, info }: { deal: DealV2; now: number; me?: string; info: Info }) {
+export function DealCardV2({
+  deal,
+  now,
+  me,
+  info,
+  tag,
+}: {
+  deal: DealV2;
+  now: number;
+  me?: string;
+  info: Info;
+  tag?: ReactNode;
+}) {
   return (
     <DealCardFrame
       href={`/v2/deal/${deal.id}`}
       deal={deal}
       now={now}
       me={me}
+      tag={tag}
       gives={<AssetSide assets={deal.offered} info={info} />}
       wants={isOpenOffer(deal) ? <OpenToOffers /> : <AssetSide assets={deal.requested} info={info} />}
     />

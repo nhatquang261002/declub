@@ -454,6 +454,391 @@ export const chogSwapAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ChogSwapIntents
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const chogSwapIntentsAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'DOMAIN_SEPARATOR',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_ASSETS_PER_SIDE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_CYCLE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'eip712Domain',
+    outputs: [
+      { name: 'fields', internalType: 'bytes1', type: 'bytes1' },
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'version', internalType: 'string', type: 'string' },
+      { name: 'chainId', internalType: 'uint256', type: 'uint256' },
+      { name: 'verifyingContract', internalType: 'address', type: 'address' },
+      { name: 'salt', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'extensions', internalType: 'uint256[]', type: 'uint256[]' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'intent',
+        internalType: 'struct IChogSwapIntents.Intent',
+        type: 'tuple',
+        components: [
+          { name: 'maker', internalType: 'address', type: 'address' },
+          {
+            name: 'give',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'want',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          { name: 'deadline', internalType: 'uint64', type: 'uint64' },
+          { name: 'nonce', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+    ],
+    name: 'hashIntent',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'pure',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'intent',
+        internalType: 'struct IChogSwapIntents.Intent',
+        type: 'tuple',
+        components: [
+          { name: 'maker', internalType: 'address', type: 'address' },
+          {
+            name: 'give',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'want',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          { name: 'deadline', internalType: 'uint64', type: 'uint64' },
+          { name: 'nonce', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+    ],
+    name: 'intentDigest',
+    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'word', internalType: 'uint256', type: 'uint256' },
+      { name: 'mask', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'invalidateNonces',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'maker', internalType: 'address', type: 'address' },
+      { name: 'nonce', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'isNonceUsed',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'cycle',
+        internalType: 'struct IChogSwapIntents.Intent[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'maker', internalType: 'address', type: 'address' },
+          {
+            name: 'give',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'want',
+            internalType: 'struct IChogSwapIntents.Asset[]',
+            type: 'tuple[]',
+            components: [
+              {
+                name: 'assetType',
+                internalType: 'enum IChogSwapIntents.AssetType',
+                type: 'uint8',
+              },
+              { name: 'token', internalType: 'address', type: 'address' },
+              { name: 'id', internalType: 'uint256', type: 'uint256' },
+              { name: 'amount', internalType: 'uint256', type: 'uint256' },
+            ],
+          },
+          { name: 'deadline', internalType: 'uint64', type: 'uint64' },
+          { name: 'nonce', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+      { name: 'signatures', internalType: 'bytes[]', type: 'bytes[]' },
+    ],
+    name: 'settle',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  { type: 'event', anonymous: false, inputs: [], name: 'EIP712DomainChanged' },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'intentHash',
+        internalType: 'bytes32',
+        type: 'bytes32',
+        indexed: true,
+      },
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'nonce',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'IntentFilled',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'maker',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'word',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'mask',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'NoncesInvalidated',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'size', internalType: 'uint256', type: 'uint256' }],
+    name: 'BadCycleSize',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'BadSignature',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'give', internalType: 'bool', type: 'bool' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'DuplicateAsset',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'DuplicateMaker',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'give', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'EmptySide',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'IntentExpired',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'give', internalType: 'bool', type: 'bool' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'InvalidAsset',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidDeadline',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidMaker',
+  },
+  { type: 'error', inputs: [], name: 'InvalidShortString' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'id', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'NftNotReceived',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'maker', internalType: 'address', type: 'address' },
+      { name: 'nonce', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'NonceUsed',
+  },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
+    name: 'SameAssetBothSides',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intents', internalType: 'uint256', type: 'uint256' },
+      { name: 'signatures', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'SignatureCountMismatch',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'str', internalType: 'string', type: 'string' }],
+    name: 'StringTooLong',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'give', internalType: 'bool', type: 'bool' },
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyAssets',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'UnsupportedToken',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'wantIndex', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'WantNotMet',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ChogSwapV2
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -10,6 +10,9 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   filled: "Accepted",
   expiring: "Ending soon",
   expired: "Expired",
+  "intent-settled": "Settled",
+  "intent-paused": "Paused",
+  "intent-dropped": "Dropped",
 };
 
 const KIND_TONE: Record<NotificationKind, string> = {
@@ -17,6 +20,9 @@ const KIND_TONE: Record<NotificationKind, string> = {
   filled: "bg-mint/10 text-mint",
   expiring: "bg-white/10 text-white/80",
   expired: "bg-danger/15 text-danger",
+  "intent-settled": "bg-mint/10 text-mint",
+  "intent-paused": "bg-warn/15 text-warn",
+  "intent-dropped": "bg-danger/15 text-danger",
 };
 
 const MAX_SHOWN = 20;
@@ -82,7 +88,7 @@ export function NotificationBell() {
 
           {shown.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-white/60">
-              You&apos;re all caught up. Direct offers, accepted deals and expiries show up here.
+              You&apos;re all caught up. Direct offers, accepted deals, settled intents and expiries show up here.
             </p>
           ) : (
             <ul className="max-h-96 overflow-y-auto">

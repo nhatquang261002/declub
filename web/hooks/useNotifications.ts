@@ -3,9 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useConnection } from "wagmi";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
-import { deriveNotifications, type AppNotification } from "@/lib/notifications";
+import {
+  deriveIntentNotifications,
+  deriveNotifications,
+  NEWS_KINDS,
+  sortNotifications,
+  type AppNotification,
+} from "@/lib/notifications";
 import { useNow } from "./useNow";
 import { useDeals } from "./useDeals";
+import { useIntents } from "./usePool";
 
 // Notifications are derived from deal state (lib/notifications.ts). All that is stored is
 // which ones this browser has already seen, and whether the user wants browser alerts.
@@ -56,11 +63,19 @@ const canAlert = () => typeof window !== "undefined" && "Notification" in window
 export function useNotifications() {
   const { address } = useConnection();
   const now = useNow(30_000);
-  const { deals, isLoading } = useDeals({ limit: 200, enabled: !!address });
+  const { deals, isLoading: dealsLoading } = useDeals({ limit: 200, enabled: !!address });
+
+  // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
+  const intents = useIntents({ status: "all", maker: address, enabled: !!address });
+  const isLoading = dealsLoading || intents.isLoading;
 
   const notifications = useMemo(
-    () => deriveNotifications(deals, address, now),
-    [deals, address, now],
+    () =>
+      sortNotifications([
+        ...deriveNotifications(deals, address, now),
+        ...deriveIntentNotifications(intents.intents, address, now),
+      ]),
+    [deals, intents.intents, address, now],
   );
 
   // The snapshot is the raw string so React can compare it by value. "" = never opened.
@@ -68,12 +83,12 @@ export function useNotifications() {
   const alertsRaw = useSyncExternalStore(subscribe, () => readStore(ALERTS_KEY), () => "");
   const read = useMemo(() => parseKeys(raw), [raw]);
 
-  // First visit for this wallet: accepted deals from before now are history, not news.
-  // Actionable items (direct offers, reclaims) stay unread.
+  // First visit for this wallet: accepted deals and settled intents from before now are history,
+  // not news. Actionable items (direct offers, reclaims, paused intents) stay unread.
   const seeded = raw !== "";
   useEffect(() => {
     if (!address || isLoading || seeded) return;
-    const past = notifications.filter((n) => !n.actionable && n.kind === "filled").map((n) => n.key);
+    const past = notifications.filter((n) => !n.actionable && NEWS_KINDS.includes(n.kind)).map((n) => n.key);
     writeStore(readKey(address), JSON.stringify(past));
   }, [address, isLoading, seeded, notifications]);
 

@@ -6,6 +6,11 @@ import { isAddress, zeroAddress, type Address } from "viem";
  * and "trait" fall back to the Chog contract.
  */
 export type DealKind = "open" | "exact" | "trait";
+/**
+ * How a deal settles. "escrow" locks the maker's side on-chain (ChogSwap / ChogSwapV2); "signed"
+ * locks nothing and is settled by a matcher (ChogSwapIntents, ADR 0008).
+ */
+export type Settlement = "escrow" | "signed";
 export type Step = 1 | 2 | 3;
 export const STEP_LABELS = ["Deal type", "Your assets", "Confirm"] as const;
 
