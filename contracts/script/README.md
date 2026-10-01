@@ -56,7 +56,18 @@ deployed addresses. Local (31337) runs and dry runs are gitignored.
 
 ## `DeployIntents.s.sol`
 
-Deploys `ChogSwapIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)). It takes no arguments and needs no mock tokens: the existing mUSD and Chog collection work with it. A dry run estimates about **2.05M gas, roughly 0.42 MON**.
+Deploys `ChogSwapIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)) with its protocol fee ([ADR 0015](../../docs/adr/0015-protocol-fee.md)). The existing mUSD and Chog collection work with it. A dry run estimated about **2.05M gas, roughly 0.42 MON** before the fee was added.
+
+Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset there is no fee):
+
+| Variable | |
+|---|---|
+| `PROTOCOL_FEE_WEI` | what each maker pays when a cycle settles, in `FEE_TOKEN` units (18 decimals); at most 500 tokens |
+| `FEE_RECIPIENT` | who receives it; required when the fee is not 0 |
+| `FEE_TOKEN` | the chain's wrapped MON; required when the fee is not 0, unless the next one is set |
+| `DEPLOY_MOCK_WMON` | `true` deploys a `MockWMON` and uses it as the fee token. Testnet has no canonical WMON. Ignored when `FEE_TOKEN` is set |
+
+The same `PROTOCOL_FEE_WEI` and `FEE_RECIPIENT` go to `DeployV2.s.sol` (there the fee is plain MON), so both contracts charge the same amount. It also prints the fee settings it deployed with. The amount, token and recipient are immutable: to change them, deploy again and point the app at the new address.
 
 ```bash
 cd contracts

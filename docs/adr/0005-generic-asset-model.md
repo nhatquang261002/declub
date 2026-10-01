@@ -17,7 +17,7 @@ enum AssetType { Native, ERC20, ERC721 }
 struct Asset { AssetType assetType; address token; uint256 id; uint256 amount; }
 ```
 
-Native has `token = 0, id = 0`; ERC-20 has `id = 0`; ERC-721 has `amount = 1`. Up to 10 assets per side. Everything else from v1 carries over: atomic fill ([ADR 0001](0001-atomic-fill.md)), the maker escrows and the taker never does, expiry is derived, no fees, no admin, `transferFrom` only, no `receive()`.
+Native has `token = 0, id = 0`; ERC-20 has `id = 0`; ERC-721 has `amount = 1`. Up to 10 assets per side. Everything else from v1 carries over: atomic fill ([ADR 0001](0001-atomic-fill.md)), the maker escrows and the taker never does, expiry is derived, no admin (a flat per-side protocol fee was added later: [ADR 0015](0015-protocol-fee.md)), `transferFrom` only, no `receive()`.
 
 **Any token, no allowlist.** The contract works on a per-token basis and never trusts a token to be honest about anything but its own balances, so a bad token can only hurt trades that name it. What that took:
 

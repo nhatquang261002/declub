@@ -125,6 +125,10 @@ interface IChogSwapV2 {
         uint256 id,
         uint256 amount
     );
+    /// @notice A deal completed and both sides' fee shares (`amount` = 2 × `FEE`) went to
+    ///         `recipient`, or were credited to it for `claim` if it rejected the MON. Not
+    ///         emitted when the fee is 0.
+    event FeeCharged(uint256 indexed tradeId, address indexed recipient, uint256 amount);
 
     // ─────────────────────────────────────────────────────────────── Errors
 
@@ -138,8 +142,13 @@ interface IChogSwapV2 {
     /// @notice The same asset is on both sides, so the trade could never be filled.
     error SameAssetBothSides(uint256 offeredIndex, uint256 requestedIndex);
     error ExpiryInPast(uint64 expiry);
-    /// @notice `msg.value` isn't exactly the native amount for this call.
+    /// @notice `msg.value` isn't exactly the native amount for this call plus `FEE`, the caller's
+    ///         share of the protocol fee. `expected` already includes the fee.
     error WrongNativeAmount(uint256 expected, uint256 sent);
+    /// @notice The constructor's fee is above `MAX_FEE`.
+    error FeeTooHigh(uint256 fee, uint256 max);
+    /// @notice The constructor's fee is not 0 but the recipient is the zero address.
+    error NoFeeRecipient();
     /// @notice The escrow received less than the maker offered (fee-on-transfer, rebasing or
     ///         otherwise non-standard token). Such tokens aren't supported.
     error UnsupportedToken(address token);
@@ -179,7 +188,8 @@ interface IChogSwapV2 {
     // ─────────────────────────────────────────────────────────────── Mutating
 
     /// @notice Escrow `offered` and open a trade for `requested`. Send exactly the native
-    ///         amount listed in `offered` as `msg.value`.
+    ///         amount listed in `offered` plus `FEE` as `msg.value`. The `FEE` share is held, and
+    ///         refunded if the trade is cancelled or reclaimed.
     function createTrade(
         Asset[] calldata offered,
         Asset[] calldata requested,
@@ -209,7 +219,8 @@ interface IChogSwapV2 {
     ) external payable returns (uint256 tradeId);
 
     /// @notice Escrow `assets` as a proposal on an open offer. Send exactly the native amount
-    ///         listed in `assets` as `msg.value`.
+    ///         listed in `assets` plus `FEE` as `msg.value`. The `FEE` share is held with the
+    ///         proposal and refunded on withdraw or reject.
     function propose(uint256 tradeId, Asset[] calldata assets)
         external
         payable
@@ -224,10 +235,13 @@ interface IChogSwapV2 {
     /// @notice Maker settles the open offer with an `Active` proposal: the proposal's assets go
     ///         to the maker and the escrowed offer to the proposer. Other proposals stay
     ///         `Active` for their proposers to withdraw.
+    ///         Both fee shares (the maker's and the proposer's, already held) go to
+    ///         `FEE_RECIPIENT`.
     function acceptProposal(uint256 tradeId, uint256 proposalId) external;
 
     /// @notice Pay `requested` and receive `offered`. Send exactly the native amount listed in
-    ///         `requested` as `msg.value`.
+    ///         `requested` plus `FEE` as `msg.value`. Both sides' fee shares go to
+    ///         `FEE_RECIPIENT`.
     function fillTrade(uint256 tradeId) external payable;
 
     /// @notice `fillTrade` for a trade with `ERC721Trait` assets: `fills[k]` answers the k-th
@@ -249,6 +263,10 @@ interface IChogSwapV2 {
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
     function MAX_NOTE_BYTES() external view returns (uint256);
     function MAX_SPEC_BYTES() external view returns (uint256);
+    /// @notice The native MON each side of a completed deal pays. Fixed at deploy.
+    function FEE() external view returns (uint256);
+    function FEE_RECIPIENT() external view returns (address);
+    function MAX_FEE() external view returns (uint256);
     function tradeCount() external view returns (uint256);
     function getTrade(uint256 tradeId) external view returns (Trade memory);
     function isExpired(uint256 tradeId) external view returns (bool);

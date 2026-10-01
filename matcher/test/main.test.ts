@@ -99,7 +99,10 @@ describe("the matcher process", { skip }, () => {
   });
 
   it("refuses to start without its configuration", () => {
-    const r = spawnSync("node", [MAIN], { env: { PATH: process.env.PATH }, encoding: "utf8" });
+    const r = spawnSync("node", [MAIN], {
+      env: { PATH: process.env.PATH, MATCHER_ENV_FILE: "/nonexistent/.env" },
+      encoding: "utf8",
+    });
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS is required/);
   });
@@ -111,6 +114,7 @@ describe("the matcher process", { skip }, () => {
         NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS: w.swap,
         MATCHER_RPC_URL: w.rpcUrl,
         MATCHER_PRIVATE_KEY: "0x1234",
+        MATCHER_ENV_FILE: "/nonexistent/.env",
       },
       encoding: "utf8",
     });

@@ -11,16 +11,32 @@ import {IChogSwapV2} from "./interfaces/IChogSwapV2.sol";
 /// @title ChogSwapV2: generic multi-asset OTC escrow
 /// @notice See IChogSwapV2 for the behaviour spec, docs/adr/0005-generic-asset-model.md and
 ///         docs/adr/0007-open-offers.md for the reasoning.
-/// @dev No admin, no fees, no upgradeability, no token allowlist. Every mutating function is
+/// @dev No admin, no upgradeability, no token allowlist. Every mutating function is
 ///      nonReentrant and follows checks → effects → interactions. Payouts out of escrow never
 ///      revert: a recipient or token that rejects one gets a credit to `claim` instead.
 ///      Moving the *taker's* assets to the maker does revert on failure, so a fill is atomic.
+///
+///      Protocol fee (docs/adr/0015-protocol-fee.md): every side of a completed deal pays `FEE`
+///      in native MON, to `FEE_RECIPIENT`. Each side sends its share with its own assets
+///      (`msg.value` = native amount + `FEE`), and the contract only *holds* it: both shares are
+///      released together when the deal completes (a fill or an accepted proposal) and refunded
+///      with that side's escrow on cancel, reclaim, reject and withdraw. Both values are
+///      immutable and there is no setter, so every deal owes the same share and no per-deal
+///      record is needed.
 contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
     uint256 public constant MAX_NOTE_BYTES = 280;
     uint256 public constant MAX_SPEC_BYTES = 1024;
+    /// @notice Ceiling for `FEE`, so a typo at deploy can't set an absurd fee. Roughly $2 stays
+    ///         well under it unless MON loses nearly all of its value.
+    uint256 public constant MAX_FEE = 500 ether;
+
+    /// @notice Native MON each side of a completed deal pays, escrowed with that side's assets.
+    uint256 public immutable FEE;
+    /// @notice Where the fees go when a deal completes.
+    address public immutable FEE_RECIPIENT;
 
     uint256 public tradeCount;
 
@@ -31,6 +47,15 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     /// @dev account → keccak256(assetType, token, id) → amount. Native and ERC-20 amounts add
     ///      up; an NFT credit is 1.
     mapping(address account => mapping(bytes32 assetKey => uint256 amount)) internal _credits;
+
+    /// @param fee Per-side fee in wei. 0 charges nothing (tests, testnet).
+    /// @param feeRecipient Receives the fees. Required when `fee` is not 0.
+    constructor(uint256 fee, address feeRecipient) {
+        if (fee > MAX_FEE) revert FeeTooHigh(fee, MAX_FEE);
+        if (fee != 0 && feeRecipient == address(0)) revert NoFeeRecipient();
+        FEE = fee;
+        FEE_RECIPIENT = feeRecipient;
+    }
 
     // ─────────────────────────────────────────────────────────────── Mutating
 
@@ -66,8 +91,8 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         uint64 expiry,
         string calldata note
     ) external payable nonReentrant returns (uint256 tradeId) {
-        uint256 offeredNative = _validateSide(offered, false);
-        if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
+        uint256 expectedValue = _validateSide(offered, false) + FEE;
+        if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
         uint256 noteLength = bytes(note).length;
@@ -99,9 +124,9 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == t.maker) revert SelfPropose(tradeId);
 
-        uint256 native = _validateSide(assets, false);
+        uint256 expectedValue = _validateSide(assets, false) + FEE;
         _validateNoOverlap(t.offered, assets);
-        if (msg.value != native) revert WrongNativeAmount(native, msg.value);
+        if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
 
         Proposal[] storage all = _proposals[tradeId];
         proposalId = all.length;
@@ -127,6 +152,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         emit ProposalWithdrawn(tradeId, proposalId);
 
         _payoutAll(p.assets, msg.sender);
+        _refundFee(msg.sender);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -140,7 +166,9 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         p.status = ProposalStatus.Rejected;
         emit ProposalRejected(tradeId, proposalId);
 
-        _payoutAll(p.assets, p.proposer);
+        address proposer = p.proposer;
+        _payoutAll(p.assets, proposer);
+        _refundFee(proposer);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -158,10 +186,11 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         emit TradeFilled(tradeId, msg.sender, proposer);
         emit ProposalAccepted(tradeId, proposalId);
 
-        // Both sides are already in escrow, so neither payout can revert: a rejected one is
-        // credited for `claim`.
+        // Both sides, and both fee shares, are already in escrow, so no payout can revert: a
+        // rejected one is credited for `claim`.
         _payoutAll(p.assets, msg.sender);
         _payoutAll(t.offered, proposer);
+        _chargeFee(tradeId);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -188,6 +217,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         emit TradeCancelled(tradeId, t.maker);
 
         _payoutAll(t.offered, t.maker);
+        _refundFee(t.maker);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -200,6 +230,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         emit TradeReclaimed(tradeId, t.maker, msg.sender);
 
         _payoutAll(t.offered, t.maker);
+        _refundFee(t.maker);
     }
 
     /// @inheritdoc IChogSwapV2
@@ -355,11 +386,11 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         // Only `createTraitTrade` passes a spec (it rejects an empty one), and only it admits
         // trait assets.
         bool trait = bytes(spec).length != 0;
-        uint256 offeredNative = _validateSide(offered, false);
+        uint256 expectedValue = _validateSide(offered, false) + FEE;
         _validateSide(requested, trait);
         if (trait && _countTrait(requested) == 0) revert NoTraitAsset();
         _validateNoOverlap(offered, requested);
-        if (msg.value != offeredNative) revert WrongNativeAmount(offeredNative, msg.value);
+        if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
 
@@ -388,8 +419,8 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
         address taker = t.taker;
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == maker) revert SelfFill(tradeId);
-        uint256 requestedNative = _nativeAmount(t.requested);
-        if (msg.value != requestedNative) revert WrongNativeAmount(requestedNative, msg.value);
+        uint256 expectedValue = _nativeAmount(t.requested) + FEE;
+        if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // Every proof is checked before anything changes or moves.
         _verifyTraitFills(tradeId, t.requested, fills);
 
@@ -419,6 +450,7 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
             }
         }
         _payoutAll(t.offered, msg.sender);
+        _chargeFee(tradeId);
     }
 
     /// @dev `fills[k]` must answer the k-th trait asset: `amount` distinct ids, each with a
@@ -545,16 +577,37 @@ contract ChogSwapV2 is IChogSwapV2, ReentrancyGuard {
     /// @dev Never reverts: if the recipient or the token rejects the transfer, the amount is
     ///      credited for `claim` instead, so one bad party can't block a fill, cancel or reclaim.
     function _payout(address to, Asset storage a) private {
-        AssetType assetType = a.assetType;
-        address token = a.token;
-        uint256 id = a.id;
-        uint256 amount = a.amount;
+        _pay(to, a.assetType, a.token, a.id, a.amount);
+    }
+
+    function _pay(address to, AssetType assetType, address token, uint256 id, uint256 amount)
+        private
+    {
         if (_transferOut(assetType, token, id, amount, to)) return;
 
         _credits[to][_key(assetType, token, id)] += amount;
         // Only known after the (failed) call; nonReentrant rules out log fabrication.
         // forge-lint: disable-next-line(reentrancy-events)
         emit AssetCredited(to, token, assetType, id, amount);
+    }
+
+    /// @dev A deal completed: both sides' shares (held since each side's own call) go to the
+    ///      recipient in one send. Never reverts: a recipient that rejects MON gets a credit.
+    function _chargeFee(uint256 tradeId) private {
+        uint256 fee = FEE;
+        if (fee == 0) return;
+        uint256 amount = 2 * fee;
+        address to = FEE_RECIPIENT;
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit FeeCharged(tradeId, to, amount);
+        _pay(to, AssetType.Native, address(0), 0, amount);
+    }
+
+    /// @dev A side left without a deal: its share goes back with the rest of its escrow.
+    function _refundFee(address to) private {
+        uint256 fee = FEE;
+        if (fee == 0) return;
+        _pay(to, AssetType.Native, address(0), 0, fee);
     }
 
     /// @dev Send from escrow. Returns false instead of reverting. Crediting after a *failed*

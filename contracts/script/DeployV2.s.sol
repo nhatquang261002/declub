@@ -5,15 +5,19 @@ import {Script, console} from "forge-std/Script.sol";
 import {ChogSwapV2} from "../src/ChogSwapV2.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 
-/// @notice Deploys the generic ChogSwapV2 (no constructor args, any token), and optionally a
+/// @notice Deploys the generic ChogSwapV2 (any token) with its protocol fee, and optionally a
 ///         mock ERC-20 so the multi-asset flow can be demoed on testnet.
 /// @dev Env (all optional):
+///        PROTOCOL_FEE_WEI   per-side fee in wei (default 0 = no fee); at most `MAX_FEE`
+///        FEE_RECIPIENT      address that receives the fees; required when the fee is not 0
 ///        DEPLOY_MOCK_ERC20  true → also deploy "Mock USD" (mUSD) with an open mint
 ///        DEMO_WALLETS       comma-separated addresses to mint mUSD to
 ///        DEMO_MINT_AMOUNT   mUSD (whole tokens) per demo wallet (default 1000)
 ///      V1 (Deploy.s.sol) is untouched and keeps running; the two contracts are independent.
 contract DeployV2 is Script {
     struct Config {
+        uint256 fee;
+        address feeRecipient;
         bool deployMockErc20;
         address[] demoWallets;
         uint256 mintAmount; // whole tokens
@@ -29,12 +33,16 @@ contract DeployV2 is Script {
         r = deploy(configFromEnv());
         console.log("NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS=%s", r.swap);
         console.log("NEXT_PUBLIC_CHOG_SWAP_V2_DEPLOY_BLOCK=%s", r.deployBlock);
+        console.log("protocol fee per side (wei)=%s", ChogSwapV2(r.swap).FEE());
+        console.log("fee recipient=%s", ChogSwapV2(r.swap).FEE_RECIPIENT());
         if (r.mockErc20 != address(0)) {
             console.log("NEXT_PUBLIC_MOCK_ERC20_ADDRESS=%s", r.mockErc20);
         }
     }
 
     function configFromEnv() public view returns (Config memory c) {
+        c.fee = vm.envOr("PROTOCOL_FEE_WEI", uint256(0));
+        c.feeRecipient = vm.envOr("FEE_RECIPIENT", address(0));
         c.deployMockErc20 = vm.envOr("DEPLOY_MOCK_ERC20", false);
         c.mintAmount = vm.envOr("DEMO_MINT_AMOUNT", uint256(1000));
         string memory wallets = vm.trim(vm.envOr("DEMO_WALLETS", string("")));
@@ -52,7 +60,7 @@ contract DeployV2 is Script {
         r.deployBlock = block.number;
         vm.startBroadcast();
 
-        r.swap = address(new ChogSwapV2());
+        r.swap = address(new ChogSwapV2(c.fee, c.feeRecipient));
         if (c.deployMockErc20) {
             MockERC20 token = new MockERC20("Mock USD", "mUSD");
             r.mockErc20 = address(token);

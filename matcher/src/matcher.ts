@@ -24,7 +24,7 @@ export interface MatcherConfig {
   gasBufferPct: bigint;
   /**
    * Refuse to send a cycle that needs more gas than this. The matcher pays for settlements that
-   * succeed too, and a token can burn gas on purpose. The contract's worst case is 3.3M.
+   * succeed too, and a token can burn gas on purpose. The contract's worst case is 3.4M (with the fee).
    */
   maxGas: bigint;
 }
@@ -56,6 +56,7 @@ export interface MatchReport {
 /** Contract errors whose first argument is the index of the intent at fault, and what that means. */
 const BROKEN_INTENT: Record<string, Status> = {
   BadSignature: "rejected",
+  WrongFee: "rejected",
   InvalidMaker: "rejected",
   InvalidDeadline: "rejected",
   EmptySide: "rejected",

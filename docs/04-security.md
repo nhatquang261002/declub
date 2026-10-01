@@ -11,7 +11,8 @@ The contract holds other people's Chogs and MON, so every decision below is aime
 | Maker | Create, cancel their own open trade, withdraw credited MON | Change terms after creation; take back escrow after a fill |
 | Taker | Fill an open, unexpired trade they're allowed to fill | Fill with the wrong NFTs or the wrong MON amount; fill twice |
 | Anyone | Reclaim an expired trade *to its maker* | Redirect a refund; cancel someone else's trade |
-| Deployer | Nothing after deploy | Pause, upgrade, sweep or fee-switch (none of these exist) |
+| Deployer | Nothing after deploy | Pause, upgrade, sweep or change the fee (none of these exist; the fee amount, token and recipient are immutable) |
+| Fee recipient | Receives the protocol fee when a deal completes | Touch escrow, or take a fee for a deal that didn't complete |
 
 ## Invariants
 
@@ -115,7 +116,10 @@ Recomputed from the trades themselves in `test/v2/invariant/`, over native, two 
 | V4–V5 | As I4 / I5: statuses only move `None → Open → {Filled, Cancelled}`, ids are contiguous. |
 | V6 | No fill after expiry. |
 | V7 | A fill or refund leaves each party holding (balance + credit) exactly what the terms say, and a reclaim caller who isn't the maker gets nothing. |
+| V8 | `fillTrade` never settles an open offer, and every valid proposal call succeeds. |
 | Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
+
+**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md)). The invariant suite runs with a 3 MON fee and a fee recipient that sometimes rejects MON. V1 becomes `balance == Σ native offered by Open trades + 1 fee share per Open trade and per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler. The fee suite (`ChogSwapV2.fee.t.sol`, 28 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
 
 Mutation checks: removing the credit on a failed payout, redirecting reclaimed assets to the caller, and allowing fills after expiry each make the invariant suite fail.
 
@@ -157,7 +161,7 @@ contracts/test/v2/
 contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook tokens
 ```
 
-`forge test --match-path "test/v2/*"` runs 84 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapV2.sol` is 100% of lines, statements, branches and functions.
+`forge test --match-path "test/v2/*"` runs 185 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapV2.sol` is 100% of lines, statements, branches and functions.
 
 ## ChogSwapIntents
 
@@ -172,13 +176,16 @@ contracts/test/intents/
 ├── ChogSwapIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
 ├── ChogSwapIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
 ├── ChogSwapIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
-├── ChogSwapIntents.gas.t.sol        worst-case ring (4 × 10 NFTs)
-└── invariant/                       handler + invariants N1, N2, N5 and conservation
+├── ChogSwapIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
+├── ChogSwapIntents.fee.t.sol        the protocol fee (ADR 0015)
+└── invariant/                       handler + invariants N1, N2, N5, N6 and conservation
 ```
 
-`forge test --match-path "test/intents/*"` runs 65 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
+`forge test --match-path "test/intents/*"` runs 95 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
 
-Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721; **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
+Protocol fee: every maker in a settled cycle pays `FEE_AMOUNT` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements); the deployer picks it once and it can't change. The fee is signed into each intent, so a signature carries consent to exactly one amount. `ChogSwapIntents.fee.t.sol` (22 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, wrong or missing fee terms, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
+
+Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721 (and no fee token); **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; **N6** the recipient holds exactly the fee for every maker in every settled cycle, and nobody else paid; plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
 
 Known risk specific to this contract: a maker can spend an asset or revoke an approval after signing, which makes `settle` revert and costs the matcher gas. Nobody loses assets. Mitigation lives in the matcher (simulate right before sending), not the contract.
 

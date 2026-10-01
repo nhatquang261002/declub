@@ -33,7 +33,7 @@ The create screen shows six short reasons as chips (*Can't fail*, *Costs gas*, *
 - Confirm the wallet and network before signing.
 - Review every token id, MON amount, taker address, and expiry.
 - Public deals can be filled by anyone who owns the requested assets; direct deals can only be filled by the named wallet.
-- Chog Swap has no platform fee. Wallets still charge network gas.
+- Multi-asset and signed deals charge a small flat protocol fee per side, only when the deal completes ([ADR 0015](adr/0015-protocol-fee.md)); the screens show the exact amount before you confirm. Single-collection deals on the original contract have no fee. Wallets also charge network gas.
 - The current deployment is a Monad testnet demo with MockChog. Do not use valuable mainnet assets.
 - Never approve or send assets to a contract address copied from an untrusted message.
 

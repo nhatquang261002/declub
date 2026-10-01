@@ -7,6 +7,13 @@ export function formatMon(wei: bigint): string {
   return `${whole}${trimmed ? `.${trimmed}` : ""} MON`;
 }
 
+export type FeeUnit = "MON" | "WMON";
+
+/** The protocol fee as the person pays it: MON in escrow deals, WMON (wrapped MON) in signed ones. */
+export function formatFee(amount: bigint, unit: FeeUnit = "MON"): string {
+  return formatMon(amount).replace(/ MON$/, ` ${unit}`);
+}
+
 /** "1.5" → 1500000000000000000n. Empty → 0n. Invalid or negative → null. */
 export function parseMon(input: string): bigint | null {
   const value = input.trim();

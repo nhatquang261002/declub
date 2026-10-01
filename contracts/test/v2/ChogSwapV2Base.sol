@@ -9,6 +9,9 @@ import {MockERC20} from "../../src/mocks/MockERC20.sol";
 
 /// @dev Fixture: alice owns Chogs 1–5, bob 6–10, carol 11–15. Each also holds START_MON MON and
 ///      START_TOKEN of `usdc` and `weth`, and approves the swap for everything.
+///      The swap is deployed with no protocol fee, so a test reads as the plain deal; the
+///      fee suite (`ChogSwapV2.fee.t.sol`) overrides `_fee` and the invariants run with one.
+///      Every helper that sends native MON adds `swap.FEE()`, so it works either way.
 abstract contract ChogSwapV2Base is Test {
     uint256 internal constant START_MON = 100 ether;
     uint256 internal constant START_TOKEN = 1_000 ether;
@@ -21,6 +24,7 @@ abstract contract ChogSwapV2Base is Test {
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
     address internal carol = makeAddr("carol");
+    address internal treasury = makeAddr("treasury");
 
     uint256 internal constant A1 = 1;
     uint256 internal constant A2 = 2;
@@ -32,11 +36,16 @@ abstract contract ChogSwapV2Base is Test {
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
-        swap = new ChogSwapV2();
+        swap = new ChogSwapV2(_fee(), treasury);
 
         _onboard(alice);
         _onboard(bob);
         _onboard(carol);
+    }
+
+    /// @dev The per-side protocol fee the fixture deploys with. 0 unless a suite overrides it.
+    function _fee() internal view virtual returns (uint256) {
+        return 0;
     }
 
     function _onboard(address who) internal {
@@ -130,8 +139,10 @@ abstract contract ChogSwapV2Base is Test {
         address taker,
         uint64 expiry
     ) internal returns (uint256 id) {
+        // Read the value before the prank: any call, even a view, would spend it.
+        uint256 value = _nativeOf(offered) + swap.FEE();
         vm.prank(maker);
-        id = swap.createTrade{value: _nativeOf(offered)}(offered, requested, taker, expiry);
+        id = swap.createTrade{value: value}(offered, requested, taker, expiry);
     }
 
     /// @dev `maker` opens a public, no-expiry open offer with `note`.
@@ -149,20 +160,22 @@ abstract contract ChogSwapV2Base is Test {
         address taker,
         uint64 expiry
     ) internal returns (uint256 id) {
+        uint256 value = _nativeOf(offered) + swap.FEE();
         vm.prank(maker);
-        id = swap.createOpenOffer{value: _nativeOf(offered)}(offered, taker, expiry, note);
+        id = swap.createOpenOffer{value: value}(offered, taker, expiry, note);
     }
 
     function _propose(address who, uint256 id, IChogSwapV2.Asset[] memory assets)
         internal
         returns (uint256 proposalId)
     {
+        uint256 value = _nativeOf(assets) + swap.FEE();
         vm.prank(who);
-        proposalId = swap.propose{value: _nativeOf(assets)}(id, assets);
+        proposalId = swap.propose{value: value}(id, assets);
     }
 
     function _fill(address taker, uint256 id) internal {
-        uint256 value = _nativeOf(swap.getTrade(id).requested);
+        uint256 value = _nativeOf(swap.getTrade(id).requested) + swap.FEE();
         vm.prank(taker);
         swap.fillTrade{value: value}(id);
     }

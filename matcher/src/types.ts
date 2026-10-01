@@ -15,6 +15,9 @@ export interface Intent {
   maker: Address;
   give: Asset[];
   want: Asset[];
+  /** The protocol fee the maker agrees to pay if the cycle settles (ADR 0015). */
+  feeToken: Address;
+  fee: bigint;
   deadline: bigint;
   nonce: bigint;
 }

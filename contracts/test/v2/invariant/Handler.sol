@@ -14,11 +14,17 @@ import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 ///      1 MON-rejecting contract, trading native + two ERC-20s (one with a blocklist) + Chogs.
 ///      The invariants recompute escrow from the trades themselves, so the only ghost state is
 ///      the expected status per trade and a few counters that must stay 0.
+///      The swap charges a protocol fee: every create, proposal and fill sends it with the call,
+///      and the fee recipient is a MON-rejecting contract at times, so its credit is exercised.
 contract Handler is Test {
     ChogSwapV2 public immutable swap;
     MockChog public immutable chog;
     MockERC20 public immutable usdc;
     BlocklistToken public immutable blk;
+
+    MonReceiver public immutable treasury;
+    /// @dev The per-side fee, read once: a call made after `vm.prank` would spend the prank.
+    uint256 public immutable fee;
 
     address[] public actors;
     mapping(uint256 tradeId => IChogSwapV2.Status) public expectedStatus;
@@ -32,11 +38,20 @@ contract Handler is Test {
     uint256 public ghost_validCancelReverted; // a maker can always cancel
     uint256 public ghost_openOfferFilled; // V8: fillTrade must never settle an open offer
     uint256 public ghost_validProposalOpReverted; // valid propose / accept / reject / withdraw
+    uint256 public ghost_completed; // deals that completed: a fill or an accepted proposal
 
     mapping(bytes32 => uint256) public calls;
 
-    constructor(ChogSwapV2 swap_, MockChog chog_, MockERC20 usdc_, BlocklistToken blk_) {
+    constructor(
+        ChogSwapV2 swap_,
+        MockChog chog_,
+        MockERC20 usdc_,
+        BlocklistToken blk_,
+        MonReceiver treasury_
+    ) {
         swap = swap_;
+        treasury = treasury_;
+        fee = swap_.FEE();
         chog = chog_;
         usdc = usdc_;
         blk = blk_;
@@ -89,10 +104,7 @@ contract Handler is Test {
             _side(counterparty, requestedMask, nRequestedNft, amountSeed >> 16);
         if (offered.length == 0 || requested.length == 0) return;
 
-        uint256 value;
-        for (uint256 i; i < offered.length; ++i) {
-            if (offered[i].assetType == IChogSwapV2.AssetType.Native) value = offered[i].amount;
-        }
+        uint256 value = _sum(offered, 0) + fee;
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
         address taker = restrictTaker ? counterparty : address(0);
@@ -122,17 +134,21 @@ contract Handler is Test {
         uint256[3] memory makerBefore = _holdings(t.maker);
         uint256[3] memory takerBefore = _holdings(taker);
         vm.prank(taker);
-        try swap.fillTrade{value: _sum(t.requested, 0)}(id) {
+        try swap.fillTrade{value: _sum(t.requested, 0) + fee}(id) {
             if (expired) ghost_expiredFills++;
             expectedStatus[id] = IChogSwapV2.Status.Filled;
             _checkNfts(t.offered, taker);
             _checkNfts(t.requested, t.maker);
             // The maker gains the requested side; the taker gains the offered side and pays the
             // requested one. A rejected payout shows up as a credit, which _holdings includes.
-            if (!_gained(t.maker, makerBefore, t.requested, new IChogSwapV2.Asset[](0))) {
+            if (!_gained(t.maker, makerBefore, t.requested, new IChogSwapV2.Asset[](0), 0, 0)) {
                 ghost_badSettlements++;
             }
-            if (!_gained(taker, takerBefore, t.offered, t.requested)) ghost_badSettlements++;
+            // The taker also sends its fee share; the maker's was sent when it created the trade.
+            if (!_gained(taker, takerBefore, t.offered, t.requested, 0, fee)) {
+                ghost_badSettlements++;
+            }
+            ghost_completed++;
             calls["fill"]++;
         } catch {
             if (!expired) ghost_validFillReverted++;
@@ -156,7 +172,7 @@ contract Handler is Test {
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
         vm.prank(maker);
-        uint256 id = swap.createOpenOffer{value: _sum(offered, 0)}(
+        uint256 id = swap.createOpenOffer{value: _sum(offered, 0) + fee}(
             offered, restrictTaker ? counterparty : address(0), expiry, "note"
         );
         expectedStatus[id] = IChogSwapV2.Status.Open;
@@ -181,7 +197,7 @@ contract Handler is Test {
         if (assets.length == 0) return;
 
         vm.prank(proposer);
-        try swap.propose{value: _sum(assets, 0)}(id, assets) returns (uint256 pid) {
+        try swap.propose{value: _sum(assets, 0) + fee}(id, assets) returns (uint256 pid) {
             if (pid != swap.proposalCount(id) - 1) ghost_validProposalOpReverted++;
             expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Active;
             calls["propose"]++;
@@ -208,8 +224,11 @@ contract Handler is Test {
             _checkNfts(p.assets, t.maker);
             _checkNfts(t.offered, p.proposer);
             IChogSwapV2.Asset[] memory none = new IChogSwapV2.Asset[](0);
-            if (!_gained(t.maker, makerBefore, p.assets, none)) ghost_badSettlements++;
-            if (!_gained(p.proposer, proposerBefore, t.offered, none)) ghost_badSettlements++;
+            if (!_gained(t.maker, makerBefore, p.assets, none, 0, 0)) ghost_badSettlements++;
+            if (!_gained(p.proposer, proposerBefore, t.offered, none, 0, 0)) {
+                ghost_badSettlements++;
+            }
+            ghost_completed++;
             calls["accept"]++;
         } catch {
             ghost_validProposalOpReverted++;
@@ -230,7 +249,7 @@ contract Handler is Test {
         try swap.rejectProposal(id, pid) {
             expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Rejected;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0))) {
+            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["reject"]++;
@@ -254,7 +273,7 @@ contract Handler is Test {
         try swap.withdrawProposal(id, pid) {
             expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Withdrawn;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0))) {
+            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["withdraw"]++;
@@ -272,7 +291,7 @@ contract Handler is Test {
         try swap.cancelTrade(id) {
             expectedStatus[id] = IChogSwapV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, before, t.offered, new IChogSwapV2.Asset[](0))) {
+            if (!_gained(t.maker, before, t.offered, new IChogSwapV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["cancel"]++;
@@ -292,7 +311,7 @@ contract Handler is Test {
         try swap.reclaimExpired(id) {
             expectedStatus[id] = IChogSwapV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, makerBefore, t.offered, new IChogSwapV2.Asset[](0))) {
+            if (!_gained(t.maker, makerBefore, t.offered, new IChogSwapV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             // A caller who isn't the maker gets nothing.
@@ -326,6 +345,11 @@ contract Handler is Test {
         MonReceiver(payable(actors[3])).setAccept(accept);
     }
 
+    /// @dev Flips whether the fee recipient takes MON, so fees are paid or credited.
+    function acceptFees(bool accept) external {
+        treasury.setAccept(accept);
+    }
+
     function warp(uint256 secs) external {
         vm.warp(block.timestamp + bound(secs, 1, 2 days));
     }
@@ -355,16 +379,21 @@ contract Handler is Test {
         }
     }
 
-    /// @dev holdings(after) == holdings(before) + Σ gained − Σ paid, per fungible.
+    /// @dev holdings(after) == holdings(before) + Σ gained − Σ paid, per fungible. `feeBack` is a
+    ///      fee share refunded in the call and `feePaid` one sent with it, both native.
     function _gained(
         address who,
         uint256[3] memory before,
         IChogSwapV2.Asset[] memory gained,
-        IChogSwapV2.Asset[] memory paid
+        IChogSwapV2.Asset[] memory paid,
+        uint256 feeBack,
+        uint256 feePaid
     ) internal view returns (bool) {
         uint256[3] memory nowHeld = _holdings(who);
         for (uint256 k; k < 3; ++k) {
-            if (nowHeld[k] + _sum(paid, k) != before[k] + _sum(gained, k)) return false;
+            uint256 plus = _sum(gained, k) + (k == 0 ? feeBack : 0);
+            uint256 minus = _sum(paid, k) + (k == 0 ? feePaid : 0);
+            if (nowHeld[k] + minus != before[k] + plus) return false;
         }
         return true;
     }
@@ -428,7 +457,7 @@ contract Handler is Test {
         for (uint256 i; i < t.requested.length; ++i) {
             IChogSwapV2.Asset memory a = t.requested[i];
             if (a.assetType == IChogSwapV2.AssetType.Native) {
-                if (taker.balance < a.amount) return false;
+                if (taker.balance < a.amount + fee) return false;
             } else if (a.assetType == IChogSwapV2.AssetType.ERC20) {
                 if (IERC20Like(a.token).balanceOf(taker) < a.amount) return false;
                 // A blocked maker can't receive the blocklist token, which reverts the fill.

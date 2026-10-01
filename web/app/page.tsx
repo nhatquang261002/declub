@@ -57,7 +57,7 @@ export default function HomePage() {
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
           <div className="hero-stat"><strong>Non-custodial</strong><span>Your assets stay yours until a swap</span></div>
           <div className="hero-stat"><strong>Permissionless</strong><span>Public or direct offers, your choice</span></div>
-          <div className="hero-stat"><strong>No platform fees</strong><span>Only the network transaction cost</span></div>
+          <div className="hero-stat"><strong>Pay only on success</strong><span>A small flat fee, only when a deal completes</span></div>
         </div>
       </section>
 

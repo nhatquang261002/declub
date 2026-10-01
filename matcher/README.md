@@ -20,6 +20,8 @@ cd matcher && npm install && npm start      # http://127.0.0.1:8787
 
 The contract comes from `contracts/script/DeployIntents.s.sol` ([how to deploy](../contracts/script/README.md)). The key is the matcher's own account: it only pays gas and never holds anyone's assets. Use a key with testnet funds only. Real environment variables override `.env`.
 
+The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md)): every maker in a settled cycle pays a flat amount of WMON from their wallet to the fee recipient, and signs it into the intent. The matcher reads the fee token, amount and recipient from the contract at start and prints them; it never receives or holds any of it.
+
 | Variable | Default | |
 |---|---|---|
 | `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS` | required | `ChogSwapIntents` |
@@ -29,6 +31,7 @@ The contract comes from `contracts/script/DeployIntents.s.sol` ([how to deploy](
 | `MATCHER_HOST` / `MATCHER_PORT` | `127.0.0.1` / `8787` | loopback by default, since the process holds a key |
 | `MATCHER_DB_PATH` | `matcher/data/pool.sqlite` | |
 | `MATCHER_POLL_MS` / `MATCHER_PRUNE_MS` | `5000` / `30000` | |
+| `MATCHER_ENV_FILE` | repo-root `.env` | another env file to load (the tests point it at a path that doesn't exist) |
 
 ## HTTP API
 
@@ -36,20 +39,20 @@ Bigints are decimal strings. Errors are `{ "error": code, "message": … }`. COR
 
 | | |
 |---|---|
-| `GET /info` | `{ chainId, swap, matcher, maxCycle }` |
+| `GET /info` | `{ chainId, swap, matcher, fee: { token, amount, recipient }, maxCycle }` (`amount` is a decimal string) |
 | `POST /intents` | `{ intent, signature }` → `201 { hash, status, created }`, or `200` if already known |
 | `GET /intents` | the book. `?status=` (default `open`; `stale`, `settled`, `cancelled`, `expired`, `consumed`, `rejected`, `all`), `?maker=`, `?give=` / `?want=` (an asset key `type:token:id`, e.g. `2:0xabc…:7`), `?limit=` |
 | `GET /intents/:hash` | one intent |
 | `DELETE /intents/:hash` | `{ signature }`: the maker's EIP-712 signature over `CancelIntent(bytes32 intentHash)` in the same domain |
 | `GET /settlements` | settled cycles with their intents. `?maker=`, `?limit=` |
 
-`hash` is the EIP-712 struct hash, the same id the contract emits in `IntentFilled`. Posting is rejected (422) unless the intent is well formed, the deadline is 60 s to 7 days away, the signature is one the contract would accept (non-malleable ECDSA, or ERC-1271 for contract wallets), the nonce is unused and the maker holds and has approved everything in `give`. Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
+`hash` is the EIP-712 struct hash, the same id the contract emits in `IntentFilled`. Posting is rejected (422) unless the intent is well formed, it signs exactly the contract's fee (`wrong_fee`), the deadline is 60 s to 7 days away, the signature is one the contract would accept (non-malleable ECDSA, or ERC-1271 for contract wallets), the nonce is unused and the maker holds and has approved everything in `give` plus the fee (`fee_balance`, `fee_allowance`; the fee counts on top of any give of the same token). Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
 
 ## How matching works
 
 - **Graph.** Intents are nodes. There is an edge `i → j` when `i.give` covers `j.want` (ERC-20 amounts are floors, NFTs exact). A settlement is a cycle of 2 to 4 intents with distinct makers. Edges are found through an asset-key index, and cycles by a bounded depth-first search capped at 5,000 cycles per pass.
 - **Choosing.** Most intents settled first, then the cycle holding the oldest intent. Chosen cycles share no intent and no maker.
-- **Simulate, then send.** Each cycle is an `eth_call` of `settle` first. Gas is estimated with a 10% buffer (Monad charges the gas limit, not gas used), and a cycle needing more than 5M gas is skipped: the contract's worst case is 3.3M, so more means a token is burning gas.
+- **Simulate, then send.** Each cycle is an `eth_call` of `settle` first. Gas is estimated with a 10% buffer (Monad charges the gas limit, not gas used), and a cycle needing more than 5M gas is skipped: the contract's worst case is 3.4M (with the fee), so more means a token is burning gas.
 - **When a simulation fails.** The error names the intent where the contract can say (bad signature, expired, nonce used, a token that doesn't deliver). Otherwise (no balance, allowance or ownership) each member is re-checked on-chain. The offenders are dropped and matching runs again without them, so one broken intent doesn't hold up the others. If nobody can be blamed the cycle is skipped for a minute.
 - **Pruning.** Every 30 s each live intent is re-checked: expired, nonce used, or missing balance, ownership or approval. A maker who can't honour an intent right now gets it marked `stale`, not deleted, and it comes back to `open` when they fix it.
 - **Repeat offenders.** A maker whose intents fail on-chain checks three times in an hour is left out of matching. Running late, or being settled elsewhere, doesn't count against them.
@@ -65,7 +68,7 @@ Bigints are decimal strings. Errors are `{ "error": code, "message": … }`. COR
 ## Tests
 
 ```bash
-npm test          # 58 tests, about a minute
+npm test          # 66 tests, about a minute and a half
 npm run typecheck
 ```
 

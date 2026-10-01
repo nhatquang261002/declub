@@ -6,8 +6,10 @@ import { useConnection } from "wagmi";
 import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
 import { Alert } from "@/components/Alert";
+import { FeeNote } from "@/components/FeeNote";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
+import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
@@ -145,6 +147,7 @@ export function ProposalForm({ dealId, offered }: { dealId: bigint; offered: rea
   const { address } = useConnection();
   const approval = useTxFlow();
   const tx = useTxFlow();
+  const { fee } = useEscrowFee();
   const [rows, setRows] = useState<DraftRow[]>(() => [newRow("native")]);
   const [validation, setValidation] = useState<string | null>(null);
 
@@ -162,8 +165,10 @@ export function ProposalForm({ dealId, offered }: { dealId: bigint; offered: rea
   async function send() {
     if (problems.length > 0) return setValidation(problems[0]);
     if (overlap) return setValidation(overlap);
+    if (fee === undefined) return setValidation("Couldn't read the protocol fee from the contract. Reload and try again.");
     setValidation(null);
-    const native = draft.assets.find((a) => a.kind === "native")?.amount ?? 0n;
+    // The native amount in the offer, plus this wallet's share of the protocol fee.
+    const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
     const receipt = await tx.run({
       ...swapV2!,
       functionName: "propose",
@@ -190,13 +195,19 @@ export function ProposalForm({ dealId, offered }: { dealId: bigint; offered: rea
           </Alert>
         )}
         {problems.length > 0 && !validation && <p className="text-xs text-muted">{problems[0]}</p>}
+        {fee !== undefined && (
+          <FeeNote amount={fee}>
+            Sent with your offer and held with it. It&apos;s only charged if the maker accepts. If you withdraw it, or the
+            maker rejects it, it comes back to you.
+          </FeeNote>
+        )}
         {nextApproval ? (
           <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>
             {nextApproval.label}
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap} onClick={send}>Send offer</TxButton>
+          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap || fee === undefined} onClick={send}>Send offer</TxButton>
         )}
         <TxStatus state={approval.state} success="Approved." />
         <TxStatus state={tx.state} success="Offer sent." />

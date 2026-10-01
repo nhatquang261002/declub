@@ -36,7 +36,7 @@ contract ChogSwapIntentsGasTest is ChogSwapIntentsBase {
         }
     }
 
-    function test_worstCaseRingGas() public {
+    function test_worstCaseRingGas() public virtual {
         (IChogSwapIntents.Intent[] memory cycle, bytes[] memory sigs) = _worstRing();
 
         uint256 before = gasleft();
@@ -54,5 +54,17 @@ contract ChogSwapIntentsGasTest is ChogSwapIntentsBase {
         _assertOwner(36, alice);
         assertEq(chog.balanceOf(address(swap)), 0);
         assertLt(used, 12_000_000, "worst case no longer fits the budget");
+    }
+}
+
+/// @dev The same worst case with the protocol fee on: four more ERC-20 transfers.
+contract ChogSwapIntentsGasWithFeeTest is ChogSwapIntentsGasTest {
+    function _feeAmount() internal pure override returns (uint256) {
+        return 2 ether;
+    }
+
+    function test_worstCaseRingGas() public override {
+        super.test_worstCaseRingGas();
+        assertEq(wmon.balanceOf(treasury), 8 ether);
     }
 }

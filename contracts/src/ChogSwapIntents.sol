@@ -12,27 +12,56 @@ import {IChogSwapIntents} from "./interfaces/IChogSwapIntents.sol";
 /// @title ChogSwapIntents: settle signed swap intents, wallet to wallet
 /// @notice See IChogSwapIntents for the behaviour spec, docs/adr/0008-trade-intents.md and
 ///         docs/adr/0009-ring-swaps.md for the reasoning.
-/// @dev No admin, no fees, no upgradeability, no token allowlist, no `receive()`. The contract
+/// @dev No admin, no upgradeability, no token allowlist, no `receive()`. The contract
 ///      holds no assets: every transfer goes straight from one maker's wallet to the next maker's,
 ///      so a failed transfer reverts the whole settlement instead of needing a claim path.
 ///      Every nonce in a cycle is consumed before any asset moves, and `settle` is nonReentrant.
+///
+///      Protocol fee (docs/adr/0015-protocol-fee.md): when a cycle settles, every maker in it pays
+///      `FEE_AMOUNT` of `FEE_TOKEN` (wrapped MON) straight from their wallet to `FEE_RECIPIENT`,
+///      so the contract still holds nothing. Each intent signs the fee token and amount, and
+///      `settle` refuses an intent whose values differ from this contract's. A cycle that does not
+///      settle charges nobody. All three are immutable and there is no setter.
 contract ChogSwapIntents is IChogSwapIntents, EIP712, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_CYCLE = 4;
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
+    /// @notice Ceiling for `FEE_AMOUNT`, so a typo at deploy can't set an absurd fee.
+    uint256 public constant MAX_FEE = 500 ether;
+
+    /// @notice The token every maker pays the fee in: the chain's wrapped MON.
+    address public immutable FEE_TOKEN;
+    /// @notice What each maker in a settled cycle pays, in `FEE_TOKEN`.
+    uint256 public immutable FEE_AMOUNT;
+    /// @notice Where the fees go.
+    address public immutable FEE_RECIPIENT;
 
     bytes32 private constant ASSET_TYPEHASH =
         keccak256("Asset(uint8 assetType,address token,uint256 id,uint256 amount)");
     bytes32 private constant INTENT_TYPEHASH = keccak256(
-        "Intent(address maker,Asset[] give,Asset[] want,uint64 deadline,uint256 nonce)"
+        "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 fee,uint64 deadline,uint256 nonce)"
         "Asset(uint8 assetType,address token,uint256 id,uint256 amount)"
     );
 
     /// @dev maker → word (nonce >> 8) → bitmap of used nonces.
     mapping(address maker => mapping(uint256 word => uint256 bitmap)) private _nonceBitmap;
 
-    constructor() EIP712("ChogSwapIntents", "1") {}
+    /// @param feeToken ERC-20 the fee is paid in (wrapped MON). May be zero only when the fee is 0.
+    /// @param feeAmount What each maker pays per settlement, in `feeToken` units. 0 charges nothing.
+    /// @param feeRecipient Receives the fees. Required when `feeAmount` is not 0.
+    constructor(address feeToken, uint256 feeAmount, address feeRecipient)
+        EIP712("ChogSwapIntents", "2")
+    {
+        if (feeAmount > MAX_FEE) revert FeeTooHigh(feeAmount, MAX_FEE);
+        if (feeAmount != 0) {
+            if (feeToken.code.length == 0) revert InvalidFeeToken(feeToken);
+            if (feeRecipient == address(0)) revert NoFeeRecipient();
+        }
+        FEE_TOKEN = feeToken;
+        FEE_AMOUNT = feeAmount;
+        FEE_RECIPIENT = feeRecipient;
+    }
 
     // ─────────────────────────────────────────────────────────────── Actions
 
@@ -79,6 +108,8 @@ contract ChogSwapIntents is IChogSwapIntents, EIP712, ReentrancyGuard {
                 _send(from, to, give[k]);
             }
         }
+
+        _chargeFees(cycle);
     }
 
     /// @inheritdoc IChogSwapIntents
@@ -120,6 +151,8 @@ contract ChogSwapIntents is IChogSwapIntents, EIP712, ReentrancyGuard {
                 it.maker,
                 _hashAssets(it.give),
                 _hashAssets(it.want),
+                it.feeToken,
+                it.fee,
                 it.deadline,
                 it.nonce
             )
@@ -142,6 +175,10 @@ contract ChogSwapIntents is IChogSwapIntents, EIP712, ReentrancyGuard {
         if (it.maker == address(0)) revert InvalidMaker(index);
         if (it.deadline == 0) revert InvalidDeadline(index);
         if (block.timestamp > it.deadline) revert IntentExpired(index);
+        // The maker signed a fee, and it has to be the one this contract charges.
+        if (it.feeToken != FEE_TOKEN || it.fee != FEE_AMOUNT) {
+            revert WrongFee(index, it.feeToken, it.fee);
+        }
 
         _validateSide(it.give, index, true);
         _validateSide(it.want, index, false);
@@ -205,6 +242,24 @@ contract ChogSwapIntents is IChogSwapIntents, EIP712, ReentrancyGuard {
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
+
+    /// @dev Every maker in the settled cycle pays the fee from their wallet to the recipient. A
+    ///      maker without the balance or the approval reverts the whole settlement.
+    // `from` is arbitrary on purpose: it is a maker whose signature `settle` just verified, and
+    // the signature covers the fee token and amount.
+    // forge-lint: disable-next-item(require-revert-in-loop, calls-loop, arbitrary-send-erc20)
+    function _chargeFees(Intent[] calldata cycle) private {
+        uint256 fee = FEE_AMOUNT;
+        if (fee == 0) return;
+        IERC20 token = IERC20(FEE_TOKEN);
+        address to = FEE_RECIPIENT;
+        uint256 n = cycle.length;
+        for (uint256 i; i < n; ++i) {
+            token.safeTransferFrom(cycle[i].maker, to, fee);
+        }
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit FeeCharged(to, address(token), fee * n);
+    }
 
     // forge-lint: disable-next-item(require-revert-in-loop)
     function _useNonce(address maker, uint256 nonce) private {

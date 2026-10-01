@@ -49,7 +49,7 @@ const FAQ: ReadonlyArray<[string, string]> = [
   ["Can I cancel my deal?", "Yes. The maker can cancel any open deal before it is filled. Your escrowed assets and offered MON are returned to your wallet."],
   ["What happens when a deal expires?", "An expired deal cannot be filled. The maker, or another wallet on the maker's behalf, can call Reclaim to return the escrowed assets."],
   ["Who can accept a deal?", "Public deals can be accepted by any wallet that owns all requested assets. A direct deal can only be accepted by the wallet named by the maker."],
-  ["Are there platform fees?", "On Deal has no platform fee. You only pay the Monad transaction cost, plus any MON intentionally included in the deal."],
+  ["Are there platform fees?", "Multi-asset and signed deals charge a small flat protocol fee per side, so both people pay the same. It is only charged when the deal completes: if you cancel, it expires, or an offer is rejected or withdrawn, nobody pays it. The screens show the exact amount before you confirm. In a locked deal it is sent in MON with your side and held with it, and refunded if the deal doesn't complete. In a signed swap it is taken in WMON (wrapped MON) from your wallet when the swap settles, and the first step wraps the MON you need. You also pay the Monad transaction cost. Deals on the original single-collection contract have no fee."],
   ["Why do I need to approve On Deal?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
   ["Is this mainnet?", "The current demo runs on Monad testnet with test assets. Treat them as disposable and never send valuable assets to an unfamiliar contract."],
 ];

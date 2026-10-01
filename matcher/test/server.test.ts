@@ -4,7 +4,7 @@ import { after, before, describe, it } from "node:test";
 import type { Hex } from "viem";
 import { assetKey, cancelTypes, domain } from "../src/intent.ts";
 import { createPoolServer } from "../src/server.ts";
-import { CHAIN_ID, type World, skipReason, startWorld } from "./harness.ts";
+import { CHAIN_ID, FEE, type World, skipReason, startWorld } from "./harness.ts";
 
 const skip = skipReason() ?? false;
 const ONE = 10n ** 18n;
@@ -22,6 +22,7 @@ describe("pool HTTP API", { skip }, () => {
       chainId: CHAIN_ID,
       swap: w.swap,
       matcher: w.matcherSender.account.address,
+      fee: { token: w.wmon, amount: FEE.toString(), recipient: w.feeRecipient },
     });
     await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
     const { port } = server.address() as { port: number };
@@ -56,6 +57,7 @@ describe("pool HTTP API", { skip }, () => {
       chainId: CHAIN_ID,
       swap: w.swap,
       matcher: w.matcherSender.account.address,
+      fee: { token: w.wmon, amount: FEE.toString(), recipient: w.feeRecipient },
       maxCycle: 4,
     });
   });

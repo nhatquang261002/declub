@@ -8,15 +8,20 @@ import {MockChog} from "../../src/mocks/MockChog.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 
 /// @dev Fixture: alice owns Chogs 1–5, bob 6–10, carol 11–15, dave 16–20. Each also holds
-///      START_TOKEN of `usdc` and `weth`, and approves the contract for everything. Each has a
-///      signing key (`aliceKey`, …) so tests can sign real EIP-712 intents.
+///      START_TOKEN of `usdc`, `weth` and `wmon` (the fee token), and approves the contract for
+///      everything. Each has a signing key (`aliceKey`, …) so tests can sign real EIP-712 intents.
+///      The contract is deployed with no protocol fee, so a test reads as the plain settlement;
+///      the fee suite (`ChogSwapIntents.fee.t.sol`) overrides `_feeAmount`. Intents always carry
+///      the contract's own fee token and amount, so they are valid either way.
 abstract contract ChogSwapIntentsBase is Test {
     uint256 internal constant START_TOKEN = 1_000 ether;
 
     MockChog internal chog;
     MockERC20 internal usdc;
     MockERC20 internal weth;
+    MockERC20 internal wmon;
     ChogSwapIntents internal swap;
+    address internal treasury = makeAddr("treasury");
 
     address internal alice;
     address internal bob;
@@ -38,7 +43,8 @@ abstract contract ChogSwapIntentsBase is Test {
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
-        swap = new ChogSwapIntents();
+        wmon = new MockERC20("Wrapped MON", "WMON");
+        swap = new ChogSwapIntents(address(wmon), _feeAmount(), treasury);
 
         (alice, aliceKey) = makeAddrAndKey("alice");
         (bob, bobKey) = makeAddrAndKey("bob");
@@ -51,14 +57,21 @@ abstract contract ChogSwapIntentsBase is Test {
         _onboard(dave);
     }
 
+    /// @dev What each maker pays per settlement. 0 unless a suite overrides it.
+    function _feeAmount() internal view virtual returns (uint256) {
+        return 0;
+    }
+
     function _onboard(address who) internal {
         chog.mint(who, 5);
         usdc.mint(who, START_TOKEN);
         weth.mint(who, START_TOKEN);
+        wmon.mint(who, START_TOKEN);
         vm.startPrank(who);
         chog.setApprovalForAll(address(swap), true);
         usdc.approve(address(swap), type(uint256).max);
         weth.approve(address(swap), type(uint256).max);
+        wmon.approve(address(swap), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -122,7 +135,9 @@ abstract contract ChogSwapIntentsBase is Test {
         IChogSwapIntents.Asset[] memory want,
         uint256 nonce
     ) internal view returns (IChogSwapIntents.Intent memory) {
-        return IChogSwapIntents.Intent(maker, give, want, _deadline(), nonce);
+        return IChogSwapIntents.Intent(
+            maker, give, want, swap.FEE_TOKEN(), swap.FEE_AMOUNT(), _deadline(), nonce
+        );
     }
 
     function _sign(uint256 key, IChogSwapIntents.Intent memory it)

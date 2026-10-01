@@ -7,11 +7,13 @@ import { useConnection } from "wagmi";
 import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
 import { ConsentNotice } from "@/components/IntentParts";
+import { FeeNote } from "@/components/FeeNote";
 import { Select } from "@/components/Select";
 import { Alert } from "@/components/Alert";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useIntentReadiness, type NftScope } from "@/hooks/useIntentReadiness";
 import { usePoolInfo } from "@/hooks/usePool";
+import { useIntentFee } from "@/hooks/useProtocolFee";
 import { useSignFlow } from "@/hooks/useSignFlow";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
@@ -40,13 +42,18 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const approval = useTxFlow();
   const sign = useSignFlow();
   const pool = usePoolInfo();
+  const { fee, isLoading: feeLoading } = useIntentFee();
 
   const [giveRows, setGiveRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
   const [wantRows, setWantRows] = useState<DraftRow[]>(() => [newRow("erc20", MOCK_ERC20_ADDRESS ?? "")]);
   const [deadline, setDeadline] = useState<DeadlineKey>(DEFAULT_DEADLINE);
   const [scope, setScope] = useState<NftScope>("token");
 
-  const tokens = useMemo(() => draftTokens([...giveRows, ...wantRows]), [giveRows, wantRows]);
+  const feeTokenAddress = fee?.token;
+  const tokens = useMemo(
+    () => [...new Set([...draftTokens([...giveRows, ...wantRows]), ...(feeTokenAddress ? [feeTokenAddress] : [])])],
+    [giveRows, wantRows, feeTokenAddress],
+  );
   const { info } = useTokenInfo(tokens);
   const decimalsOf = (token: Address) => info.get(token.toLowerCase())?.decimals;
 
@@ -56,9 +63,10 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const giveError = give.errors[0] ?? intentProblem(give.assets, want.assets);
 
   // Reads the chain only once the draft is sound, so typing doesn't fire a read per keystroke.
-  const readiness = useIntentReadiness(address, wantError || giveError ? [] : give.assets, info, scope);
+  const readiness = useIntentReadiness(address, wantError || giveError ? [] : give.assets, info, scope, fee);
   const poolDown = !!pool.error || pool.mismatch;
-  const blocker = wantError ?? giveError ?? readiness.problems[0] ?? null;
+  const feeBlocker = fee ? null : feeLoading ? "Reading the protocol fee from the contract…" : "Couldn't read the protocol fee from the contract.";
+  const blocker = wantError ?? giveError ?? readiness.problems[0] ?? feeBlocker;
   const nextApproval = blocker ? undefined : readiness.steps[0];
   const hasNfts = give.assets.some((a) => a.kind === "erc721");
 
@@ -182,10 +190,16 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
           ))}
         </dl>
       </ReviewCard>
+      {fee && (
+        <FeeNote amount={fee.amount} unit="WMON">
+          Signed with your swap and taken from your wallet only if it settles, in WMON (wrapped MON). Every wallet in the
+          match pays the same. If it never settles, you pay nothing. Holding only MON is fine: the first step wraps what you need.
+        </FeeNote>
+      )}
       <ConsentNotice />
       <ConfirmCard
         onBack={() => onStep(2)}
-        note={blocker ?? "Signing is free. Approving the tokens you give is what lets the swap run later without another confirmation."}
+        note={blocker ?? "Signing is free. Approving the tokens you give, and the fee, is what lets the swap run later without another confirmation."}
         status={
           <>
             <TxStatus state={approval.state} success="Approved." />

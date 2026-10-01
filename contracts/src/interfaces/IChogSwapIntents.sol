@@ -6,7 +6,8 @@ pragma solidity ^0.8.24;
 ///         their assets. Anyone may submit a *cycle* of intents that satisfy each other: every
 ///         intent's `give` is paid, in full, to the next intent's maker, and must cover that
 ///         maker's `want`. Two intents make a plain swap; up to `MAX_CYCLE` make a ring.
-///         The contract never holds any asset.
+///         The contract never holds any asset. Every maker in a settled cycle also pays a small
+///         protocol fee in wrapped MON, straight from their wallet to the fee recipient.
 /// @dev Design and rationale: docs/adr/0008-trade-intents.md and docs/adr/0009-ring-swaps.md.
 ///      `Asset` mirrors ChogSwapV2's struct and enum values so the frontend's asset editor can be
 ///      reused, but only `ERC20` and `ERC721` are valid here: native MON can't be pulled from a
@@ -36,10 +37,15 @@ interface IChogSwapIntents {
     ///      minimums, NFTs are exact. Anything the previous party gives beyond `want` (extra
     ///      amount, extra assets) goes to the maker. `deadline` is required (non-zero).
     ///      `nonce` is unordered: bit `nonce & 0xff` of word `nonce >> 8`.
+    ///      `feeToken` and `fee` are the protocol fee the maker agrees to pay if the cycle
+    ///      settles. They are part of what is signed, and `settle` requires them to equal the
+    ///      contract's `FEE_TOKEN` and `FEE_AMOUNT`.
     struct Intent {
         address maker;
         Asset[] give;
         Asset[] want;
+        address feeToken;
+        uint256 fee;
         uint64 deadline;
         uint256 nonce;
     }
@@ -50,6 +56,10 @@ interface IChogSwapIntents {
     event IntentFilled(
         bytes32 indexed intentHash, address indexed maker, address indexed recipient, uint256 nonce
     );
+
+    /// @notice A cycle settled and every maker in it paid the fee: `amount` is the total sent to
+    ///         `recipient` (the per-maker fee times the cycle size). Not emitted when the fee is 0.
+    event FeeCharged(address indexed recipient, address indexed token, uint256 amount);
 
     /// @notice A maker invalidated unordered nonces without settling them.
     event NoncesInvalidated(address indexed maker, uint256 word, uint256 mask);
@@ -74,11 +84,21 @@ interface IChogSwapIntents {
     ///         rebasing, lying token).
     error UnsupportedToken(address token);
     error NftNotReceived(address token, uint256 id);
+    /// @notice The intent's signed `feeToken` or `fee` isn't what this contract charges.
+    error WrongFee(uint256 intent, address feeToken, uint256 fee);
+    /// @notice The constructor's fee is above `MAX_FEE`.
+    error FeeTooHigh(uint256 fee, uint256 max);
+    /// @notice The constructor's fee is not 0 but the fee token isn't a contract.
+    error InvalidFeeToken(address token);
+    /// @notice The constructor's fee is not 0 but the recipient is the zero address.
+    error NoFeeRecipient();
 
     // ─────────────────────────────────────────────────────────────── Actions
 
     /// @notice Settle a cycle of 2..`MAX_CYCLE` intents atomically. Anyone may call. Reverts if
-    ///         anything about any intent or transfer is off, leaving everyone as they were.
+    ///         anything about any intent or transfer is off, leaving everyone as they were. Every
+    ///         maker needs `FEE_AMOUNT` of `FEE_TOKEN` and an allowance for it, besides their
+    ///         `give`.
     /// @param cycle `cycle[i].give` goes to `cycle[(i + 1) % n].maker`.
     /// @param signatures `signatures[i]` is `cycle[i].maker`'s EIP-712 signature (ECDSA, or
     ///        ERC-1271 for contract wallets).
@@ -92,6 +112,12 @@ interface IChogSwapIntents {
 
     function MAX_CYCLE() external view returns (uint256);
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
+    function MAX_FEE() external view returns (uint256);
+    /// @notice The token the fee is paid in (wrapped MON). Fixed at deploy.
+    function FEE_TOKEN() external view returns (address);
+    /// @notice What each maker pays when a cycle settles. Fixed at deploy.
+    function FEE_AMOUNT() external view returns (uint256);
+    function FEE_RECIPIENT() external view returns (address);
 
     /// @notice The EIP-712 struct hash of an intent.
     function hashIntent(Intent calldata intent) external pure returns (bytes32);

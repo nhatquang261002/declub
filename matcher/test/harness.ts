@@ -23,6 +23,8 @@ import { intentToWire } from "../src/wire.ts";
 
 const OUT = resolve(import.meta.dirname, "../../contracts/out");
 export const CHAIN_ID = 31337;
+/** The protocol fee the test contract charges each maker, in WMON (ADR 0015). */
+export const FEE = 2n * 10n ** 18n;
 /** Anvil's default, publicly known test mnemonic. */
 const MNEMONIC = "test test test test test test test test test test test junk";
 
@@ -58,6 +60,7 @@ function freePort(): Promise<number> {
 const erc20Abi = parseAbi([
   "function mint(address to, uint256 amount)",
   "function approve(address spender, uint256 amount) returns (bool)",
+  "function transfer(address to, uint256 amount) returns (bool)",
   "function balanceOf(address owner) view returns (uint256)",
 ]);
 const chogAbi = parseAbi([
@@ -91,6 +94,10 @@ export interface World {
   chog: Address;
   usd: Address;
   weth: Address;
+  /** The fee token. Every actor holds plenty of it and has approved the swap. */
+  wmon: Address;
+  /** Who receives the fees. */
+  feeRecipient: Address;
   alice: Actor;
   bob: Actor;
   carol: Actor;
@@ -105,6 +112,7 @@ export interface World {
   approveChog(who: Actor, id: bigint): Promise<void>;
   revokeChog(who: Actor, id: bigint): Promise<void>;
   approveToken(who: Actor, token: Address, amount: bigint): Promise<void>;
+  transferToken(who: Actor, token: Address, to: Address, amount: bigint): Promise<void>;
   balanceOf(token: Address, who: Address): Promise<bigint>;
   ownerOf(id: bigint): Promise<Address>;
   deployWallet(owner: Address): Promise<Address>;
@@ -151,7 +159,9 @@ export async function startWorld(): Promise<World> {
     return getAddress((await reader.waitForTransactionReceipt({ hash })).contractAddress!);
   };
 
-  const swap = await deploy("ChogSwapIntents.sol", "ChogSwapIntents");
+  const wmon = await deploy("MockERC20.sol", "MockERC20", ["Wrapped MON", "WMON"]);
+  const feeRecipient = makeActor(8, rpcUrl).address;
+  const swap = await deploy("ChogSwapIntents.sol", "ChogSwapIntents", [wmon, FEE, feeRecipient]);
   const chog = await deploy("MockChog.sol", "MockChog");
   const usd = await deploy("MockERC20.sol", "MockERC20", ["Mock USD", "mUSD"]);
   const weth = await deploy("MockERC20.sol", "MockERC20", ["Mock WETH", "mWETH"]);
@@ -159,7 +169,7 @@ export async function startWorld(): Promise<World> {
   let nonce = 1n;
 
   const world: World = {
-    rpcUrl, reader, swap, chog, usd, weth, alice, bob, carol, dave, matcherSender,
+    rpcUrl, reader, swap, chog, usd, weth, wmon, feeRecipient, alice, bob, carol, dave, matcherSender,
     stop: () => anvil.kill(),
     tx,
     async mintChogs(to, n) {
@@ -181,6 +191,9 @@ export async function startWorld(): Promise<World> {
     async approveToken(who, token, amount) {
       await tx(who.wallet.writeContract({ address: token, abi: erc20Abi, functionName: "approve", args: [swap, amount] }));
     },
+    async transferToken(who, token, to, amount) {
+      await tx(who.wallet.writeContract({ address: token, abi: erc20Abi, functionName: "transfer", args: [to, amount] }));
+    },
     balanceOf: (token, who) =>
       reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [who] }),
     ownerOf: (id) => reader.readContract({ address: chog, abi: chogAbi, functionName: "ownerOf", args: [id] }),
@@ -190,6 +203,8 @@ export async function startWorld(): Promise<World> {
     intent(maker, give, want, extra = {}) {
       return {
         maker, give, want,
+        feeToken: wmon,
+        fee: FEE,
         deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
         nonce: nonce++,
         ...extra,
@@ -222,7 +237,7 @@ export async function startWorld(): Promise<World> {
       const matcherRef: { current?: Matcher } = {};
       const pool = new Pool(
         store, reader,
-        { chainId: CHAIN_ID, swap, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600 },
+        { chainId: CHAIN_ID, swap, fee: { token: wmon, amount: FEE }, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600 },
         { onNew: () => matcherRef.current?.kick() },
       );
       const matcher = new Matcher(pool, matcherSender, { ...defaultMatcherConfig(swap), ...over });
@@ -232,5 +247,10 @@ export async function startWorld(): Promise<World> {
     chogOf: (id) => ({ assetType: AssetType.ERC721, token: chog, id, amount: 1n }),
     tokenOf: (token, amount) => ({ assetType: AssetType.ERC20, token, id: 0n, amount }),
   };
+  // Every trader can pay the fee, so a test only has to think about it when it is about the fee.
+  for (const who of [alice, bob, carol, dave]) {
+    await world.mintToken(wmon, who.address, 1000n * 10n ** 18n);
+    await world.approveToken(who, wmon, 2n ** 256n - 1n);
+  }
   return world;
 }

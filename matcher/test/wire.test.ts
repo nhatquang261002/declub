@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { type Address, getAddress } from "viem";
-import { cancelDigest, covers, intentDigest, intentHash, shapeProblem } from "../src/intent.ts";
+import {
+  cancelDigest,
+  covers,
+  feeProblem,
+  intentDigest,
+  intentHash,
+  shapeProblem,
+} from "../src/intent.ts";
 import { verifyEcdsa } from "../src/signature.ts";
 import { AssetType, type Asset, type Intent } from "../src/types.ts";
 import { WireError, intentFromWire, intentToWire } from "../src/wire.ts";
@@ -17,7 +24,15 @@ const erc20 = (amount: bigint, token = U): Asset => ({
   id: 0n,
   amount,
 });
-const base: Intent = { maker: A, give: [nft(1n)], want: [erc20(5n)], deadline: 100n, nonce: 7n };
+const base: Intent = {
+  maker: A,
+  give: [nft(1n)],
+  want: [erc20(5n)],
+  feeToken: U,
+  fee: 2n,
+  deadline: 100n,
+  nonce: 7n,
+};
 
 describe("wire codec", () => {
   it("round-trips an intent, including values past 2^53", () => {
@@ -33,6 +48,10 @@ describe("wire codec", () => {
     assert.throws(() => intentFromWire({ ...w, nonce: (2n ** 256n).toString() }), WireError);
     assert.throws(() => intentFromWire({ ...w, deadline: (2n ** 64n).toString() }), WireError);
     assert.throws(() => intentFromWire({ ...w, maker: "0x12" }), WireError);
+    assert.throws(() => intentFromWire({ ...w, feeToken: "0x12" }), WireError);
+    assert.throws(() => intentFromWire({ ...w, fee: 2 }), WireError);
+    assert.throws(() => intentFromWire({ ...w, fee: "-1" }), WireError);
+    assert.throws(() => intentFromWire({ ...w, fee: (2n ** 256n).toString() }), WireError);
     assert.throws(() => intentFromWire({ ...w, give: "nope" }), WireError);
     assert.throws(() => intentFromWire({ ...w, give: [{ ...w.give[0], assetType: 256 }] }), WireError);
     assert.throws(() => intentFromWire(null), WireError);
@@ -57,6 +76,21 @@ describe("shapeProblem", () => {
   });
 });
 
+describe("feeProblem", () => {
+  const terms = { token: U, amount: 2n };
+
+  it("accepts the contract's fee and nothing else", () => {
+    assert.equal(feeProblem(base, terms), null);
+    assert.match(feeProblem({ ...base, fee: 1n }, terms)!, /fee must be 2/);
+    assert.match(feeProblem({ ...base, fee: 3n }, terms)!, /fee must be 2/);
+    assert.match(feeProblem({ ...base, feeToken: T }, terms)!, /fee must be 2/);
+  });
+
+  it("compares the token without regard to case", () => {
+    assert.equal(feeProblem({ ...base, feeToken: getAddress(U.toLowerCase()) }, terms), null);
+  });
+});
+
 describe("covers", () => {
   it("compares ERC-20 amounts as a floor and NFTs exactly", () => {
     assert.ok(covers([erc20(10n)], [erc20(10n)]));
@@ -73,6 +107,8 @@ describe("hashing", () => {
     const h = intentHash(base);
     for (const patch of [
       { nonce: 8n },
+      { fee: 3n },
+      { feeToken: T },
       { deadline: 101n },
       { want: [erc20(6n)] },
       { give: [nft(2n)] },

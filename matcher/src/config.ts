@@ -2,9 +2,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Address, type Hex, isAddress, isHex } from "viem";
 
-/** The same repo-root `.env` the web app and Foundry use; real environment variables win. */
+/**
+ * The same repo-root `.env` the web app and Foundry use; real environment variables win.
+ * `MATCHER_ENV_FILE` points somewhere else (the tests use a path that doesn't exist, so a
+ * developer's own `.env` can't leak into them).
+ */
 export function loadRootEnv() {
-  const path = resolve(import.meta.dirname, "../../.env");
+  const path = process.env.MATCHER_ENV_FILE?.trim() || resolve(import.meta.dirname, "../../.env");
   if (existsSync(path)) process.loadEnvFile(path);
 }
 

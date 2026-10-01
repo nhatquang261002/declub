@@ -73,15 +73,17 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Privy sign-in, wallet-first (Google / X / Discord / wallet; socials link to a wallet in either order; embedded wallets opt-in) and an account screen to link, unlink and switch wallets ([ADR 0010](adr/0010-privy-sign-in.md)). Optional behind `NEXT_PUBLIC_PRIVY_APP_ID`; typechecked, linted and built in both modes, but not yet signed in with a real Privy app
 - [x] Privy webhooks keep verified profiles in step: `user.linked_account` / `unlinked_account` / `transferred_account` / `deleted` re-sync the affected users' shares (`POST /api/webhooks/privy`, Svix-verified, state re-read from Privy so replays are harmless). Needs `PRIVY_WEBHOOK_SIGNING_SECRET` and, in production, Privy's Enterprise plan; policies and transaction webhooks skipped because they only cover embedded wallets ([ADR 0013](adr/0013-privy-webhooks.md)). Logic and route tested with signed requests; not yet delivered by a real Privy app
 - [ ] Set up the Privy webhook: add `https://<host>/api/webhooks/privy` under Configuration > Webhooks (subscribe to `user.linked_account`, `unlinked_account`, `transferred_account`, `deleted`), put its `whsec_…` secret in `PRIVY_WEBHOOK_SIGNING_SECRET`, check it with the dashboard's *Test webhook*, then unlink an account and see the shared profile update. Production needs Privy's Enterprise plan ([ADR 0013](adr/0013-privy-webhooks.md))
-- [ ] Privy smart wallets: gas sponsorship and batched approvals (needs a paymaster and a check of escrow and `withdraw` with a contract wallet)
+- [ ] Verified-collections list for mainnet: a curated `web/data/assets.json` marks collections and tokens as verified or blocked, and the UI badges, warns or hides by tier. It only changes what the UI shows; the contracts stay permissionless ([ADR 0014](adr/0014-verified-collections-list.md), proposed)
+- [x] Protocol fee, $2 per side: a flat fee when a deal completes, so a pair pays $4 and a ring of n pays n × $2. `ChogSwapV2` takes MON escrowed with each side (refunded on cancel, reclaim, reject or withdraw); `ChogSwapIntents` pulls WMON (wrapped MON) from every maker in `settle` (signed in the intent, domain version bump). Immutable amounts and recipient fixed at deploy, shown in the review, fill and signing steps ([ADR 0015](adr/0015-protocol-fee.md)). Built: contracts (100% coverage, invariants V9 and N6), deploy scripts with `MockWMON`, the matcher (66 tests) and the app (typechecked, linted, built). Not deployed: the testnet contracts predate it, so redeploy both and update the addresses
+- [ ] Protocol fee, before mainnet: the canonical WMON address, the recipient wallet, the dollar-to-MON amount for `PROTOCOL_FEE_WEI`, and a click-through on testnet with a real wallet (wrap, approve, sign, settle; create, fill, cancel and reject for escrow)
 - [ ] Reputation
 - [ ] External audit before mainnet with real Chogs
 
 ## Open questions
 
-| Question | Needed by |
-|---|---|
-| Real Chog contract address, and is it `ERC721Enumerable`? | Mainnet / Phase 2 "My Chogs" |
-| WalletConnect (needs a project id + `@walletconnect/ethereum-provider`)? Privy's sign-in covers most mobile users, so maybe not | Mobile wallets |
-| Where do Chog traits live (IPFS JSON? API?), and are they final? | Phase 3 |
-| Protocol fee, ever? (v1: none) | Phase 4 |
+| Question                                                                                                                        | Needed by                    |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Real Chog contract address, and is it `ERC721Enumerable`?                                                                       | Mainnet / Phase 2 "My Chogs" |
+| WalletConnect (needs a project id + `@walletconnect/ethereum-provider`)? Privy's sign-in covers most mobile users, so maybe not | Mobile wallets               |
+| Where do Chog traits live (IPFS JSON? API?), and are they final?                                                                | Phase 3                      |
+| Canonical WMON address, recipient wallet and MON amount for the $2 protocol fee (ADR 0015)                                      | Mainnet deploy               |

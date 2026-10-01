@@ -34,6 +34,17 @@ export const swapIntents = CHOG_SWAP_INTENTS_ADDRESS
   ? ({ address: CHOG_SWAP_INTENTS_ADDRESS, abi: chogSwapIntentsAbi, chainId: CHAIN_ID } as const)
   : undefined;
 
+/**
+ * Wrapped MON, the fee token of ChogSwapIntents (ADR 0015). `deposit` wraps native MON one to
+ * one (the WETH9 interface), which is how a wallet holding only MON can pay the fee.
+ */
+export const wmonAbi = parseAbi([
+  "function deposit() payable",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+]);
+
 /** The ERC-721 calls the V2 and intent screens make on any collection. */
 export const erc721Abi = parseAbi([
   "function isApprovedForAll(address owner, address operator) view returns (bool)",

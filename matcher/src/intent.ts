@@ -12,7 +12,7 @@ export const MAX_CYCLE = 4;
 export const MAX_ASSETS_PER_SIDE = 10;
 
 export const domain = (chainId: number, verifyingContract: Address) =>
-  ({ name: "ChogSwapIntents", version: "1", chainId, verifyingContract }) as const;
+  ({ name: "ChogSwapIntents", version: "2", chainId, verifyingContract }) as const;
 
 export const types = {
   Asset: [
@@ -25,6 +25,8 @@ export const types = {
     { name: "maker", type: "address" },
     { name: "give", type: "Asset[]" },
     { name: "want", type: "Asset[]" },
+    { name: "feeToken", type: "address" },
+    { name: "fee", type: "uint256" },
     { name: "deadline", type: "uint64" },
     { name: "nonce", type: "uint256" },
   ],
@@ -34,6 +36,20 @@ export const types = {
 export const cancelTypes = {
   CancelIntent: [{ name: "intentHash", type: "bytes32" }],
 } as const;
+
+/** What the contract charges each maker in a settled cycle (`FEE_TOKEN`, `FEE_AMOUNT`). */
+export interface FeeTerms {
+  token: Address;
+  amount: bigint;
+}
+
+/** The signed fee has to be the one the contract charges, or `settle` reverts with `WrongFee`. */
+export function feeProblem(intent: Intent, terms: FeeTerms): string | null {
+  if (!isAddressEqual(intent.feeToken, terms.token) || intent.fee !== terms.amount) {
+    return `the fee must be ${terms.amount} of ${terms.token}`;
+  }
+  return null;
+}
 
 /** The EIP-712 struct hash. It is the id the contract emits in `IntentFilled`. */
 export function intentHash(intent: Intent): Hex {

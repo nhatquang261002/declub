@@ -44,7 +44,10 @@ export function IntentStatusBadge({ status }: { status: IntentStatus }) {
 
 /** Symbols and decimals for every token in a set of intents or settlements. */
 export function useIntentsTokenInfo(rows: readonly PoolIntent[]) {
-  const tokens = useMemo(() => erc20Tokens(rows.flatMap((r) => [...r.intent.give, ...r.intent.want])), [rows]);
+  const tokens = useMemo(
+    () => [...new Set([...erc20Tokens(rows.flatMap((r) => [...r.intent.give, ...r.intent.want])), ...rows.map((r) => r.intent.feeToken)])],
+    [rows],
+  );
   return useTokenInfo(tokens);
 }
 
@@ -108,6 +111,10 @@ export function ConsentNotice({ className = "" }: { className?: string }) {
         <li>
           Nothing is locked. Your assets stay in your wallet until the swap, and the approval you give stays in place
           until it settles, expires, or you revoke it.
+        </li>
+        <li>
+          If it settles, the protocol fee comes out of the wallet that signed it, in WMON. If it doesn&apos;t, nobody
+          pays anything.
         </li>
         <li>You can&apos;t edit it once signed. Removing it from the pool doesn&apos;t recall a signature that already left, so keep the deadline short.</li>
       </ul>

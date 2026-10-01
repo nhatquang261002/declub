@@ -27,6 +27,8 @@ contract Handler is Test {
     mapping(address => mapping(uint256 => bool)) public invalidatedNonce;
 
     uint256 public settlements;
+    /// @dev Makers across all settled cycles: each paid one fee.
+    uint256 public settledMakers;
     uint256 public attempts;
     bool public nonceSettledTwice;
     bool public invalidatedNonceSettled;
@@ -159,6 +161,7 @@ contract Handler is Test {
         }
         try SWAP.settle(cycle, sigs) {
             ++settlements;
+            settledMakers += cycle.length;
             for (uint256 n; n < cycle.length; ++n) {
                 address maker = cycle[n].maker;
                 uint256 nonce = cycle[n].nonce;
@@ -178,7 +181,13 @@ contract Handler is Test {
         uint64 deadline
     ) internal view returns (IChogSwapIntents.Intent memory) {
         return IChogSwapIntents.Intent(
-            actors[who], give, want, deadline, bound(nonce, 0, NONCE_RANGE - 1)
+            actors[who],
+            give,
+            want,
+            SWAP.FEE_TOKEN(),
+            SWAP.FEE_AMOUNT(),
+            deadline,
+            bound(nonce, 0, NONCE_RANGE - 1)
         );
     }
 

@@ -12,6 +12,8 @@ export interface WireIntent {
   maker: Address;
   give: WireAsset[];
   want: WireAsset[];
+  feeToken: Address;
+  fee: string;
   deadline: string;
   nonce: string;
 }
@@ -32,6 +34,8 @@ export function intentToWire(i: Intent): WireIntent {
     maker: i.maker,
     give: i.give.map(assetToWire),
     want: i.want.map(assetToWire),
+    feeToken: i.feeToken,
+    fee: i.fee.toString(),
     deadline: i.deadline.toString(),
     nonce: i.nonce.toString(),
   };
@@ -84,6 +88,8 @@ export function intentFromWire(v: unknown): Intent {
     maker: address(o.maker, "intent.maker"),
     give: assets(o.give, "intent.give"),
     want: assets(o.want, "intent.want"),
+    feeToken: address(o.feeToken, "intent.feeToken"),
+    fee: uint(o.fee, "intent.fee", U256_MAX),
     deadline: uint(o.deadline, "intent.deadline", U64_MAX),
     nonce: uint(o.nonce, "intent.nonce", U256_MAX),
   };

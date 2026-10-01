@@ -2,7 +2,9 @@ import type { Address, Hex } from "viem";
 import { checkIntent } from "./checks.ts";
 import type { Reader } from "./chain.ts";
 import {
+  type FeeTerms,
   cancelDigest,
+  feeProblem,
   intentDigest,
   intentHash,
   shapeProblem,
@@ -25,6 +27,8 @@ export class PoolError extends Error {
 export interface PoolConfig {
   chainId: number;
   swap: Address;
+  /** What the contract charges each maker. An intent that signs anything else can never settle. */
+  fee: FeeTerms;
   /** An intent must still have this long to run when posted. */
   minTtlSec: number;
   /** ADR 0008: a short deadline is the real protection, so the pool caps how long one can be. */
@@ -77,6 +81,8 @@ export class Pool {
 
     const problem = shapeProblem(intent);
     if (problem) throw new PoolError(422, "invalid_intent", problem);
+    const wrongFee = feeProblem(intent, this.cfg.fee);
+    if (wrongFee) throw new PoolError(422, "wrong_fee", wrongFee);
 
     const nowSec = Math.floor(now / 1000);
     const left = Number(intent.deadline) - nowSec;

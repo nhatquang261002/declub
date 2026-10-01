@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
 import { AssetList } from "@/components/AssetList";
+import { FeeNote } from "@/components/FeeNote";
 import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { describeError } from "@/lib/errors";
@@ -19,8 +20,9 @@ import { useProposalsV2 } from "@/hooks/useProposalsV2";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTraitFill } from "@/hooks/useTraitFill";
 import { useDealV2 } from "@/hooks/useDealV2";
+import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTxFlow } from "@/hooks/useTxFlow";
-import { ASSET_TYPE, erc20Tokens, formatAsset, sameAsset, type Asset } from "@/lib/assets";
+import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
@@ -42,6 +44,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
+  const { fee } = useEscrowFee();
   // History needs to know which public deals this wallet filled (hooks/useFills.ts).
   const { record } = useFills(address, swapV2!.address);
 
@@ -79,13 +82,15 @@ function DealDetailV2({ id }: { id: bigint }) {
   // this wallet made. Reading claimable() for every other wallet's offers would be wasted calls.
   const creditAssets = useMemo(
     () => [
+      // A protocol-fee share that couldn't be refunded is credited as MON, whatever the deal holds.
+      ...(fee ? [nativeAsset(0n)] : []),
       ...(deal?.offered ?? []),
       ...(deal?.requested ?? []),
       ...proposals
         .filter((p) => p.status === "accepted" || sameAddress(p.proposer, address))
         .flatMap((p) => p.assets),
     ],
-    [deal, proposals, address],
+    [deal, proposals, address, fee],
   );
   const credits = useCredits(address, creditAssets);
 
@@ -143,6 +148,19 @@ function DealDetailV2({ id }: { id: bigint }) {
           </div>
         </div>
 
+        {fee !== undefined && status === "open" && canFill && (
+          <FeeNote amount={fee}>
+            Sent with your payment, together with the maker&apos;s matching share that is already held with this deal. Both
+            go to the protocol only because this deal completes.
+          </FeeNote>
+        )}
+        {fee !== undefined && status === "open" && isMaker && (
+          <FeeNote amount={fee}>
+            Your share is held with this deal. It&apos;s only charged if someone completes it, and it comes back to you if you
+            cancel or it expires.
+          </FeeNote>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           {status === "open" && isMaker && (
             <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapV2!, functionName: "cancelTrade", args: [id] })}>
@@ -163,11 +181,14 @@ function DealDetailV2({ id }: { id: bigint }) {
           {canFill && !steps[0] && (
             <TxButton
               state={action.state}
-              disabled={traitFillBlocked}
+              disabled={traitFillBlocked || fee === undefined}
               onClick={async () => {
+                if (fee === undefined) return;
+                // What the maker asked for in MON, plus this wallet's share of the protocol fee.
+                const value = requestedNative + fee;
                 const receipt = traitFill.hasTraits
-                  ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value: requestedNative }))
-                  : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value: requestedNative });
+                  ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
+                  : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value });
                 if (receipt) record(id);
               }}
             >

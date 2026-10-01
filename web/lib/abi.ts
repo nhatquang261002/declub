@@ -458,12 +458,41 @@ export const chogSwapAbi = [
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const chogSwapIntentsAbi = [
-  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'feeToken', internalType: 'address', type: 'address' },
+      { name: 'feeAmount', internalType: 'uint256', type: 'uint256' },
+      { name: 'feeRecipient', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [],
     name: 'DOMAIN_SEPARATOR',
     outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_AMOUNT',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_RECIPIENT',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_TOKEN',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -477,6 +506,13 @@ export const chogSwapIntentsAbi = [
     type: 'function',
     inputs: [],
     name: 'MAX_CYCLE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -534,6 +570,8 @@ export const chogSwapIntentsAbi = [
               { name: 'amount', internalType: 'uint256', type: 'uint256' },
             ],
           },
+          { name: 'feeToken', internalType: 'address', type: 'address' },
+          { name: 'fee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -582,6 +620,8 @@ export const chogSwapIntentsAbi = [
               { name: 'amount', internalType: 'uint256', type: 'uint256' },
             ],
           },
+          { name: 'feeToken', internalType: 'address', type: 'address' },
+          { name: 'fee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -650,6 +690,8 @@ export const chogSwapIntentsAbi = [
               { name: 'amount', internalType: 'uint256', type: 'uint256' },
             ],
           },
+          { name: 'feeToken', internalType: 'address', type: 'address' },
+          { name: 'fee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -661,6 +703,31 @@ export const chogSwapIntentsAbi = [
     stateMutability: 'nonpayable',
   },
   { type: 'event', anonymous: false, inputs: [], name: 'EIP712DomainChanged' },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeCharged',
+  },
   {
     type: 'event',
     anonymous: false,
@@ -751,6 +818,14 @@ export const chogSwapIntentsAbi = [
   },
   {
     type: 'error',
+    inputs: [
+      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'FeeTooHigh',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
     name: 'IntentExpired',
   },
@@ -770,6 +845,11 @@ export const chogSwapIntentsAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'InvalidFeeToken',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'intent', internalType: 'uint256', type: 'uint256' }],
     name: 'InvalidMaker',
   },
@@ -782,6 +862,7 @@ export const chogSwapIntentsAbi = [
     ],
     name: 'NftNotReceived',
   },
+  { type: 'error', inputs: [], name: 'NoFeeRecipient' },
   {
     type: 'error',
     inputs: [
@@ -836,6 +917,15 @@ export const chogSwapIntentsAbi = [
     ],
     name: 'WantNotMet',
   },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'feeToken', internalType: 'address', type: 'address' },
+      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'WrongFee',
+  },
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -844,9 +934,38 @@ export const chogSwapIntentsAbi = [
 
 export const chogSwapV2Abi = [
   {
+    type: 'constructor',
+    inputs: [
+      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'feeRecipient', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_RECIPIENT',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
     type: 'function',
     inputs: [],
     name: 'MAX_ASSETS_PER_SIDE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_FEE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1336,6 +1455,31 @@ export const chogSwapV2Abi = [
         type: 'uint256',
         indexed: true,
       },
+      {
+        name: 'recipient',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeCharged',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'tradeId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
       { name: 'note', internalType: 'string', type: 'string', indexed: false },
     ],
     name: 'OfferNote',
@@ -1606,6 +1750,14 @@ export const chogSwapV2Abi = [
   },
   {
     type: 'error',
+    inputs: [
+      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'FeeTooHigh',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
     name: 'InvalidAsset',
   },
@@ -1630,6 +1782,7 @@ export const chogSwapV2Abi = [
     ],
     name: 'NftNotReceived',
   },
+  { type: 'error', inputs: [], name: 'NoFeeRecipient' },
   { type: 'error', inputs: [], name: 'NoTraitAsset' },
   {
     type: 'error',

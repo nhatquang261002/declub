@@ -57,7 +57,7 @@ contract ChogSwapIntentsSignaturesTest is ChogSwapIntentsBase {
         bytes32 assetType =
             keccak256("Asset(uint8 assetType,address token,uint256 id,uint256 amount)");
         bytes32 intentType = keccak256(
-            "Intent(address maker,Asset[] give,Asset[] want,uint64 deadline,uint256 nonce)"
+            "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 fee,uint64 deadline,uint256 nonce)"
             "Asset(uint8 assetType,address token,uint256 id,uint256 amount)"
         );
         bytes32 giveHash = keccak256(
@@ -70,15 +70,25 @@ contract ChogSwapIntentsSignaturesTest is ChogSwapIntentsBase {
                 keccak256(abi.encode(assetType, uint8(1), address(usdc), uint256(0), 100 ether))
             )
         );
-        bytes32 structHash =
-            keccak256(abi.encode(intentType, alice, giveHash, wantHash, a.deadline, uint256(0)));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                intentType,
+                alice,
+                giveHash,
+                wantHash,
+                swap.FEE_TOKEN(),
+                swap.FEE_AMOUNT(),
+                a.deadline,
+                uint256(0)
+            )
+        );
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 keccak256(
                     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
                 ),
                 keccak256("ChogSwapIntents"),
-                keccak256("1"),
+                keccak256("2"),
                 block.chainid,
                 address(swap)
             )
@@ -109,6 +119,14 @@ contract ChogSwapIntentsSignaturesTest is ChogSwapIntentsBase {
         assertTrue(swap.intentDigest(x) != base);
 
         x = _copy(a);
+        x.feeToken = address(usdc);
+        assertTrue(swap.intentDigest(x) != base);
+
+        x = _copy(a);
+        x.fee += 1;
+        assertTrue(swap.intentDigest(x) != base);
+
+        x = _copy(a);
         x.give = _list(_chog(A2));
         assertTrue(swap.intentDigest(x) != base);
 
@@ -122,7 +140,9 @@ contract ChogSwapIntentsSignaturesTest is ChogSwapIntentsBase {
         pure
         returns (IChogSwapIntents.Intent memory)
     {
-        return IChogSwapIntents.Intent(a.maker, a.give, a.want, a.deadline, a.nonce);
+        return IChogSwapIntents.Intent(
+            a.maker, a.give, a.want, a.feeToken, a.fee, a.deadline, a.nonce
+        );
     }
 
     // ───────────────────────────────────────────── bad signatures
@@ -161,7 +181,7 @@ contract ChogSwapIntentsSignaturesTest is ChogSwapIntentsBase {
 
     /// @dev A signature for another deployment of the contract is worthless here.
     function test_revertsOnSignatureForAnotherContract() public {
-        ChogSwapIntents other = new ChogSwapIntents();
+        ChogSwapIntents other = new ChogSwapIntents(address(wmon), _feeAmount(), treasury);
         (IChogSwapIntents.Intent memory a, IChogSwapIntents.Intent memory b) = _pair();
         (uint8 va, bytes32 ra, bytes32 sa) = vm.sign(aliceKey, other.intentDigest(a));
         (uint8 vb, bytes32 rb, bytes32 sb) = vm.sign(bobKey, other.intentDigest(b));

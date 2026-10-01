@@ -16,6 +16,8 @@ export interface ServerInfo {
   chainId: number;
   swap: string;
   matcher: string | null;
+  /** The protocol fee each maker pays when a cycle settles (ADR 0015). */
+  fee: { token: string; amount: string; recipient: string };
 }
 
 const rowJson = (r: Row) => ({
@@ -66,7 +68,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
 
 /**
  * The pool's HTTP API:
- *   GET    /info                       chain, contract and matcher address
+ *   GET    /info                       chain, contract, matcher address and the protocol fee
  *   POST   /intents      {intent, signature}   verify and store
  *   GET    /intents      ?status=&maker=&give=&want=&limit=   the book (default: open)
  *   GET    /intents/:hash

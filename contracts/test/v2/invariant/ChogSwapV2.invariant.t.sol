@@ -6,28 +6,35 @@ import {ChogSwapV2} from "../../../src/ChogSwapV2.sol";
 import {IChogSwapV2} from "../../../src/interfaces/IChogSwapV2.sol";
 import {MockChog} from "../../../src/mocks/MockChog.sol";
 import {MockERC20} from "../../../src/mocks/MockERC20.sol";
+import {MonReceiver} from "../../utils/Actors.sol";
 import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 import {Handler} from "./Handler.sol";
 
 /// @dev The escrow is always exactly what open trades and `Active` proposals hold plus what is
 ///      credited for `claim`, for native, every ERC-20 and every NFT, however the calls
-///      interleave.
+///      interleave. Native also holds one fee share per open trade and per `Active` proposal, and
+///      the fee recipient has received exactly 2 × fee for every deal that completed.
 contract ChogSwapV2InvariantTest is Test {
+    uint256 internal constant FEE = 3 ether;
+
     ChogSwapV2 internal swap;
+    MonReceiver internal treasury;
     MockChog internal chog;
     MockERC20 internal usdc;
     BlocklistToken internal blk;
     Handler internal handler;
 
     function setUp() public {
-        swap = new ChogSwapV2();
+        treasury = new MonReceiver();
+        treasury.setAccept(true);
+        swap = new ChogSwapV2(FEE, address(treasury));
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         blk = new BlocklistToken();
-        handler = new Handler(swap, chog, usdc, blk);
+        handler = new Handler(swap, chog, usdc, blk, treasury);
 
         targetContract(address(handler));
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = Handler.create.selector;
         selectors[1] = Handler.fill.selector;
         selectors[2] = Handler.cancel.selector;
@@ -41,6 +48,7 @@ contract ChogSwapV2InvariantTest is Test {
         selectors[10] = Handler.acceptProposal.selector;
         selectors[11] = Handler.rejectProposal.selector;
         selectors[12] = Handler.withdrawProposal.selector;
+        selectors[13] = Handler.acceptFees.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
@@ -95,12 +103,37 @@ contract ChogSwapV2InvariantTest is Test {
         return false;
     }
 
-    /// I1: native balance == Σ open native offered + Σ native credits.
+    /// @dev Fee shares the escrow holds: one per open trade (the maker's) and per `Active`
+    ///      proposal (the proposer's).
+    function _heldShares() internal view returns (uint256 shares) {
+        for (uint256 id = 1; id <= swap.tradeCount(); ++id) {
+            if (swap.getTrade(id).status == IChogSwapV2.Status.Open) ++shares;
+            for (uint256 pid; pid < swap.proposalCount(id); ++pid) {
+                if (swap.getProposal(id, pid).status == IChogSwapV2.ProposalStatus.Active) {
+                    ++shares;
+                }
+            }
+        }
+    }
+
+    /// I1: native balance == Σ open native offered + Σ fee shares held + Σ native credits
+    ///     (the fee recipient's included).
     function invariant_nativeIsFullyAccounted() public view {
         assertEq(
             address(swap).balance,
-            _openOffered(IChogSwapV2.AssetType.Native, address(0))
+            _openOffered(IChogSwapV2.AssetType.Native, address(0)) + _heldShares() * FEE
                 + _credits(IChogSwapV2.AssetType.Native, address(0), 0)
+                + swap.claimable(address(treasury), IChogSwapV2.AssetType.Native, address(0), 0)
+        );
+    }
+
+    /// V9: the recipient has received exactly 2 × fee per completed deal, as MON or as a credit,
+    ///     and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn.
+    function invariant_feesAreOnlyTakenOnCompletion() public view {
+        assertEq(
+            address(treasury).balance
+                + swap.claimable(address(treasury), IChogSwapV2.AssetType.Native, address(0), 0),
+            2 * FEE * handler.ghost_completed()
         );
     }
 

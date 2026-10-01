@@ -20,6 +20,7 @@ import { explorerAddress } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { sameAddress } from "@/lib/deals";
 import { Who } from "@/components/Who";
+import { erc20Asset, formatAsset } from "@/lib/assets";
 import { formatDate } from "@/lib/format";
 import {
   isLive,
@@ -119,6 +120,12 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
             </span>
           </Row>
           <Row label="Deadline">{formatDate(intent.deadline)}</Row>
+          {intent.fee > 0n && (
+            <Row label="Protocol fee">
+              {formatAsset(erc20Asset(intent.feeToken, intent.fee), info.get(intent.feeToken.toLowerCase()))}
+              <span className="block text-xs font-normal text-muted">Charged to the maker only if it settles</span>
+            </Row>
+          )}
           <Row label="Nonce">{intent.nonce.toString()}</Row>
         </dl>
       </section>
@@ -156,7 +163,13 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
   const invalidate = useTxFlow();
   const sign = useSignFlow();
   const { intent } = row;
-  const readiness = useIntentReadiness(intent.maker, stale ? intent.give : [], info);
+  const readiness = useIntentReadiness(
+    intent.maker,
+    stale ? intent.give : [],
+    info,
+    "token",
+    useMemo(() => ({ token: intent.feeToken, amount: intent.fee }), [intent.feeToken, intent.fee]),
+  );
   const fix = readiness.steps[0];
   const contract = swapIntents;
 

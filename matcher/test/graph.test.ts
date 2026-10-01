@@ -26,7 +26,15 @@ let seq = 0;
 const node = (maker: number, give: Asset[], want: Asset[], createdAt = ++seq): Node => ({
   hash: `0x${(++seq).toString(16).padStart(64, "0")}` as Hex,
   createdAt,
-  intent: { maker: addr(maker), give, want, deadline: 9999999999n, nonce: BigInt(seq) } satisfies Intent,
+  intent: {
+    maker: addr(maker),
+    give,
+    want,
+    feeToken: addr(0xf0),
+    fee: 0n,
+    deadline: 9999999999n,
+    nonce: BigInt(seq),
+  } satisfies Intent,
 });
 
 const ids = (nodes: Node[], cycles: number[][]) =>

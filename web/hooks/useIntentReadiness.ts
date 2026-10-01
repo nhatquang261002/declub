@@ -2,11 +2,13 @@
 
 import { useMemo } from "react";
 import type { Address } from "viem";
-import { useReadContracts } from "wagmi";
+import { useBalance, useReadContracts } from "wagmi";
 import { CHAIN_ID, CHOG_SWAP_INTENTS_ADDRESS } from "@/lib/config";
-import { erc20Abi, erc721Abi } from "@/lib/contracts";
-import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
+import { erc20Abi, erc721Abi, wmonAbi } from "@/lib/contracts";
+import { erc20Asset, formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { sameAddress } from "@/lib/deals";
+import { formatMon } from "@/lib/format";
+import type { IntentFee } from "./useProtocolFee";
 import type { WriteCall } from "./useTxFlow";
 
 export type ApprovalStep = { key: string; label: string; call: WriteCall };
@@ -23,24 +25,43 @@ export type NftScope = "token" | "collection";
  * the approvals still missing: exact amounts for tokens, a single-token approval for NFTs unless
  * the maker chose to approve the collection. Run `steps[0]` and the list shrinks by itself,
  * because useTxFlow refetches every query after a write.
+ *
+ * `fee` is the protocol fee `settle` takes from the maker's wallet in the fee token, after the
+ * gives move (ADR 0015). It is counted on top of whatever the maker gives of that same token. A
+ * maker short of the fee token but holding enough MON gets a "wrap" step first, so someone with
+ * only MON never has to find WMON elsewhere.
  */
 export function useIntentReadiness(
   owner: Address | undefined,
   give: readonly Asset[],
   info: ReadonlyMap<string, TokenInfo>,
   scope: NftScope = "token",
+  fee?: IntentFee,
 ) {
   const spender = CHOG_SWAP_INTENTS_ADDRESS;
-  const tokens = useMemo(() => give.filter((a) => a.kind === "erc20"), [give]);
+  const feeToken = fee && fee.amount > 0n ? fee : undefined;
+  // Every ERC-20 the wallet has to hold and approve: what it gives, plus the fee token. When the
+  // fee token is also given, one approval has to cover both.
+  const needs = useMemo(() => {
+    const out = give
+      .filter((a) => a.kind === "erc20")
+      .map((a) => ({ token: a.token, give: a.amount, fee: feeToken && sameAddress(a.token, feeToken.token) ? feeToken.amount : 0n }));
+    if (feeToken && !out.some((n) => sameAddress(n.token, feeToken.token))) {
+      out.push({ token: feeToken.token, give: 0n, fee: feeToken.amount });
+    }
+    return out;
+  }, [give, feeToken]);
   const nfts = useMemo(() => give.filter((a) => a.kind === "erc721"), [give]);
   const collections = useMemo(() => [...new Set(nfts.map((a) => a.token))], [nfts]);
 
   const enabled = !!owner && !!spender && give.length > 0;
+  // Native MON, only to offer wrapping it into the fee token.
+  const native = useBalance({ address: owner, chainId: CHAIN_ID, query: { enabled: enabled && !!feeToken } });
   const result = useReadContracts({
     contracts: [
-      ...tokens.flatMap((a) => [
-        { address: a.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "balanceOf", args: [owner!] },
-        { address: a.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "allowance", args: [owner!, spender!] },
+      ...needs.flatMap((n) => [
+        { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "balanceOf", args: [owner!] },
+        { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "allowance", args: [owner!, spender!] },
       ] as const),
       ...nfts.flatMap((a) => [
         { address: a.token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "ownerOf", args: [a.id] },
@@ -62,24 +83,40 @@ export function useIntentReadiness(
     const problems: string[] = [];
     const label = (a: Asset) => formatAsset(a, info.get(a.token.toLowerCase()));
 
-    tokens.forEach((a, i) => {
+    needs.forEach((n, i) => {
       const balance = data[i * 2];
       const allowance = data[i * 2 + 1];
       if (balance?.status !== "success" || allowance?.status !== "success") {
-        problems.push(`${a.token.slice(0, 6)}… isn't a readable token.`);
+        problems.push(`${n.token.slice(0, 6)}… isn't a readable token.`);
         return;
       }
-      if ((balance.result as bigint) < a.amount) problems.push(`You hold less than ${label(a)}.`);
-      if ((allowance.result as bigint) < a.amount) {
+      const total = n.give + n.fee;
+      const asset = erc20Asset(n.token, total);
+      const symbol = info.get(n.token.toLowerCase())?.symbol ?? "WMON";
+      const withFee = n.fee > 0n ? " (with the protocol fee)" : "";
+      if ((balance.result as bigint) < total) {
+        const shortfall = total - (balance.result as bigint);
+        const mon = native.data?.value;
+        if (n.fee > 0n && mon !== undefined && mon >= shortfall) {
+          steps.push({
+            key: `wrap:${n.token}`,
+            label: `Wrap ${formatMon(shortfall)} into ${symbol}`,
+            call: { address: n.token, abi: wmonAbi, functionName: "deposit", args: [], value: shortfall },
+          });
+        } else {
+          problems.push(`You hold less than ${label(asset)}${withFee}.`);
+        }
+      }
+      if ((allowance.result as bigint) < total) {
         steps.push({
-          key: `erc20:${a.token}`,
-          label: `Approve ${label(a)}`,
-          call: { address: a.token, abi: erc20Abi, functionName: "approve", args: [spender, a.amount] },
+          key: `erc20:${n.token}`,
+          label: n.give === 0n ? `Approve ${label(asset)} for the protocol fee` : `Approve ${label(asset)}${withFee}`,
+          call: { address: n.token, abi: erc20Abi, functionName: "approve", args: [spender, total] },
         });
       }
     });
 
-    const nftBase = tokens.length * 2;
+    const nftBase = needs.length * 2;
     const allBase = nftBase + nfts.length * 2;
     const collectionApproved = (token: Address) => {
       const read = data[allBase + collections.indexOf(token)];
@@ -118,5 +155,5 @@ export function useIntentReadiness(
     });
 
     return { steps, problems, isLoading: false };
-  }, [result.data, result.isLoading, enabled, owner, spender, tokens, nfts, collections, info, scope]);
+  }, [result.data, result.isLoading, enabled, owner, spender, needs, nfts, collections, info, scope, native.data?.value]);
 }

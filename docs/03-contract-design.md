@@ -219,7 +219,7 @@ Replace `offeredIds/offeredMon` with `Asset[] offered` and do the same for the r
 
 ## Phase 4: `ChogSwapV2` (generic assets)
 
-Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IChogSwapV2.sol`](../contracts/src/interfaces/IChogSwapV2.sol). Implementation: [`ChogSwapV2.sol`](../contracts/src/ChogSwapV2.sol). It's a separate contract with no constructor arguments, so it works with any token and v1 is untouched.
+Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IChogSwapV2.sol`](../contracts/src/interfaces/IChogSwapV2.sol). Implementation: [`ChogSwapV2.sol`](../contracts/src/ChogSwapV2.sol). It's a separate contract that works with any token, and v1 is untouched. Its constructor takes only the protocol fee and where it goes (see [Protocol fee](#protocol-fee-chogswapv2)).
 
 ```solidity
 enum AssetType { Native, ERC20, ERC721, ERC721Trait }
@@ -231,14 +231,14 @@ struct Trade { address maker; uint64 expiry; Status status; address taker; Asset
 
 | Function | What it does |
 |---|---|
-| `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` (or 0). |
-| `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested`. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker. |
+| `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` plus `FEE`. |
+| `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested` plus `FEE`. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker; both fee shares go to `FEE_RECIPIENT`. |
 | `createTraitTrade(offered, requested, taker, expiry, spec) payable` | `createTrade` for a `requested` side with `ERC721Trait` assets (a Merkle root of allowed ids and a count). `spec` (1–1024 bytes) describes them for clients. [ADR 0006](adr/0006-trait-requests-in-v2.md). |
 | `fillTraitTrade(id, fills) payable` | `fillTrade` for a trade with trait assets: `fills[k]` is `{tokenIds, proofs}` for the k-th trait asset. `fillTrade` reverts with `TraitFillRequired` on such a trade. |
 | `cancelTrade(id)` | Maker, while open. Refunds the offered side to the maker. |
 | `reclaimExpired(id)` | Anyone, once expired. Refunds to the maker. |
 | `claim(assetType, token, id)` | Collect a payout that was rejected earlier. |
-| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE`, `MAX_SPEC_BYTES` | Views. |
+| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE`, `MAX_SPEC_BYTES`, `FEE`, `FEE_RECIPIENT`, `MAX_FEE` | Views. |
 
 ### Create-time checks
 
@@ -251,7 +251,7 @@ struct Trade { address maker; uint64 expiry; Status status; address taker; Asset
 | same `(type, token, id)` on both sides | `SameAssetBothSides(i, j)` |
 | trait asset on the offered side, in a proposal, or via `createTrade`; zero root, zero or > 10 `amount`, or non-contract token | `InvalidAsset(index)` |
 | `createTraitTrade` without a trait asset / with an empty or oversized spec | `NoTraitAsset` / `BadTraitSpec(length, max)` |
-| `msg.value` ≠ native amount offered | `WrongNativeAmount(expected, sent)` |
+| `msg.value` ≠ native amount offered + `FEE` | `WrongNativeAmount(expected, sent)` (`expected` includes the fee) |
 | `expiry` in the past | `ExpiryInPast` |
 | ERC-20 deposit delivered a different amount | `UnsupportedToken(token)` |
 | NFT not owned by the escrow after the transfer | `NftNotReceived(token, id)` |
@@ -270,7 +270,24 @@ _payout(to, asset):                      // never reverts
 
 ### Events
 
-`TradeCreated(id, maker, taker, offered[], requested[], expiry)`, `TradeFilled`, `TradeCancelled`, `TradeReclaimed` (same shape as v1), plus `AssetCredited(account, token, assetType, id, amount)` and `Claimed(...)`.
+`TradeCreated(id, maker, taker, offered[], requested[], expiry)`, `TradeFilled`, `TradeCancelled`, `TradeReclaimed` (same shape as v1), plus `AssetCredited(account, token, assetType, id, amount)`, `Claimed(...)` and `FeeCharged(id, recipient, amount)` (once per completed deal; not emitted when the fee is 0).
+
+### Protocol fee (`ChogSwapV2`)
+
+Reasoning: [ADR 0015](adr/0015-protocol-fee.md). `constructor(uint256 fee, address feeRecipient)`: `FEE` and `FEE_RECIPIENT` are immutable, `MAX_FEE` is 500 MON, `FeeTooHigh` and `NoFeeRecipient` guard the constructor, and a fee of 0 (tests, testnet) charges and emits nothing.
+
+Every side sends `FEE` with its own call and the contract only **holds** it:
+
+| Call | `msg.value` | The share |
+|---|---|---|
+| `createTrade`, `createTraitTrade`, `createOpenOffer` | native offered + `FEE` | the maker's, held with the trade |
+| `propose` | native proposed + `FEE` | the proposer's, held with the proposal |
+| `fillTrade`, `fillTraitTrade` | native requested + `FEE` | the taker's, released at once with the maker's |
+| `acceptProposal` | none (non-payable) | both held shares released |
+| `cancelTrade`, `reclaimExpired` | none | the maker's share refunded to the maker |
+| `rejectProposal`, `withdrawProposal` | none | the proposer's share refunded to the proposer |
+
+A completed deal sends `2 × FEE` to the recipient in one payout. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + one `FEE` per open trade and per active proposal + unclaimed credits.
 
 ### Gas (worst case: 10 NFTs each way)
 
@@ -282,12 +299,13 @@ A third contract beside `ChogSwap` and `ChogSwapV2`: settles signed intents wall
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents; `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces, so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`ChogSwapIntents`, version `1`), ECDSA or ERC-1271; malleable signatures are refused.
+- Signatures: EIP-712 (`ChogSwapIntents`, version `2`), ECDSA or ERC-1271; malleable signatures are refused. `Intent` is `(maker, give, want, feeToken, fee, deadline, nonce)`.
+- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md)): `constructor(feeToken, feeAmount, feeRecipient)`, all immutable, with `MAX_FEE` at 500 tokens. Each intent signs `feeToken` and `fee`, and `settle` reverts with `WrongFee(intent, feeToken, fee)` unless they equal `FEE_TOKEN` and `FEE_AMOUNT`. After every `give` has moved, each maker in the cycle pays `FEE_AMOUNT` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
 - ERC-20 only moves if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert, as in V2); NFTs are checked with `ownerOf`.
 - Only `ERC20` and `ERC721` assets. Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
-- The contract never holds an asset, has no `receive()`, no admin and no fee.
+- The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`), has no `receive()` and no admin.
 
 ### Gas (worst case: 4 makers × 10 NFTs each way)
 
-`settle` costs **3.3M gas** (`test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M, a three-way ring about 0.5M.
+`settle` costs **3.3M gas** without the fee and **3.39M** with it (four more token transfers; `test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M (about 0.3M with the fee), a three-way ring about 0.5M.
 

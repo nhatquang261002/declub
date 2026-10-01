@@ -13,6 +13,9 @@ export type Intent = {
   maker: Address;
   give: Asset[];
   want: Asset[];
+  /** The protocol fee the maker agrees to pay if the cycle settles (ADR 0015): signed, and it has to match the contract's. */
+  feeToken: Address;
+  fee: bigint;
   deadline: bigint;
   nonce: bigint;
 };
@@ -28,6 +31,8 @@ export const INTENT_TYPES = {
     { name: "maker", type: "address" },
     { name: "give", type: "Asset[]" },
     { name: "want", type: "Asset[]" },
+    { name: "feeToken", type: "address" },
+    { name: "fee", type: "uint256" },
     { name: "deadline", type: "uint64" },
     { name: "nonce", type: "uint256" },
   ],
@@ -39,12 +44,14 @@ export const CANCEL_TYPES = {
 } as const;
 
 export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "ChogSwapIntents", version: "1", chainId, verifyingContract }) as const;
+  ({ name: "ChogSwapIntents", version: "2", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,
   give: intent.give.map(toRawAsset),
   want: intent.want.map(toRawAsset),
+  feeToken: intent.feeToken,
+  fee: intent.fee,
   deadline: intent.deadline,
   nonce: intent.nonce,
 });
@@ -79,6 +86,8 @@ export type WireIntent = {
   maker: Address;
   give: WireAsset[];
   want: WireAsset[];
+  feeToken: Address;
+  fee: string;
   deadline: string;
   nonce: string;
 };
@@ -92,6 +101,8 @@ export const intentToWire = (intent: Intent): WireIntent => ({
   maker: intent.maker,
   give: intent.give.map(wireAsset),
   want: intent.want.map(wireAsset),
+  feeToken: intent.feeToken,
+  fee: intent.fee.toString(),
   deadline: intent.deadline.toString(),
   nonce: intent.nonce.toString(),
 });
@@ -119,10 +130,12 @@ export function intentFromWire(v: unknown): Intent | null {
   if (!isRecord(v) || typeof v.maker !== "string" || !isAddress(v.maker)) return null;
   const give = parseSide(v.give);
   const want = parseSide(v.want);
+  const fee = uint(v.fee);
   const deadline = uint(v.deadline);
   const nonce = uint(v.nonce);
-  if (!give || !want || deadline === null || nonce === null) return null;
-  return { maker: getAddress(v.maker), give, want, deadline, nonce };
+  if (typeof v.feeToken !== "string" || !isAddress(v.feeToken)) return null;
+  if (!give || !want || fee === null || deadline === null || nonce === null) return null;
+  return { maker: getAddress(v.maker), give, want, feeToken: getAddress(v.feeToken), fee, deadline, nonce };
 }
 
 export type IntentStatus = "open" | "stale" | "settled" | "cancelled" | "expired" | "consumed" | "rejected";
@@ -228,6 +241,8 @@ export function reasonText(reason: string | null): string | null {
   const copy: Record<string, string> = {
     balance: "You no longer hold everything this intent gives.",
     allowance: "Your token approval for this intent is missing or too small.",
+    fee_balance: "You don't hold enough WMON for the protocol fee any more.",
+    fee_allowance: "Your WMON approval for the protocol fee is missing or too small.",
     not_owner: "You no longer own an NFT this intent gives.",
     not_approved: "An NFT this intent gives isn't approved for On Deal any more.",
     bad_token: "A token in this intent stopped answering.",

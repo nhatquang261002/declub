@@ -5,7 +5,7 @@ import { formatAbiItem } from "viem/utils";
 import { intentsAbi } from "../src/abi.ts";
 import { cancelTypes, domain, intentDigest, intentHash } from "../src/intent.ts";
 import { PoolError } from "../src/pool.ts";
-import { type World, CHAIN_ID, skipReason, startWorld, walletAbi } from "./harness.ts";
+import { type World, CHAIN_ID, FEE, skipReason, startWorld, walletAbi } from "./harness.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -18,6 +18,10 @@ describe("pool and matcher against a local chain", { skip }, () => {
     w = await startWorld();
   });
   after(() => w?.stop());
+
+  const reject = async (p: Promise<unknown>, code: string) => {
+    await assert.rejects(p, (e) => e instanceof PoolError && e.code === code, `expected ${code}`);
+  };
 
   /** Set up `who` to give an NFT, approve it, and post. Returns the intent hash. */
   async function postNft(
@@ -289,10 +293,6 @@ describe("pool and matcher against a local chain", { skip }, () => {
   // ── Posting ─────────────────────────────────────────────────────────────
 
   describe("posting", () => {
-    const reject = async (p: Promise<unknown>, code: string) => {
-      await assert.rejects(p, (e) => e instanceof PoolError && e.code === code, `expected ${code}`);
-    };
-
     it("rejects a signature from someone else", async () => {
       const { pool } = w.fresh();
       const [id] = await w.mintChogs(w.alice.address, 1);
@@ -403,14 +403,17 @@ describe("pool and matcher against a local chain", { skip }, () => {
     const [chogId] = await w.mintChogs(w.bob.address, 1);
     // The wallet holds mUSD and approves via `exec`, signing happens with its owner's key.
     await w.mintToken(w.usd, wallet, 40n * ONE);
-    await w.tx(w.alice.wallet.writeContract({
-      address: wallet, abi: walletAbi, functionName: "exec",
-      args: [w.usd, encodeFunctionData({
-        abi: [{ type: "function", name: "approve", stateMutability: "nonpayable",
-          inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] }],
-        functionName: "approve", args: [w.swap, 40n * ONE],
-      })],
-    }));
+    await w.mintToken(w.wmon, wallet, FEE); // and the protocol fee
+    for (const [token, amount] of [[w.usd, 40n * ONE], [w.wmon, FEE]] as const) {
+      await w.tx(w.alice.wallet.writeContract({
+        address: wallet, abi: walletAbi, functionName: "exec",
+        args: [token, encodeFunctionData({
+          abi: [{ type: "function", name: "approve", stateMutability: "nonpayable",
+            inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] }],
+          functionName: "approve", args: [w.swap, amount],
+        })],
+      }));
+    }
     const walletIntent = w.intent(wallet, [w.tokenOf(w.usd, 40n * ONE)], [w.chogOf(chogId!)]);
     await pool.submit(await w.body(w.alice, walletIntent)); // alice signs for her wallet
 
@@ -431,6 +434,111 @@ describe("pool and matcher against a local chain", { skip }, () => {
       pool.submit(await w.body(w.alice, intent)),
       (e) => e instanceof PoolError && e.code === "bad_signature",
     );
+  });
+
+  // ── The protocol fee (ADR 0015) ─────────────────────────────────────────
+
+  it("hashes the fee into the intent, as the contract does", async () => {
+    const [id] = await w.mintChogs(w.alice.address, 1);
+    const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)]);
+    assert.equal(intent.fee, FEE);
+    assert.equal(intent.feeToken, w.wmon);
+    const other = { ...intent, fee: FEE + 1n };
+    assert.notEqual(intentHash(other), intentHash(intent));
+    assert.equal(
+      await w.reader.readContract({ address: w.swap, abi: intentsAbi, functionName: "hashIntent", args: [other] }),
+      intentHash(other),
+    );
+  });
+
+  it("rejects an intent that signs another fee, or another fee token", async () => {
+    const { pool } = w.fresh();
+    const [id] = await w.mintChogs(w.alice.address, 1);
+    await w.approveChog(w.alice, id!);
+    for (const patch of [{ fee: FEE - 1n }, { fee: 0n }, { fee: FEE + 1n }, { feeToken: w.usd }]) {
+      const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)], patch);
+      await reject(pool.submit(await w.body(w.alice, intent)), "wrong_fee");
+    }
+  });
+
+  it("rejects a maker who can't pay the fee: no approval, too little, or no balance", async () => {
+    const { pool } = w.fresh();
+    const [id] = await w.mintChogs(w.carol.address, 1);
+    await w.approveChog(w.carol, id!);
+    const intent = w.intent(w.carol.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)]);
+    const body = await w.body(w.carol, intent);
+
+    await w.approveToken(w.carol, w.wmon, FEE - 1n);
+    await reject(pool.submit(body), "fee_allowance");
+    await w.approveToken(w.carol, w.wmon, 0n);
+    await reject(pool.submit(body), "fee_allowance");
+    await w.approveToken(w.carol, w.wmon, 2n ** 256n - 1n);
+
+    const held = await w.balanceOf(w.wmon, w.carol.address);
+    await w.transferToken(w.carol, w.wmon, w.dave.address, held);
+    try {
+      await reject(pool.submit(body), "fee_balance");
+    } finally {
+      await w.transferToken(w.dave, w.wmon, w.carol.address, held);
+    }
+    assert.equal((await pool.submit(body)).status, "open"); // all good again
+  });
+
+  it("counts the fee on top of a give in the same token", async () => {
+    const { pool } = w.fresh();
+    const [id] = await w.mintChogs(w.alice.address, 1);
+    const held = await w.balanceOf(w.wmon, w.bob.address);
+    // Giving every WMON leaves nothing for the fee.
+    const all = w.intent(w.bob.address, [w.tokenOf(w.wmon, held)], [w.chogOf(id!)]);
+    await reject(pool.submit(await w.body(w.bob, all)), "fee_balance");
+    const leaving = w.intent(w.bob.address, [w.tokenOf(w.wmon, held - FEE)], [w.chogOf(id!)]);
+    assert.equal((await pool.submit(await w.body(w.bob, leaving))).status, "open");
+  });
+
+  it("charges every maker in a settled pair, and the contract keeps none of it", async () => {
+    const { pool, matcher } = w.fresh();
+    const [id] = await w.mintChogs(w.alice.address, 1);
+    const [aliceBefore, bobBefore, paidBefore] = await Promise.all([
+      w.balanceOf(w.wmon, w.alice.address),
+      w.balanceOf(w.wmon, w.bob.address),
+      w.balanceOf(w.wmon, w.feeRecipient),
+    ]);
+    await postNft(pool, w.alice, id!, [w.tokenOf(w.usd, 7n * ONE)]);
+    await postToken(pool, w.bob, w.tokenOf(w.usd, 7n * ONE), [w.chogOf(id!)]);
+
+    const report = await matcher.runOnce();
+
+    assert.equal(report.settled.length, 1);
+    assert.equal(await w.balanceOf(w.wmon, w.alice.address), aliceBefore - FEE);
+    assert.equal(await w.balanceOf(w.wmon, w.bob.address), bobBefore - FEE);
+    assert.equal(await w.balanceOf(w.wmon, w.feeRecipient), paidBefore + 2n * FEE);
+    assert.equal(await w.balanceOf(w.wmon, w.swap), 0n);
+  });
+
+  it("marks an intent stale when its maker revokes the fee approval, and skips it", async () => {
+    const { pool, matcher, store } = w.fresh();
+    const [id] = await w.mintChogs(w.alice.address, 1);
+    const hashA = await postNft(pool, w.alice, id!, [w.tokenOf(w.usd, 3n * ONE)]);
+    await postToken(pool, w.bob, w.tokenOf(w.usd, 3n * ONE), [w.chogOf(id!)]);
+    const paidBefore = await w.balanceOf(w.wmon, w.feeRecipient);
+
+    await w.approveToken(w.alice, w.wmon, 0n);
+    try {
+      const report = await matcher.runOnce();
+      assert.equal(report.settled.length, 0);
+      assert.equal(store.get(hashA)?.status, "stale");
+      assert.match(store.get(hashA)?.reason ?? "", /fee_allowance/);
+      assert.equal(await w.balanceOf(w.wmon, w.feeRecipient), paidBefore); // nobody was charged
+      assert.equal(await w.ownerOf(id!), w.alice.address);
+    } finally {
+      await w.approveToken(w.alice, w.wmon, 2n ** 256n - 1n);
+    }
+
+    // Approval back: the next prune revives it and the pair settles.
+    await pool.prune();
+    assert.equal(store.get(hashA)?.status, "open");
+    assert.equal((await matcher.runOnce()).settled.length, 1);
+    assert.equal(await w.ownerOf(id!), w.bob.address);
   });
 
   // ── Time ────────────────────────────────────────────────────────────────

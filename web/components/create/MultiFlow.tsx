@@ -6,10 +6,12 @@ import { parseEventLogs, type Address } from "viem";
 import { useConnection } from "wagmi";
 import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
+import { FeeNote } from "@/components/FeeNote";
 import { TraitClauseSummary } from "@/components/TraitClause";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { statusOf, useCollectionCatalogs } from "@/hooks/useCollectionTraits";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
+import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
@@ -43,6 +45,8 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   const router = useRouter();
   const approval = useTxFlow();
   const tx = useTxFlow();
+  // Sent with the offer and held with it: paid out only if the deal completes (ADR 0015).
+  const { fee, isLoading: feeLoading } = useEscrowFee();
 
   const [offeredRows, setOfferedRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
   const [requestedRows, setRequestedRows] = useState<DraftRow[]>(() => [newRow("native")]);
@@ -115,8 +119,9 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   const nextApproval = askError || offerError ? undefined : steps[0];
 
   async function create() {
-    if (!address || !swapV2 || askError || offerError) return;
-    const native = offered.assets.find((a) => a.kind === "native")?.amount ?? 0n;
+    if (!address || !swapV2 || askError || offerError || fee === undefined) return;
+    // The native amount in the offer, plus this side's share of the protocol fee.
+    const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
     const expiry = expiryTimestamp(terms.expiry);
     const to = takerAddress(terms.taker);
     const receipt = isOpen
@@ -248,9 +253,19 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
         terms={terms}
         whoLabel={isOpen ? "Who can send offers" : "Who can accept"}
       />
+      {fee !== undefined && (
+        <FeeNote amount={fee}>
+          Sent with your {isOpen ? "offer" : "deal"} and held with it. It&apos;s only charged if the deal completes, and the
+          other side pays the same. If you cancel it, or it expires, it comes back to you with your assets.
+        </FeeNote>
+      )}
       <ConfirmCard
         onBack={() => onStep(2)}
-        note="On Deal locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
+        note={
+          fee === undefined && !feeLoading
+            ? "Couldn't read the protocol fee from the contract, so the deal can't be created right now."
+            : "On Deal locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
+        }
         status={
           <>
             <TxStatus state={approval.state} success="Approved." />
@@ -264,7 +279,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={preview || !!askError || !!offerError} onClick={create}>
+          <TxButton state={tx.state} disabled={preview || !!askError || !!offerError || fee === undefined} onClick={create}>
             {isOpen ? "Post open offer" : "Create deal"}
           </TxButton>
         )}

@@ -67,7 +67,7 @@ Then, checks first and effects second: **every nonce is marked used before any a
 
 **Any failure reverts the whole settlement.** There is no credit-and-claim path here because the contract never holds anything: V2 needed it because a payout out of escrow must not be blockable by the recipient, but here the transfer is wallet to wallet and an atomic revert leaves everyone exactly where they started.
 
-The contract has no `receive()`, no `fallback`, no admin, no fee and no upgrade path, and it is never the owner or holder of any asset after a call.
+The contract has no `receive()`, no `fallback`, no admin and no upgrade path, and it is never the owner or holder of any asset after a call. It does charge a flat protocol fee, but only by moving WMON from each maker straight to the fee recipient inside `settle`, so it still holds nothing ([ADR 0015](0015-protocol-fee.md)).
 
 ### Cancellation and replay
 

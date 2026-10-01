@@ -3,13 +3,16 @@ import { parseAbi } from "viem";
 /** The slice of `ChogSwapIntents` the pool and matcher use. Checked against the build in tests. */
 export const intentsAbi = parseAbi([
   "struct Asset { uint8 assetType; address token; uint256 id; uint256 amount; }",
-  "struct Intent { address maker; Asset[] give; Asset[] want; uint64 deadline; uint256 nonce; }",
+  "struct Intent { address maker; Asset[] give; Asset[] want; address feeToken; uint256 fee; uint64 deadline; uint256 nonce; }",
   "function settle(Intent[] cycle, bytes[] signatures)",
   "function isNonceUsed(address maker, uint256 nonce) view returns (bool)",
   "function hashIntent(Intent intent) pure returns (bytes32)",
   "function intentDigest(Intent intent) view returns (bytes32)",
   "function DOMAIN_SEPARATOR() view returns (bytes32)",
   "function MAX_CYCLE() view returns (uint256)",
+  "function FEE_TOKEN() view returns (address)",
+  "function FEE_AMOUNT() view returns (uint256)",
+  "function FEE_RECIPIENT() view returns (address)",
   "event IntentFilled(bytes32 indexed intentHash, address indexed maker, address indexed recipient, uint256 nonce)",
   "error BadCycleSize(uint256 size)",
   "error SignatureCountMismatch(uint256 intents, uint256 signatures)",
@@ -27,6 +30,7 @@ export const intentsAbi = parseAbi([
   "error WantNotMet(uint256 intent, uint256 wantIndex)",
   "error UnsupportedToken(address token)",
   "error NftNotReceived(address token, uint256 id)",
+  "error WrongFee(uint256 intent, address feeToken, uint256 fee)",
 ]);
 
 export const erc20Abi = parseAbi([

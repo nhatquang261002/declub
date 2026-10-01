@@ -13,17 +13,23 @@ import {Handler} from "./Handler.sol";
 ///      N1 the contract never holds anything; N2 a nonce settles at most once and never after it
 ///      was invalidated; N5 nothing settles after its deadline. N3/N4 (assets only leave signers'
 ///      wallets, everyone is paid) show up as conservation: nothing is created or destroyed.
+///      The contract charges a fee in WMON: N6 the recipient has received exactly the fee for
+///      every maker in every settlement, and nothing otherwise.
 contract ChogSwapIntentsInvariantTest is Test {
     uint256 internal constant START = 100_000 ether;
+    uint256 internal constant FEE = 2 ether;
 
     ChogSwapIntents internal swap;
     MockChog internal chog;
     MockERC20 internal usdc;
     MockERC20 internal weth;
+    MockERC20 internal wmon;
+    address internal treasury = makeAddr("treasury");
     Handler internal handler;
 
     function setUp() public {
-        swap = new ChogSwapIntents();
+        wmon = new MockERC20("Wrapped MON", "WMON");
+        swap = new ChogSwapIntents(address(wmon), FEE, treasury);
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
@@ -37,11 +43,13 @@ contract ChogSwapIntentsInvariantTest is Test {
             for (uint256 k; k < START / 1_000_000 ether + 1; ++k) {
                 usdc.mint(actors[i], START);
                 weth.mint(actors[i], START);
+                wmon.mint(actors[i], START);
             }
             vm.startPrank(actors[i]);
             chog.setApprovalForAll(address(swap), true);
             usdc.approve(address(swap), type(uint256).max);
             weth.approve(address(swap), type(uint256).max);
+            wmon.approve(address(swap), type(uint256).max);
             vm.stopPrank();
         }
         handler = new Handler(swap, chog, usdc, weth, actors, keys);
@@ -52,6 +60,7 @@ contract ChogSwapIntentsInvariantTest is Test {
         assertEq(address(swap).balance, 0);
         assertEq(usdc.balanceOf(address(swap)), 0);
         assertEq(weth.balanceOf(address(swap)), 0);
+        assertEq(wmon.balanceOf(address(swap)), 0);
         assertEq(chog.balanceOf(address(swap)), 0);
     }
 
@@ -68,6 +77,16 @@ contract ChogSwapIntentsInvariantTest is Test {
         assertEq(usdcSum, usdc.totalSupply());
         assertEq(wethSum, weth.totalSupply());
         assertEq(chogSum, 20);
+    }
+
+    /// N6: every settled maker paid the fee, to the recipient, and nobody else paid anything.
+    function invariant_N6_feesAreChargedPerSettledMaker() public view {
+        assertEq(wmon.balanceOf(treasury), FEE * handler.settledMakers());
+        uint256 held;
+        for (uint256 i; i < 4; ++i) {
+            held += wmon.balanceOf(handler.actors(i));
+        }
+        assertEq(held + wmon.balanceOf(treasury), wmon.totalSupply());
     }
 
     function invariant_N2_nonceSettlesAtMostOnce() public view {
