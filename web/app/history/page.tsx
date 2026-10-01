@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { ListingGrid } from "@/components/IntentParts";
 import { DealGrid } from "@/components/DealParts";
@@ -17,7 +18,6 @@ import { useIntents } from "@/hooks/usePool";
 import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
 import { swapIntents, swapV2 } from "@/lib/contracts";
 import { intentAsListing } from "@/lib/intents";
-import { errorMessage } from "@/lib/errors";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
 import { CreateDealButton } from "@/components/CreateDealButton";
@@ -128,9 +128,7 @@ export default function HistoryPage() {
       </div>
 
       {error ? (
-        <EmptyState>
-          <span className="text-danger">Couldn&apos;t load history: {errorMessage(error)}</span>
-        </EmptyState>
+        <LoadError title="Couldn&apos;t load history" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading activity…</EmptyState>
       ) : !address ? (

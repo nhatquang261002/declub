@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
+import { Alert } from "@/components/Alert";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { Pagination } from "@/components/Pagination";
 import { DealFilterBar, DealTabs, type DealTab } from "@/components/DealListControls";
@@ -13,7 +15,7 @@ import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { erc20Tokens } from "@/lib/assets";
 import { swapIntents } from "@/lib/contracts";
-import { errorMessage } from "@/lib/errors";
+import { describeError } from "@/lib/errors";
 import { intentAsListing } from "@/lib/intents";
 import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
 import { applyDealFiltersV2 } from "@/lib/dealFiltersV2";
@@ -137,15 +139,13 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
       />
 
       {showSigned && openSigned.error && (
-        <p className="mb-5 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-warn" role="status">
-          Signed swaps are unavailable right now: {errorMessage(openSigned.error)}
-        </p>
+        <Alert tone="warn" title="Signed swaps are unavailable right now" className="mb-5">
+          {describeError(openSigned.error).message} Deals you can accept on-chain are still listed below.
+        </Alert>
       )}
 
       {error ? (
-        <EmptyState>
-          <span className="text-danger">Couldn&apos;t load deals: {errorMessage(error)}</span>
-        </EmptyState>
+        <LoadError title="Couldn&apos;t load deals" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading deals…</EmptyState>
       ) : shown.length === 0 && filtering ? (

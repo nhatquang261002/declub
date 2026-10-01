@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { explorerTx } from "@/lib/config";
 import type { TxState } from "@/hooks/useTxFlow";
+import { Alert, toneOf } from "./Alert";
 
 const BUSY_LABEL: Partial<Record<TxState["status"], string>> = {
   "switching-chain": "Switching network…",
@@ -23,7 +24,7 @@ type TxButtonProps = {
   children: ReactNode;
 };
 
-/** Button that shows the tx stage while busy. Pair with <TxStatus> for errors and links. */
+/** Button that shows the tx stage while busy. Pair with <TxStatus> for the inline result and links. */
 export function TxButton({ state, onClick, disabled, variant = "primary", children }: TxButtonProps) {
   const busy = BUSY_LABEL[state.status];
   return (
@@ -43,10 +44,16 @@ export function TxButton({ state, onClick, disabled, variant = "primary", childr
 
 export function TxStatus({ state, success }: { state: TxState; success?: ReactNode }) {
   if (state.status === "error") {
+    // The same failure also appears as a toast; this stays beside the button as the record.
     return (
-      <p className="text-sm text-danger" role="alert">
-        {state.message} {state.hash && <TxLink hash={state.hash} />}
-      </p>
+      <Alert
+        tone={toneOf(state)}
+        title={state.title}
+        details={state.details}
+        actions={state.hash && <TxLink hash={state.hash} />}
+      >
+        {state.message}
+      </Alert>
     );
   }
   if (state.status === "pending") {

@@ -5,6 +5,7 @@ import type { Address } from "viem";
 import { useConnection } from "wagmi";
 import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
+import { Alert } from "@/components/Alert";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
@@ -183,7 +184,11 @@ export function ProposalForm({ dealId, offered }: { dealId: bigint; offered: rea
         owner={address}
       />
       <div className="card space-y-3 p-4">
-        {(validation ?? overlap) && <p className="text-sm text-danger" role="alert">{validation ?? overlap}</p>}
+        {(validation ?? overlap) && (
+          <Alert tone="warn" title="Check your offer">
+            {validation ?? overlap}
+          </Alert>
+        )}
         {problems.length > 0 && !validation && <p className="text-xs text-muted">{problems[0]}</p>}
         {nextApproval ? (
           <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>

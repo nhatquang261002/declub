@@ -773,21 +773,6 @@ body {
   color: var(--feedback-danger);
 }
 
-.wallet-error {
-  position: absolute;
-  top: calc(100% + 0.6rem);
-  right: 0;
-  z-index: 30;
-  width: min(20rem, calc(100vw - 2rem));
-  border: 1px solid rgb(239 105 112 / 0.4);
-  border-radius: 0.75rem;
-  background: #351e27;
-  padding: 0.7rem 0.8rem;
-  color: #ffb7b9;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  box-shadow: var(--shadow-float);
-}
 @utility input {
   @apply w-full border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-muted/60 focus:border-accent;
   border-radius: var(--radius-control);
@@ -887,4 +872,155 @@ body {
 
 @utility label {
   @apply mb-1.5 block text-xs font-medium tracking-wide text-muted uppercase;
+}
+
+/*
+ * Alerts: one look for errors and notices, inline (Alert) and floating (toast). Fixed light
+ * colours on purpose, so they read the same on cream pages and dark cards.
+ */
+.alert {
+  --alert-accent: #a9282f;
+  --alert-bg: #fde8ea;
+  --alert-fg: #3a1014;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  border: 2px solid var(--alert-accent);
+  border-left-width: 0.4rem;
+  border-radius: 0.75rem;
+  background: var(--alert-bg);
+  padding: 0.7rem 0.8rem;
+  color: var(--alert-fg);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.alert-danger { --alert-accent: #a9282f; --alert-bg: #fde8ea; --alert-fg: #3a1014; }
+.alert-warn { --alert-accent: #b27500; --alert-bg: #fff3d1; --alert-fg: #4a3200; }
+.alert-info { --alert-accent: #315ea8; --alert-bg: #e8eefb; --alert-fg: #14284d; }
+.alert-success { --alert-accent: #1f7a55; --alert-bg: #e3f5ec; --alert-fg: #0f3a29; }
+
+.alert-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  margin-top: 0.05rem;
+  color: var(--alert-accent);
+}
+
+.alert-title {
+  font-weight: 800;
+  color: var(--alert-accent);
+}
+
+.alert-body {
+  margin-top: 0.1rem;
+  overflow-wrap: anywhere;
+}
+
+.alert a,
+.alert-link {
+  color: var(--alert-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.alert a:hover,
+.alert-link:hover {
+  color: var(--alert-fg);
+}
+
+.alert-details {
+  margin-top: 0.5rem;
+  max-height: 9rem;
+  overflow: auto;
+  border-radius: 0.5rem;
+  background: rgb(17 19 24 / 0.07);
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-geist-mono);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.alert-close {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  margin: -0.15rem -0.25rem 0 0;
+  border-radius: 0.4rem;
+  color: var(--alert-fg);
+  opacity: 0.6;
+  transition: opacity 160ms ease, background-color 160ms ease;
+}
+
+.alert-close:hover { background: rgb(17 19 24 / 0.1); opacity: 1; }
+.alert-close:focus-visible { outline: 2px solid var(--alert-accent); opacity: 1; }
+.alert-close svg { width: 0.9rem; height: 0.9rem; }
+
+/*
+ * Toasts float at the top of the viewport, below the sticky header (taller on phones, where its
+ * nav wraps), so a failure is seen wherever the page is scrolled without covering the wallet button.
+ */
+.toast-stack {
+  position: fixed;
+  top: 8rem;
+  right: 1rem;
+  z-index: 60;
+  display: flex;
+  width: min(24rem, calc(100vw - 2rem));
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .toast-stack { top: 5rem; }
+}
+
+.toast {
+  pointer-events: auto;
+  animation: toast-in 240ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.toast .alert {
+  box-shadow: 0.3rem 0.3rem 0 rgb(17 19 24 / 0.85), var(--shadow-float);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-0.75rem) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+/* A failed data load: a centred panel with a way out, instead of a line of red text. */
+.error-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.error-panel-icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  margin-bottom: 0.4rem;
+  border: 2px solid #111318;
+  border-radius: 999px;
+  background: #fde8ea;
+  color: #a9282f;
+  box-shadow: 0.2rem 0.2rem 0 #a9282f;
 }

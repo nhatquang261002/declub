@@ -18,7 +18,8 @@ import {
   writeContract,
 } from "wagmi/actions";
 import { useQueryClient } from "@tanstack/react-query";
-import { errorMessage } from "@/lib/errors";
+import { describeError, type AppError } from "@/lib/errors";
+import { useToast } from "@/components/Toast";
 import { chain } from "@/lib/wagmi";
 
 // idle → simulating → awaiting-signature → pending → confirmed
@@ -32,7 +33,7 @@ export type TxState =
   | { status: "posting" }
   | { status: "pending"; hash: Hash }
   | { status: "confirmed"; hash: Hash }
-  | { status: "error"; message: string; hash?: Hash };
+  | ({ status: "error"; hash?: Hash } & AppError);
 
 type Mutability = "nonpayable" | "payable";
 
@@ -61,6 +62,7 @@ const GAS_BUFFER_PERCENT = 110n;
 export function useTxFlow() {
   const config = useConfig();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [state, setState] = useState<TxState>({ status: "idle" });
 
   const run = useCallback(
@@ -99,11 +101,15 @@ export function useTxFlow() {
         await queryClient.invalidateQueries();
         return receipt;
       } catch (error) {
-        setState({ status: "error", message: errorMessage(error), hash });
+        // The toast is what the user sees wherever they've scrolled; `state` keeps the record
+        // beside the button for <TxStatus>.
+        const described = describeError(error);
+        setState({ status: "error", ...described, hash });
+        toast.error(described);
         return null;
       }
     },
-    [config, queryClient],
+    [config, queryClient, toast],
   );
 
   const reset = useCallback(() => setState({ status: "idle" }), []);

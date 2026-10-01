@@ -8,6 +8,7 @@ import { useConnection } from "wagmi";
 import { AssetList } from "@/components/AssetList";
 import { ExpiryCountdown } from "@/components/DealParts";
 import { ConsentNotice, CycleView, IntentStatusBadge, useIntentsTokenInfo } from "@/components/IntentParts";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useIntent, useSettlements } from "@/hooks/usePool";
@@ -18,7 +19,6 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { explorerAddress } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { sameAddress } from "@/lib/deals";
-import { errorMessage } from "@/lib/errors";
 import { formatDate, shortAddress } from "@/lib/format";
 import {
   isLive,
@@ -50,9 +50,7 @@ function IntentDetail({ hash }: { hash: Hex }) {
         </Link>
       </PageHeader>
       {error ? (
-        <EmptyState>
-          <span className="text-danger">Couldn&apos;t load this intent: {errorMessage(error)}</span>
-        </EmptyState>
+        <LoadError title="Couldn&apos;t load this intent" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading intent…</EmptyState>
       ) : !row ? (

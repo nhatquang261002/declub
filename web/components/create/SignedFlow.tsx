@@ -8,6 +8,7 @@ import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
 import { ConsentNotice } from "@/components/IntentParts";
 import { Select } from "@/components/Select";
+import { Alert } from "@/components/Alert";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useIntentReadiness, type NftScope } from "@/hooks/useIntentReadiness";
 import { usePoolInfo } from "@/hooks/usePool";
@@ -151,11 +152,11 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
     <div className="space-y-6">
       <StepHeading title="Review and sign" blurb="Check both sides. You can remove it later, but not edit it." />
       {poolDown && (
-        <p className="rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger" role="alert">
+        <Alert tone="danger" title={pool.mismatch ? "Wrong intent pool" : "Can't reach the intent pool"}>
           {pool.mismatch
             ? `The pool at ${POOL_URL} is for a different chain or contract than this app.`
-            : `Can't reach the intent pool at ${POOL_URL}. Start the matcher, then reload.`}
-        </p>
+            : `Nothing answered at ${POOL_URL}. Start the matcher, then reload.`}
+        </Alert>
       )}
       <div className="grid gap-6 md:grid-cols-2">
         <ReviewCard title="You give" note="Stays in your wallet until a match settles.">

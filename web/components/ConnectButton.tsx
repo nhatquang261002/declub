@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain } from "wagmi";
+import { useToast } from "@/components/Toast";
 import { explorerAddress } from "@/lib/config";
-import { errorMessage } from "@/lib/errors";
 import { shortAddress } from "@/lib/format";
 import { chain } from "@/lib/wagmi";
 
@@ -14,6 +14,18 @@ export function ConnectButton() {
   const disconnect = useDisconnect();
   const switchChain = useSwitchChain();
   const [open, setOpen] = useState(false);
+  const toast = useToast();
+
+  // Wallet failures (no wallet installed, a refused prompt, a failed network switch) toast at the
+  // top of the screen instead of hanging off the button until the next click.
+  const connectError = connect.error;
+  const switchError = switchChain.error;
+  useEffect(() => {
+    if (connectError) toast.error(connectError);
+  }, [connectError, toast]);
+  useEffect(() => {
+    if (switchError) toast.error(switchError);
+  }, [switchError, toast]);
 
   if (status === "connected" && address) {
     if (chainId !== chain.id) {
@@ -122,14 +134,6 @@ export function ConnectButton() {
             </button>
           ))}
         </div>
-      )}
-
-      {connect.error && (
-        <p className="wallet-error">
-          {String(connect.error.name) === "ProviderNotFoundError"
-            ? "No wallet found. Install MetaMask, Rabby or another EVM wallet."
-            : errorMessage(connect.error)}
-        </p>
       )}
     </div>
   );

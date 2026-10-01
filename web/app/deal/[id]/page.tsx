@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useConnection } from "wagmi";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
+import { describeError } from "@/lib/errors";
 import { StatusBadge, DealSide } from "@/components/DealParts";
 import { TraitRequestSummary } from "@/components/TraitRequest";
 import { TxButton, TxStatus } from "@/components/Tx";
@@ -70,6 +72,8 @@ function DealDetail({ id }: { id: bigint }) {
   const isTraitDeal = !!deal?.requestedRoot && !!deal.requestedCount && deal.requestedCount > 0n;
 
   if (isLoading) return <EmptyState>Loading deal…</EmptyState>;
+  // A missing id reverts on-chain; anything else (network, RPC) is a failed load, not a missing deal.
+  if (error && describeError(error).kind !== "reverted") return <LoadError title="Couldn&apos;t load this deal" error={error} />;
   if (error || !deal) return <EmptyState>This deal does not exist.</EmptyState>;
 
   const status = displayStatus(deal, now);

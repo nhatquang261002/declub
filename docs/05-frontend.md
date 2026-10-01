@@ -27,7 +27,10 @@ web/
 │   ├── DealParts.tsx          ✓ StatusBadge · MonPill · DealSide · DealCard · DealGrid
 │   ├── Tabs.tsx                ✓ the one tab bar (`tabbar` / `tab` styles; Pagination reuses them)
 │   ├── Select.tsx              ✓ the one dropdown: accessible listbox, replaces native <select>
-│   ├── Tx.tsx                  ✓ TxButton (shows the tx stage) · TxStatus (error / explorer link)
+│   ├── Tx.tsx                  ✓ TxButton (shows the tx stage) · TxStatus (inline result / explorer link)
+│   ├── Alert.tsx               ✓ the one look for errors and notices (icon, title, message, Details toggle)
+│   ├── Toast.tsx               ✓ ToastProvider + useToast: errors float top-right, below the header
+│   ├── ErrorPanel.tsx          ✓ ErrorPanel / LoadError: a failed load with a Try again button
 │   ├── Page.tsx                ✓ PageHeader · RequireWallet · EmptyState
 │   ├── ChogArt.tsx             ✓ Angel/Devil swap illustration
 │   └── PinnedChog.tsx          ✓ randomized NFT pinboard collage
@@ -256,7 +259,14 @@ idle ─run─► switching-chain? ─► simulating ─► awaiting-signature �
 
 ## Error messages
 
-`lib/errors.ts` walks the viem error chain. It checks, in order: contract revert → copy below, wallet rejection (4001) → "You rejected the request in your wallet.", insufficient funds → "Not enough MON to cover this transaction and gas.", and otherwise viem's `shortMessage`.
+`describeError()` in `lib/errors.ts` walks the viem error chain and returns `{ kind, title, message, details }`. It checks, in order: pool rejection, wallet rejection (4001) → "Request cancelled" (shown as a notice, not a failure), contract revert → copy below, insufficient funds, network/RPC failure, wallet problems (no wallet, failed network switch), and otherwise viem's `shortMessage`. `details` holds the raw cause and only appears behind a "Details" toggle. `errorMessage()` is the one-sentence shortcut.
+
+Where errors show up:
+
+- **Transactions and signatures** (`useTxFlow`, `useSignFlow`): a **toast** at the top of the screen, so a failure is seen wherever the page is scrolled, plus an inline `Alert` beside the button via `TxStatus` as the record.
+- **Failed loads** (deals, history, deal and intent pages): `LoadError`, a panel with a Try again button that refetches. A deal page shows "does not exist" only for a contract revert; network failures get the panel instead.
+- **Wallet connect and network switch**: toasts from `ConnectButton`.
+- **A page that crashes while rendering**: `app/error.tsx` keeps the header and wallet up; `app/global-error.tsx` covers the root layout. Both use the `retry` prop of this Next version (not `reset`).
 
 | Contract error | UI copy |
 |---|---|

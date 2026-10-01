@@ -5,7 +5,9 @@ import { useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
 import { AssetList } from "@/components/AssetList";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
+import { describeError } from "@/lib/errors";
 import { TraitSlotView } from "@/components/TraitFillPanel";
 import { OfferNote, ProposalForm, ProposalList } from "@/components/Proposals";
 import { StatusBadge } from "@/components/DealParts";
@@ -35,7 +37,7 @@ export default function DealV2Page() {
 
 function DealDetailV2({ id }: { id: bigint }) {
   const { address } = useConnection();
-  const { deal, note, traitClauses, isLoading } = useDealV2(id);
+  const { deal, note, traitClauses, isLoading, error } = useDealV2(id);
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
@@ -87,6 +89,9 @@ function DealDetailV2({ id }: { id: bigint }) {
   const credits = useCredits(address, creditAssets);
 
   if (isLoading) return <EmptyState>Loading deal…</EmptyState>;
+  if (!deal && error && describeError(error).kind !== "reverted") {
+    return <LoadError title="Couldn&apos;t load this deal" error={error} />;
+  }
   if (!deal) return <EmptyState>This deal does not exist.</EmptyState>;
 
   const requestedNative = deal.requested.find((a) => a.kind === "native")?.amount ?? 0n;

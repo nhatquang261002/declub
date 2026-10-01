@@ -7,9 +7,10 @@ import { getConnection, readContracts, signTypedData, switchChain } from "wagmi/
 import { useQueryClient } from "@tanstack/react-query";
 import { CHAIN_ID, CHOG_SWAP_INTENTS_ADDRESS } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
-import { errorMessage } from "@/lib/errors";
+import { describeError } from "@/lib/errors";
+import { useToast } from "@/components/Toast";
 import { cancelTypedData, intentHash, intentTypedData, type Intent } from "@/lib/intents";
-import { cancelIntent, listIntents, PoolError, submitIntent } from "@/lib/pool";
+import { cancelIntent, listIntents, submitIntent } from "@/lib/pool";
 import { chain } from "@/lib/wagmi";
 import type { Asset } from "@/lib/assets";
 import type { TxState } from "./useTxFlow";
@@ -49,6 +50,7 @@ export type NewIntent = { give: Asset[]; want: Asset[]; ttlSeconds: number };
 export function useSignFlow() {
   const config = useConfig();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [state, setState] = useState<TxState>({ status: "idle" });
 
   /** Connects the chain, then runs `work` with the connected account. Resolves to null on failure. */
@@ -67,11 +69,13 @@ export function useSignFlow() {
         await queryClient.invalidateQueries();
         return out;
       } catch (error) {
-        setState({ status: "error", message: error instanceof PoolError ? error.message : errorMessage(error) });
+        const described = describeError(error);
+        setState({ status: "error", ...described });
+        toast.error(described);
         return null;
       }
     },
-    [config, queryClient],
+    [config, queryClient, toast],
   );
 
   /** Signs a new intent and posts it. Resolves to its hash, or null (the reason is in `state`). */

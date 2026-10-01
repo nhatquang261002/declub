@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
+import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { Pagination } from "@/components/Pagination";
 import { DealFilterBar, DealTabs, type DealTab } from "@/components/DealListControls";
@@ -9,7 +10,6 @@ import { DealGrid } from "@/components/DealParts";
 import { useNow } from "@/hooks/useNow";
 import { useDeals } from "@/hooks/useDeals";
 import { useDealTraits } from "@/hooks/useTraits";
-import { errorMessage } from "@/lib/errors";
 import {
   DEFAULT_FILTERS,
   applyDealFilters,
@@ -84,9 +84,7 @@ export function DealsV1({ switcher }: { switcher: ReactNode }) {
       />
 
       {error ? (
-        <EmptyState>
-          <span className="text-danger">Couldn&apos;t load deals: {errorMessage(error)}</span>
-        </EmptyState>
+        <LoadError title="Couldn&apos;t load deals" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading deals…</EmptyState>
       ) : shown.length === 0 && filtering ? (

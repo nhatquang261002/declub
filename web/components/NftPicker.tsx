@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getAddress, isAddress, type Address } from "viem";
+import { Alert } from "@/components/Alert";
 import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedTokenIds, useTokenOwner, useTokenViews } from "@/hooks/useCollection";
 import { useMarketCollections } from "@/hooks/useMarketCollections";
 import { collectionLabel, featuredCollections, isFeatured, recentCollections, type CollectionInfo } from "@/lib/collections";
@@ -192,9 +193,9 @@ function PastedCollection({ address, onSelect }: { address: Address; onSelect: (
   if (isLoading || !info) return <p className="text-sm text-muted">Reading the contract…</p>;
   if (!info.isErc721) {
     return (
-      <p className="text-sm text-danger" role="alert">
-        {shortAddress(address)} doesn&apos;t answer as an NFT collection (ERC-721). Check the address and the network.
-      </p>
+      <Alert tone="danger" title="Not an NFT collection">
+        {shortAddress(address)} doesn&apos;t answer as an ERC-721 collection. Check the address and the network.
+      </Alert>
     );
   }
   return (
@@ -242,7 +243,9 @@ function TokenStep({
       </div>
 
       {info && !info.isErc721 ? (
-        <p className="text-sm text-danger" role="alert">That contract isn&apos;t an NFT collection. Change the collection.</p>
+        <Alert tone="danger" title="Not an NFT collection">
+          That contract isn&apos;t an ERC-721 collection. Change the collection.
+        </Alert>
       ) : mine ? (
         <OwnedGrid collection={collection} owner={owner} enumerable={enumerable} taken={taken} selected={selected} onToggle={onToggle} room={room} />
       ) : (

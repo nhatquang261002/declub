@@ -1,9 +1,12 @@
 import {
   BaseError,
   ContractFunctionRevertedError,
+  HttpRequestError,
   InsufficientFundsError,
+  TimeoutError,
   UserRejectedRequestError,
 } from "viem";
+import { PoolError } from "./pool";
 
 // Contract error name → UI copy. Kept in sync with docs/05-frontend.md#error-messages.
 const COPY: Record<string, string> = {
@@ -50,28 +53,100 @@ const COPY: Record<string, string> = {
   InvalidQuantity: "Mint between 1 and 20 at a time.",
 };
 
-/** Turns anything thrown by wagmi/viem into one readable sentence. */
+export type ErrorKind = "rejected" | "funds" | "reverted" | "network" | "wallet" | "pool" | "unknown";
+
+/** An error shaped for the UI: a short title, one readable sentence, and the raw cause for the curious. */
+export type AppError = {
+  kind: ErrorKind;
+  title: string;
+  message: string;
+  /** Technical detail behind `message`; shown behind a "Details" toggle, never as the headline. */
+  details?: string;
+};
+
+const WALLET_ERRORS = new Set([
+  "ProviderNotFoundError",
+  "ConnectorNotConnectedError",
+  "ConnectorAlreadyConnectedError",
+  "ChainNotConfiguredError",
+  "SwitchChainError",
+]);
+
+const MAX_DETAILS = 600;
+const clip = (text: string) => (text.length > MAX_DETAILS ? `${text.slice(0, MAX_DETAILS)}…` : text);
+
+function rawMessage(error: unknown): string {
+  if (error instanceof BaseError) return error.message;
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Turns anything thrown by wagmi/viem/the pool into a title, one readable sentence and optional details. */
+export function describeError(error: unknown): AppError {
+  const raw = rawMessage(error);
+  const details = (message: string) => (raw && raw !== message ? clip(raw) : undefined);
+
+  if (error instanceof PoolError) {
+    return { kind: "pool", title: "Intent pool refused this", message: error.message, details: `Pool code: ${error.code}` };
+  }
+
+  const rejected =
+    (error as { code?: number } | null)?.code === 4001 ||
+    (error instanceof BaseError &&
+      error.walk((e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001));
+  if (rejected) {
+    return { kind: "rejected", title: "Request cancelled", message: "You rejected the request in your wallet. Nothing was sent." };
+  }
+
+  if (error instanceof BaseError) {
+    const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
+    if (reverted instanceof ContractFunctionRevertedError) {
+      const name = reverted.data?.errorName;
+      const message =
+        (name && COPY[name]) ||
+        (name ? `The contract rejected this (${name}).` : (reverted.reason ?? "The contract rejected this transaction."));
+      return {
+        kind: "reverted",
+        title: "This can't go through",
+        message,
+        details: name ? `Contract error: ${name}` : details(message),
+      };
+    }
+
+    if (error.walk((e) => e instanceof InsufficientFundsError)) {
+      const message = "Not enough MON to cover this transaction and gas.";
+      return { kind: "funds", title: "Not enough MON", message, details: details(message) };
+    }
+
+    if (error.walk((e) => e instanceof HttpRequestError || e instanceof TimeoutError)) {
+      const message = "Couldn't reach the Monad network. Check your connection and try again.";
+      return { kind: "network", title: "Network problem", message, details: details(message) };
+    }
+  }
+
+  if (error instanceof Error && WALLET_ERRORS.has(error.name)) {
+    const message =
+      error.name === "ProviderNotFoundError"
+        ? "No wallet found. Install MetaMask, Rabby or another EVM wallet."
+        : error.name === "ChainNotConfiguredError" || error.name === "SwitchChainError"
+          ? "Your wallet couldn't switch to the right network. Switch it manually and try again."
+          : error.message;
+    return { kind: "wallet", title: "Wallet problem", message, details: details(message) };
+  }
+
+  if (/connect a wallet/i.test(raw)) {
+    return { kind: "wallet", title: "Wallet not connected", message: "Connect your wallet to continue." };
+  }
+
+  if (/failed to fetch|fetch failed|networkerror|load failed/i.test(raw)) {
+    const message = "Couldn't reach the server. Check your connection and try again.";
+    return { kind: "network", title: "Network problem", message, details: details(message) };
+  }
+
+  const message = error instanceof BaseError ? error.shortMessage || error.message : raw;
+  return { kind: "unknown", title: "Something went wrong", message, details: details(message) };
+}
+
+/** Just the one readable sentence from `describeError`. */
 export function errorMessage(error: unknown): string {
-  if (!(error instanceof BaseError)) {
-    return error instanceof Error ? error.message : String(error);
-  }
-
-  const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
-  if (reverted instanceof ContractFunctionRevertedError) {
-    const name = reverted.data?.errorName;
-    if (name && COPY[name]) return COPY[name];
-    if (name) return `The contract rejected this (${name}).`;
-    return reverted.reason ?? "The contract rejected this transaction.";
-  }
-
-  const rejected = error.walk(
-    (e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001,
-  );
-  if (rejected) return "You rejected the request in your wallet.";
-
-  if (error.walk((e) => e instanceof InsufficientFundsError)) {
-    return "Not enough MON to cover this transaction and gas.";
-  }
-
-  return error.shortMessage || error.message;
+  return describeError(error).message;
 }
