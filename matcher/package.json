@@ -1,0 +1,22 @@
+{
+  "name": "matcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Off-chain intent pool and local matcher for ChogSwapIntents (ADR 0008, 0009)",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "viem": "^2.56.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "^5"
+  }
+}

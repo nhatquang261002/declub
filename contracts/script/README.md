@@ -53,3 +53,17 @@ deployments and local Anvil (`chainid == 31337`) for tests; it will revert on ma
 The broadcast log for testnet goes to
 `broadcast/Deploy.s.sol/10143/run-latest.json`. Commit it so there's a record of the
 deployed addresses. Local (31337) runs and dry runs are gitignored.
+
+## `DeployIntents.s.sol`
+
+Deploys `ChogSwapIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)). It takes no arguments and needs no mock tokens: the existing mUSD and Chog collection work with it. A dry run estimates about **2.05M gas, roughly 0.42 MON**.
+
+```bash
+cd contracts
+forge script script/DeployIntents.s.sol --rpc-url monad_testnet            # dry run
+
+forge script script/DeployIntents.s.sol --rpc-url monad_testnet --account deployer --broadcast \
+  --verify --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/
+```
+
+It prints `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS=…` for the root `.env`, which the matcher and (later) the app read.

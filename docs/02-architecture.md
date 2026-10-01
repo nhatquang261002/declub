@@ -56,6 +56,10 @@ The full spec is in [03 · Contract Design](03-contract-design.md) and the inter
 
 Next.js + wagmi + viem + Tailwind. It talks to the chain directly and has no backend in v1. See [05 · Frontend](05-frontend.md).
 
+### Intent pool and matcher (`matcher/`)
+
+A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)), and the first backend in the project. The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `ChogSwapIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key, and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
+
 ### Indexer (deferred)
 
 Not in v1. The frontend reads trades straight from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks. Add an indexer when loading gets slow, when search and filters are needed, or to show who filled public trades. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
@@ -104,6 +108,7 @@ Anyone ─ reclaimExpired(id) ─► same refund path, only if expired
 chog-swap/
 ├── docs/          ← you are here
 ├── contracts/     Foundry: src/, test/, script/, lib/ (forge install)
+├── matcher/       Node: intent pool (HTTP + sqlite) and local matcher (Phase 4)
 └── web/           Next.js app: app/ (routes), components/, hooks/, lib/ (Phase 2)
 ```
 

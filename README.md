@@ -28,9 +28,10 @@ See the [roadmap](docs/06-roadmap.md).
 | ChogSwap | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
 | MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
 | ChogSwapV2 | [`0x73591F76d7deE66F683A979cEffb4356982EE1bB`](https://testnet.monadvision.com/address/0x73591F76d7deE66F683A979cEffb4356982EE1bB) | 67163690 |
+| ChogSwapIntents | [`0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2`](https://testnet.monadvision.com/address/0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2) | 67194397 |
 | MockERC20 (mUSD) | [`0xd300f095f456D59AAc122B0100833fE195136F6c`](https://testnet.monadvision.com/address/0xd300f095f456D59AAc122B0100833fE195136F6c) | 66874652 |
 
-All four are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait requests and open offers; the earlier V2 at `0x8a05…CC75` (block 66874644) is superseded, and mUSD is shared. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction records: [`Deploy.s.sol`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) (v1) and [`DeployV2.s.sol`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) (V2).
+All five are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait requests and open offers; the earlier V2 at `0x8a05…CC75` (block 66874644) is superseded, and mUSD is shared. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction records: [`Deploy.s.sol`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) (v1) [`DeployV2.s.sol`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) (V2) and [`DeployIntents.s.sol`](contracts/broadcast/DeployIntents.s.sol/10143/run-latest.json) (intents; the matcher in [`matcher/`](matcher/README.md) settles through it).
 
 ## Repo map
 
@@ -44,6 +45,7 @@ All four are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait 
 | [`docs/06-roadmap.md`](docs/06-roadmap.md)                 | Phase checklist and open questions                                                  |
 | [`docs/adr/`](docs/adr/)                                   | Architecture decision records                                                       |
 | [`contracts/`](contracts/)                                 | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
+| [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |
 | [`web/`](web/)                                             | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md))    |
 
 ## Stack
@@ -66,6 +68,11 @@ forge coverage --report summary --no-match-coverage "(test|script)"
 ```
 
 To deploy to Monad testnet, see [`contracts/script/README.md`](contracts/script/README.md).
+
+```bash
+# Intent pool and matcher (needs Node 24+; the tests also need anvil and `forge build`)
+cd matcher && npm install && npm test
+```
 
 ```bash
 # Frontend (defaults to the testnet deployment above)

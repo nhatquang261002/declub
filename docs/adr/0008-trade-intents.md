@@ -1,6 +1,6 @@
 # ADR 0008: Signed trade intents and an off-chain matcher
 
-**Status:** Accepted · 2026-10-01 · Phase 4. Open questions settled below. `ChogSwapIntents` is implemented and tested (65 tests, 100% coverage); not deployed. The pool and matcher are not built yet. [ADR 0009](0009-ring-swaps.md) builds on this one and shares its contract.
+**Status:** Accepted · 2026-10-01 · Phase 4. Open questions settled below. `ChogSwapIntents` is implemented and tested (65 tests, 100% coverage) and deployed to Monad testnet (see the README). The pool and local matcher are built and tested in [`matcher/`](../../matcher/README.md); the frontend is not. [ADR 0009](0009-ring-swaps.md) builds on this one and shares its contract.
 
 ## Context
 
