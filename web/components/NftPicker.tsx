@@ -5,7 +5,8 @@ import { getAddress, isAddress, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedTokenIds, useTokenOwner, useTokenViews } from "@/hooks/useCollection";
 import { useMarketCollections } from "@/hooks/useMarketCollections";
-import { collectionLabel, featuredCollections, isFeatured, recentCollections, type CollectionInfo } from "@/lib/collections";
+import { collectionLabel, featuredCollections, isFeatured, type CollectionInfo } from "@/lib/collections";
+import { useRecentCollections } from "@/hooks/useRecentCollections";
 import { shortAddress } from "@/lib/format";
 
 const PAGE = 12;
@@ -104,17 +105,18 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
 function CollectionStep({ onSelect }: { onSelect: (address: Address) => void }) {
   const [query, setQuery] = useState("");
   const market = useMarketCollections();
+  const recents = useRecentCollections();
   const text = query.trim();
   const pasted = isAddress(text) ? getAddress(text) : null;
 
-  // Featured first, then what this browser used, then what open deals use. One list, no repeats.
+  // Featured first, then what you used lately, then what open deals use. One list, no repeats.
   const sources = useMemo(() => {
     const out = new Map<string, "Featured" | "Recent" | "In open deals">();
     featuredCollections().forEach((a) => out.set(a.toLowerCase(), "Featured"));
-    recentCollections().forEach((a) => !out.has(a.toLowerCase()) && out.set(a.toLowerCase(), "Recent"));
+    recents.forEach((a) => !out.has(a.toLowerCase()) && out.set(a.toLowerCase(), "Recent"));
     market.forEach((a) => !out.has(a.toLowerCase()) && out.set(a.toLowerCase(), "In open deals"));
     return out;
-  }, [market]);
+  }, [market, recents]);
   const candidates = useMemo(() => [...sources.keys()].map((a) => getAddress(a)), [sources]);
   const { infos, isLoading } = useCollectionInfos(candidates);
 

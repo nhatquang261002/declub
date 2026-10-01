@@ -9,7 +9,7 @@ import { ListingGrid } from "@/components/IntentParts";
 import { DealGrid } from "@/components/DealParts";
 import { Tabs } from "@/components/Tabs";
 import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
-import { useLocalFills } from "@/hooks/useLocalFills";
+import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useDeals } from "@/hooks/useDeals";
@@ -44,17 +44,17 @@ export default function HistoryPage() {
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
   const v2Deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
   const { info } = useDealsTokenInfo(v2Deals);
-  // Fills are remembered per contract, so each version reads its own record.
-  const v1Fills = useLocalFills(address, CHOG_SWAP_ADDRESS);
-  const v2Fills = useLocalFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
+  // Fills are kept per contract, so each version reads its own record.
+  const v1Fills = useFills(address, CHOG_SWAP_ADDRESS);
+  const v2Fills = useFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
   const { error } = isV2 ? v2 : v1;
   const isLoading = (isV2 ? v2.isLoading || signed.isLoading : v1.isLoading) && !error;
   const deals: Array<Deal | DealV2> = isV2 ? v2Deals : v1.deals;
-  const localFillIds = isV2 ? v2Fills.ids : v1Fills.ids;
+  const fillIds = isV2 ? v2Fills.ids : v1Fills.ids;
 
   const walletDeals = useMemo(
-    () => deals.filter((deal) => isWalletDeal(deal, address, localFillIds)),
-    [address, localFillIds, deals],
+    () => deals.filter((deal) => isWalletDeal(deal, address, fillIds)),
+    [address, fillIds, deals],
   );
   const statuses = useMemo(
     () => walletDeals.map((deal) => displayStatus(deal, now)),
@@ -151,11 +151,11 @@ export default function HistoryPage() {
   );
 }
 
-function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, localFillIds: readonly bigint[]) {
+function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
   return !!address
     && (sameAddress(deal.maker, address)
       || sameAddress(deal.taker, address)
-      || localFillIds.some((id) => id === deal.id));
+      || fillIds.some((id) => id === deal.id));
 }
 
 function filterStatus(filter: Exclude<HistoryFilter, "all">): DisplayStatus {

@@ -20,6 +20,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { describeError, type AppError } from "@/lib/errors";
 import { useToast } from "@/components/Toast";
+import { mayFill, reportFill } from "@/lib/fillReport";
 import { chain } from "@/lib/wagmi";
 
 // idle → simulating → awaiting-signature → pending → confirmed
@@ -98,6 +99,8 @@ export function useTxFlow() {
         if (receipt.status !== "success") throw new Error("The transaction reverted on-chain.");
 
         setState({ status: "confirmed", hash });
+        // History needs the filler on record before it refetches (lib/fillReport.ts).
+        if (mayFill(call)) await reportFill(hash);
         await queryClient.invalidateQueries();
         return receipt;
       } catch (error) {

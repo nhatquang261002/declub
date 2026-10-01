@@ -38,3 +38,10 @@ export const ClockIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5"
 export const SwapIcon = (p: P) => (<Icon {...p}><path d="M5 8h13l-3-3" /><path d="M19 16H6l3 3" /></Icon>);
 export const PauseIcon = (p: P) => (<Icon {...p}><path d="M9 6v12M15 6v12" /></Icon>);
 export const CrossIcon = (p: P) => (<Icon {...p}><path d="M6 6l12 12M18 6 6 18" /></Icon>);
+
+/** The X logo. Filled rather than stroked, so it doesn't use the shared stroke icon frame. */
+export const XLogoIcon = ({ className = "size-3" }: P) => (
+  <svg aria-hidden="true" className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" />
+  </svg>
+);

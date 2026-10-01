@@ -19,7 +19,8 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { explorerAddress } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { sameAddress } from "@/lib/deals";
-import { formatDate, shortAddress } from "@/lib/format";
+import { Who } from "@/components/Who";
+import { formatDate } from "@/lib/format";
 import {
   isLive,
   nonceBit,
@@ -110,9 +111,12 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
       <section className="page-section p-4">
         <dl className="space-y-1.5 text-sm">
           <Row label="Maker">
-            <a href={explorerAddress(intent.maker)} target="_blank" rel="noreferrer" className="font-mono underline">
-              {mine ? `you (${shortAddress(intent.maker)})` : shortAddress(intent.maker)}
-            </a>
+            <span className="inline-flex flex-wrap items-baseline gap-x-2">
+              <Who address={intent.maker} mine={mine} />
+              <a href={explorerAddress(intent.maker)} target="_blank" rel="noreferrer" className="text-xs underline">
+                explorer ↗
+              </a>
+            </span>
           </Row>
           <Row label="Deadline">{formatDate(intent.deadline)}</Row>
           <Row label="Nonce">{intent.nonce.toString()}</Row>

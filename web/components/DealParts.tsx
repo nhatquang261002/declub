@@ -3,11 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { formatMon, shortAddress } from "@/lib/format";
+import { formatMon } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { TraitFilter } from "@/lib/traitRequests";
 import { ChogThumb } from "./Chog";
 import { TraitRequestSummary } from "./TraitRequest";
+import { Who } from "./Who";
 
 const BADGE: Record<DisplayStatus, string> = {
   open: "bg-mint/15 text-mint",
@@ -169,11 +170,11 @@ export function DealCardFrame({
       <SwapPanels gives={gives} wants={wants} />
 
       <div className="mt-4 text-xs text-muted">
-        by <span className="font-mono">{mine ? "you" : shortAddress(deal.maker)}</span>
+        by <Who address={deal.maker} mine={mine} plain />
         {deal.taker && !forMe && (
           <>
             {" "}
-            · only <span className="font-mono">{shortAddress(deal.taker)}</span> can accept
+            · only <Who address={deal.taker} plain /> can accept
           </>
         )}
       </div>

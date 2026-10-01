@@ -13,9 +13,9 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
 import { toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
-import { shortAddress } from "@/lib/format";
 import type { ProposalStatus, ProposalV2 } from "@/lib/proposals";
 import { sameAddress } from "@/lib/deals";
+import { Who } from "@/components/Who";
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
@@ -116,7 +116,7 @@ function ProposalRow({
           {proposal.status}
         </span>
         <span className="ml-auto text-xs text-muted">
-          from <span className="font-mono">{mine ? "you" : shortAddress(proposal.proposer)}</span>
+          from <Who address={proposal.proposer} mine={mine} />
         </span>
       </div>
       <AssetList assets={proposal.assets} info={info} />

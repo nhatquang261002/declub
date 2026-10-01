@@ -48,26 +48,45 @@ export const isFeatured = (address: string) =>
 
 // ─────────────────────────────────────────────────────────────── Recently used
 
-const RECENT_KEY = "ondeal:recent-collections";
+export const RECENT_KEY = "ondeal:recent-collections";
+/** Fired on this tab after the list changes; other tabs get the browser's own `storage` event. */
+export const RECENT_EVENT = "chogswap:recents";
 const RECENT_MAX = 8;
 
-/** Storage can be blocked or full; the picker works without it. */
-export function recentCollections(): Address[] {
+/** The saved list as stored. Storage can be blocked or full; the picker works without it. */
+export function readRecentRaw(): string {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
-    return Array.isArray(raw) ? raw.filter((a): a is string => typeof a === "string" && isAddress(a)).map((a) => getAddress(a)) : [];
+    return localStorage.getItem(RECENT_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+/** Collection addresses from a stored list, newest first. Anything that isn't an address is dropped. */
+export function parseRecent(raw: string): Address[] {
+  try {
+    const list: unknown = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((a): a is string => typeof a === "string" && isAddress(a)).map((a) => getAddress(a)) : [];
   } catch {
     return [];
   }
 }
 
-export function rememberCollection(address: Address) {
+export const recentCollections = (): Address[] => parseRecent(readRecentRaw());
+
+/** Puts `addresses` (newest first, no repeats) at the front of the saved list. */
+export function saveRecent(addresses: readonly Address[]): Address[] {
+  const seen = new Set<string>();
+  const next = [...addresses, ...recentCollections()]
+    .filter((a) => !seen.has(a.toLowerCase()) && !!seen.add(a.toLowerCase()))
+    .slice(0, RECENT_MAX);
   try {
-    const next = [address, ...recentCollections().filter((a) => a.toLowerCase() !== address.toLowerCase())];
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next.slice(0, RECENT_MAX)));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event(RECENT_EVENT));
   } catch {
     // Not remembering is fine.
   }
+  return next;
 }
 
 // ─────────────────────────────────────────────────────────────── Images

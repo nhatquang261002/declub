@@ -7,7 +7,8 @@ import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
 import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
 import { newRow, type DraftRow } from "@/lib/assetDraft";
 import type { TokenInfo } from "@/lib/assets";
-import { collectionLabel, rememberCollection } from "@/lib/collections";
+import { collectionLabel } from "@/lib/collections";
+import { useRememberCollection } from "@/hooks/useRecentCollections";
 import { shortAddress } from "@/lib/format";
 
 const KIND_LABEL = { native: "MON", erc20: "Token", erc721: "NFT" } as const;
@@ -34,6 +35,7 @@ type Props = {
 export function AssetEditor({ title, hint, rows, onChange, info, allowNative = true, amountIsMinimum = false, owner }: Props) {
   // `replace` is the row being changed; `collection` starts the picker inside one collection.
   const [picker, setPicker] = useState<{ replace?: string; collection?: Address } | null>(null);
+  const rememberCollection = useRememberCollection();
   const update = (key: string, patch: Partial<DraftRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const full = rows.length >= MAX_TOKENS_PER_SIDE;

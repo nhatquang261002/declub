@@ -13,7 +13,7 @@ import { OfferNote, ProposalForm, ProposalList } from "@/components/Proposals";
 import { StatusBadge } from "@/components/DealParts";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
-import { useLocalFills } from "@/hooks/useLocalFills";
+import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
 import { useProposalsV2 } from "@/hooks/useProposalsV2";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
@@ -22,6 +22,7 @@ import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
+import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
 import { isOpenOffer } from "@/lib/dealsV2";
 import { displayStatus, sameAddress } from "@/lib/deals";
@@ -41,8 +42,8 @@ function DealDetailV2({ id }: { id: bigint }) {
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
-  // History can't see who filled a public deal without an indexer, so remember this browser's fills.
-  const { record } = useLocalFills(address, swapV2!.address);
+  // History needs to know which public deals this wallet filled (hooks/useFills.ts).
+  const { record } = useFills(address, swapV2!.address);
 
   // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
   const openOffer = !!deal && isOpenOffer(deal);
@@ -135,10 +136,10 @@ function DealDetailV2({ id }: { id: bigint }) {
               </div>
             </div>
           )}
-          <div className="text-sm text-muted">Created by <span className="font-mono">{deal.maker}</span></div>
+          <div className="text-sm text-muted">Created by <Who address={deal.maker} full /></div>
           <div className="text-sm text-muted">
             {deal.expiry === 0n ? "No expiry" : `Expires ${formatDate(deal.expiry)}`}
-            {deal.taker && <> · private offer for <span className="font-mono">{deal.taker}</span></>}
+            {deal.taker && <> · private offer for <Who address={deal.taker} full /></>}
           </div>
         </div>
 

@@ -8,9 +8,9 @@ import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
 import { explorerTx } from "@/lib/config";
 import { sameAddress } from "@/lib/deals";
-import { shortAddress } from "@/lib/format";
 import type { DealV2 } from "@/lib/dealsV2";
 import { SETTLEMENT_GUIDE } from "@/lib/settlementTerms";
+import { Who } from "@/components/Who";
 import {
   isLive,
   isSignedListing,
@@ -75,7 +75,7 @@ export function IntentCard({ row, now, me, info }: { row: PoolIntent; now: numbe
         wants={<AssetSide assets={row.intent.want} info={info} />}
       />
       <div className="mt-4 text-xs text-muted">
-        by <span className="font-mono">{mine ? "you" : shortAddress(row.intent.maker)}</span>
+        by <Who address={row.intent.maker} mine={mine} plain />
         {why && <span className="text-warn"> · {why}</span>}
       </div>
     </Link>
@@ -124,7 +124,7 @@ function Maker({ address, me }: { address: string; me?: string }) {
   return sameAddress(address, me) ? (
     <span className="font-semibold text-white">you</span>
   ) : (
-    <span className="font-mono">{shortAddress(address)}</span>
+    <Who address={address} />
   );
 }
 

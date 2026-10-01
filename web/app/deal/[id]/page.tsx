@@ -12,12 +12,13 @@ import { TraitRequestSummary } from "@/components/TraitRequest";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useChogApproval } from "@/hooks/useChogApproval";
 import { useChogOwners, useOwnedChogMetadata } from "@/hooks/useChogs";
-import { useLocalFills } from "@/hooks/useLocalFills";
+import { useFills } from "@/hooks/useFills";
 import { useDeal } from "@/hooks/useDeal";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { useNow } from "@/hooks/useNow";
 import { displayStatus, sameAddress } from "@/lib/deals";
 import { Select } from "@/components/Select";
+import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
 import { chog, swap } from "@/lib/contracts";
 import { buildMerkleSet } from "@/lib/merkle";
@@ -36,7 +37,7 @@ function DealDetail({ id }: { id: bigint }) {
   const { isApproved, approveCall } = useChogApproval(address);
   const { owners } = useChogOwners(deal?.requestedIds ?? []);
   const { entries: ownedEntries } = useOwnedChogMetadata(address);
-  const { record } = useLocalFills(address);
+  const { record } = useFills(address);
   const [traitType, setTraitType] = useState("");
   const [traitValue, setTraitValue] = useState("");
 
@@ -137,7 +138,7 @@ function DealDetail({ id }: { id: bigint }) {
               </div>
               : <DealSide ids={deal.requestedIds} mon={deal.requestedMon} />}
           </div>
-          <div className="text-sm text-muted">Created by <span className="font-mono">{deal.maker}</span></div>
+          <div className="text-sm text-muted">Created by <Who address={deal.maker} full /></div>
           <div className="text-sm text-muted">{deal.expiry === 0n ? "No expiry" : `Expires ${formatDate(deal.expiry)}`}</div>
         </div>
         <div className="card space-y-3 p-5">

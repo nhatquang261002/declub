@@ -16,7 +16,7 @@ The app connects injected wallets only. Anyone without MetaMask or Rabby can't u
   - Several linked wallets: `/account` shows which one is in use and switches between connected ones.
 - **Embedded wallets are opt-in** (`NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true`, and enabled in the Privy dashboard). Off by default, so nobody is given a wallet they didn't bring. When on, a social sign-in with no wallet creates one.
 - **wagmi stays the interface.** `@privy-io/wagmi` swaps the config and provider; every `useReadContract`, `useWriteContract` and `useSignTypedData` call is unchanged. Embedded wallets are EOAs, so EIP-712 intents and the contracts' `msg.sender` assumptions hold as before.
-- **Linked accounts** live on `/account`: link or unlink email, Google, X, Discord and extra wallets, and export the embedded wallet's key. Linking is for sign-in and recovery. **Nothing is shown to other traders**: showing a maker's verified handle needs a server that maps address to Privy user, which this ADR does not add. That belongs with the reputation work.
+- **Linked accounts** live on `/account`: link or unlink email, Google, X, Discord and extra wallets, and export the embedded wallet's key. Linking is for sign-in and recovery. **Nothing is shown to other traders** by this ADR: showing a maker's verified handle needs a server that maps address to Privy user. That is [ADR 0011](0011-verified-profiles.md).
 - **Chain:** Monad testnet is passed as Privy's `defaultChain` and only supported chain.
 
 ## Consequences

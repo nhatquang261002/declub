@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConnection } from "wagmi";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
 import {
@@ -10,12 +10,19 @@ import {
   sortNotifications,
   type AppNotification,
 } from "@/lib/notifications";
+import { loadState, saveState } from "@/lib/userState";
+import { useAccessToken } from "./useAccessToken";
 import { useNow } from "./useNow";
 import { useDeals } from "./useDeals";
 import { useIntents } from "./usePool";
 
-// Notifications are derived from deal state (lib/notifications.ts). All that is stored is
-// which ones this browser has already seen, and whether the user wants browser alerts.
+// Notifications are derived from deal state (lib/notifications.ts). All that is stored is which
+// ones have already been seen, and whether the user wants browser alerts.
+//
+// Seen markers live in this browser, and, signed in with Privy, on the server too (ADR 0012), so
+// reading a notification on one device clears it on the next. They only ever grow, so the two
+// copies are merged by union and neither can lose a mark. Whether to show browser alerts stays
+// per browser: it is that browser's own permission.
 
 const EVENT = "chogswap:notifications";
 const scope = `${CHAIN_ID}:${CHOG_SWAP_ADDRESS}`;
@@ -83,21 +90,72 @@ export function useNotifications() {
   const alertsRaw = useSyncExternalStore(subscribe, () => readStore(ALERTS_KEY), () => "");
   const read = useMemo(() => parseKeys(raw), [raw]);
 
+  // The server's copy for this wallet, folded in once per sign-in. Until it has been, a wallet
+  // that has never been opened here must not be seeded: the other device may already have done it.
+  const getToken = useAccessToken();
+  const getTokenRef = useRef(getToken);
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  });
+  const signedIn = !!getToken;
+  const [syncedFor, setSyncedFor] = useState<string>();
+  const waiting = signedIn && !!address && syncedFor !== address.toLowerCase();
+
+  useEffect(() => {
+    const token = getTokenRef.current;
+    if (!address || !token) return;
+    let cancelled = false;
+    (async () => {
+      const remote = await loadState(token, address);
+      if (cancelled) return;
+      if (remote.enabled) {
+        const stored = readStore(readKey(address));
+        const mine = parseKeys(stored);
+        const merged = new Set([...mine, ...remote.seen]);
+        // Never opened here but opened elsewhere: take the server's list, even if it is empty.
+        if (merged.size !== mine.size || (stored === "" && remote.initialized)) {
+          writeStore(readKey(address), JSON.stringify([...merged]));
+        }
+        const theirs = new Set(remote.seen);
+        const up = [...mine].filter((key) => !theirs.has(key));
+        const needsInit = stored !== "" && !remote.initialized;
+        if (up.length > 0 || needsInit) {
+          void saveState(token, { account: address, seen: up, ...(needsInit ? { initialized: true as const } : {}) });
+        }
+      }
+      setSyncedFor(address.toLowerCase());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [address, signedIn]);
+
+  const pushSeen = useCallback(
+    (keys: string[], initialized?: true) => {
+      const token = getTokenRef.current;
+      if (token && address) void saveState(token, { account: address, seen: keys, initialized });
+    },
+    [address],
+  );
+
   // First visit for this wallet: accepted deals and settled intents from before now are history,
   // not news. Actionable items (direct offers, reclaims, paused intents) stay unread.
   const seeded = raw !== "";
   useEffect(() => {
-    if (!address || isLoading || seeded) return;
+    if (!address || isLoading || seeded || waiting) return;
     const past = notifications.filter((n) => !n.actionable && NEWS_KINDS.includes(n.kind)).map((n) => n.key);
     writeStore(readKey(address), JSON.stringify(past));
-  }, [address, isLoading, seeded, notifications]);
+    pushSeen(past, true);
+  }, [address, isLoading, seeded, waiting, notifications, pushSeen]);
 
   const persist = useCallback(
     (keys: Iterable<string>) => {
       if (!address) return;
-      writeStore(readKey(address), JSON.stringify([...new Set(keys)]));
+      const next = [...new Set(keys)];
+      writeStore(readKey(address), JSON.stringify(next));
+      pushSeen(next.filter((key) => !read.has(key)));
     },
-    [address],
+    [address, read, pushSeen],
   );
   const markRead = useCallback((key: string) => persist([...read, key]), [persist, read]);
   const markAllRead = useCallback(

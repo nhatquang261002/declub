@@ -4,9 +4,9 @@ import { useCallback, useSyncExternalStore } from "react";
 import type { Address } from "viem";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
 
-// Who filled a public deal is only recorded in the TradeFilled event, and the public RPC
-// can't scan logs from the deploy block (100-block cap). Until an indexer exists
-// (ADR 0003), remember the deals this browser filled.
+// This browser's own record of the deals it filled. It is History's data only when the server
+// store is off (ADR 0012, hooks/useFills.ts): who filled a public deal is recorded only in the
+// TradeFilled event, and the public RPC can't scan logs from the deploy block (100-block cap).
 
 const EVENT = "chogswap:fills";
 const key = (contract: string, account: string) =>
