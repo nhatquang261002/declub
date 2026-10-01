@@ -1,6 +1,6 @@
 # ADR 0006: Trait requests in ChogSwapV2 as a fourth asset type
 
-**Status:** Accepted, implemented, not deployed · 2026-09-30 · Phase 4. Contract, tests (31, 100% coverage of `ChogSwapV2`) and frontend are in the repo. It needs a redeploy of `ChogSwapV2` (together with ADR 0007's open offers) and `NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS` pointed at it. An earlier draft of this ADR was prototyped and taken out; this version adds the on-chain spec, several traits per request, and a scan that works for any collection.
+**Status:** Accepted, implemented, deployed (`ChogSwapV2` `0x7359…E1bB`, block 67163690) · 2026-09-30 · Phase 4. Contract, tests (31, 100% coverage of `ChogSwapV2`) and frontend are in the repo. It shipped in the same redeploy as ADR 0007's open offers. An earlier draft of this ADR was prototyped and taken out; this version adds the on-chain spec, several traits per request, and a scan that works for any collection.
 
 ## Context
 
