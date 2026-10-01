@@ -276,3 +276,18 @@ _payout(to, asset):                      // never reverts
 
 Create **2.2M**, fill **0.9M**. A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
 
+## ChogSwapIntents (Phase 4)
+
+A third contract beside `ChogSwap` and `ChogSwapV2`: settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)). Spec in `src/interfaces/IChogSwapIntents.sol`.
+
+- `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents; `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
+- `invalidateNonces(word, mask)`: Permit2-style unordered nonces, so a maker can have many live intents and cancel any one.
+- Signatures: EIP-712 (`ChogSwapIntents`, version `1`), ECDSA or ERC-1271; malleable signatures are refused.
+- ERC-20 only moves if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert, as in V2); NFTs are checked with `ownerOf`.
+- Only `ERC20` and `ERC721` assets. Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
+- The contract never holds an asset, has no `receive()`, no admin and no fee.
+
+### Gas (worst case: 4 makers × 10 NFTs each way)
+
+`settle` costs **3.3M gas** (`test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M, a three-way ring about 0.5M.
+

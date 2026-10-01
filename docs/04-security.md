@@ -159,3 +159,26 @@ contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook
 
 `forge test --match-path "test/v2/*"` runs 84 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapV2.sol` is 100% of lines, statements, branches and functions.
 
+## ChogSwapIntents
+
+[ADR 0008](adr/0008-trade-intents.md) and [0009](adr/0009-ring-swaps.md). Standing approvals make this contract more sensitive than the escrow ones, so it has no admin, no arbitrary calls and no way to move an asset without a valid unexpired signature from its owner.
+
+```text
+contracts/test/intents/
+├── ChogSwapIntentsBase.sol          fixture: 4 wallets with keys, Chogs and ERC-20s; intent and signing helpers
+├── ChogSwapIntents.settle.t.sol     pairs, surplus, 10-asset swaps, rings of 2–4, rotation, events
+├── ChogSwapIntents.reverts.t.sol    every error, want coverage, moved/revoked assets, atomic failure, per-token NFT approvals
+├── ChogSwapIntents.signatures.t.sol EIP-712 digest checked against the spec, wrong key/contract/chain, malleability, ERC-1271 wallets
+├── ChogSwapIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
+├── ChogSwapIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
+├── ChogSwapIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
+├── ChogSwapIntents.gas.t.sol        worst-case ring (4 × 10 NFTs)
+└── invariant/                       handler + invariants N1, N2, N5 and conservation
+```
+
+`forge test --match-path "test/intents/*"` runs 65 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
+
+Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721; **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
+
+Known risk specific to this contract: a maker can spend an asset or revoke an approval after signing, which makes `settle` revert and costs the matcher gas. Nobody loses assets. Mitigation lives in the matcher (simulate right before sending), not the contract.
+

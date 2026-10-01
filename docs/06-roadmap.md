@@ -66,8 +66,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Frontend for V2, list: a Chogs / Multi-asset switch on Trades and History, V2 cards and filters (search by NFT id, token symbol or address, maker; MON filter; sort), fills remembered per contract. Typechecked, linted and built; the filter logic was checked with sample trades, but the list has not been exercised against the deployed V2 yet
 - [x] Trait requests in V2: `ERC721Trait` asset with a Merkle root, `createTraitTrade` with an on-chain spec, `fillTraitTrade`. Several traits per request (any / all), and a server scan of the chosen collection's traits ([ADR 0006](adr/0006-trait-requests-in-v2.md)). Contract and frontend done, 31 tests, 100% coverage. Deployed with open offers (see the README), source-verified; the create and fill screens still need a pass against it
 - [x] Open offers ("make me an offer"): the maker lists assets with a text note and takers escrow proposals. Contract, tests and frontend (create mode, offers list, send / accept / reject / withdraw) done. Deployed: `ChogSwapV2` `0x7359…E1bB` at block 67163690 (Sourcify full match), frontend pointed at it. The screens still need a pass against it ([ADR 0007](adr/0007-open-offers.md))
-- [ ] Trade intents + off-chain matcher
-- [ ] Multi-party ring swaps
+- [ ] Trade intents + off-chain matcher ([ADR 0008](adr/0008-trade-intents.md), accepted): signed EIP-712 intents, `ChogSwapIntents` settles wallet to wallet, off-chain pool and matcher. Contract done (65 tests, 100% coverage, not deployed); pool, matcher and frontend to do
+- [ ] Multi-party ring swaps ([ADR 0009](adr/0009-ring-swaps.md), accepted, `MAX_CYCLE = 4`): cycles of the same signed intents through the same `settle`, so no separate contract. Contract side done (rings of 2–4, worst case 3.3M gas); the matcher's cycle search and the UI to do
 - [ ] Reputation
 - [ ] External audit before mainnet with real Chogs
 
