@@ -1,4 +1,6 @@
 import { CreateDealButton } from "@/components/CreateDealButton";
+import { swapIntents } from "@/lib/contracts";
+import { termsFor } from "@/lib/settlementTerms";
 
 const STEPS = [
   {
@@ -23,7 +25,24 @@ const STEPS = [
   },
 ];
 
-const FAQ = [
+/** Locked deals against signed swaps, row by row. The one-line reasons live in lib/settlementTerms.ts. */
+const COMPARE: ReadonlyArray<[string, string, string]> = [
+  ["Can it fail?", "No. Once someone accepts, both sides move together.", "Yes, if you move the asset or revoke the approval before a match."],
+  ["What it costs", "Gas to create, and again to cancel. Approvals cost gas too.", "Nothing to post or remove. You only pay for approvals."],
+  ["Your assets", "Held by the contract until it's accepted, cancelled or expires.", "Stay in your wallet the whole time."],
+  ["What you can use", "MON, NFTs, tokens and trait requests.", "NFTs and tokens. MON must be wrapped as WMON. No trait requests."],
+  ["Who can take it", "Anyone, one named wallet, or you pick from the offers you receive.", "Anyone that meets your terms. A matcher finds pairs and rings of up to 4 wallets."],
+  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, removed from the pool, or its deadline passes (10 minutes to 7 days, required)."],
+];
+
+/** Only shown where signed swaps exist. */
+const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
+  ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post. See Locked deals vs signed swaps above."],
+  ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
+  ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. A short deadline is the best protection."],
+];
+
+const FAQ: ReadonlyArray<[string, string]> = [
   ["What is On Deal?", "On Deal is a peer-to-peer, non-custodial way to swap digital assets. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
   ["Do I have to trust the other party?", "No. The swap is atomic: either every NFT and MON transfer succeeds, or the transaction reverts. The other party never receives your escrowed assets without sending their side."],
   ["What does escrow mean here?", "When you create an open deal, the assets you offer move into the On Deal contract. They remain there until the deal is filled, cancelled by you, or reclaimed after expiry."],
@@ -51,6 +70,7 @@ export default function GuidePage() {
         </div>
         <nav className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold">
           <a href="#how-it-works" className="text-accent hover:underline">How it works</a>
+          {swapIntents && <a href="#settlement" className="text-accent hover:underline">Locked vs signed</a>}
           <a href="#safety" className="text-accent hover:underline">Safety checklist</a>
           <a href="#faq" className="text-accent hover:underline">FAQ</a>
         </nav>
@@ -61,6 +81,7 @@ export default function GuidePage() {
           <p className="text-xs font-bold uppercase tracking-wider text-muted">On this page</p>
           <nav className="mt-4 space-y-3 border-l border-black/10 pl-4 text-sm">
             <a href="#how-it-works" className="block text-muted hover:text-accent">How it works</a>
+            {swapIntents && <a href="#settlement" className="block text-muted hover:text-accent">Locked vs signed</a>}
             <a href="#safety" className="block text-muted hover:text-accent">Safety checklist</a>
             <a href="#faq" className="block text-muted hover:text-accent">FAQ</a>
           </nav>
@@ -86,9 +107,71 @@ export default function GuidePage() {
             </div>
           </section>
 
+          {swapIntents && (
+            <section id="settlement" className="scroll-mt-24">
+              <div className="flex items-start gap-4">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">2</span>
+                <div>
+                  <p className="text-sm font-semibold text-accent">Choosing how it settles</p>
+                  <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Locked deals vs signed swaps</h2>
+                </div>
+              </div>
+              <p className="mt-5 max-w-3xl text-sm leading-6 text-muted">
+                Every deal settles one of two ways, and you choose when you create it. A <strong>locked deal</strong> puts
+                your side in the contract, so it&apos;s certain but ties up your assets. A <strong>signed swap</strong> is a
+                message you sign: free and nothing is locked, but it&apos;s only as reliable as your wallet at the moment
+                it settles. Both appear in the same list, tagged Locked or Signed.
+              </p>
+
+              <div className="mt-6 overflow-x-auto rounded-xl border border-black/10 bg-white">
+                <table className="w-full min-w-[34rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-black/10 text-xs uppercase tracking-wider text-muted">
+                      <th className="px-5 py-3 font-bold" />
+                      <th className="px-5 py-3 font-bold">Lock assets now</th>
+                      <th className="px-5 py-3 font-bold">Sign only</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/10">
+                    {COMPARE.map(([row, locked, signed]) => (
+                      <tr key={row} className="align-top">
+                        <th scope="row" className="px-5 py-4 font-semibold whitespace-nowrap">{row}</th>
+                        <td className="px-5 py-4 leading-6 text-muted">{locked}</td>
+                        <td className="px-5 py-4 leading-6 text-muted">{signed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {(["escrow", "signed"] as const).map((mode) => (
+                  <div key={mode} className="rounded-xl border border-black/10 bg-white p-5">
+                    <h3 className="font-bold">{mode === "escrow" ? "Lock assets now" : "Sign only"}</h3>
+                    <dl className="mt-4 space-y-4">
+                      {termsFor(mode).map((term) => (
+                        <div key={term.id} id={term.id} className="scroll-mt-24 target:rounded-lg target:bg-[#fff4cf] target:p-2 target:-m-2">
+                          <dt className="flex items-center gap-1.5 text-sm font-semibold">
+                            <span className={`font-black ${term.good ? "text-mint" : "text-warn"}`} aria-hidden>{term.good ? "+" : "−"}</span>
+                            {term.label}
+                          </dt>
+                          <dd className="mt-1 text-sm leading-6 text-muted">{term.detail}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-sm text-muted">
+                The design and settlement rules are written up in the project docs: ADR 0008 (signed swaps) and ADR 0009
+                (rings).
+              </p>
+            </section>
+          )}
+
           <section id="safety" className="scroll-mt-24 rounded-xl border border-black/10 bg-white p-6 sm:p-8">
             <div className="flex items-start gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">2</span>
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">{swapIntents ? 3 : 2}</span>
               <div>
                 <p className="text-sm font-semibold text-accent">Before you confirm</p>
                 <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Safety checklist</h2>
@@ -104,14 +187,14 @@ export default function GuidePage() {
 
           <section id="faq" className="scroll-mt-24">
             <div className="flex items-start gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">3</span>
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">{swapIntents ? 4 : 3}</span>
               <div>
                 <p className="text-sm font-semibold text-accent">Questions, answered</p>
                 <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Frequently asked questions</h2>
               </div>
             </div>
             <div className="mt-7 divide-y divide-black/10 rounded-xl border border-black/10 bg-white">
-              {FAQ.map(([question, answer]) => (
+              {[...FAQ.slice(0, 1), ...(swapIntents ? SIGNED_FAQ : []), ...FAQ.slice(1)].map(([question, answer]) => (
                 <details key={question} className="group px-5 sm:px-6">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-semibold">
                     {question}

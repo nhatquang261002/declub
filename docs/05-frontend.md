@@ -185,6 +185,7 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 | `/create` | Step 1 opens with **How should it settle?**: *Lock assets now* (the three deal kinds, as before) or *Sign only*. Sign only runs `SignedFlow`: want (no MON), give plus a deadline (default 1 hour), then review, the consent notice, **approve** and **Sign and post**. Both steps link back to *Lock assets* for a deal that needs MON or a trait request |
 | `/deals` (Multi-asset) | Locked deals and open signed swaps in one grid, each tagged **Locked** or **Signed**. A *Type* filter (All / Locked / Signed) sits beside the MON and sort filters. Search, MON and sort apply to both. The page opens on Multi-asset once V2 and intents are both configured |
 | `/history` (Multi-asset) | The wallet's signed swaps in every status beside its locked deals, with the same Active / Completed / Expired filters |
+| `/guide#settlement` | *Locked deals vs signed swaps*: a comparison table and one anchored entry per chip (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
 | `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain** |
 | `/intents`, `/intents/new` | Redirect to `/deals` and `/create`, for old links |
 
@@ -195,7 +196,9 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 | `hooks/usePool.ts` | `usePoolInfo` (also flags a pool for another chain or contract), `useIntents`, `useIntent`, `useSettlements` |
 | `hooks/useIntentReadiness.ts` | What stands between a wallet and an intent that can settle: balance and ownership problems, and the approvals still missing |
 | `hooks/useSignFlow.ts` | Sign and post an intent, or sign a cancel. Free, no gas; reuses `TxState` with an added `posting` stage so `TxButton` works unchanged |
-| `components/create/SettlementPicker.tsx` | The *Lock assets now* / *Sign only* choice |
+| `components/create/SettlementPicker.tsx` | The *Lock assets now* / *Sign only* choice: two cards, each with three chips (plus or minus) that open a tooltip |
+| `components/Tooltip.tsx` | The one tooltip: opens on hover, focus or tap; closes on Escape, outside tap or blur; an optional "Learn more" link; shifts to the right edge near the screen edge. Its trigger is a button, so it can't sit inside another button or link |
+| `lib/settlementTerms.ts` | The six chip terms: `id` (the Guide anchor), label, plus or minus, a tooltip `tip` and the Guide's longer `detail`. One source for the chips, the tooltips and `/guide`, so they can't drift apart |
 | `components/create/SignedFlow.tsx` | Steps 1 to 3 of a signed swap |
 | `components/IntentParts.tsx` | Status badge, `IntentCard`, `ListingGrid` (deals and signed swaps in one grid), `CycleView`, and `ConsentNotice` |
 

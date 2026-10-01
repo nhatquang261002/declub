@@ -10,6 +10,7 @@ import { explorerTx } from "@/lib/config";
 import { sameAddress } from "@/lib/deals";
 import { shortAddress } from "@/lib/format";
 import type { DealV2 } from "@/lib/dealsV2";
+import { SETTLEMENT_GUIDE } from "@/lib/settlementTerms";
 import {
   isLive,
   isSignedListing,
@@ -110,6 +111,11 @@ export function ConsentNotice({ className = "" }: { className?: string }) {
         </li>
         <li>You can&apos;t edit it once signed. Removing it from the pool doesn&apos;t recall a signature that already left, so keep the deadline short.</li>
       </ul>
+      <p>
+        <Link href={SETTLEMENT_GUIDE} className="font-semibold underline">
+          Locked deals vs signed swaps →
+        </Link>
+      </p>
     </div>
   );
 }
