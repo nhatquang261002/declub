@@ -24,7 +24,7 @@ export function usePoolInfo() {
 export function useIntents(params: ListParams & { enabled?: boolean } = {}) {
   const { enabled = true, ...list } = params;
   const query = useQuery({
-    queryKey: ["pool", "intents", list.status ?? "open", list.maker?.toLowerCase() ?? null, list.limit ?? null],
+    queryKey: ["pool", "intents", list.status ?? "open", list.maker?.toLowerCase() ?? null, list.limit ?? null, list.token?.toLowerCase() ?? null],
     queryFn: () => listIntents(list),
     enabled: enabled && !!CHOG_SWAP_INTENTS_ADDRESS,
     refetchInterval: POLL_MS,

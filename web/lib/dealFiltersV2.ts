@@ -66,3 +66,15 @@ export function applyDealFiltersV2<T extends DealV2>(
   }
   return out;
 }
+
+const names = (assets: DealV2["offered"], token: string) =>
+  assets.some((a) => a.kind !== "native" && a.token.toLowerCase() === token.toLowerCase());
+
+/** The deal gives this token away (any id, or any amount). A Club's "Have" list. */
+export const offersToken = (deal: Pick<DealV2, "offered">, token: string) => names(deal.offered, token);
+
+/** The deal asks for this token, including a trait request for it. A Club's "Wanted" list. */
+export const requestsToken = (deal: Pick<DealV2, "requested">, token: string) => names(deal.requested, token);
+
+export const involvesToken = (deal: Pick<DealV2, "offered" | "requested">, token: string) =>
+  offersToken(deal, token) || requestsToken(deal, token);

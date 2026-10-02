@@ -10,6 +10,7 @@ import { CreateDealButton } from "@/components/CreateDealButton";
 // Create is a button beside the wallet, not a tab: it starts an action rather than showing a list.
 const NAV = [
   { href: "/deals", label: "Deals" },
+  { href: "/clubs", label: "Clubs" },
   { href: "/history", label: "History" },
   { href: "/guide", label: "Guide" },
 ];

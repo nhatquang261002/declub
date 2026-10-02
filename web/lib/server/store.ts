@@ -4,8 +4,9 @@ import { Redis } from "@upstash/redis";
  * The one place the web server keeps state that isn't in a contract (ADR 0011): Upstash Redis over
  * its REST API, which works from serverless functions with no connection pool.
  *
- * Only what is small, cosmetic or rebuildable goes here. Nothing in this store can move assets or
- * change a trade: losing it all costs people their shared profile and nothing else.
+ * Nothing in this store can move assets or change a trade. Most of it is small, cosmetic or
+ * rebuildable (shared profiles, fill history). Club memberships (ADR 0016) are not: they exist
+ * nowhere else, so losing the store loses them.
  *
  * Without credentials the store is `null` in production, and each feature that needs it switches
  * itself off. In development an in-memory copy stands in so the screens can be tried without an
@@ -20,6 +21,9 @@ export type Store = {
   members(key: string): Promise<string[]>;
   /** Replaces the whole set. An empty list removes it. */
   setMembers(key: string, members: string[]): Promise<void>;
+  addMember(key: string, member: string): Promise<void>;
+  removeMember(key: string, member: string): Promise<void>;
+  countMembers(key: string): Promise<number>;
   /**
    * Adds members to a ranked set (re-adding a member moves its score), then keeps only the `cap`
    * highest-scored ones, so a set can't grow without bound.
@@ -56,6 +60,13 @@ function upstash(redis: Redis): Store {
       if (members.length > 0) pipeline.sadd(key, members[0], ...members.slice(1));
       await pipeline.exec();
     },
+    async addMember(key, member) {
+      await redis.sadd(key, member);
+    },
+    async removeMember(key, member) {
+      await redis.srem(key, member);
+    },
+    countMembers: (key) => redis.scard(key),
     async rank(key, entries, cap) {
       if (entries.length === 0) return;
       const [first, ...rest] = entries;
@@ -75,7 +86,8 @@ function upstash(redis: Redis): Store {
   };
 }
 
-function memory(): Store {
+/** An in-memory store: what development uses without credentials, and what tests use. */
+export function memoryStore(): Store {
   const values = new Map<string, unknown>();
   const sets = new Map<string, Set<string>>();
   const ranks = new Map<string, Map<string, number>>();
@@ -96,6 +108,7 @@ function memory(): Store {
         values.delete(key);
         sets.delete(key);
         ranks.delete(key);
+        counters.delete(key);
       }
     },
     async members(key) {
@@ -104,6 +117,18 @@ function memory(): Store {
     async setMembers(key, members) {
       if (members.length === 0) sets.delete(key);
       else sets.set(key, new Set(members));
+    },
+    async addMember(key, member) {
+      const set = sets.get(key) ?? new Set<string>();
+      sets.set(key, set.add(member));
+    },
+    async removeMember(key, member) {
+      const set = sets.get(key);
+      set?.delete(member);
+      if (set?.size === 0) sets.delete(key);
+    },
+    async countMembers(key) {
+      return sets.get(key)?.size ?? 0;
     },
     async rank(key, entries, cap) {
       const set = ranks.get(key) ?? new Map<string, number>();
@@ -134,7 +159,7 @@ export function getStore(): Store | null {
   g.__chogswapStore = creds
     ? upstash(new Redis(creds))
     : process.env.NODE_ENV !== "production"
-      ? memory()
+      ? memoryStore()
       : null;
   return g.__chogswapStore;
 }

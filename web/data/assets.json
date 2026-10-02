@@ -1,0 +1,21 @@
+[
+  {
+    "chainId": 10143,
+    "address": "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4",
+    "kind": "erc721",
+    "name": "Mock Chog",
+    "symbol": "MCHOG",
+    "status": "verified",
+    "note": "The project's own test collection on Monad testnet, deployed from this repo (source-verified on Sourcify)."
+  },
+  {
+    "chainId": 10143,
+    "address": "0xd300f095f456D59AAc122B0100833fE195136F6c",
+    "kind": "erc20",
+    "name": "Mock USD",
+    "symbol": "mUSD",
+    "status": "verified",
+    "note": "The project's own test token on Monad testnet, deployed from this repo (source-verified on Sourcify).",
+    "minHolding": "1000000000000000000"
+  }
+]

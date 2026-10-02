@@ -1,6 +1,7 @@
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
 import { CHAIN_ID, CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS, RPC_URL } from "../config";
+import type { ReceiptLike } from "./activity";
 import type { Store } from "./store";
 
 /**
@@ -43,8 +44,13 @@ export async function ingestFills(store: Store, hash: Hex): Promise<IngestResult
     if (error instanceof Error && error.name === "TransactionReceiptNotFoundError") return { status: "pending" };
     throw error;
   }
+  return { status: "recorded", fills: await recordFills(store, receipt) };
+}
+
+/** The part of `ingestFills` after the receipt is in hand: the number of fills recorded. */
+export async function recordFills(store: Store, receipt: ReceiptLike): Promise<number> {
   // A reverted transaction emitted nothing that counts.
-  if (receipt.status !== "success") return { status: "recorded", fills: 0 };
+  if (receipt.status !== "success") return 0;
 
   const score = Number(receipt.blockNumber);
   let fills = 0;
@@ -52,14 +58,14 @@ export async function ingestFills(store: Store, hash: Hex): Promise<IngestResult
     if (!isFillContract(log.address)) continue;
     let event;
     try {
-      event = decodeEventLog({ abi, data: log.data, topics: log.topics });
+      event = decodeEventLog({ abi, data: log.data, topics: log.topics as [Hex, ...Hex[]] });
     } catch {
       continue;
     }
     await store.rank(fillsKey(log.address, getAddress(event.args.taker)), [{ member: event.args.tradeId.toString(), score }], MAX_FILLS_PER_ACCOUNT);
     fills++;
   }
-  return { status: "recorded", fills };
+  return fills;
 }
 
 /** Trade ids `account` has filled on `contract`, newest first. */

@@ -1,3 +1,5 @@
+import { linkedEthereumWallets } from "../profiles";
+import { syncMemberships } from "./members";
 import { syncProfile } from "./profileSync";
 import type { Store } from "./store";
 
@@ -37,7 +39,8 @@ export function affectedUsers(event: unknown): string[] {
  * replayed "linked" event arriving after the account was unlinked must not bring the profile back,
  * and reading the current accounts makes every delivery harmless.
  *
- * Only shares that already exist are touched (`refresh`): a webhook never publishes anyone.
+ * Only shares that already exist are touched (`refresh`): a webhook never publishes anyone. Club
+ * memberships are re-synced too, which never adds one.
  * Throws when Privy or the store fails, so the caller answers non-2xx and Privy retries.
  */
 export async function handlePrivyEvent(event: unknown, store: Store, load: LoadAccounts): Promise<string[]> {
@@ -45,6 +48,8 @@ export async function handlePrivyEvent(event: unknown, store: Store, load: LoadA
   for (const userId of users) {
     const accounts = await load(userId);
     await syncProfile(store, userId, accounts ?? [], true);
+    // Club members' wallets follow the account too (ADR 0016): an unlinked wallet stops counting.
+    await syncMemberships(store, userId, linkedEthereumWallets(accounts ?? []));
   }
   return users;
 }

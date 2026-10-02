@@ -35,6 +35,12 @@ function duration(seconds: number): string {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
+/** "just now", "5m ago", "3h ago", "2d ago". A time in the future reads as "just now". */
+export function ago(unixSec: number, nowSec: number): string {
+  const delta = nowSec - unixSec;
+  return delta < 30 ? "just now" : `${duration(delta)} ago`;
+}
+
 /** "expires in 3h", "expired 2m ago", "no expiry". */
 export function expiryLabel(expiry: bigint, nowSec: number): string {
   if (expiry === 0n) return "no expiry";

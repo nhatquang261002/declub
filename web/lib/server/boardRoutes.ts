@@ -1,0 +1,287 @@
+import { isAddress } from "viem";
+import { linkedEthereumWallets } from "../profiles";
+import type { Registry } from "../verifiedAssets";
+import {
+  banUser,
+  claimOwner,
+  createPost,
+  deletePost,
+  hidePost,
+  listBans,
+  listPosts,
+  ownershipCheck,
+  pinPost,
+  purgeClub,
+  reportPost,
+  roleIn,
+  setRole,
+  unbanUser,
+  updateProfile,
+  type Actor,
+  type Deps as BoardDeps,
+} from "./board";
+import { adminIds, loadProfile, loadRoles, readLog } from "./clubState";
+import { fail, gateUser, json, type UserGate } from "./gate";
+import { getMember } from "./members";
+import { clubOf, type Ctx } from "./memberRoutes";
+import { authenticate } from "./privy";
+import { clientId, getStore, withinLimit, type Store } from "./store";
+import { isStaff } from "../clubRoles";
+
+/**
+ * The board and staff routes, built over a registry like the other Club routes so tests can use a
+ * list of their own. Writes need the caller's Privy access token; reads are public, and a reader
+ * who sends a token also sees their own hidden posts (and, as staff, every hidden one).
+ */
+export type RouteDeps = BoardDeps & {
+  gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
+  /** Who is reading, if they said: Privy in production, a stand-in in tests. */
+  viewer?: (request: Request) => Promise<{ id: string } | null>;
+};
+
+type ItemCtx = { params: Promise<{ token: string; id: string }> };
+
+/** Every refusal reason, and what the caller is told. */
+const REFUSALS: Record<string, [number, string]> = {
+  archived: [409, "This Club is archived: it stays readable, but it isn’t taking changes."],
+  not_member: [403, "Join the Club first."],
+  banned: [403, "You can’t do that in this Club."],
+  no_profile: [403, "Share a verified X or Discord profile on your Account page first, so people can see who is posting."],
+  holders_only: [403, "The Owner has limited posting to holders."],
+  bad_kind: [400, "A post is a note or a “looking for”."],
+  empty: [400, "Write something first."],
+  too_long: [400, "Posts are at most 280 characters."],
+  bad_link: [400, "Link a deal id or a signed-swap hash, and only on a “looking for” post."],
+  link_not_found: [404, "That deal or signed swap wasn’t found."],
+  link_mismatch: [422, "That deal or signed swap doesn’t involve this Club’s asset."],
+  link_unavailable: [503, "Couldn’t check that link right now. Try again."],
+  cooldown: [429, "Wait a few seconds between posts."],
+  rate_limited: [429, "You’ve reached the limit for now. Try again later."],
+  not_found: [404, "Not found."],
+  forbidden: [403, "You can’t do that."],
+  own_post: [409, "You can’t report your own post."],
+  too_many_pinned: [409, "At most 3 posts can be pinned."],
+  hidden: [409, "A hidden post can’t be pinned."],
+  too_many_moderators: [409, "A Club has at most 10 Moderators."],
+  already_owner: [409, "They are already the Owner."],
+  no_change: [409, "Nothing to change."],
+  no_owner: [422, "This token has no owner() to claim through. Ask an admin."],
+  not_owner: [403, "None of your linked wallets is this token’s owner."],
+  has_owner: [409, "This Club already has an Owner. Ask an admin."],
+  invalid: [400, "That isn’t valid."],
+  not_hidden: [409, "Only a Club that is hidden from the list can be purged."],
+};
+
+const refuse = (reason: string, message?: string) => {
+  const [status, text] = REFUSALS[reason] ?? [400, "That isn’t allowed."];
+  return fail(status, reason, message ?? text);
+};
+
+const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
+  const body: unknown = await request.json().catch(() => null);
+  return typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+};
+
+/** A user's id and the wallet to name them by in the log: their Club wallet, else their first linked one. */
+async function actorOf(store: Store, token: string, user: { id: string; linked_accounts: unknown }): Promise<Actor> {
+  const row = await getMember(store, token, user.id);
+  const wallets = linkedEthereumWallets(user.linked_accounts as Parameters<typeof linkedEthereumWallets>[0]);
+  return { userId: user.id, wallet: row?.displayWallet ?? wallets[0]?.toLowerCase() ?? "unknown" };
+}
+
+/** The common front of a write: the Club exists, the caller is signed in, and who they are. */
+async function front(registry: Registry, ctx: Ctx, request: Request, deps: RouteDeps, name: string, limit = 30) {
+  const entry = await clubOf(registry, ctx);
+  if (entry instanceof Response) return entry;
+  const g = await (deps.gate ?? gateUser)(request, name, limit);
+  if (g instanceof Response) return g;
+  const actor = await actorOf(g.store, entry.address, g.user);
+  return { entry, store: g.store, user: g.user, actor };
+}
+
+async function softViewer(request: Request, deps: RouteDeps): Promise<{ id: string } | null> {
+  if (!request.headers.get("authorization")) return null;
+  return deps.viewer ? deps.viewer(request) : authenticate(request);
+}
+
+/** GET (public) and POST (members) /api/clubs/[token]/posts. */
+export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false, posts: [], role: null }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+
+      const viewer = await softViewer(request, deps);
+      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id }, deps);
+      // Anonymous readers share one cached answer; a signed-in reader's depends on who they are.
+      const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
+      return Response.json({ enabled: true, posts, role }, { headers: { "Cache-Control": cache } });
+    },
+
+    async POST(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-post");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const result = await createPost(f.store, f.entry, f.user.id, { kind: body.kind, text: body.text, link: body.link }, deps);
+      return result.ok ? json({ enabled: true, post: result.post }, 201) : refuse(result.reason);
+    },
+  };
+}
+
+/** DELETE /api/clubs/[token]/posts/[id]: the author, or staff who may act on the author. */
+export function deletePostHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function DELETE(request: Request, ctx: ItemCtx) {
+    const f = await front(registry, ctx, request, deps, "club-post-edit");
+    if (f instanceof Response) return f;
+    const result = await deletePost(f.store, f.entry, f.actor, (await ctx.params).id, deps);
+    return result.ok ? json({ enabled: true }) : refuse(result.reason);
+  };
+}
+
+/** POST /api/clubs/[token]/posts/[id]/report */
+export function reportHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function POST(request: Request, ctx: ItemCtx) {
+    const f = await front(registry, ctx, request, deps, "club-report", 30);
+    if (f instanceof Response) return f;
+    const result = await reportPost(f.store, f.entry, f.user.id, (await ctx.params).id, deps);
+    return result.ok ? json({ enabled: true, hidden: result.hidden }) : refuse(result.reason);
+  };
+}
+
+/** POST /api/clubs/[token]/posts/[id]/hide  { hidden: boolean } */
+export function hideHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function POST(request: Request, ctx: ItemCtx) {
+    const f = await front(registry, ctx, request, deps, "club-mod");
+    if (f instanceof Response) return f;
+    const body = await bodyOf(request);
+    if (typeof body.hidden !== "boolean") return refuse("invalid", "Send { hidden: true } or { hidden: false }.");
+    const result = await hidePost(f.store, f.entry, f.actor, (await ctx.params).id, body.hidden, deps);
+    return result.ok ? json({ enabled: true }) : refuse(result.reason);
+  };
+}
+
+/** POST /api/clubs/[token]/posts/[id]/pin  { pinned: boolean } */
+export function pinHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function POST(request: Request, ctx: ItemCtx) {
+    const f = await front(registry, ctx, request, deps, "club-mod");
+    if (f instanceof Response) return f;
+    const body = await bodyOf(request);
+    if (typeof body.pinned !== "boolean") return refuse("invalid", "Send { pinned: true } or { pinned: false }.");
+    const result = await pinPost(f.store, f.entry, f.actor, (await ctx.params).id, body.pinned, deps);
+    return result.ok ? json({ enabled: true }) : refuse(result.reason);
+  };
+}
+
+/** GET (staff), POST and DELETE /api/clubs/[token]/bans. */
+export function bansHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const bans = await listBans(f.store, f.entry, f.user.id, deps);
+      return bans ? json({ enabled: true, ...bans }) : refuse("forbidden");
+    },
+    async POST(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const result = await banUser(f.store, f.entry, f.actor, { wallet: body.wallet, post: body.post }, body.everywhere === true, deps);
+      return result.ok ? json({ enabled: true, wallet: result.wallet }) : refuse(result.reason);
+    },
+    async DELETE(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      if (typeof body.wallet !== "string") return refuse("invalid", "Say which wallet to unban.");
+      const result = await unbanUser(f.store, f.entry, f.actor, body.wallet, body.everywhere === true, deps);
+      return result.ok ? json({ enabled: true }) : refuse(result.reason);
+    },
+  };
+}
+
+/** POST /api/clubs/[token]/claim: become Owner by holding the contract's `owner()` wallet. */
+export function claimHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function POST(request: Request, ctx: Ctx) {
+    const f = await front(registry, ctx, request, deps, "club-claim", 10);
+    if (f instanceof Response) return f;
+    const wallets = linkedEthereumWallets(f.user.linked_accounts);
+    const result = await claimOwner(f.store, f.entry, f.actor, wallets, deps);
+    return result.ok ? json({ enabled: true, role: "owner" }) : refuse(result.reason);
+  };
+}
+
+/** PUT /api/clubs/[token]/roles  { wallet, role: "owner" | "moderator" | null } */
+export function rolesHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function PUT(request: Request, ctx: Ctx) {
+    const f = await front(registry, ctx, request, deps, "club-mod");
+    if (f instanceof Response) return f;
+    const body = await bodyOf(request);
+    const role = body.role;
+    if (typeof body.wallet !== "string" || (role !== null && role !== "owner" && role !== "moderator")) {
+      return refuse("invalid", "Send { wallet, role } where role is owner, moderator or null.");
+    }
+    const result = await setRole(f.store, f.entry, f.actor, body.wallet, role, deps);
+    return result.ok ? json({ enabled: true }) : refuse(result.reason);
+  };
+}
+
+/** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */
+export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const { description, links, holdersOnlyPosts } = await loadProfile(store, entry.address);
+      const roles = await loadRoles(store, entry.address);
+      return Response.json(
+        { enabled: true, description, links, holdersOnlyPosts, hasOwner: !!roles.owner },
+        { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
+      );
+    },
+    async PATCH(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await updateProfile(f.store, f.entry, f.actor, await bodyOf(request), deps);
+      if (result.ok) {
+        const { description, links, holdersOnlyPosts } = result.profile;
+        return json({ enabled: true, description, links, holdersOnlyPosts });
+      }
+      return refuse(result.reason, result.message);
+    },
+  };
+}
+
+/** GET /api/clubs/[token]/log: the moderation log. Staff only; admins also see an ownership check. */
+export function logHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function GET(request: Request, ctx: Ctx) {
+    const f = await front(registry, ctx, request, deps, "club-mod");
+    if (f instanceof Response) return f;
+    const role = await roleIn(f.store, f.entry.address, f.user.id, deps);
+    if (!isStaff(role)) return refuse("forbidden");
+    const ownership = role === "admin" ? await ownershipCheck(f.store, f.entry, deps) : null;
+    return json({ enabled: true, log: await readLog(f.store, f.entry.address), ownership });
+  };
+}
+
+/**
+ * DELETE /api/clubs/[token]: delete everything stored for a Club that is hidden from the list
+ * (blocked, or no longer on it). App admins only. A live Club can't be purged: take it off the
+ * list first.
+ */
+export function purgeHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function DELETE(request: Request, ctx: Ctx) {
+    const { token } = await ctx.params;
+    if (!isAddress(token, { strict: false })) return fail(400, "bad_request", "Give a token address.");
+    const g = await (deps.gate ?? gateUser)(request, "club-purge", 10);
+    if (g instanceof Response) return g;
+    if (!(deps.admins ?? adminIds()).has(g.user.id)) return refuse("forbidden");
+    if (registry.clubFor(token)) return refuse("not_hidden");
+    return json({ enabled: true, purged: await purgeClub(g.store, token) });
+  };
+}

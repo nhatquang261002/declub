@@ -1,5 +1,6 @@
 import { linkedEthereumWallets, pickProfile, profileKey, userWalletsKey, type Profile } from "@/lib/profiles";
 import { fail, gateUser, json } from "@/lib/server/gate";
+import { syncMemberships } from "@/lib/server/members";
 import { ownedRows, syncProfile } from "@/lib/server/profileSync";
 
 /**
@@ -44,6 +45,8 @@ export async function PUT(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as { refresh?: unknown };
   const result = await syncProfile(store, user.id, user.linked_accounts, body.refresh === true);
+  // The wallet a Club shows for this user depends on which of theirs has a shared profile.
+  await syncMemberships(store, user.id, linkedEthereumWallets(user.linked_accounts));
 
   if (result.shared) return json({ enabled: true, shared: true, profile: result.profile });
   if (result.reason) return fail(422, result.reason, "Link an X or Discord account and a wallet first.");
@@ -57,5 +60,6 @@ export async function DELETE(request: Request) {
 
   const owned = await ownedRows(store, user.id, linkedEthereumWallets(user.linked_accounts));
   await store.del(...owned.map((entry) => profileKey(entry.address)), userWalletsKey(user.id));
+  await syncMemberships(store, user.id, linkedEthereumWallets(user.linked_accounts));
   return json({ enabled: true, shared: false });
 }

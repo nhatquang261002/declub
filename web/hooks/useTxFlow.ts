@@ -20,7 +20,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { describeError, type AppError } from "@/lib/errors";
 import { useToast } from "@/components/Toast";
-import { mayFill, reportFill } from "@/lib/fillReport";
+import { mayFill, mayReport, reportTx } from "@/lib/fillReport";
 import { chain } from "@/lib/wagmi";
 
 // idle → simulating → awaiting-signature → pending → confirmed
@@ -100,7 +100,9 @@ export function useTxFlow() {
 
         setState({ status: "confirmed", hash });
         // History needs the filler on record before it refetches (lib/fillReport.ts).
-        if (mayFill(call)) await reportFill(hash);
+        if (mayFill(call)) await reportTx(hash);
+        // A new deal only feeds a Club, so nothing waits for it.
+        else if (mayReport(call)) void reportTx(hash);
         await queryClient.invalidateQueries();
         return receipt;
       } catch (error) {

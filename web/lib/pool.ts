@@ -70,12 +70,19 @@ export async function getInfo(): Promise<PoolInfo> {
   return { chainId: body.chainId, swap: body.swap, matcher: body.matcher ?? null, maxCycle: body.maxCycle ?? 4 };
 }
 
-export type ListParams = { status?: IntentStatus | "all"; maker?: Address; limit?: number };
+export type ListParams = {
+  status?: IntentStatus | "all";
+  maker?: Address;
+  /** Only intents that name this token, on either side. */
+  token?: Address;
+  limit?: number;
+};
 
 /** The book, newest first. The pool returns oldest first, and unreadable rows are left out. */
-export async function listIntents({ status = "open", maker, limit = 200 }: ListParams = {}): Promise<PoolIntent[]> {
+export async function listIntents({ status = "open", maker, token, limit = 200 }: ListParams = {}): Promise<PoolIntent[]> {
   const q = new URLSearchParams({ status, limit: String(limit) });
   if (maker) q.set("maker", maker);
+  if (token) q.set("token", token);
   const body = (await call(`/intents?${q}`)) as { intents?: unknown };
   const rows = Array.isArray(body.intents) ? body.intents : [];
   return rows
@@ -93,9 +100,15 @@ export async function getIntent(hash: Hex): Promise<PoolIntent | null> {
   }
 }
 
-export async function listSettlements({ maker, limit = 50 }: { maker?: Address; limit?: number } = {}): Promise<Settlement[]> {
+/** Settled cycles, newest first. `token` keeps the ones that name that token. */
+export async function listSettlements({
+  maker,
+  token,
+  limit = 50,
+}: { maker?: Address; token?: Address; limit?: number } = {}): Promise<Settlement[]> {
   const q = new URLSearchParams({ limit: String(limit) });
   if (maker) q.set("maker", maker);
+  if (token) q.set("token", token);
   const body = (await call(`/settlements?${q}`)) as { settlements?: unknown };
   const rows = Array.isArray(body.settlements) ? body.settlements : [];
   return rows.map(parseSettlement).filter((s): s is Settlement => s !== null);

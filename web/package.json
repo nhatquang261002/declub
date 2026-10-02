@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "abi": "wagmi generate",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs --test --test-concurrency=1 \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@next/env": "^16.3.6",

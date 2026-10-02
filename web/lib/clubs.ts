@@ -1,0 +1,132 @@
+import type { Settlement } from "./intents";
+import type { AssetEntry } from "./verifiedAssets";
+import { CHOG_SWAP_INTENTS_ADDRESS } from "./config";
+import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
+
+/**
+ * What a Club's page shows, worked out from its activity (ADR 0016, docs/09-clubs.md). Pure, so
+ * the server routes and the tests share it.
+ */
+
+/** One thing that happened to a Club's asset. Field order is fixed: the log stores it as JSON. */
+export type ActivityEvent = {
+  /** `txHash:logIndex`, so a replayed report is the same event. */
+  id: string;
+  kind: ActivityKind;
+  /** The contract that emitted it, lowercase. */
+  contract: string;
+  /** The ChogSwapV2 trade id; for a signed swap, the settlement's transaction hash. */
+  deal: string;
+  block: number;
+  /** Unix seconds (the block's timestamp). */
+  at: number;
+  /** Lowercase wallets: the maker for a creation, every side for a swap. */
+  parties: string[];
+  /** Every non-native token the deal names, lowercase. */
+  tokens: string[];
+};
+
+export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties });
+
+export type ClubStats = {
+  /** Club Momentum. */
+  momentum: number;
+  /** Momentum now minus a week ago. */
+  change: number;
+  /** Completed swaps in the last 7 days. */
+  completed7d: number;
+  /** New deals, open offers and intents in the last 7 days. */
+  created7d: number;
+  /** Distinct wallets in the last 30 days. */
+  traders30d: number;
+  /** Unix seconds of the latest event, or null. */
+  lastActive: number | null;
+};
+
+const DAY = 86_400;
+
+export function summarize(events: readonly ActivityEvent[], now: number): ClubStats {
+  const scored = events.map(toScored);
+  const t = trend(scored, now);
+  const week = events.filter((e) => e.at > now - 7 * DAY && e.at <= now);
+  return {
+    momentum: t.score,
+    change: t.change,
+    completed7d: week.filter((e) => e.kind === "swapped").length,
+    created7d: week.filter((e) => e.kind === "created").length,
+    traders30d: score(scored, now).uniqueWallets,
+    lastActive: events.reduce<number | null>((latest, e) => (latest === null || e.at > latest ? e.at : latest), null),
+  };
+}
+
+/**
+ * Signed swaps as activity events, from the pool's settled cycles. Every maker in the cycle is a
+ * party, and the tokens are whatever the cycle's intents give or want.
+ */
+export function settlementEvents(settlements: readonly Settlement[]): ActivityEvent[] {
+  return settlements.map((s) => {
+    const makers = s.cycle.map((row) => row.intent.maker.toLowerCase());
+    const tokens = s.cycle.flatMap((row) =>
+      [...row.intent.give, ...row.intent.want].filter((a) => a.kind !== "native").map((a) => a.token.toLowerCase()),
+    );
+    return {
+      id: `${s.txHash.toLowerCase()}:settled`,
+      kind: "swapped" as const,
+      contract: (CHOG_SWAP_INTENTS_ADDRESS ?? "").toLowerCase(),
+      deal: s.txHash.toLowerCase(),
+      block: s.blockNumber,
+      at: Math.floor(s.at / 1000),
+      parties: [...new Set(makers)],
+      tokens: [...new Set(tokens)],
+    };
+  });
+}
+
+/** Events from several sources as one list: each id once, newest first. */
+export function mergeEvents(...lists: ReadonlyArray<readonly ActivityEvent[]>): ActivityEvent[] {
+  const byId = new Map<string, ActivityEvent>();
+  for (const list of lists) for (const e of list) if (!byId.has(e.id)) byId.set(e.id, e);
+  return [...byId.values()].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1));
+}
+
+/** Completed swaps, newest first. */
+export const completedSwaps = (events: readonly ActivityEvent[], limit: number) =>
+  mergeEvents(events.filter((e) => e.kind === "swapped")).slice(0, limit);
+
+
+
+/** What a Club is, from the assets list (the part that doesn't change with activity). */
+export type ClubInfo = {
+  /** Lowercase address. */
+  token: string;
+  name: string;
+  symbol: string;
+  kind: "erc721" | "erc20";
+  archived: boolean;
+  note: string;
+};
+
+export const toClubInfo = (entry: AssetEntry): ClubInfo => ({
+  token: entry.address.toLowerCase(),
+  name: entry.name,
+  symbol: entry.symbol,
+  kind: entry.kind,
+  archived: entry.club === "archived",
+  note: entry.note,
+});
+
+/** A Club as the list and the detail show it. */
+export type ClubSummary = ClubInfo & { stats: ClubStats; members: number };
+
+/** `holders` is how many members held the asset at their last check. */
+export type ClubDetail = { club: ClubSummary; recent: ActivityEvent[]; holders: number };
+
+/** Up to two letters from the asset's name ("Mock Chog" → "MC"), for a Club's tile. */
+export const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();

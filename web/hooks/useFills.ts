@@ -11,7 +11,7 @@ type FillsResponse = { enabled: false } | { enabled: true; ids: string[] };
 /**
  * The deals a wallet has filled, for History (ADR 0012). With the server store on, this is the
  * server's record: every fill the app reported after checking its receipt, the same on every
- * device (`reportFill`, called from useTxFlow). Without it, it is this browser's own record, as
+ * device (`reportTx`, called from useTxFlow). Without it, it is this browser's own record, as
  * before (hooks/useLocalFills.ts), and `record` is how a page adds to it.
  */
 export function useFills(account: Address | undefined, contract: Address = CHOG_SWAP_ADDRESS) {
