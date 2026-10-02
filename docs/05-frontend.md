@@ -18,6 +18,8 @@ web/
 │   ├── create/page.tsx         ✓ Create a deal: three-step wizard (deal type → assets → confirm). /v2/create redirects here
 │   ├── deal/[id]/page.tsx     ✓ Deal Detail + actions
 │   ├── history/page.tsx        ✓ my deals + withdraw
+│   ├── clubs/page.tsx          ✓ Clubs index: Your Clubs row + Clubs by Momentum
+│   ├── clubs/[address]/        ✓ one Club: page.tsx + ClubMarket · ClubBoard · ClubMembers · ClubManage
 │   └── guide/page.tsx          ✓ deal guide + FAQ
 ├── components/
 │   ├── Providers.tsx           ✓ WagmiProvider + QueryClientProvider
@@ -226,6 +228,34 @@ otherwise                                   → "You don't own the requested Cho
 ```
 
 The **Escrow panel** keeps the spec's picture: `Maker ✓ deposited` (always true while Open) and `Taker ✗, pays on accept`.
+
+## Clubs
+
+[Spec](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md). Two routes, `/clubs` and `/clubs/[address]`, with "Clubs" in the header's `NAV`. Nothing on these screens calls a contract: Clubs read the deals that `useDealsV2` and the pool already load, plus the Club routes under `/api/clubs`.
+
+| Screen | Reads | Writes |
+|---|---|---|
+| **Clubs** `/clubs` | the verified list (`web/data/assets.json`) at once; `/api/clubs` fills in Momentum and counts; `/api/me/clubs` for "Your Clubs" | — |
+| **Club** `/clubs/[address]` | `/api/clubs/[token]`, the Market from `useClubMarket` (newest 200 deals + the pool's `token=` filter), `/members`, `/posts`, `/membership`, `/profile` | join/leave, post, report, and the staff actions below |
+
+**Without a store or Privy,** the routes return `{enabled:false}` and the screens show a read-only Club with a "not configured" note (like `NotConfigured` on the Account page). The cards still draw from the list; only the numbers are missing, and a note says so.
+
+**Tabs** (`components/Tabs.tsx`): Market, Board, Members, and Manage for staff only. Which one you see comes from the `role` returned by `GET .../membership`.
+
+- **Market** (`ClubMarket.tsx`): Have and Wanted use `DealGridV2` and `ListingGrid`; Completed is the Club's latest swaps. It says when the 200-deal scan limit was hit or the pool didn't answer.
+- **Board** (`ClubBoard.tsx`, `PostItem.tsx`): a composer for members (Note or Looking for, with a 280-character counter and the link field) and the list, pinned first. Each post offers Report, Delete (author or staff), and for staff Hide or Restore, and for the Owner Pin. A hidden post shows "hidden after reports" to everyone else.
+- **Members** (`ClubMembers.tsx`): the leaderboard with a Newest sort, `HolderBadge`, and Owner/Moderator badges. Staff get buttons by role: make or remove moderator, hand over, ban. Each is shown only when the viewer's role may act on that row (`mayActOn` in `lib/clubRoles.ts`, the same rule the server applies), and the server decides regardless.
+- **Manage** (`ClubManage.tsx`): the page editor (description, up to 3 `https://` links, "holders only can post"), the ban list, the "ownership changed on-chain" note (admins) and the moderation log.
+
+**Header** (`app/clubs/[address]/page.tsx`): name, symbol, Verified chip, Archived chip, `MomentumBadge`, stats (members, holders, swaps and new deals in 7 days, traders in 30 days, last activity), `JoinClubButton`, the description and links, and a **Claim** prompt for a member whose wallet is the token's `owner()` when the Club has no Owner.
+
+**Sign-in and writes.** `hooks/useSignIn.ts` opens Privy; `hooks/useClubMembership.ts`, `useClubBoard.ts` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`) use React Query and `useAccessToken`, send the Privy access token, and report errors through `useToast`. A failed load uses `LoadError`. Server refusals (`banned`, `cooldown`, `rate_limited`, `link_mismatch`, …) arrive as `{error, message}` and the message is what the toast shows.
+
+**Rules the UI relies on:** posts are rendered as plain text (React escapes them, nothing is linked); the Club page's links are the only anchors users supply, and they carry `rel="noopener noreferrer nofollow"`; user ids never reach the browser, so staff name people by wallet.
+
+**Reporting activity.** `lib/fillReport.ts` (`mayReport`, `reportTx`) posts a transaction hash to `/api/activity` after a fill or a V2 create, so Momentum counts the deal. It is fire-and-forget, except a fill, which History waits for.
+
+**Not built:** the banner image, notifications for Club posts and deals, and in-app requests for new Clubs.
 
 ## Listing a wallet's Chogs
 

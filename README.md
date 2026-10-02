@@ -43,6 +43,7 @@ All five are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait 
 | [`docs/04-security.md`](docs/04-security.md)               | Trust model, invariants, threats, test plan                                         |
 | [`docs/05-frontend.md`](docs/05-frontend.md)               | Screens → contract calls, tx flow, error copy                                       |
 | [`docs/06-roadmap.md`](docs/06-roadmap.md)                 | Phase checklist and open questions                                                  |
+| [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs and Momentum: a community per verified asset (spec, roles, data, API)         |
 | [`docs/adr/`](docs/adr/)                                   | Architecture decision records                                                       |
 | [`contracts/`](contracts/)                                 | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
 | [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |

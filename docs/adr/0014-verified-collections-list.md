@@ -1,6 +1,6 @@
 # ADR 0014: A curated list marks which collections and tokens are verified
 
-**Status:** Proposed · 2026-10-01 · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md).
+**Status:** Accepted · 2026-10-02 (the list file; the UI badges and warnings are still to build) · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md). [ADR 0016](0016-clubs-and-momentum.md) opens a Club for each verified entry.
 
 ## Context
 

@@ -32,6 +32,7 @@ For a wallet-free UI review, set `NEXT_PUBLIC_DEMO_DEALS=true`. Sample deals rep
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run lint` | ESLint (flat config, `eslint-config-next`) |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Unit tests with `node --test` (Node 24+; no extra dependencies, see `test/register.mjs`) |
 | `npm run abi` | Rebuild contracts with Foundry and regenerate `lib/abi.ts` (needs `forge` on PATH) |
 
 `lib/abi.ts` is committed, so the app builds without Foundry. Rerun `npm run abi` after any contract change.
@@ -39,7 +40,7 @@ For a wallet-free UI review, set `NEXT_PUBLIC_DEMO_DEALS=true`. Sample deals rep
 ## Layout
 
 ```text
-app/         routes: / · /my-chogs · /create · /deal/[id] · /history · /guide
+app/         routes: / · /my-chogs · /create · /deal/[id] · /history · /clubs · /guide
 components/  Providers, Header, ConnectButton, Chog*, Deal*, Tx*, Page helpers, artwork
 hooks/       useDeals, useDeal, useChogs, useChogApproval, useTxFlow, useLocalFills, useNow
 lib/         abi (generated), config, wagmi, contracts, deals, errors, metadata, format
@@ -50,4 +51,5 @@ lib/         abi (generated), config, wagmi, contracts, deals, errors, metadata,
 - Deals are read from storage (`tradeCount` + multicall `getTrade`), not event logs, because the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0004](../docs/adr/0004-read-deals-from-storage.md)).
 - Every write goes through `useTxFlow`: switch chain → simulate → estimate gas (+10%, since Monad bills the limit) → sign → receipt → refetch.
 - The deals page uses the supplied NFT artwork as a randomized pinboard collage; the hero swap art uses Angel Chog #1159 and Devil Chog #1376 in board-style white frames.
+- Clubs (`/clubs`) need the Upstash store and Privy sign-in (`UPSTASH_REDIS_REST_*`, `PRIVY_APP_SECRET`); without them they are read-only. Set `CLUB_ADMIN_USER_IDS` (Privy user ids, comma-separated) to name the app admins. A new Club is a `verified` entry in `data/assets.json`; `npm test` covers the logic. Spec: [docs/09-clubs.md](../docs/09-clubs.md).
 - `AGENTS.md` / `CLAUDE.md` come from create-next-app. They point coding agents at the bundled Next 16 docs in `node_modules/next/dist/docs/`.

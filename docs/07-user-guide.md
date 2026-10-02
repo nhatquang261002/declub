@@ -28,6 +28,38 @@ When signed swaps are enabled (`NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS`), step 1 
 
 The create screen shows six short reasons as chips (*Can't fail*, *Costs gas*, *Assets locked*, *Free*, *Nothing locked*, *Can fail*). Each has a tooltip and links to its own entry in the in-app Guide (`/guide#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`). The wording for all of them lives in one file, `web/lib/settlementTerms.ts`, which the tooltips and the Guide page both read; change a reason there and both follow. The reasoning behind the two paths is in [ADR 0008](adr/0008-trade-intents.md) and [ADR 0009](adr/0009-ring-swaps.md).
 
+## Clubs and Momentum
+
+A **Club** is the community for one verified NFT collection or token, such as Chog. Open **Clubs** in the header to see them all, busiest first. Each Club has four tabs:
+
+- **Market:** the open deals and signed swaps that offer or ask for the asset, and the latest completed swaps.
+- **Board:** short posts from members.
+- **Members:** a leaderboard of the people in the Club.
+- **Manage:** only for the Club's staff (see *Roles*).
+
+**Joining.** Sign in, link a wallet, and press **Join**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. **Leave** takes you off the list again.
+
+**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection, or the minimum amount of a token). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
+
+**Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet. Posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has seen counts, so a deal made outside the app may be missing.
+
+**Posting.** You need to be a member and to have shared a verified X or Discord profile (Account page). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+
+**Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different members have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it.
+
+### Roles
+
+| Role | Who | Can |
+|---|---|---|
+| **Owner** | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page. Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders |
+| **Moderator** | Appointed by the Owner | Hide, restore and delete posts, ban and unban members of this Club. Can't act on the Owner or other moderators |
+| **Member** | Anyone who joined | Post, report, appear on the leaderboard |
+| **Visitor** | Not signed in or not joined | Read only |
+
+The app's admins can do all of this in every Club and ban someone from all of them. A banned person leaves the Club, loses any role and can't rejoin or post. Staff actions are written to a log that only staff can read.
+
+Clubs are community pages, not part of the contracts: nothing in a deal, a fee or a settlement depends on one. Posts and memberships are kept by the app's server, and a Club only exists for assets on the verified list, so a copycat collection can't get one.
+
 ## Safety guidelines
 
 - Confirm the wallet and network before signing.
@@ -36,5 +68,6 @@ The create screen shows six short reasons as chips (*Can't fail*, *Costs gas*, *
 - Multi-asset and signed deals charge a small flat protocol fee per side, only when the deal completes ([ADR 0015](adr/0015-protocol-fee.md)); the screens show the exact amount before you confirm. Single-collection deals on the original contract have no fee. Wallets also charge network gas.
 - The current deployment is a Monad testnet demo with MockChog. Do not use valuable mainnet assets.
 - Never approve or send assets to a contract address copied from an untrusted message.
+- A Club post or a profile link is written by a member, not checked by Chog Swap. A Holder badge or a high Momentum is not an endorsement. Check the deal itself before you sign.
 
 The in-app [Field Guide](../web/app/guide/page.tsx) contains the user-facing FAQ and walkthrough.
