@@ -26,6 +26,7 @@ See the [roadmap](docs/06-roadmap.md).
 Privy is On Deal's identity layer for trading with strangers, not just its sign-in:
 
 - **Verified trader profiles:** a maker's X or Discord handle, read from Privy's linked accounts on the server, shows beside their wallet on every deal.
+- **Make a deal for @handle:** type the counterparty's X or Discord handle, and Privy's user lookup finds the wallet to lock the deal to, so nobody pastes an address from a DM.
 - **Webhooks** keep those profiles and Club memberships accurate when an account is unlinked, transferred or deleted.
 - **One person, many wallets:** link a vault and a hot wallet. Club Holder badges count assets across all of them, and Club roles and bans follow the Privy user, not one wallet.
 - **Per-user server state** is authorized by verified Privy access tokens.

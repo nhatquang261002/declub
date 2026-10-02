@@ -11,6 +11,12 @@ On Deal is a peer-to-peer, non-custodial marketplace for dealing Chogs on Monad.
 5. **Accept a deal** when you own every requested Chog. The taker approves the collection if needed and sends requested MON in the Accept & Swap transaction.
 6. **Settle, cancel, or reclaim.** A successful fill swaps both sides atomically. The maker can cancel an open deal, or reclaim it after expiry.
 
+## A deal for one person
+
+To lock a deal to the person you agreed it with, put their wallet in **Only this wallet can accept**. If they have shared their profile (Account page), you can type their X or Discord handle instead, like `@bob`, and press **Find**. You'll see the wallets they show under that handle; pick the one they'll accept from. The review shows the handle next to the address.
+
+Only people who turned on "Show my profile to other traders" can be found, and you need to be signed in. A handle tells you the X or Discord account and the wallet belong to the same person, not that they're honest, and lookalike handles exist: check the handle and the address against your conversation.
+
 ## Locked deals or signed swaps
 
 When signed swaps are enabled (`NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS`), step 1 of Create asks how the deal settles. Both end in the same list, tagged **Locked** or **Signed**.

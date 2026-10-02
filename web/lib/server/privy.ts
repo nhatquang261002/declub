@@ -1,6 +1,7 @@
 import { NotFoundError, PrivyClient, type User } from "@privy-io/node";
 import { Webhook } from "svix";
 import { PRIVY_APP_ID } from "../config";
+import type { ProfileProvider } from "../profiles";
 
 /**
  * Server-side Privy. Needs the app secret (PRIVY_APP_SECRET, from the Privy dashboard) beside the
@@ -59,6 +60,23 @@ export function verifyWebhook(body: string, headers: Headers): unknown | null {
     });
   } catch {
     return null;
+  }
+}
+
+/**
+ * The id of the Privy user who linked this X or Discord username, or `null` if nobody in this app
+ * has (ADR 0017). Only an id comes back: what may be shown about them is decided by what they chose
+ * to share.
+ */
+export async function findUserIdByHandle(provider: ProfileProvider, username: string): Promise<string | null> {
+  const users = client().users();
+  try {
+    const user =
+      provider === "twitter" ? await users.getByTwitterUsername({ username }) : await users.getByDiscordUsername({ username });
+    return user.id;
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
   }
 }
 

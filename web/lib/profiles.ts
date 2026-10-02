@@ -21,6 +21,44 @@ const HANDLE: Record<ProfileProvider, RegExp> = {
 
 export const PROFILE_LABEL: Record<ProfileProvider, string> = { twitter: "X", discord: "Discord" };
 
+/** A handle as people write it: `@bob` on X, plain `bob` on Discord. */
+export const handleLabel = (profile: Profile) => (profile.provider === "twitter" ? `@${profile.handle}` : profile.handle);
+
+/** A trader found by handle, with the wallets they show under it (ADR 0017). */
+export type HandleMatch = Profile & { wallets: `0x${string}`[] };
+
+/** The usernames to look up for what someone typed. */
+export type HandleQuery = Partial<Record<ProfileProvider, string>>;
+
+/**
+ * Reads a handle typed into "who can accept" (ADR 0017): `@bob`, `bob` or an x.com / twitter.com
+ * link. The same text can be an X and a Discord username, possibly of two different people, so
+ * both are returned and each match is shown with its provider. A link is X only. `null` when the
+ * text can't be a handle.
+ */
+export function parseHandleQuery(text: string): HandleQuery | null {
+  const raw = text.trim();
+  const link = /^(?:https?:\/\/)?(?:www\.)?(?:x|twitter)\.com\/@?([^/?#\s]+)\/?(?:[?#].*)?$/i.exec(raw);
+  if (link) return HANDLE.twitter.test(link[1]) ? { twitter: link[1] } : null;
+  const name = raw.startsWith("@") ? raw.slice(1) : raw;
+  const query: HandleQuery = {};
+  if (HANDLE.twitter.test(name)) query.twitter = name;
+  // Discord usernames are lowercase; people often type them capitalised.
+  if (HANDLE.discord.test(name.toLowerCase())) query.discord = name.toLowerCase();
+  return query.twitter || query.discord ? query : null;
+}
+
+/**
+ * Whether "who can accept" holds a handle rather than (the start of) an address. Text starting
+ * with 0x is read as an address while it's typed; an X handle that starts with 0x can be entered
+ * as `@0x…`.
+ */
+export function looksLikeHandle(text: string): boolean {
+  const raw = text.trim();
+  if (/^0x/i.test(raw)) return false;
+  return parseHandleQuery(raw) !== null;
+}
+
 /** The profile page, for providers that have one by handle. */
 export function profileUrl(profile: Profile): string | undefined {
   return profile.provider === "twitter" ? `https://x.com/${profile.handle}` : undefined;

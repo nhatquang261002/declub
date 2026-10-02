@@ -238,8 +238,9 @@ function ShareProfile() {
       </h2>
       <p className="mt-1 text-sm text-muted">
         Next to your wallet on deals, others see the X or Discord account you linked here, so they know who they are
-        trading with. It only shows that the account and the wallet belong to the same person, not that either is
-        trustworthy. Off until you turn it on, and you can turn it off at any time.
+        trading with, and signed-in traders can find your wallet by that handle to make you a private deal. It only
+        shows that the account and the wallet belong to the same person, not that either is trustworthy. Off until you
+        turn it on, and you can turn it off at any time.
       </p>
       {shared && profile ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/70 px-3 py-2.5">

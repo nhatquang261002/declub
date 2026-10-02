@@ -366,6 +366,7 @@ Rules on the Chog-contract side (client-side):
 - Up to 10 Chogs per side, no duplicates, and nothing on both sides.
 - Offered Chogs are picked from the wallet. Requested Chogs are added by id; `ownerOf` blocks ids that don't exist.
 - A private taker must currently own every requested Chog.
+- "Who can accept" also takes an X or Discord handle when Privy is on: **Find** calls `/api/profiles/lookup` and lists the wallets that trader shares under it; picking one fills in the address. A handle left unresolved blocks the step. The review shows the taker with `<Who>` ([ADR 0017](adr/0017-deal-by-handle.md)).
 - A trait request needs a trait that matches at least one Chog.
 - The approval step only appears when a Chog is offered (a MON-only offer needs none).
 - On confirm, read the new id from the receipt's `TradeCreated` / `TraitTradeCreated` log and go to `/deal/<id>`.

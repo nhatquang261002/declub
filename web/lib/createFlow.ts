@@ -1,4 +1,6 @@
 import { isAddress, zeroAddress, type Address } from "viem";
+import { PRIVY_APP_ID } from "./config";
+import { looksLikeHandle } from "./profiles";
 
 /**
  * The three ways to start a deal. "open" (makers list assets, takers send offers) and, when
@@ -34,10 +36,14 @@ export function expiryTimestamp(expiry: Expiry): bigint {
   return seconds === 0 ? 0n : BigInt(Math.floor(Date.now() / 1000) + seconds);
 }
 
-/** What is wrong with the "only this wallet" field, or null when it is empty or fine. */
-export function takerError(text: string, me: Address | undefined): string | null {
+/**
+ * What is wrong with the "only this wallet" field, or null when it is empty or fine. A handle is
+ * never accepted as it is: the maker picks one of the wallets it resolves to (ADR 0017).
+ */
+export function takerError(text: string, me: Address | undefined, handles = !!PRIVY_APP_ID): string | null {
   const taker = text.trim();
   if (!taker) return null;
+  if (handles && looksLikeHandle(taker)) return "Pick which of their wallets can accept, or enter a wallet address.";
   if (!isAddress(taker)) return "Enter a valid wallet address, or leave it empty.";
   if (me && taker.toLowerCase() === me.toLowerCase()) return "You cannot make a private offer to yourself.";
   return null;

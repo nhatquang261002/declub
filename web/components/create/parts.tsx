@@ -1,7 +1,14 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { isAddress } from "viem";
+import { XLogoIcon } from "@/components/Icons";
 import { Select } from "@/components/Select";
+import { Who } from "@/components/Who";
+import { useAccessToken } from "@/hooks/useAccessToken";
+import { call } from "@/hooks/useClubMembership";
+import { PRIVY_APP_ID } from "@/lib/config";
 import { EXPIRIES, expiryLabelOf, type Terms } from "@/lib/createFlow";
 import { shortAddress } from "@/lib/format";
+import { PROFILE_LABEL, handleLabel, looksLikeHandle, type HandleMatch } from "@/lib/profiles";
 
 export function StepHeading({ title, blurb }: { title: string; blurb?: string }) {
   return (
@@ -43,17 +50,7 @@ export function NextButton({ onClick, disabled, children = "Continue" }: { onCli
 export function TermsFields({ terms, onChange, takerLabel }: { terms: Terms; onChange: (terms: Terms) => void; takerLabel: string }) {
   return (
     <section className="page-section grid gap-6 p-4 md:grid-cols-2">
-      <div>
-        <label className="label" htmlFor="taker">{takerLabel}</label>
-        <input
-          id="taker"
-          className="input font-mono"
-          placeholder="0x…"
-          value={terms.taker}
-          onChange={(e) => onChange({ ...terms, taker: e.target.value })}
-        />
-        <p className="mt-1 text-xs text-muted">Leave empty to let anyone.</p>
-      </div>
+      <TakerField label={takerLabel} value={terms.taker} onChange={(taker) => onChange({ ...terms, taker })} />
       <div>
         <label className="label" htmlFor="expiry">Expiry</label>
         <Select
@@ -65,6 +62,110 @@ export function TermsFields({ terms, onChange, takerLabel }: { terms: Terms; onC
         <p className="mt-1 text-xs text-muted">After this you can take your assets back.</p>
       </div>
     </section>
+  );
+}
+
+type Lookup = { enabled: boolean; matches?: HandleMatch[]; self?: boolean };
+
+/**
+ * "Only this wallet": an address, or (with Privy) someone's X or Discord handle, which is looked up
+ * and turned into one of the wallets they share under it (ADR 0017). The deal is always locked to
+ * an address; the handle only helps find the right one.
+ */
+function TakerField({ label, value, onChange }: { label: string; value: string; onChange: (taker: string) => void }) {
+  const getToken = useAccessToken();
+  const [lookup, setLookup] = useState<{ query: string; data?: Lookup; error?: string }>();
+  const [busy, setBusy] = useState(false);
+
+  const text = value.trim();
+  const handle = !!PRIVY_APP_ID && looksLikeHandle(text);
+  const found = lookup?.query === text ? lookup : undefined;
+
+  async function find() {
+    if (!getToken || !handle || busy) return;
+    setBusy(true);
+    try {
+      const data = await call<Lookup>(getToken, "GET", `/api/profiles/lookup?handle=${encodeURIComponent(text)}`);
+      setLookup({ query: text, data });
+    } catch (error) {
+      setLookup({ query: text, error: error instanceof Error ? error.message : "Couldn't look that handle up." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const note = (children: ReactNode) => <p className="mt-1 text-xs text-muted">{children}</p>;
+  let hint: ReactNode;
+  if (!text) hint = note(PRIVY_APP_ID ? "Leave empty to let anyone, or type someone's @handle to find their wallet." : "Leave empty to let anyone.");
+  else if (isAddress(text)) hint = note(<>Only <Who address={text} /></>);
+  else if (!handle) hint = null;
+  else if (!getToken) hint = note("Sign in to find a trader by handle, or enter their wallet address.");
+  else if (found?.error) hint = <p className="mt-1 text-xs text-danger">{found.error}</p>;
+  else if (found?.data && !found.data.enabled) hint = note("Finding traders by handle is off here. Enter their wallet address.");
+  else if (found?.data?.matches?.length) hint = <HandleMatches matches={found.data.matches} onPick={onChange} />;
+  else if (found?.data) {
+    hint = note(
+      found.data.self
+        ? "That's your own handle."
+        : `Nobody shows a profile as ${text}. Ask them to turn on “Show my profile to other traders” on their Account page, or enter their wallet address.`,
+    );
+  } else hint = note(`Press Find to look up ${text.startsWith("@") ? text : `@${text}`}.`);
+
+  return (
+    <div>
+      <label className="label" htmlFor="taker">{label}</label>
+      <div className="flex gap-2">
+        <input
+          id="taker"
+          className="input font-mono"
+          placeholder={PRIVY_APP_ID ? "0x… or @handle" : "0x…"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && handle) {
+              e.preventDefault();
+              void find();
+            }
+          }}
+        />
+        {handle && getToken && (
+          <button type="button" className="btn-secondary shrink-0" disabled={busy} onClick={find}>
+            {busy ? "Finding…" : "Find"}
+          </button>
+        )}
+      </div>
+      {hint}
+    </div>
+  );
+}
+
+/** The wallets found for a handle. Picking one puts its address in the field. */
+function HandleMatches({ matches, onPick }: { matches: HandleMatch[]; onPick: (wallet: string) => void }) {
+  return (
+    <div className="mt-2 space-y-1.5">
+      <p className="text-xs text-muted">Pick the wallet they will accept from:</p>
+      <ul className="flex flex-col gap-1.5">
+        {matches.flatMap((match) =>
+          match.wallets.map((wallet) => (
+            <li key={`${match.provider}:${wallet}`}>
+              <button
+                type="button"
+                title={wallet}
+                className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-line/70 px-3 py-2 text-left text-sm hover:border-mint/60"
+                onClick={() => onPick(wallet)}
+              >
+                <span className="flex items-center gap-1.5">
+                  {match.provider === "twitter" && <XLogoIcon className="size-3 shrink-0" />}
+                  <span className="font-semibold">{handleLabel(match)}</span>
+                  <span className="text-xs text-muted">on {PROFILE_LABEL[match.provider]}</span>
+                </span>
+                <span className="font-mono text-xs">{shortAddress(wallet)}</span>
+              </button>
+            </li>
+          )),
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -84,9 +185,10 @@ export function ReviewCard({ title, note, children }: { title: string; note?: st
 /** The deal kind, who can accept and the expiry, as the final review shows them. */
 export function ReviewTerms({ kindLabel, terms, whoLabel }: { kindLabel: string; terms: Terms; whoLabel: string }) {
   const taker = terms.taker.trim();
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, ReactNode]> = [
     ["Deal type", kindLabel],
-    [whoLabel, taker ? shortAddress(taker) : "Anyone"],
+    // The taker's shared profile, if any, so the maker sees whose wallet the deal is locked to.
+    [whoLabel, taker ? <Who address={taker} plain /> : "Anyone"],
     ["Expires", terms.expiry === "none" ? "Never" : `In ${expiryLabelOf(terms.expiry)}`],
   ];
   return (
