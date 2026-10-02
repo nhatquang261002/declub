@@ -5,12 +5,15 @@ import {Vm} from "forge-std/Vm.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OnDealV2} from "../../src/OnDealV2.sol";
 import {IOnDealV2} from "../../src/interfaces/IOnDealV2.sol";
+import {IFeeAdmin} from "../../src/interfaces/IFeeAdmin.sol";
 import {OnDealV2Base} from "./OnDealV2Base.sol";
 import {MonReceiver, ReentrantReceiver} from "../utils/Actors.sol";
 
-/// @dev The protocol fee (docs/adr/0015-protocol-fee.md): every side sends FEE with its own call,
-///      the escrow holds it, and it is released to the recipient only when the deal completes and
-///      refunded otherwise. The fixture deploys with a 2 MON fee, so a completed deal pays 4.
+/// @dev The protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
+///      every side sends the trade's fee with its own call, the escrow holds it, and it is
+///      released to the recipient only when the deal completes and refunded otherwise. The
+///      fixture deploys with a 2 MON fee (ceiling 8), so a completed deal pays 4. The admin
+///      functions themselves are in `FeeAdmin.t.sol`.
 contract OnDealV2FeeTest is OnDealV2Base {
     uint256 internal constant FEE = 2 ether;
     IOnDealV2.AssetType internal constant NATIVE = IOnDealV2.AssetType.Native;
@@ -40,31 +43,40 @@ contract OnDealV2FeeTest is OnDealV2Base {
     // ───────────────────────────────────────────── constructor
 
     function test_exposesTheFeeAndTheRecipient() public view {
-        assertEq(swap.FEE(), FEE);
+        assertEq(swap.fee(), FEE);
         assertEq(swap.FEE_RECIPIENT(), treasury);
-        assertEq(swap.MAX_FEE(), 500 ether);
+        assertEq(swap.MAX_FEE(), 4 * FEE);
+        assertEq(swap.feeAdmin(), feeAdmin);
+    }
+
+    function test_constructorRefusesACeilingAboveTheLimit() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IFeeAdmin.FeeTooHigh.selector, 500 ether + 1, 500 ether)
+        );
+        new OnDealV2(0, 500 ether + 1, treasury, feeAdmin);
     }
 
     function test_constructorRefusesAFeeAboveTheCeiling() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(IOnDealV2.FeeTooHigh.selector, 500 ether + 1, 500 ether)
-        );
-        new OnDealV2(500 ether + 1, treasury);
+        vm.expectRevert(abi.encodeWithSelector(IFeeAdmin.FeeTooHigh.selector, 3 ether, 2 ether));
+        new OnDealV2(3 ether, 2 ether, treasury, feeAdmin);
     }
 
-    function test_constructorAcceptsTheCeilingExactly() public {
-        assertEq(new OnDealV2(500 ether, treasury).FEE(), 500 ether);
+    function test_constructorAcceptsTheLimitExactly() public {
+        OnDealV2 s = new OnDealV2(500 ether, 500 ether, treasury, feeAdmin);
+        assertEq(s.fee(), 500 ether);
+        assertEq(s.MAX_FEE(), 500 ether);
     }
 
-    function test_constructorRefusesAFeeWithoutARecipient() public {
-        vm.expectRevert(IOnDealV2.NoFeeRecipient.selector);
-        new OnDealV2(1, address(0));
+    function test_constructorRefusesACeilingWithoutARecipient() public {
+        vm.expectRevert(IFeeAdmin.NoFeeRecipient.selector);
+        new OnDealV2(0, 1, address(0), feeAdmin); // no fee yet, but one could be set
     }
 
     function test_constructorAllowsNoFeeAndNoRecipient() public {
-        OnDealV2 free = new OnDealV2(0, address(0));
-        assertEq(free.FEE(), 0);
+        OnDealV2 free = new OnDealV2(0, 0, address(0), address(0));
+        assertEq(free.fee(), 0);
         assertEq(free.FEE_RECIPIENT(), address(0));
+        assertEq(free.feeAdmin(), address(0));
     }
 
     // ───────────────────────────────────────────── exact value on every payable entry
@@ -324,7 +336,7 @@ contract OnDealV2FeeTest is OnDealV2Base {
 
     function test_recipientThatRejectsMonIsCreditedAndTheFillStillWorks() public {
         MonReceiver picky = new MonReceiver();
-        OnDealV2 s = new OnDealV2(FEE, address(picky));
+        OnDealV2 s = new OnDealV2(FEE, FEE, address(picky), address(0));
         vm.prank(alice);
         chog.setApprovalForAll(address(s), true);
         vm.prank(bob);
@@ -369,7 +381,7 @@ contract OnDealV2FeeTest is OnDealV2Base {
 
     function test_recipientCannotReenterWhileBeingPaid() public {
         ReentrantReceiver reentrant = new ReentrantReceiver();
-        OnDealV2 s = new OnDealV2(FEE, address(reentrant));
+        OnDealV2 s = new OnDealV2(FEE, FEE, address(reentrant), address(0));
         vm.prank(alice);
         chog.setApprovalForAll(address(s), true);
         vm.prank(bob);
@@ -391,10 +403,133 @@ contract OnDealV2FeeTest is OnDealV2Base {
         assertEq(address(s).balance, 0);
     }
 
+    // ───────────────────────────────────────────── the fee is fixed per deal
+
+    function _setFeeNow(uint256 newFee) internal {
+        vm.prank(feeAdmin);
+        swap.setFee(newFee);
+        if (newFee > swap.fee()) {
+            vm.warp(block.timestamp + swap.FEE_RAISE_DELAY());
+            vm.prank(feeAdmin);
+            swap.applyFee();
+        }
+        assertEq(swap.fee(), newFee);
+    }
+
+    function test_aTradeRecordsTheFeeInForceWhenCreated() public {
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_chog(B1)));
+        assertEq(swap.getTrade(id).fee, FEE);
+
+        _setFeeNow(1 ether);
+        uint256 id2 = _create(alice, _list(_chog(A2)), _list(_chog(B2)));
+        assertEq(swap.getTrade(id2).fee, 1 ether);
+        assertEq(swap.getTrade(id).fee, FEE, "an old trade keeps its fee");
+    }
+
+    function test_aRaiseDoesNotChangeWhatAnOldTradeCosts() public {
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_chog(B1)));
+        _setFeeNow(3 * FEE);
+
+        vm.prank(bob);
+        vm.expectRevert(_wrongAmount(FEE, 3 * FEE)); // the new fee is not what this deal owes
+        swap.fillTrade{value: 3 * FEE}(id);
+
+        vm.expectEmit(true, true, false, true, address(swap));
+        emit IOnDealV2.FeeCharged(id, treasury, 2 * FEE);
+        vm.prank(bob);
+        swap.fillTrade{value: FEE}(id);
+
+        assertEq(treasury.balance, 2 * FEE);
+        assertEq(bob.balance, START_MON - FEE);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aCutDoesNotChangeWhatAnOldTradeCosts() public {
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_chog(B1)));
+        _setFeeNow(0.5 ether);
+
+        vm.prank(bob);
+        vm.expectRevert(_wrongAmount(FEE, 0.5 ether));
+        swap.fillTrade{value: 0.5 ether}(id);
+
+        _fill(bob, id);
+        assertEq(treasury.balance, 2 * FEE);
+    }
+
+    function test_aCancelAfterAChangeRefundsTheShareTheMakerPaid() public {
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_chog(B1)));
+        _setFeeNow(3 * FEE);
+
+        vm.prank(alice);
+        swap.cancelTrade(id);
+        assertEq(alice.balance, START_MON);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aReclaimAfterAChangeRefundsTheShareTheMakerPaid() public {
+        uint256 id = _create(
+            alice, _list(_chog(A1)), _list(_chog(B1)), address(0), uint64(block.timestamp + 1)
+        );
+        _setFeeNow(0); // a cut applies at once
+        vm.warp(block.timestamp + 2);
+
+        swap.reclaimExpired(id);
+        assertEq(alice.balance, START_MON);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aProposalPaysTheOffersFeeAcrossAChange() public {
+        uint256 id = _openOffer(alice, _list(_chog(A1)), "anything");
+        _setFeeNow(3 * FEE);
+
+        vm.prank(bob);
+        vm.expectRevert(_wrongAmount(FEE, 3 * FEE));
+        swap.propose{value: 3 * FEE}(id, _list(_chog(B1)));
+
+        uint256 p0 = _propose(bob, id, _list(_chog(B1)));
+        uint256 p1 = _propose(carol, id, _list(_chog(C1)));
+        assertEq(address(swap).balance, 3 * FEE, "maker's share and two proposals, at FEE");
+
+        vm.prank(alice);
+        swap.rejectProposal(id, p1);
+        assertEq(carol.balance, START_MON, "rejected at the share it paid");
+
+        vm.prank(alice);
+        swap.acceptProposal(id, p0);
+        assertEq(treasury.balance, 2 * FEE);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aWithdrawnProposalAfterAChangeGetsItsShareBack() public {
+        uint256 id = _openOffer(alice, _list(_chog(A1)), "");
+        uint256 p = _propose(bob, id, _list(_chog(B1)));
+        _setFeeNow(0);
+
+        vm.prank(bob);
+        swap.withdrawProposal(id, p);
+        assertEq(bob.balance, START_MON);
+        assertEq(address(swap).balance, FEE, "only the maker's share is left");
+    }
+
+    function test_aTradeCreatedAtZeroFeeStaysFreeAfterARaise() public {
+        _setFeeNow(0);
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_chog(B1)));
+        _setFeeNow(FEE);
+
+        vm.recordLogs();
+        vm.prank(bob);
+        swap.fillTrade(id);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != IOnDealV2.FeeCharged.selector, "FeeCharged emitted");
+        }
+        assertEq(treasury.balance, 0);
+    }
+
     // ───────────────────────────────────────────── zero fee
 
     function test_aZeroFeeDeploymentChargesAndEmitsNothing() public {
-        OnDealV2 free = new OnDealV2(0, address(0));
+        OnDealV2 free = new OnDealV2(0, 0, address(0), address(0));
         vm.prank(alice);
         chog.setApprovalForAll(address(free), true);
         vm.prank(bob);

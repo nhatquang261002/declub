@@ -12,10 +12,12 @@ import {Handler} from "./Handler.sol";
 
 /// @dev The escrow is always exactly what open trades and `Active` proposals hold plus what is
 ///      credited for `claim`, for native, every ERC-20 and every NFT, however the calls
-///      interleave. Native also holds one fee share per open trade and per `Active` proposal, and
-///      the fee recipient has received exactly 2 × fee for every deal that completed.
+///      interleave. Native also holds one fee share per open trade and per `Active` proposal, at
+///      that trade's own fee, and the fee recipient has received exactly 2 × the trade's fee for
+///      every deal that completed. The fee admin changes the fee during the run.
 contract OnDealV2InvariantTest is Test {
     uint256 internal constant FEE = 3 ether;
+    address internal constant FEE_ADMIN = address(0xFEEAD);
 
     OnDealV2 internal swap;
     MonReceiver internal treasury;
@@ -27,14 +29,14 @@ contract OnDealV2InvariantTest is Test {
     function setUp() public {
         treasury = new MonReceiver();
         treasury.setAccept(true);
-        swap = new OnDealV2(FEE, address(treasury));
+        swap = new OnDealV2(FEE, 4 * FEE, address(treasury), FEE_ADMIN);
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         blk = new BlocklistToken();
-        handler = new Handler(swap, chog, usdc, blk, treasury);
+        handler = new Handler(swap, chog, usdc, blk, treasury, FEE_ADMIN);
 
         targetContract(address(handler));
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](15);
         selectors[0] = Handler.create.selector;
         selectors[1] = Handler.fill.selector;
         selectors[2] = Handler.cancel.selector;
@@ -49,6 +51,7 @@ contract OnDealV2InvariantTest is Test {
         selectors[11] = Handler.rejectProposal.selector;
         selectors[12] = Handler.withdrawProposal.selector;
         selectors[13] = Handler.acceptFees.selector;
+        selectors[14] = Handler.changeFee.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
@@ -103,14 +106,15 @@ contract OnDealV2InvariantTest is Test {
         return false;
     }
 
-    /// @dev Fee shares the escrow holds: one per open trade (the maker's) and per `Active`
-    ///      proposal (the proposer's).
-    function _heldShares() internal view returns (uint256 shares) {
+    /// @dev Fee shares the escrow holds, each at its trade's own fee: one per open trade (the
+    ///      maker's) and per `Active` proposal (the proposer's).
+    function _heldShares() internal view returns (uint256 held) {
         for (uint256 id = 1; id <= swap.tradeCount(); ++id) {
-            if (swap.getTrade(id).status == IOnDealV2.Status.Open) ++shares;
+            IOnDealV2.Trade memory t = swap.getTrade(id);
+            if (t.status == IOnDealV2.Status.Open) held += t.fee;
             for (uint256 pid; pid < swap.proposalCount(id); ++pid) {
                 if (swap.getProposal(id, pid).status == IOnDealV2.ProposalStatus.Active) {
-                    ++shares;
+                    held += t.fee;
                 }
             }
         }
@@ -121,19 +125,20 @@ contract OnDealV2InvariantTest is Test {
     function invariant_nativeIsFullyAccounted() public view {
         assertEq(
             address(swap).balance,
-            _openOffered(IOnDealV2.AssetType.Native, address(0)) + _heldShares() * FEE
+            _openOffered(IOnDealV2.AssetType.Native, address(0)) + _heldShares()
                 + _credits(IOnDealV2.AssetType.Native, address(0), 0)
                 + swap.claimable(address(treasury), IOnDealV2.AssetType.Native, address(0), 0)
         );
     }
 
-    /// V9: the recipient has received exactly 2 × fee per completed deal, as MON or as a credit,
-    ///     and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn.
+    /// V9: the recipient has received exactly 2 × the trade's own fee per completed deal, as MON
+    ///     or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or
+    ///     withdrawn.
     function invariant_feesAreOnlyTakenOnCompletion() public view {
         assertEq(
             address(treasury).balance
                 + swap.claimable(address(treasury), IOnDealV2.AssetType.Native, address(0), 0),
-            2 * FEE * handler.ghost_completed()
+            handler.ghost_feesCharged()
         );
     }
 

@@ -57,7 +57,7 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
         bytes32 assetType =
             keccak256("Asset(uint8 assetType,address token,uint256 id,uint256 amount)");
         bytes32 intentType = keccak256(
-            "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 fee,uint64 deadline,uint256 nonce)"
+            "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 maxFee,uint64 deadline,uint256 nonce)"
             "Asset(uint8 assetType,address token,uint256 id,uint256 amount)"
         );
         bytes32 giveHash = keccak256(
@@ -77,7 +77,7 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
                 giveHash,
                 wantHash,
                 swap.FEE_TOKEN(),
-                swap.FEE_AMOUNT(),
+                swap.fee(),
                 a.deadline,
                 uint256(0)
             )
@@ -88,7 +88,7 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
                     "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
                 ),
                 keccak256("OnDealIntents"),
-                keccak256("2"),
+                keccak256("3"),
                 block.chainid,
                 address(swap)
             )
@@ -123,7 +123,7 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
         assertTrue(swap.intentDigest(x) != base);
 
         x = _copy(a);
-        x.fee += 1;
+        x.maxFee += 1;
         assertTrue(swap.intentDigest(x) != base);
 
         x = _copy(a);
@@ -141,7 +141,7 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
         returns (IOnDealIntents.Intent memory)
     {
         return IOnDealIntents.Intent(
-            a.maker, a.give, a.want, a.feeToken, a.fee, a.deadline, a.nonce
+            a.maker, a.give, a.want, a.feeToken, a.maxFee, a.deadline, a.nonce
         );
     }
 
@@ -181,7 +181,8 @@ contract OnDealIntentsSignaturesTest is OnDealIntentsBase {
 
     /// @dev A signature for another deployment of the contract is worthless here.
     function test_revertsOnSignatureForAnotherContract() public {
-        OnDealIntents other = new OnDealIntents(address(wmon), _feeAmount(), treasury);
+        OnDealIntents other =
+            new OnDealIntents(address(wmon), _feeAmount(), _maxFee(), treasury, feeAdmin);
         (IOnDealIntents.Intent memory a, IOnDealIntents.Intent memory b) = _pair();
         (uint8 va, bytes32 ra, bytes32 sa) = vm.sign(aliceKey, other.intentDigest(a));
         (uint8 vb, bytes32 rb, bytes32 sb) = vm.sign(bobKey, other.intentDigest(b));

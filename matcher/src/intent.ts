@@ -12,7 +12,7 @@ export const MAX_CYCLE = 4;
 export const MAX_ASSETS_PER_SIDE = 10;
 
 export const domain = (chainId: number, verifyingContract: Address) =>
-  ({ name: "OnDealIntents", version: "2", chainId, verifyingContract }) as const;
+  ({ name: "OnDealIntents", version: "3", chainId, verifyingContract }) as const;
 
 export const types = {
   Asset: [
@@ -26,7 +26,7 @@ export const types = {
     { name: "give", type: "Asset[]" },
     { name: "want", type: "Asset[]" },
     { name: "feeToken", type: "address" },
-    { name: "fee", type: "uint256" },
+    { name: "maxFee", type: "uint256" },
     { name: "deadline", type: "uint64" },
     { name: "nonce", type: "uint256" },
   ],
@@ -37,16 +37,25 @@ export const cancelTypes = {
   CancelIntent: [{ name: "intentHash", type: "bytes32" }],
 } as const;
 
-/** What the contract charges each maker in a settled cycle (`FEE_TOKEN`, `FEE_AMOUNT`). */
+/**
+ * What the contract charges each maker in a settled cycle: `FEE_TOKEN`, fixed, and `fee()`, which
+ * the fee admin can change (ADR 0018), so `amount` is only true when it was read.
+ */
 export interface FeeTerms {
   token: Address;
   amount: bigint;
 }
 
-/** The signed fee has to be the one the contract charges, or `settle` reverts with `WrongFee`. */
+/**
+ * The signed fee token has to be the contract's, and the signed `maxFee` at least the fee in force,
+ * or `settle` reverts with `WrongFee`. Above it is fine: the maker pays only the fee.
+ */
 export function feeProblem(intent: Intent, terms: FeeTerms): string | null {
-  if (!isAddressEqual(intent.feeToken, terms.token) || intent.fee !== terms.amount) {
-    return `the fee must be ${terms.amount} of ${terms.token}`;
+  if (!isAddressEqual(intent.feeToken, terms.token)) {
+    return `the fee is paid in ${terms.token}, not ${intent.feeToken}`;
+  }
+  if (intent.maxFee < terms.amount) {
+    return `the fee is ${terms.amount}, above the signed maxFee ${intent.maxFee}`;
   }
   return null;
 }

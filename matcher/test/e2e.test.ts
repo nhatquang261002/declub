@@ -441,9 +441,9 @@ describe("pool and matcher against a local chain", { skip }, () => {
   it("hashes the fee into the intent, as the contract does", async () => {
     const [id] = await w.mintChogs(w.alice.address, 1);
     const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)]);
-    assert.equal(intent.fee, FEE);
+    assert.equal(intent.maxFee, FEE);
     assert.equal(intent.feeToken, w.wmon);
-    const other = { ...intent, fee: FEE + 1n };
+    const other = { ...intent, maxFee: FEE + 1n };
     assert.notEqual(intentHash(other), intentHash(intent));
     assert.equal(
       await w.reader.readContract({ address: w.swap, abi: intentsAbi, functionName: "hashIntent", args: [other] }),
@@ -451,14 +451,17 @@ describe("pool and matcher against a local chain", { skip }, () => {
     );
   });
 
-  it("rejects an intent that signs another fee, or another fee token", async () => {
+  it("rejects an intent whose maxFee is below the fee, or that signs another fee token", async () => {
     const { pool } = w.fresh();
     const [id] = await w.mintChogs(w.alice.address, 1);
     await w.approveChog(w.alice, id!);
-    for (const patch of [{ fee: FEE - 1n }, { fee: 0n }, { fee: FEE + 1n }, { feeToken: w.usd }]) {
+    for (const patch of [{ maxFee: FEE - 1n }, { maxFee: 0n }, { feeToken: w.usd }]) {
       const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)], patch);
       await reject(pool.submit(await w.body(w.alice, intent)), "wrong_fee");
     }
+    // Above the fee is fine: the maker only ever pays the fee.
+    const generous = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, ONE)], { maxFee: FEE + 1n });
+    assert.equal((await pool.submit(await w.body(w.alice, generous))).status, "open");
   });
 
   it("rejects a maker who can't pay the fee: no approval, too little, or no balance", async () => {

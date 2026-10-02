@@ -1,8 +1,7 @@
 import type { Address, Hex } from "viem";
 import { checkIntent } from "./checks.ts";
-import type { Reader } from "./chain.ts";
+import { type Reader, readFee } from "./chain.ts";
 import {
-  type FeeTerms,
   cancelDigest,
   feeProblem,
   intentDigest,
@@ -27,8 +26,11 @@ export class PoolError extends Error {
 export interface PoolConfig {
   chainId: number;
   swap: Address;
-  /** What the contract charges each maker. An intent that signs anything else can never settle. */
-  fee: FeeTerms;
+  /**
+   * The token the contract charges the fee in (`FEE_TOKEN`, fixed). The amount, `fee()`, can change
+   * (ADR 0018), so the pool reads it for every submission and every prune pass.
+   */
+  feeToken: Address;
   /** An intent must still have this long to run when posted. */
   minTtlSec: number;
   /** ADR 0008: a short deadline is the real protection, so the pool caps how long one can be. */
@@ -81,7 +83,8 @@ export class Pool {
 
     const problem = shapeProblem(intent);
     if (problem) throw new PoolError(422, "invalid_intent", problem);
-    const wrongFee = feeProblem(intent, this.cfg.fee);
+    const fee = await readFee(this.reader, this.cfg.swap);
+    const wrongFee = feeProblem(intent, { token: this.cfg.feeToken, amount: fee });
     if (wrongFee) throw new PoolError(422, "wrong_fee", wrongFee);
 
     const nowSec = Math.floor(now / 1000);
@@ -102,7 +105,7 @@ export class Pool {
       throw new PoolError(422, "bad_signature", "the signature is not valid for the maker");
     }
 
-    const chainProblem = await checkIntent(this.reader, this.cfg.swap, intent, nowSec);
+    const chainProblem = await checkIntent(this.reader, this.cfg.swap, intent, nowSec, fee);
     if (chainProblem) {
       throw new PoolError(422, chainProblem.code, chainProblem.detail);
     }
@@ -130,17 +133,25 @@ export class Pool {
 
   /**
    * Re-check every live intent against the chain: expire the late ones, mark `stale` the ones the
-   * maker can't currently honour, and revive stale ones whose assets came back. An RPC error skips
-   * that intent for this pass instead of changing it.
+   * maker can't currently honour (including a fee raised above their `maxFee`), and revive stale
+   * ones whose assets came back or whose fee came down. An RPC error skips that intent for this
+   * pass instead of changing it.
    */
   async prune(now = Date.now()): Promise<PruneReport> {
     const nowSec = Math.floor(now / 1000);
     const report: PruneReport = { checked: 0, changed: [] };
+    let fee: bigint;
+    try {
+      fee = await readFee(this.reader, this.cfg.swap);
+    } catch (err) {
+      this.log(`prune: skipped, can't read the fee: ${(err as Error).message.split("\n")[0]}`);
+      return report;
+    }
     for (const row of this.store.live()) {
       report.checked++;
       let next: { status: Status; reason: string | null };
       try {
-        const p = await checkIntent(this.reader, this.cfg.swap, row.intent, nowSec);
+        const p = await checkIntent(this.reader, this.cfg.swap, row.intent, nowSec, fee);
         next = !p
           ? { status: "open", reason: null }
           : p.code === "expired"

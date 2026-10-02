@@ -15,7 +15,7 @@ const intent = (maker: Address, give: Asset[], want: Asset[]): Intent => ({
   give,
   want,
   feeToken: WMON,
-  fee: 2n,
+  maxFee: 2n,
   deadline: 1_000n,
   nonce: 1n,
 });

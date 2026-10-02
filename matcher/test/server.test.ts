@@ -22,7 +22,7 @@ describe("pool HTTP API", { skip }, () => {
       chainId: CHAIN_ID,
       swap: w.swap,
       matcher: w.matcherSender.account.address,
-      fee: { token: w.wmon, amount: FEE.toString(), recipient: w.feeRecipient },
+      fee: async () => ({ token: w.wmon, amount: FEE.toString(), recipient: w.feeRecipient }),
     });
     await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
     const { port } = server.address() as { port: number };

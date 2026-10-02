@@ -15,9 +15,12 @@ export interface Intent {
   maker: Address;
   give: Asset[];
   want: Asset[];
-  /** The protocol fee the maker agrees to pay if the cycle settles (ADR 0015). */
+  /**
+   * The protocol fee token, and the most the maker agrees to pay if the cycle settles (ADR 0015,
+   * 0018). The contract charges its current `fee()`, which must not be above `maxFee`.
+   */
   feeToken: Address;
-  fee: bigint;
+  maxFee: bigint;
   deadline: bigint;
   nonce: bigint;
 }

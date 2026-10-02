@@ -11,7 +11,9 @@ import {MockERC20} from "../../src/mocks/MockERC20.sol";
 ///      START_TOKEN of `usdc` and `weth`, and approves the swap for everything.
 ///      The swap is deployed with no protocol fee, so a test reads as the plain deal; the
 ///      fee suite (`OnDealV2.fee.t.sol`) overrides `_fee` and the invariants run with one.
-///      Every helper that sends native MON adds `swap.FEE()`, so it works either way.
+///      Every helper that sends native MON adds the right share (`swap.fee()` to create, the
+///      trade's own `fee` to propose or fill), so it works either way. `feeAdmin` may change
+///      the fee up to `_maxFee`.
 abstract contract OnDealV2Base is Test {
     uint256 internal constant START_MON = 100 ether;
     uint256 internal constant START_TOKEN = 1_000 ether;
@@ -25,6 +27,7 @@ abstract contract OnDealV2Base is Test {
     address internal bob = makeAddr("bob");
     address internal carol = makeAddr("carol");
     address internal treasury = makeAddr("treasury");
+    address internal feeAdmin = makeAddr("feeAdmin");
 
     uint256 internal constant A1 = 1;
     uint256 internal constant A2 = 2;
@@ -36,7 +39,7 @@ abstract contract OnDealV2Base is Test {
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
-        swap = new OnDealV2(_fee(), treasury);
+        swap = new OnDealV2(_fee(), _maxFee(), treasury, feeAdmin);
 
         _onboard(alice);
         _onboard(bob);
@@ -46,6 +49,11 @@ abstract contract OnDealV2Base is Test {
     /// @dev The per-side protocol fee the fixture deploys with. 0 unless a suite overrides it.
     function _fee() internal view virtual returns (uint256) {
         return 0;
+    }
+
+    /// @dev The ceiling the fixture deploys with.
+    function _maxFee() internal view virtual returns (uint256) {
+        return 4 * _fee();
     }
 
     function _onboard(address who) internal {
@@ -140,7 +148,7 @@ abstract contract OnDealV2Base is Test {
         uint64 expiry
     ) internal returns (uint256 id) {
         // Read the value before the prank: any call, even a view, would spend it.
-        uint256 value = _nativeOf(offered) + swap.FEE();
+        uint256 value = _nativeOf(offered) + swap.fee();
         vm.prank(maker);
         id = swap.createTrade{value: value}(offered, requested, taker, expiry);
     }
@@ -160,7 +168,7 @@ abstract contract OnDealV2Base is Test {
         address taker,
         uint64 expiry
     ) internal returns (uint256 id) {
-        uint256 value = _nativeOf(offered) + swap.FEE();
+        uint256 value = _nativeOf(offered) + swap.fee();
         vm.prank(maker);
         id = swap.createOpenOffer{value: value}(offered, taker, expiry, note);
     }
@@ -169,13 +177,14 @@ abstract contract OnDealV2Base is Test {
         internal
         returns (uint256 proposalId)
     {
-        uint256 value = _nativeOf(assets) + swap.FEE();
+        uint256 value = _nativeOf(assets) + swap.getTrade(id).fee;
         vm.prank(who);
         proposalId = swap.propose{value: value}(id, assets);
     }
 
     function _fill(address taker, uint256 id) internal {
-        uint256 value = _nativeOf(swap.getTrade(id).requested) + swap.FEE();
+        IOnDealV2.Trade memory t = swap.getTrade(id);
+        uint256 value = _nativeOf(t.requested) + t.fee;
         vm.prank(taker);
         swap.fillTrade{value: value}(id);
     }

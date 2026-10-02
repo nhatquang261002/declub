@@ -763,8 +763,10 @@ export const onDealIntentsAbi = [
     type: 'constructor',
     inputs: [
       { name: 'feeToken', internalType: 'address', type: 'address' },
-      { name: 'feeAmount', internalType: 'uint256', type: 'uint256' },
+      { name: 'initialFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
       { name: 'feeRecipient', internalType: 'address', type: 'address' },
+      { name: 'admin', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -778,7 +780,7 @@ export const onDealIntentsAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'FEE_AMOUNT',
+    name: 'FEE_RAISE_DELAY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -820,6 +822,27 @@ export const onDealIntentsAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'MAX_FEE_LIMIT',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'acceptFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'applyFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'eip712Domain',
     outputs: [
       { name: 'fields', internalType: 'bytes1', type: 'bytes1' },
@@ -830,6 +853,20 @@ export const onDealIntentsAbi = [
       { name: 'salt', internalType: 'bytes32', type: 'bytes32' },
       { name: 'extensions', internalType: 'uint256[]', type: 'uint256[]' },
     ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'fee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -872,7 +909,7 @@ export const onDealIntentsAbi = [
             ],
           },
           { name: 'feeToken', internalType: 'address', type: 'address' },
-          { name: 'fee', internalType: 'uint256', type: 'uint256' },
+          { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -922,7 +959,7 @@ export const onDealIntentsAbi = [
             ],
           },
           { name: 'feeToken', internalType: 'address', type: 'address' },
-          { name: 'fee', internalType: 'uint256', type: 'uint256' },
+          { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -951,6 +988,41 @@ export const onDealIntentsAbi = [
     name: 'isNonceUsed',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFeeAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFeeAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'renounceFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFee', internalType: 'uint256', type: 'uint256' }],
+    name: 'setFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -992,7 +1064,7 @@ export const onDealIntentsAbi = [
             ],
           },
           { name: 'feeToken', internalType: 'address', type: 'address' },
-          { name: 'fee', internalType: 'uint256', type: 'uint256' },
+          { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
           { name: 'deadline', internalType: 'uint64', type: 'uint64' },
           { name: 'nonce', internalType: 'uint256', type: 'uint256' },
         ],
@@ -1003,7 +1075,80 @@ export const onDealIntentsAbi = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    inputs: [{ name: 'next', internalType: 'address', type: 'address' }],
+    name: 'transferFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
   { type: 'event', anonymous: false, inputs: [], name: 'EIP712DomainChanged' },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'current',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'next', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'FeeAdminTransferStarted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previous',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'next', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'FeeAdminTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'effectiveAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeChangeQueued',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeChanged',
+  },
   {
     type: 'event',
     anonymous: false,
@@ -1119,6 +1264,11 @@ export const onDealIntentsAbi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'effectiveAt', internalType: 'uint256', type: 'uint256' }],
+    name: 'FeeRaiseNotReady',
+  },
+  {
+    type: 'error',
     inputs: [
       { name: 'fee', internalType: 'uint256', type: 'uint256' },
       { name: 'max', internalType: 'uint256', type: 'uint256' },
@@ -1164,6 +1314,7 @@ export const onDealIntentsAbi = [
     name: 'NftNotReceived',
   },
   { type: 'error', inputs: [], name: 'NoFeeRecipient' },
+  { type: 'error', inputs: [], name: 'NoPendingFee' },
   {
     type: 'error',
     inputs: [
@@ -1171,6 +1322,16 @@ export const onDealIntentsAbi = [
       { name: 'nonce', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'NonceUsed',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'NotFeeAdmin',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'NotPendingFeeAdmin',
   },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   {
@@ -1223,7 +1384,7 @@ export const onDealIntentsAbi = [
     inputs: [
       { name: 'intent', internalType: 'uint256', type: 'uint256' },
       { name: 'feeToken', internalType: 'address', type: 'address' },
-      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'WrongFee',
   },
@@ -1237,15 +1398,17 @@ export const onDealV2Abi = [
   {
     type: 'constructor',
     inputs: [
-      { name: 'fee', internalType: 'uint256', type: 'uint256' },
+      { name: 'initialFee', internalType: 'uint256', type: 'uint256' },
+      { name: 'maxFee', internalType: 'uint256', type: 'uint256' },
       { name: 'feeRecipient', internalType: 'address', type: 'address' },
+      { name: 'admin', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
   },
   {
     type: 'function',
     inputs: [],
-    name: 'FEE',
+    name: 'FEE_RAISE_DELAY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1273,6 +1436,13 @@ export const onDealV2Abi = [
   {
     type: 'function',
     inputs: [],
+    name: 'MAX_FEE_LIMIT',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'MAX_NOTE_BYTES',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -1286,11 +1456,25 @@ export const onDealV2Abi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'acceptFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
       { name: 'proposalId', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'acceptProposal',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'applyFee',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -1441,6 +1625,20 @@ export const onDealV2Abi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'fee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'fillTrade',
     outputs: [],
@@ -1561,6 +1759,7 @@ export const onDealV2Abi = [
             type: 'uint8',
           },
           { name: 'taker', internalType: 'address', type: 'address' },
+          { name: 'fee', internalType: 'uint96', type: 'uint96' },
           {
             name: 'offered',
             internalType: 'struct IOnDealV2.Asset[]',
@@ -1608,6 +1807,27 @@ export const onDealV2Abi = [
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'offerNote',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFeeAdmin',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingFeeAt',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -1661,6 +1881,20 @@ export const onDealV2Abi = [
   {
     type: 'function',
     inputs: [],
+    name: 'renounceFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newFee', internalType: 'uint256', type: 'uint256' }],
+    name: 'setFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'tradeCount',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -1671,6 +1905,13 @@ export const onDealV2Abi = [
     name: 'traitSpec',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'next', internalType: 'address', type: 'address' }],
+    name: 'transferFeeAdmin',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -1745,6 +1986,72 @@ export const onDealV2Abi = [
       },
     ],
     name: 'Claimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'current',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'next', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'FeeAdminTransferStarted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previous',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'next', internalType: 'address', type: 'address', indexed: true },
+    ],
+    name: 'FeeAdminTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'effectiveAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeChangeQueued',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'oldFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeChanged',
   },
   {
     type: 'event',
@@ -2051,6 +2358,11 @@ export const onDealV2Abi = [
   },
   {
     type: 'error',
+    inputs: [{ name: 'effectiveAt', internalType: 'uint256', type: 'uint256' }],
+    name: 'FeeRaiseNotReady',
+  },
+  {
+    type: 'error',
     inputs: [
       { name: 'fee', internalType: 'uint256', type: 'uint256' },
       { name: 'max', internalType: 'uint256', type: 'uint256' },
@@ -2084,11 +2396,17 @@ export const onDealV2Abi = [
     name: 'NftNotReceived',
   },
   { type: 'error', inputs: [], name: 'NoFeeRecipient' },
+  { type: 'error', inputs: [], name: 'NoPendingFee' },
   { type: 'error', inputs: [], name: 'NoTraitAsset' },
   {
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'NotAllowedTaker',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'NotFeeAdmin',
   },
   {
     type: 'error',
@@ -2099,6 +2417,11 @@ export const onDealV2Abi = [
     type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'NotOpenOffer',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'caller', internalType: 'address', type: 'address' }],
+    name: 'NotPendingFeeAdmin',
   },
   {
     type: 'error',

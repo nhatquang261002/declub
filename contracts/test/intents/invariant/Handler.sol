@@ -9,12 +9,15 @@ import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 
 /// @dev Drives random pair and ring settlements with signed intents, including ones that must
 ///      fail: reused or invalidated nonces, moved NFTs, drained or un-approved ERC-20s, and
-///      expired deadlines. Ghost state records what the contract must never allow.
+///      expired deadlines. Ghost state records what the contract must never allow. The fee admin
+///      changes the fee as the run goes, and makers sometimes sign a `maxFee` below the fee in
+///      force (must fail) or above it (pays only the fee).
 contract Handler is Test {
     OnDealIntents public immutable SWAP;
     MockChog public immutable CHOG;
     MockERC20 public immutable USDC;
     MockERC20 public immutable WETH;
+    address public immutable FEE_ADMIN;
 
     address[4] public actors;
     uint256[4] internal _keys;
@@ -29,6 +32,11 @@ contract Handler is Test {
     uint256 public settlements;
     /// @dev Makers across all settled cycles: each paid one fee.
     uint256 public settledMakers;
+    /// @dev N6: the fee in force at each settlement, once per maker.
+    uint256 public feesPaid;
+    /// @dev What makers sign relative to the fee in force: 0 exact, 1 one wei below, 2 above.
+    uint256 public maxFeeMode;
+    bool public settledBelowMaxFee;
     uint256 public attempts;
     bool public nonceSettledTwice;
     bool public invalidatedNonceSettled;
@@ -40,9 +48,11 @@ contract Handler is Test {
         MockERC20 usdc_,
         MockERC20 weth_,
         address[4] memory actors_,
-        uint256[4] memory keys_
+        uint256[4] memory keys_,
+        address feeAdmin_
     ) {
         SWAP = swap_;
+        FEE_ADMIN = feeAdmin_;
         CHOG = chog_;
         USDC = usdc_;
         WETH = weth_;
@@ -137,6 +147,24 @@ contract Handler is Test {
         USDC.approve(address(SWAP), on ? type(uint256).max : 0);
     }
 
+    /// @dev The fee admin moves the fee anywhere up to the ceiling. A raise waits out its delay
+    ///      and is applied, so it takes effect within the run.
+    function changeFee(uint256 seed) external {
+        uint256 newFee = bound(seed, 0, SWAP.MAX_FEE());
+        bool raise = newFee > SWAP.fee();
+        vm.prank(FEE_ADMIN);
+        SWAP.setFee(newFee);
+        if (raise) {
+            vm.warp(block.timestamp + SWAP.FEE_RAISE_DELAY());
+            vm.prank(FEE_ADMIN);
+            SWAP.applyFee();
+        }
+    }
+
+    function setMaxFeeMode(uint256 mode) external {
+        maxFeeMode = mode % 3;
+    }
+
     function warp(uint256 secs) external {
         vm.warp(block.timestamp + bound(secs, 0, 12 hours));
     }
@@ -159,10 +187,13 @@ contract Handler is Test {
         for (uint256 n; n < cycle.length; ++n) {
             sigs[n] = _sign(_keys[who[n]], cycle[n]);
         }
+        uint256 fee = SWAP.fee();
         try SWAP.settle(cycle, sigs) {
             ++settlements;
             settledMakers += cycle.length;
+            feesPaid += fee * cycle.length;
             for (uint256 n; n < cycle.length; ++n) {
+                if (cycle[n].maxFee < fee) settledBelowMaxFee = true;
                 address maker = cycle[n].maker;
                 uint256 nonce = cycle[n].nonce;
                 if (settledNonce[maker][nonce]) nonceSettledTwice = true;
@@ -185,10 +216,17 @@ contract Handler is Test {
             give,
             want,
             SWAP.FEE_TOKEN(),
-            SWAP.FEE_AMOUNT(),
+            _maxFee(),
             deadline,
             bound(nonce, 0, NONCE_RANGE - 1)
         );
+    }
+
+    function _maxFee() internal view returns (uint256) {
+        uint256 fee = SWAP.fee();
+        if (maxFeeMode == 1 && fee != 0) return fee - 1;
+        if (maxFeeMode == 2) return fee + 1 ether;
+        return fee;
     }
 
     function _sign(uint256 key, IOnDealIntents.Intent memory it)

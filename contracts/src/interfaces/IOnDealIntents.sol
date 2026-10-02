@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IFeeAdmin} from "./IFeeAdmin.sol";
+
 /// @title On Deal Intents: settle signed swap intents, wallet to wallet
 /// @notice A maker signs an `Intent` (what they give, what they want back at least) and keeps
 ///         their assets. Anyone may submit a *cycle* of intents that satisfy each other: every
@@ -12,7 +14,9 @@ pragma solidity ^0.8.24;
 ///      `Asset` mirrors OnDealV2's struct and enum values so the frontend's asset editor can be
 ///      reused, but only `ERC20` and `ERC721` are valid here: native MON can't be pulled from a
 ///      wallet (use WMON) and trait sets are not supported yet.
-interface IOnDealIntents {
+///      The fee amount can change (IFeeAdmin, docs/adr/0018-adjustable-protocol-fee.md), so a
+///      maker signs the most they will pay, and `settle` charges the fee in force.
+interface IOnDealIntents is IFeeAdmin {
     // ─────────────────────────────────────────────────────────────── Types
 
     enum AssetType {
@@ -37,15 +41,15 @@ interface IOnDealIntents {
     ///      minimums, NFTs are exact. Anything the previous party gives beyond `want` (extra
     ///      amount, extra assets) goes to the maker. `deadline` is required (non-zero).
     ///      `nonce` is unordered: bit `nonce & 0xff` of word `nonce >> 8`.
-    ///      `feeToken` and `fee` are the protocol fee the maker agrees to pay if the cycle
-    ///      settles. They are part of what is signed, and `settle` requires them to equal the
-    ///      contract's `FEE_TOKEN` and `FEE_AMOUNT`.
+    ///      `feeToken` and `maxFee` bound the protocol fee the maker agrees to pay if the cycle
+    ///      settles. They are part of what is signed: `settle` requires `feeToken` to equal
+    ///      `FEE_TOKEN` and `maxFee` to be at least `fee()`, and charges `fee()`.
     struct Intent {
         address maker;
         Asset[] give;
         Asset[] want;
         address feeToken;
-        uint256 fee;
+        uint256 maxFee;
         uint64 deadline;
         uint256 nonce;
     }
@@ -58,7 +62,8 @@ interface IOnDealIntents {
     );
 
     /// @notice A cycle settled and every maker in it paid the fee: `amount` is the total sent to
-    ///         `recipient` (the per-maker fee times the cycle size). Not emitted when the fee is 0.
+    ///         `recipient` (`fee()` at settlement times the cycle size). Not emitted when the fee
+    ///         is 0.
     event FeeCharged(address indexed recipient, address indexed token, uint256 amount);
 
     /// @notice A maker invalidated unordered nonces without settling them.
@@ -84,21 +89,16 @@ interface IOnDealIntents {
     ///         rebasing, lying token).
     error UnsupportedToken(address token);
     error NftNotReceived(address token, uint256 id);
-    /// @notice The intent's signed `feeToken` or `fee` isn't what this contract charges.
-    error WrongFee(uint256 intent, address feeToken, uint256 fee);
-    /// @notice The constructor's fee is above `MAX_FEE`.
-    error FeeTooHigh(uint256 fee, uint256 max);
-    /// @notice The constructor's fee is not 0 but the fee token isn't a contract.
+    /// @notice The intent's signed `feeToken` isn't `FEE_TOKEN`, or its `maxFee` is below `fee()`.
+    error WrongFee(uint256 intent, address feeToken, uint256 maxFee);
+    /// @notice The constructor's fee ceiling is not 0 but the fee token isn't a contract.
     error InvalidFeeToken(address token);
-    /// @notice The constructor's fee is not 0 but the recipient is the zero address.
-    error NoFeeRecipient();
 
     // ─────────────────────────────────────────────────────────────── Actions
 
     /// @notice Settle a cycle of 2..`MAX_CYCLE` intents atomically. Anyone may call. Reverts if
     ///         anything about any intent or transfer is off, leaving everyone as they were. Every
-    ///         maker needs `FEE_AMOUNT` of `FEE_TOKEN` and an allowance for it, besides their
-    ///         `give`.
+    ///         maker needs `fee()` of `FEE_TOKEN` and an allowance for it, besides their `give`.
     /// @param cycle `cycle[i].give` goes to `cycle[(i + 1) % n].maker`.
     /// @param signatures `signatures[i]` is `cycle[i].maker`'s EIP-712 signature (ECDSA, or
     ///        ERC-1271 for contract wallets).
@@ -112,12 +112,8 @@ interface IOnDealIntents {
 
     function MAX_CYCLE() external view returns (uint256);
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
-    function MAX_FEE() external view returns (uint256);
     /// @notice The token the fee is paid in (wrapped MON). Fixed at deploy.
     function FEE_TOKEN() external view returns (address);
-    /// @notice What each maker pays when a cycle settles. Fixed at deploy.
-    function FEE_AMOUNT() external view returns (uint256);
-    function FEE_RECIPIENT() external view returns (address);
 
     /// @notice The EIP-712 struct hash of an intent.
     function hashIntent(Intent calldata intent) external pure returns (bytes32);

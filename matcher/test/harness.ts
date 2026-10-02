@@ -23,8 +23,11 @@ import { intentToWire } from "../src/wire.ts";
 
 const OUT = resolve(import.meta.dirname, "../../contracts/out");
 export const CHAIN_ID = 31337;
-/** The protocol fee the test contract charges each maker, in WMON (ADR 0015). */
+/** The protocol fee the test contract charges each maker at deploy, in WMON (ADR 0015). */
 export const FEE = 2n * 10n ** 18n;
+/** The ceiling the fee admin can raise it to (ADR 0018). */
+export const MAX_FEE = 4n * FEE;
+export const FEE_RAISE_DELAY = 7 * 24 * 60 * 60;
 /** Anvil's default, publicly known test mnemonic. */
 const MNEMONIC = "test test test test test test test test test test test junk";
 
@@ -73,7 +76,12 @@ export const walletAbi = parseAbi([
   "function exec(address target, bytes data)",
   "function setReject(bool value)",
 ]);
-const swapAbi = parseAbi(["function invalidateNonces(uint256 word, uint256 mask)"]);
+const swapAbi = parseAbi([
+  "function invalidateNonces(uint256 word, uint256 mask)",
+  "function setFee(uint256 newFee)",
+  "function applyFee()",
+  "function fee() view returns (uint256)",
+]);
 
 export type Actor = ReturnType<typeof makeActor>;
 
@@ -98,6 +106,8 @@ export interface World {
   wmon: Address;
   /** Who receives the fees. */
   feeRecipient: Address;
+  /** May change the fee (ADR 0018). */
+  feeAdmin: Actor;
   alice: Actor;
   bob: Actor;
   carol: Actor;
@@ -121,6 +131,11 @@ export interface World {
   body(who: Actor, intent: Intent): Promise<{ intent: unknown; signature: Hex }>;
   invalidate(who: Actor, nonce: bigint): Promise<void>;
   increaseTime(sec: number): Promise<void>;
+  /**
+   * Make `newFee` the fee in force. A raise waits out its 7-day delay, which moves the chain's
+   * clock a week ahead of the wall clock: only do that in a world of its own.
+   */
+  setFee(newFee: bigint): Promise<void>;
   fresh(over?: Partial<MatcherConfig>): { store: Store; pool: Pool; matcher: Matcher };
   chogOf(id: bigint): Asset;
   tokenOf(token: Address, amount: bigint): Asset;
@@ -161,7 +176,10 @@ export async function startWorld(): Promise<World> {
 
   const wmon = await deploy("MockERC20.sol", "MockERC20", ["Wrapped MON", "WMON"]);
   const feeRecipient = makeActor(8, rpcUrl).address;
-  const swap = await deploy("OnDealIntents.sol", "OnDealIntents", [wmon, FEE, feeRecipient]);
+  const feeAdmin = makeActor(7, rpcUrl);
+  const swap = await deploy("OnDealIntents.sol", "OnDealIntents", [
+    wmon, FEE, MAX_FEE, feeRecipient, feeAdmin.address,
+  ]);
   const chog = await deploy("MockChog.sol", "MockChog");
   const usd = await deploy("MockERC20.sol", "MockERC20", ["Mock USD", "mUSD"]);
   const weth = await deploy("MockERC20.sol", "MockERC20", ["Mock WETH", "mWETH"]);
@@ -169,7 +187,8 @@ export async function startWorld(): Promise<World> {
   let nonce = 1n;
 
   const world: World = {
-    rpcUrl, reader, swap, chog, usd, weth, wmon, feeRecipient, alice, bob, carol, dave, matcherSender,
+    rpcUrl, reader, swap, chog, usd, weth, wmon, feeRecipient, feeAdmin, alice, bob, carol, dave,
+    matcherSender,
     stop: () => anvil.kill(),
     tx,
     async mintChogs(to, n) {
@@ -204,7 +223,7 @@ export async function startWorld(): Promise<World> {
       return {
         maker, give, want,
         feeToken: wmon,
-        fee: FEE,
+        maxFee: FEE,
         deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
         nonce: nonce++,
         ...extra,
@@ -232,12 +251,20 @@ export async function startWorld(): Promise<World> {
         body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "evm_mine", params: [] }),
       });
     },
+    async setFee(newFee) {
+      const current = await reader.readContract({ address: swap, abi: swapAbi, functionName: "fee" });
+      await tx(feeAdmin.wallet.writeContract({ address: swap, abi: swapAbi, functionName: "setFee", args: [newFee] }));
+      if (newFee > current) {
+        await world.increaseTime(FEE_RAISE_DELAY);
+        await tx(feeAdmin.wallet.writeContract({ address: swap, abi: swapAbi, functionName: "applyFee" }));
+      }
+    },
     fresh(over = {}) {
       const store = new Store();
       const matcherRef: { current?: Matcher } = {};
       const pool = new Pool(
         store, reader,
-        { chainId: CHAIN_ID, swap, fee: { token: wmon, amount: FEE }, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600 },
+        { chainId: CHAIN_ID, swap, feeToken: wmon, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600 },
         { onNew: () => matcherRef.current?.kick() },
       );
       const matcher = new Matcher(pool, matcherSender, { ...defaultMatcherConfig(swap), ...over });

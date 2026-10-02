@@ -56,18 +56,20 @@ deployed addresses. Local (31337) runs and dry runs are gitignored.
 
 ## `DeployIntents.s.sol`
 
-Deploys `OnDealIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)) with its protocol fee ([ADR 0015](../../docs/adr/0015-protocol-fee.md)). The existing mUSD and Chog collection work with it. A dry run estimated about **2.05M gas, roughly 0.42 MON** before the fee was added.
+Deploys `OnDealIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)) with its protocol fee ([ADR 0015](../../docs/adr/0015-protocol-fee.md), [ADR 0018](../../docs/adr/0018-adjustable-protocol-fee.md)). The existing mUSD and Chog collection work with it. A dry run estimated about **2.05M gas, roughly 0.42 MON** before the fee was added.
 
 Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset there is no fee):
 
 | Variable | |
 |---|---|
-| `PROTOCOL_FEE_WEI` | what each maker pays when a cycle settles, in `FEE_TOKEN` units (18 decimals); at most 500 tokens |
-| `FEE_RECIPIENT` | who receives it; required when the fee is not 0 |
-| `FEE_TOKEN` | the chain's wrapped MON; required when the fee is not 0, unless the next one is set |
+| `PROTOCOL_FEE_WEI` | what each maker pays when a cycle settles, in `FEE_TOKEN` units (18 decimals), until the fee admin changes it |
+| `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above; defaults to 4 × `PROTOCOL_FEE_WEI`, at most 500 tokens |
+| `FEE_RECIPIENT` | who receives it (a Safe); required when the ceiling is not 0 |
+| `FEE_ADMIN` | who may change the fee (a different Safe); unset means the fee is fixed for good |
+| `FEE_TOKEN` | the chain's wrapped MON; required when the ceiling is not 0, unless the next one is set |
 | `DEPLOY_MOCK_WMON` | `true` deploys a `MockWMON` and uses it as the fee token. Testnet has no canonical WMON. Ignored when `FEE_TOKEN` is set |
 
-The same `PROTOCOL_FEE_WEI` and `FEE_RECIPIENT` go to `DeployV2.s.sol` (there the fee is plain MON), so both contracts charge the same amount. It also prints the fee settings it deployed with. The amount, token and recipient are immutable: to change them, deploy again and point the app at the new address.
+The same `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT` and `FEE_ADMIN` go to `DeployV2.s.sol` (there the fee is plain MON), so both contracts charge the same amount. Both print the fee settings they deployed with. The recipient, token and ceiling are immutable. The amount isn't: the fee admin calls `setFee` on each contract (a cut applies at once, a raise needs `applyFee` 7 days later), so keep the two in step.
 
 ```bash
 cd contracts

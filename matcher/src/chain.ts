@@ -10,7 +10,6 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { intentsAbi } from "./abi.ts";
-import type { FeeTerms } from "./intent.ts";
 
 export interface ChainConfig {
   chainId: number;
@@ -52,15 +51,19 @@ export function makeSender(cfg: ChainConfig, privateKey: Hex) {
 }
 export type Sender = ReturnType<typeof makeSender>;
 
-/** What the contract charges (`FEE_TOKEN`, `FEE_AMOUNT`) and where it goes. Read once at start. */
-export async function readFeeTerms(
+/** The fee token and recipient, both fixed at deploy. Read once at start. */
+export async function readFeeSetup(
   reader: Reader,
   swap: Address,
-): Promise<FeeTerms & { recipient: Address }> {
-  const [token, amount, recipient] = await Promise.all([
+): Promise<{ token: Address; recipient: Address }> {
+  const [token, recipient] = await Promise.all([
     reader.readContract({ address: swap, abi: intentsAbi, functionName: "FEE_TOKEN" }),
-    reader.readContract({ address: swap, abi: intentsAbi, functionName: "FEE_AMOUNT" }),
     reader.readContract({ address: swap, abi: intentsAbi, functionName: "FEE_RECIPIENT" }),
   ]);
-  return { token, amount, recipient };
+  return { token, recipient };
+}
+
+/** The fee each maker pays right now. The fee admin can change it, so read it when it's needed. */
+export function readFee(reader: Reader, swap: Address): Promise<bigint> {
+  return reader.readContract({ address: swap, abi: intentsAbi, functionName: "fee" });
 }

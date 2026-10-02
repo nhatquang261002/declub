@@ -31,7 +31,7 @@ const node = (maker: number, give: Asset[], want: Asset[], createdAt = ++seq): N
     give,
     want,
     feeToken: addr(0xf0),
-    fee: 0n,
+    maxFee: 0n,
     deadline: 9999999999n,
     nonce: BigInt(seq),
   } satisfies Intent,

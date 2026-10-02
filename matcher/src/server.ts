@@ -16,8 +16,11 @@ export interface ServerInfo {
   chainId: number;
   swap: string;
   matcher: string | null;
-  /** The protocol fee each maker pays when a cycle settles (ADR 0015). */
-  fee: { token: string; amount: string; recipient: string };
+  /**
+   * The protocol fee each maker pays when a cycle settles (ADR 0015). The amount can change
+   * (ADR 0018), so it is read for every request.
+   */
+  fee: () => Promise<{ token: string; amount: string; recipient: string }>;
 }
 
 const rowJson = (r: Row) => ({
@@ -94,7 +97,7 @@ export function createPoolServer(pool: Pool, info: ServerInfo): Server {
     if (req.method === "OPTIONS") return send(res, 204, null);
 
     if (req.method === "GET" && parts.length === 1 && parts[0] === "info") {
-      return send(res, 200, { ...info, maxCycle: MAX_CYCLE });
+      return send(res, 200, { ...info, fee: await info.fee(), maxCycle: MAX_CYCLE });
     }
 
     if (parts[0] === "intents") {

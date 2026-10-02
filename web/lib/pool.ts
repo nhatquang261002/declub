@@ -31,7 +31,7 @@ const COPY: Record<string, string> = {
   nonce_used: "That nonce was already used. Try again.",
   balance: "Your wallet doesn't hold everything you're giving.",
   allowance: "Approve the token you're giving first.",
-  wrong_fee: "This intent signs a protocol fee the contract doesn't charge. Reload the page and sign again.",
+  wrong_fee: "The protocol fee just changed, so this intent's fee is out of date. Reload the page and sign again.",
   fee_balance: "Your wallet doesn't hold enough WMON for the protocol fee. Wrap some MON first.",
   fee_allowance: "Approve WMON for the protocol fee first.",
   not_owner: "Your wallet doesn't own an NFT you're giving.",

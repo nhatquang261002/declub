@@ -219,7 +219,7 @@ Replace `offeredIds/offeredMon` with `Asset[] offered` and do the same for the r
 
 ## Phase 4: `OnDealV2` (generic assets)
 
-Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IOnDealV2.sol`](../contracts/src/interfaces/IOnDealV2.sol). Implementation: [`OnDealV2.sol`](../contracts/src/OnDealV2.sol). It's a separate contract that works with any token, and v1 is untouched. Its constructor takes only the protocol fee and where it goes (see [Protocol fee](#protocol-fee-ondealv2)).
+Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IOnDealV2.sol`](../contracts/src/interfaces/IOnDealV2.sol). Implementation: [`OnDealV2.sol`](../contracts/src/OnDealV2.sol). It's a separate contract that works with any token, and v1 is untouched. Its constructor takes only the protocol fee settings: the fee, its ceiling, where it goes and who may change it (see [Protocol fee](#protocol-fee-ondealv2)).
 
 ```solidity
 enum AssetType { Native, ERC20, ERC721, ERC721Trait }
@@ -238,7 +238,7 @@ struct Trade { address maker; uint64 expiry; Status status; address taker; Asset
 | `cancelTrade(id)` | Maker, while open. Refunds the offered side to the maker. |
 | `reclaimExpired(id)` | Anyone, once expired. Refunds to the maker. |
 | `claim(assetType, token, id)` | Collect a payout that was rejected earlier. |
-| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE`, `MAX_SPEC_BYTES`, `FEE`, `FEE_RECIPIENT`, `MAX_FEE` | Views. |
+| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE`, `MAX_SPEC_BYTES`, `fee`, `pendingFee`, `pendingFeeAt`, `feeAdmin`, `pendingFeeAdmin`, `FEE_RECIPIENT`, `MAX_FEE`, `MAX_FEE_LIMIT`, `FEE_RAISE_DELAY` | Views. `getTrade(id).fee` is the fee that trade was listed with. |
 
 ### Create-time checks
 
@@ -274,20 +274,22 @@ _payout(to, asset):                      // never reverts
 
 ### Protocol fee (`OnDealV2`)
 
-Reasoning: [ADR 0015](adr/0015-protocol-fee.md). `constructor(uint256 fee, address feeRecipient)`: `FEE` and `FEE_RECIPIENT` are immutable, `MAX_FEE` is 500 MON, `FeeTooHigh` and `NoFeeRecipient` guard the constructor, and a fee of 0 (tests, testnet) charges and emits nothing.
+Reasoning: [ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). `constructor(uint256 initialFee, uint256 maxFee, address feeRecipient, address admin)`. `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor refuses a ceiling above `MAX_FEE_LIMIT` (500 MON) or a fee above the ceiling (`FeeTooHigh`), and a non-zero ceiling without a recipient (`NoFeeRecipient`). A fee of 0 (tests, testnet) charges and emits nothing.
 
-Every side sends `FEE` with its own call and the contract only **holds** it:
+The fee amount is the one thing that can change (`FeeAdmin`, shared with `OnDealIntents`). The fee admin can `setFee` lower at once, or queue a raise that `applyFee` makes live after `FEE_RAISE_DELAY` (7 days), never above `MAX_FEE`. `setFee(fee())` cancels a queued raise. The role moves in two steps (`transferFeeAdmin`, `acceptFeeAdmin`), and `renounceFeeAdmin` fixes the fee for good. A zero admin at deploy is a fixed fee. Events: `FeeChangeQueued`, `FeeChanged`, `FeeAdminTransferStarted`, `FeeAdminTransferred`.
+
+**Each trade records `fee()` when it is created** (`Trade.fee`, a `uint96` packed beside `taker`), and both sides pay that recorded fee. A change never touches a deal already listed. Every side sends the trade's fee with its own call and the contract only **holds** it:
 
 | Call | `msg.value` | The share |
 |---|---|---|
-| `createTrade`, `createTraitTrade`, `createOpenOffer` | native offered + `FEE` | the maker's, held with the trade |
-| `propose` | native proposed + `FEE` | the proposer's, held with the proposal |
-| `fillTrade`, `fillTraitTrade` | native requested + `FEE` | the taker's, released at once with the maker's |
+| `createTrade`, `createTraitTrade`, `createOpenOffer` | native offered + `fee()` | the maker's, held with the trade, recorded as `t.fee` |
+| `propose` | native proposed + `t.fee` | the proposer's, held with the proposal |
+| `fillTrade`, `fillTraitTrade` | native requested + `t.fee` | the taker's, released at once with the maker's |
 | `acceptProposal` | none (non-payable) | both held shares released |
 | `cancelTrade`, `reclaimExpired` | none | the maker's share refunded to the maker |
 | `rejectProposal`, `withdrawProposal` | none | the proposer's share refunded to the proposer |
 
-A completed deal sends `2 × FEE` to the recipient in one payout. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + one `FEE` per open trade and per active proposal + unclaimed credits.
+A completed deal sends `2 × t.fee` to the recipient in one payout. Refunds return `t.fee`. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + one `t.fee` per open trade and per active proposal + unclaimed credits.
 
 ### Gas (worst case: 10 NFTs each way)
 
@@ -299,13 +301,13 @@ A third contract beside `OnDeal` and `OnDealV2`: settles signed intents wallet t
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents; `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces, so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`OnDealIntents`, version `2`), ECDSA or ERC-1271; malleable signatures are refused. `Intent` is `(maker, give, want, feeToken, fee, deadline, nonce)`.
-- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md)): `constructor(feeToken, feeAmount, feeRecipient)`, all immutable, with `MAX_FEE` at 500 tokens. Each intent signs `feeToken` and `fee`, and `settle` reverts with `WrongFee(intent, feeToken, fee)` unless they equal `FEE_TOKEN` and `FEE_AMOUNT`. After every `give` has moved, each maker in the cycle pays `FEE_AMOUNT` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
+- Signatures: EIP-712 (`OnDealIntents`, version `3`), ECDSA or ERC-1271; malleable signatures are refused. `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
+- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the amount, `fee()`, is set by the same `FeeAdmin` as in `OnDealV2`. Each intent signs `feeToken` and `maxFee`, the most its maker pays, and `settle` reverts with `WrongFee(intent, feeToken, maxFee)` if the token isn't `FEE_TOKEN` or `maxFee` is below `fee()`. After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
 - ERC-20 only moves if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert, as in V2); NFTs are checked with `ownerOf`.
 - Only `ERC20` and `ERC721` assets. Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
-- The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`), has no `receive()` and no admin.
+- The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`) and has no `receive()`. Its only admin is the fee admin, over the fee amount.
 
 ### Gas (worst case: 4 makers × 10 NFTs each way)
 
-`settle` costs **3.3M gas** without the fee and **3.39M** with it (four more token transfers; `test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M (about 0.3M with the fee), a three-way ring about 0.5M.
+`settle` costs **3.34M gas** without the fee and **3.41M** with it (four more token transfers and a read of the fee; `test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M (about 0.3M with the fee), a three-way ring about 0.5M.
 

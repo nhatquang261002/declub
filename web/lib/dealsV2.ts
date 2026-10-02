@@ -12,6 +12,11 @@ export type DealV2 = {
   /** Unix seconds. 0n = never expires. */
   expiry: bigint;
   status: DealStatus;
+  /**
+   * What each side of this deal pays in MON: the fee in force when it was listed (ADR 0018). The
+   * taker or proposer sends this, not the contract's current `fee()`.
+   */
+  fee: bigint;
   offered: readonly Asset[];
   requested: readonly Asset[];
 };
@@ -22,6 +27,7 @@ export type RawDealV2 = {
   expiry: bigint;
   status: number;
   taker: Address;
+  fee: bigint;
   offered: readonly RawAsset[];
   requested: readonly RawAsset[];
 };
@@ -50,6 +56,7 @@ export function toDealV2(id: bigint, raw: RawDealV2): DealV2 | null {
     taker: raw.taker === zeroAddress ? null : raw.taker,
     expiry: raw.expiry,
     status,
+    fee: raw.fee,
     offered: offered as Asset[],
     requested: requested as Asset[],
   };

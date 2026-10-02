@@ -29,7 +29,7 @@ const base: Intent = {
   give: [nft(1n)],
   want: [erc20(5n)],
   feeToken: U,
-  fee: 2n,
+  maxFee: 2n,
   deadline: 100n,
   nonce: 7n,
 };
@@ -49,9 +49,10 @@ describe("wire codec", () => {
     assert.throws(() => intentFromWire({ ...w, deadline: (2n ** 64n).toString() }), WireError);
     assert.throws(() => intentFromWire({ ...w, maker: "0x12" }), WireError);
     assert.throws(() => intentFromWire({ ...w, feeToken: "0x12" }), WireError);
-    assert.throws(() => intentFromWire({ ...w, fee: 2 }), WireError);
-    assert.throws(() => intentFromWire({ ...w, fee: "-1" }), WireError);
-    assert.throws(() => intentFromWire({ ...w, fee: (2n ** 256n).toString() }), WireError);
+    assert.throws(() => intentFromWire({ ...w, maxFee: 2 }), WireError);
+    assert.throws(() => intentFromWire({ ...w, maxFee: "-1" }), WireError);
+    assert.throws(() => intentFromWire({ ...w, maxFee: (2n ** 256n).toString() }), WireError);
+    assert.throws(() => intentFromWire({ ...w, maxFee: undefined }), WireError);
     assert.throws(() => intentFromWire({ ...w, give: "nope" }), WireError);
     assert.throws(() => intentFromWire({ ...w, give: [{ ...w.give[0], assetType: 256 }] }), WireError);
     assert.throws(() => intentFromWire(null), WireError);
@@ -79,11 +80,15 @@ describe("shapeProblem", () => {
 describe("feeProblem", () => {
   const terms = { token: U, amount: 2n };
 
-  it("accepts the contract's fee and nothing else", () => {
+  it("accepts a maxFee at or above the fee, in the contract's token", () => {
     assert.equal(feeProblem(base, terms), null);
-    assert.match(feeProblem({ ...base, fee: 1n }, terms)!, /fee must be 2/);
-    assert.match(feeProblem({ ...base, fee: 3n }, terms)!, /fee must be 2/);
-    assert.match(feeProblem({ ...base, feeToken: T }, terms)!, /fee must be 2/);
+    assert.equal(feeProblem({ ...base, maxFee: 3n }, terms), null);
+    assert.match(feeProblem({ ...base, maxFee: 1n }, terms)!, /fee is 2, above the signed maxFee 1/);
+    assert.match(feeProblem({ ...base, feeToken: T }, terms)!, /paid in/);
+  });
+
+  it("accepts any maxFee when the fee is 0", () => {
+    assert.equal(feeProblem({ ...base, maxFee: 0n }, { token: U, amount: 0n }), null);
   });
 
   it("compares the token without regard to case", () => {
@@ -107,7 +112,7 @@ describe("hashing", () => {
     const h = intentHash(base);
     for (const patch of [
       { nonce: 8n },
-      { fee: 3n },
+      { maxFee: 3n },
       { feeToken: T },
       { deadline: 101n },
       { want: [erc20(6n)] },

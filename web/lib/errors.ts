@@ -27,7 +27,7 @@ const COPY: Record<string, string> = {
   ERC721IncorrectOwner: "An asset in this deal isn't owned by the wallet sending it.",
   ERC721NonexistentToken: "One of these assets doesn't exist.",
   WrongNativeAmount: "The MON sent doesn't match the deal plus the protocol fee.",
-  WrongFee: "This signed swap carries a different protocol fee than the contract charges.",
+  WrongFee: "The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token.",
   TooManyAssets: "Up to 10 assets per side.",
   InvalidAsset: "One of the assets in this deal isn't valid.",
   DuplicateAsset: "The same asset is listed twice on one side.",

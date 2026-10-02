@@ -10,6 +10,7 @@ export type ProblemCode =
   | "nonce_used"
   | "balance"
   | "allowance"
+  | "wrong_fee"
   | "fee_balance"
   | "fee_allowance"
   | "not_owner"
@@ -85,15 +86,24 @@ async function assetProblem(
  * The protocol fee comes out of the maker's wallet after the gives move, in the same token a give
  * may use, so the fee is checked on top of whatever the maker gives of that token. (Anything the
  * maker receives in the same cycle is ignored: that makes this check conservative, never wrong
- * the other way.)
+ * the other way.) `fee` is the contract's current `fee()`: that is what is charged, and the
+ * intent's `maxFee` must cover it (ADR 0018).
  */
-async function feeProblem(reader: Reader, swap: Address, intent: Intent): Promise<Problem | null> {
-  if (intent.fee === 0n) return null;
+async function feeProblem(
+  reader: Reader,
+  swap: Address,
+  intent: Intent,
+  fee: bigint,
+): Promise<Problem | null> {
+  if (intent.maxFee < fee) {
+    return { code: "wrong_fee", detail: `the fee is ${fee}, above the signed maxFee ${intent.maxFee}` };
+  }
+  if (fee === 0n) return null;
   const token = intent.feeToken;
   const alsoGiven = intent.give
     .filter((a) => a.assetType === AssetType.ERC20 && isAddressEqual(a.token, token))
     .reduce((sum, a) => sum + a.amount, 0n);
-  const needed = intent.fee + alsoGiven;
+  const needed = fee + alsoGiven;
   const [balance, allowance] = await Promise.all([
     read(reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [intent.maker] })),
     read(
@@ -109,10 +119,10 @@ async function feeProblem(reader: Reader, swap: Address, intent: Intent): Promis
     return { code: "bad_token", detail: `fee token ${token} is not an ERC-20` };
   }
   if (balance < needed) {
-    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${intent.fee})` };
+    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${fee})` };
   }
   if (allowance < needed) {
-    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${intent.fee})` };
+    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${fee})` };
   }
   return null;
 }
@@ -122,12 +132,14 @@ async function feeProblem(reader: Reader, swap: Address, intent: Intent): Promis
  * approved everything in `give` and the protocol fee. This is only a plausibility check, the real answer is the
  * `settle` simulation, but it is how the pool prunes and how the matcher finds who broke a cycle.
  * Returns the first problem, by priority (expired, nonce, each give asset, then the fee), or null.
+ * `fee` is the contract's `fee()`, read once by the caller for a whole pass.
  */
 export async function checkIntent(
   reader: Reader,
   swap: Address,
   intent: Intent,
   nowSec: number,
+  fee: bigint,
 ): Promise<Problem | null> {
   if (intent.deadline < BigInt(nowSec)) {
     return { code: "expired", detail: `deadline ${intent.deadline} has passed` };
@@ -140,7 +152,7 @@ export async function checkIntent(
       args: [intent.maker, intent.nonce],
     }),
     ...intent.give.map((a) => assetProblem(reader, swap, intent.maker, a)),
-    feeProblem(reader, swap, intent),
+    feeProblem(reader, swap, intent, fee),
   ]);
   if (used) return { code: "nonce_used", detail: `nonce ${intent.nonce} is used` };
   return problems.find((p) => p !== null) ?? null;

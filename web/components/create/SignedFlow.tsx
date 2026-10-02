@@ -42,7 +42,7 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const approval = useTxFlow();
   const sign = useSignFlow();
   const pool = usePoolInfo();
-  const { fee, isLoading: feeLoading } = useIntentFee();
+  const { fee, pending: pendingFee, isLoading: feeLoading } = useIntentFee();
 
   const [giveRows, setGiveRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
   const [wantRows, setWantRows] = useState<DraftRow[]>(() => [newRow("erc20", MOCK_ERC20_ADDRESS ?? "")]);
@@ -191,9 +191,15 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
         </dl>
       </ReviewCard>
       {fee && (
-        <FeeNote amount={fee.amount} unit="WMON">
-          Signed with your swap and taken from your wallet only if it settles, in WMON (wrapped MON). Every wallet in the
-          match pays the same. If it never settles, you pay nothing. Holding only MON is fine: the first step wraps what you need.
+        <FeeNote
+          amount={fee.amount}
+          unit="WMON"
+          pending={pendingFee}
+          pendingNote="A swap signed now can't settle after that unless you sign it again at the new fee."
+        >
+          Signed with your swap as the most you&apos;ll pay, and taken from your wallet only if it settles, in WMON (wrapped
+          MON). If the fee is cut before then, you pay less. Every wallet in the match pays the same. If it never settles,
+          you pay nothing. Holding only MON is fine: the first step wraps what you need.
         </FeeNote>
       )}
       <ConsentNotice />

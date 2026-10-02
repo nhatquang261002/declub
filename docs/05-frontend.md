@@ -319,7 +319,7 @@ Where errors show up:
 | `SelfFill` | You can't accept your own deal. |
 | `WrongMonAmount` | The MON amount doesn't match the deal. |
 | `WrongNativeAmount` (V2) | The MON sent doesn't match the deal plus the protocol fee. |
-| `WrongFee` (signed swaps) | This signed swap carries a different protocol fee than the contract charges. |
+| `WrongFee` (signed swaps) | The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token. |
 | `NotMaker` | Only the creator can cancel this deal. |
 | `EmptySide` | Add at least one Chog or some MON to each side. |
 | `MonOnBothSides` | Put MON on one side only. |
@@ -352,10 +352,10 @@ The wizard picks a contract per kind. With `OnDealV2` configured, all three kind
 
 ### Protocol fee in the app
 
-[ADR 0015](adr/0015-protocol-fee.md). The fee is read from the contracts, never from config (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `OnDealV2.FEE()`, `useIntentFee()` reads `OnDealIntents.FEE_TOKEN()` and `FEE_AMOUNT()`), and the buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0) wherever it is paid, saying it is only charged if the deal completes:
+[ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). The fee is read from the contracts, never from config. The fee admin can change it, so it is re-read every minute rather than cached for good (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `OnDealV2.fee()`, `useIntentFee()` reads `OnDealIntents.FEE_TOKEN()` and `fee()`, and both read `pendingFee()` / `pendingFeeAt()` for a queued raise). The buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0 and no raise is queued) wherever it is paid, saying it is only charged if the deal completes. On the create and signing steps a queued raise adds "Scheduled to rise to X from <date>" and what that means for what is being made.
 
-- **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): the create, fill and propose calls send `native amount + fee` as `value`. The deal page also checks for a native `claimable` credit even when the deal has no MON, because a refused fee refund is credited as MON.
-- **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads the fee from the contract at the moment of signing and puts `feeToken` and `fee` into the signed `Intent` (EIP-712 domain version `2`, `lib/intents.ts`). `useIntentReadiness` counts the fee on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.
+- **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): create sends `native amount + fee()`. A fill or a proposal sends `native amount + deal.fee`, the fee the deal was listed with (`getTrade(id).fee`, `DealV2.fee`), never the current one. The deal page also checks for a native `claimable` credit when the deal has a fee, because a refused fee refund is credited as MON.
+- **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads `fee()` at the moment of signing and signs it as `maxFee`, with `feeToken`, in the `Intent` (EIP-712 domain version `3`, `lib/intents.ts`; `test/intents.test.ts` pins the hashing to the contract's type string). The intent page shows the fee charged now when a cut has brought it below `maxFee`. `useIntentReadiness` counts the fee on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.
 
 Pool rejections `wrong_fee`, `fee_balance` and `fee_allowance` and the stale reasons of the same names have their own copy (`lib/pool.ts`, `lib/intents.ts`).
 

@@ -13,7 +13,7 @@ export interface WireIntent {
   give: WireAsset[];
   want: WireAsset[];
   feeToken: Address;
-  fee: string;
+  maxFee: string;
   deadline: string;
   nonce: string;
 }
@@ -35,7 +35,7 @@ export function intentToWire(i: Intent): WireIntent {
     give: i.give.map(assetToWire),
     want: i.want.map(assetToWire),
     feeToken: i.feeToken,
-    fee: i.fee.toString(),
+    maxFee: i.maxFee.toString(),
     deadline: i.deadline.toString(),
     nonce: i.nonce.toString(),
   };
@@ -89,7 +89,7 @@ export function intentFromWire(v: unknown): Intent {
     give: assets(o.give, "intent.give"),
     want: assets(o.want, "intent.want"),
     feeToken: address(o.feeToken, "intent.feeToken"),
-    fee: uint(o.fee, "intent.fee", U256_MAX),
+    maxFee: uint(o.maxFee, "intent.maxFee", U256_MAX),
     deadline: uint(o.deadline, "intent.deadline", U64_MAX),
     nonce: uint(o.nonce, "intent.nonce", U256_MAX),
   };

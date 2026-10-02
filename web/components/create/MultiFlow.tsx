@@ -46,7 +46,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   const approval = useTxFlow();
   const tx = useTxFlow();
   // Sent with the offer and held with it: paid out only if the deal completes (ADR 0015).
-  const { fee, isLoading: feeLoading } = useEscrowFee();
+  const { fee, pending: pendingFee, isLoading: feeLoading } = useEscrowFee();
 
   const [offeredRows, setOfferedRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
   const [requestedRows, setRequestedRows] = useState<DraftRow[]>(() => [newRow("native")]);
@@ -254,7 +254,11 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
         whoLabel={isOpen ? "Who can send offers" : "Who can accept"}
       />
       {fee !== undefined && (
-        <FeeNote amount={fee}>
+        <FeeNote
+          amount={fee}
+          pending={pendingFee}
+          pendingNote="A deal listed before then keeps today's fee, for both sides, until it completes or ends."
+        >
           Sent with your {isOpen ? "offer" : "deal"} and held with it. It&apos;s only charged if the deal completes, and the
           other side pays the same. If you cancel it, or it expires, it comes back to you with your assets.
         </FeeNote>

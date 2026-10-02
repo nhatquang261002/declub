@@ -12,7 +12,8 @@ import {MockERC20} from "../../src/mocks/MockERC20.sol";
 ///      everything. Each has a signing key (`aliceKey`, …) so tests can sign real EIP-712 intents.
 ///      The contract is deployed with no protocol fee, so a test reads as the plain settlement;
 ///      the fee suite (`OnDealIntents.fee.t.sol`) overrides `_feeAmount`. Intents always carry
-///      the contract's own fee token and amount, so they are valid either way.
+///      the contract's own fee token and its current fee as `maxFee`, so they are valid either
+///      way. `feeAdmin` may change the fee up to `_maxFee`.
 abstract contract OnDealIntentsBase is Test {
     uint256 internal constant START_TOKEN = 1_000 ether;
 
@@ -22,6 +23,7 @@ abstract contract OnDealIntentsBase is Test {
     MockERC20 internal wmon;
     OnDealIntents internal swap;
     address internal treasury = makeAddr("treasury");
+    address internal feeAdmin = makeAddr("feeAdmin");
 
     address internal alice;
     address internal bob;
@@ -44,7 +46,7 @@ abstract contract OnDealIntentsBase is Test {
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
         wmon = new MockERC20("Wrapped MON", "WMON");
-        swap = new OnDealIntents(address(wmon), _feeAmount(), treasury);
+        swap = new OnDealIntents(address(wmon), _feeAmount(), _maxFee(), treasury, feeAdmin);
 
         (alice, aliceKey) = makeAddrAndKey("alice");
         (bob, bobKey) = makeAddrAndKey("bob");
@@ -60,6 +62,11 @@ abstract contract OnDealIntentsBase is Test {
     /// @dev What each maker pays per settlement. 0 unless a suite overrides it.
     function _feeAmount() internal view virtual returns (uint256) {
         return 0;
+    }
+
+    /// @dev The ceiling the fixture deploys with.
+    function _maxFee() internal view virtual returns (uint256) {
+        return 4 * _feeAmount();
     }
 
     function _onboard(address who) internal {
@@ -136,7 +143,7 @@ abstract contract OnDealIntentsBase is Test {
         uint256 nonce
     ) internal view returns (IOnDealIntents.Intent memory) {
         return IOnDealIntents.Intent(
-            maker, give, want, swap.FEE_TOKEN(), swap.FEE_AMOUNT(), _deadline(), nonce
+            maker, give, want, swap.FEE_TOKEN(), swap.fee(), _deadline(), nonce
         );
     }
 

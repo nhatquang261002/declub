@@ -13,9 +13,13 @@ export type Intent = {
   maker: Address;
   give: Asset[];
   want: Asset[];
-  /** The protocol fee the maker agrees to pay if the cycle settles (ADR 0015): signed, and it has to match the contract's. */
+  /**
+   * The protocol fee token, and the most the maker agrees to pay if the cycle settles (ADR 0015,
+   * 0018). The contract charges its current `fee()`, and refuses the intent while that is above
+   * `maxFee`.
+   */
   feeToken: Address;
-  fee: bigint;
+  maxFee: bigint;
   deadline: bigint;
   nonce: bigint;
 };
@@ -32,7 +36,7 @@ export const INTENT_TYPES = {
     { name: "give", type: "Asset[]" },
     { name: "want", type: "Asset[]" },
     { name: "feeToken", type: "address" },
-    { name: "fee", type: "uint256" },
+    { name: "maxFee", type: "uint256" },
     { name: "deadline", type: "uint64" },
     { name: "nonce", type: "uint256" },
   ],
@@ -44,14 +48,14 @@ export const CANCEL_TYPES = {
 } as const;
 
 export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "OnDealIntents", version: "2", chainId, verifyingContract }) as const;
+  ({ name: "OnDealIntents", version: "3", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,
   give: intent.give.map(toRawAsset),
   want: intent.want.map(toRawAsset),
   feeToken: intent.feeToken,
-  fee: intent.fee,
+  maxFee: intent.maxFee,
   deadline: intent.deadline,
   nonce: intent.nonce,
 });
@@ -87,7 +91,7 @@ export type WireIntent = {
   give: WireAsset[];
   want: WireAsset[];
   feeToken: Address;
-  fee: string;
+  maxFee: string;
   deadline: string;
   nonce: string;
 };
@@ -102,7 +106,7 @@ export const intentToWire = (intent: Intent): WireIntent => ({
   give: intent.give.map(wireAsset),
   want: intent.want.map(wireAsset),
   feeToken: intent.feeToken,
-  fee: intent.fee.toString(),
+  maxFee: intent.maxFee.toString(),
   deadline: intent.deadline.toString(),
   nonce: intent.nonce.toString(),
 });
@@ -130,12 +134,12 @@ export function intentFromWire(v: unknown): Intent | null {
   if (!isRecord(v) || typeof v.maker !== "string" || !isAddress(v.maker)) return null;
   const give = parseSide(v.give);
   const want = parseSide(v.want);
-  const fee = uint(v.fee);
+  const maxFee = uint(v.maxFee);
   const deadline = uint(v.deadline);
   const nonce = uint(v.nonce);
   if (typeof v.feeToken !== "string" || !isAddress(v.feeToken)) return null;
-  if (!give || !want || fee === null || deadline === null || nonce === null) return null;
-  return { maker: getAddress(v.maker), give, want, feeToken: getAddress(v.feeToken), fee, deadline, nonce };
+  if (!give || !want || maxFee === null || deadline === null || nonce === null) return null;
+  return { maker: getAddress(v.maker), give, want, feeToken: getAddress(v.feeToken), maxFee, deadline, nonce };
 }
 
 export type IntentStatus = "open" | "stale" | "settled" | "cancelled" | "expired" | "consumed" | "rejected";
@@ -243,6 +247,7 @@ export function reasonText(reason: string | null): string | null {
     allowance: "Your token approval for this intent is missing or too small.",
     fee_balance: "You don't hold enough WMON for the protocol fee any more.",
     fee_allowance: "Your WMON approval for the protocol fee is missing or too small.",
+    wrong_fee: "The protocol fee went up past the most this intent agreed to pay. Sign it again to keep it in play.",
     not_owner: "You no longer own an NFT this intent gives.",
     not_approved: "An NFT this intent gives isn't approved for On Deal any more.",
     bad_token: "A token in this intent stopped answering.",
@@ -299,6 +304,8 @@ export const intentAsListing = (row: PoolIntent): SignedListing => ({
   taker: null,
   expiry: row.intent.deadline,
   status: isLive(row.status) ? "open" : row.status === "settled" ? "filled" : "cancelled",
+  // The most each side pays. What is charged is the contract's fee at settlement, never more.
+  fee: row.intent.maxFee,
   offered: row.intent.give,
   requested: row.intent.want,
   signed: row,

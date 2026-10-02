@@ -11,8 +11,9 @@ The contract holds other people's Chogs and MON, so every decision below is aime
 | Maker | Create, cancel their own open trade, withdraw credited MON | Change terms after creation; take back escrow after a fill |
 | Taker | Fill an open, unexpired trade they're allowed to fill | Fill with the wrong NFTs or the wrong MON amount; fill twice |
 | Anyone | Reclaim an expired trade *to its maker* | Redirect a refund; cancel someone else's trade |
-| Deployer | Nothing after deploy | Pause, upgrade, sweep or change the fee (none of these exist; the fee amount, token and recipient are immutable) |
-| Fee recipient | Receives the protocol fee when a deal completes | Touch escrow, or take a fee for a deal that didn't complete |
+| Deployer | Nothing after deploy | Pause, upgrade or sweep (none of these exist), or change the fee recipient, the fee token or the fee ceiling (immutable) |
+| Fee admin (`OnDealV2`, `OnDealIntents`) | Lower the fee at once, queue a raise that applies after 7 days, never above `MAX_FEE`; hand the role on in two steps, or renounce it for good ([ADR 0018](adr/0018-adjustable-protocol-fee.md)) | Change the fee of an escrow deal already listed, charge an intent more than its signed `maxFee`, raise the fee without the delay, or touch escrow, credits, nonces, the recipient or the token |
+| Fee recipient | Receives the protocol fee when a deal completes | Touch escrow, take a fee for a deal that didn't complete, or change the fee |
 
 ## Invariants
 
@@ -72,6 +73,7 @@ contracts/test/
 ├── OnDeal.fuzz.t.sol        MON conservation, wrong msg.value, expiry boundary, access control
 ├── MockChog.t.sol             mint, traits, tokenURI
 ├── Deploy.t.sol               deploy script: mock vs existing collection, demo mints, CSV parsing
+├── FeeAdmin.t.sol             the fee admin (ADR 0018), run against OnDealV2 and OnDealIntents
 ├── utils/                     shared fixture (OnDealBase), MonReceiver, ReentrantReceiver
 └── invariant/
     ├── Handler.sol            random create/fill/cancel/reclaim/withdraw/warp across 3 EOAs
@@ -119,7 +121,9 @@ Recomputed from the trades themselves in `test/v2/invariant/`, over native, two 
 | V8 | `fillTrade` never settles an open offer, and every valid proposal call succeeds. |
 | Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
 
-**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md)). The invariant suite runs with a 3 MON fee and a fee recipient that sometimes rejects MON. V1 becomes `balance == Σ native offered by Open trades + 1 fee share per Open trade and per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler. The fee suite (`OnDealV2.fee.t.sol`, 28 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
+**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)). The invariant suite starts with a 3 MON fee (ceiling 12), a fee recipient that sometimes rejects MON, and a fee admin that changes the fee during the run, so trades carry different fees. V1 becomes `balance == Σ native offered by Open trades + each Open trade's own fee, once for the trade and once per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × the trade's fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler, at the trade's own fee. The fee suite (`OnDealV2.fee.t.sol`, 37 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a deal listed before a raise or a cut that fills, proposes and refunds at its own fee, a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
+
+**Fee admin** (`FeeAdmin.t.sol`, 22 tests, run against both contracts): a cut applies at once and drops a queued raise, a raise waits exactly 7 days and a newer one restarts the clock, never above the ceiling, the two-step handover and its cancellation, renounce dropping any queued raise or handover, a zero admin at deploy, and everything a stranger or the recipient is refused. A fuzz test checks that the fee never exceeds the ceiling and never rises without the full delay.
 
 Mutation checks: removing the credit on a failed payout, redirecting reclaimed assets to the caller, and allowing fills after expiry each make the invariant suite fail.
 
@@ -143,6 +147,7 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 - **A permanently blocked recipient** (the token itself blacklists them) keeps the credit in the escrow forever. The escrow can't do more than offer the claim.
 - **Gas-burning token or receiver.** As with v1's MON receiver, one that burns all forwarded gas can make fills of *its own* trades fail. Takers lose gas, nobody loses assets.
 - **Approvals.** ERC-20 approvals to the escrow should be limited to the amount, not unlimited. The UI should ask for the exact amount.
+- **A compromised fee admin** can raise the fee to `MAX_FEE` (about 4× the launch fee) after 7 days' public notice (`FeeChangeQueued`), or cut it to zero at once. It can't touch a deal already listed, charge an intent more than its `maxFee`, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
 - No external review yet.
 
 ### Test suite
@@ -156,6 +161,7 @@ contracts/test/v2/
 ├── OnDealV2.claim.t.sol        rejected payouts become credits: native, ERC-20, ERC-721
 ├── OnDealV2.tokens.t.sol       fee / lying / no-return tokens, re-entry, stray deposits
 ├── OnDealV2.fuzz.t.sol         conservation, exact refunds, wrong value, expiry boundary, access
+├── OnDealV2.fee.t.sol          the protocol fee (ADR 0015), fixed per deal across changes (ADR 0018)
 ├── invariant/                    handler + invariants V1–V7 and liveness
 ├── DeployV2.t.sol, MockERC20.t.sol
 contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook tokens
@@ -165,7 +171,7 @@ contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook
 
 ## OnDealIntents
 
-[ADR 0008](adr/0008-trade-intents.md) and [0009](adr/0009-ring-swaps.md). Standing approvals make this contract more sensitive than the escrow ones, so it has no admin, no arbitrary calls and no way to move an asset without a valid unexpired signature from its owner.
+[ADR 0008](adr/0008-trade-intents.md) and [0009](adr/0009-ring-swaps.md). Standing approvals make this contract more sensitive than the escrow ones, so it has no admin beyond the fee amount, no arbitrary calls and no way to move an asset without a valid unexpired signature from its owner.
 
 ```text
 contracts/test/intents/
@@ -177,15 +183,15 @@ contracts/test/intents/
 ├── OnDealIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
 ├── OnDealIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
 ├── OnDealIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
-├── OnDealIntents.fee.t.sol        the protocol fee (ADR 0015)
+├── OnDealIntents.fee.t.sol        the protocol fee (ADR 0015), signed as a maximum (ADR 0018)
 └── invariant/                       handler + invariants N1, N2, N5, N6 and conservation
 ```
 
-`forge test --match-path "test/intents/*"` runs 95 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
+`forge test --match-path "test/intents/*"` runs 100 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
 
-Protocol fee: every maker in a settled cycle pays `FEE_AMOUNT` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements); the deployer picks it once and it can't change. The fee is signed into each intent, so a signature carries consent to exactly one amount. `OnDealIntents.fee.t.sol` (22 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, wrong or missing fee terms, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
+Protocol fee: every maker in a settled cycle pays the current `fee()` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements); the deployer picks it once and it can't change. Each intent signs `maxFee`, so a signature carries consent to at most that amount, whatever the fee admin does later ([ADR 0018](adr/0018-adjustable-protocol-fee.md)). `OnDealIntents.fee.t.sol` (27 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, a `maxFee` above the fee paying only the fee, one below it or another token refused, a cut settling old intents at the new fee, a queued raise changing nothing until applied, an applied raise making old intents stale, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
 
-Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721 (and no fee token); **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; **N6** the recipient holds exactly the fee for every maker in every settled cycle, and nobody else paid; plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
+Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721 (and no fee token); **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; **N6** the recipient holds exactly the fee in force at each settlement for every maker in it, nobody else paid, and nothing settles for a maker whose `maxFee` is below the fee (the handler changes the fee and signs `maxFee` below, at or above it); plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
 
 Known risk specific to this contract: a maker can spend an asset or revoke an approval after signing, which makes `settle` revert and costs the matcher gas. Nobody loses assets. Mitigation lives in the matcher (simulate right before sending), not the contract.
 

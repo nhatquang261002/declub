@@ -10,18 +10,24 @@ import {MockWMON} from "../src/mocks/MockWMON.sol";
 /// @dev The off-chain pool and matcher (../matcher) read the address from
 ///      NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS. OnDeal and OnDealV2 are untouched.
 ///      Env (all optional; the fee is off unless PROTOCOL_FEE_WEI is set):
-///        PROTOCOL_FEE_WEI  fee per maker in `FEE_TOKEN` units (18 decimals), at most `MAX_FEE`
-///        FEE_TOKEN         the wrapped MON the fee is paid in; required when the fee is not 0
-///                          (unless DEPLOY_MOCK_WMON is set)
-///        DEPLOY_MOCK_WMON  true → deploy a `MockWMON` and use it as the fee token (testnet has
-///                          no canonical WMON). Ignored when FEE_TOKEN is set.
-///        FEE_RECIPIENT     address that receives the fees; required when the fee is not 0
+///        PROTOCOL_FEE_WEI      fee per maker in `FEE_TOKEN` units (18 decimals)
+///        PROTOCOL_FEE_MAX_WEI  ceiling the fee admin can never exceed (default 4 × the fee);
+///                              at most `MAX_FEE_LIMIT`
+///        FEE_TOKEN             the wrapped MON the fee is paid in; required when the ceiling
+///                              is not 0 (unless DEPLOY_MOCK_WMON is set)
+///        DEPLOY_MOCK_WMON      true → deploy a `MockWMON` and use it as the fee token (testnet
+///                              has no canonical WMON). Ignored when FEE_TOKEN is set.
+///        FEE_RECIPIENT         address that receives the fees; required when the ceiling is
+///                              not 0
+///        FEE_ADMIN             may change the fee within the ceiling (default none = fixed)
 contract DeployIntents is Script {
     struct Config {
         bool deployMockWmon;
         address feeToken;
         uint256 fee;
+        uint256 maxFee;
         address feeRecipient;
+        address feeAdmin;
     }
 
     struct Result {
@@ -35,13 +41,18 @@ contract DeployIntents is Script {
         console.log("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS=%s", r.swap);
         console.log("NEXT_PUBLIC_ON_DEAL_INTENTS_DEPLOY_BLOCK=%s", r.deployBlock);
         if (r.mockWmon != address(0)) console.log("MOCK_WMON_ADDRESS=%s", r.mockWmon);
-        console.log("fee token=%s", OnDealIntents(r.swap).FEE_TOKEN());
-        console.log("protocol fee per maker (wei)=%s", OnDealIntents(r.swap).FEE_AMOUNT());
-        console.log("fee recipient=%s", OnDealIntents(r.swap).FEE_RECIPIENT());
+        OnDealIntents swap = OnDealIntents(r.swap);
+        console.log("fee token=%s", swap.FEE_TOKEN());
+        console.log("protocol fee per maker (wei)=%s", swap.fee());
+        console.log("fee ceiling (wei)=%s", swap.MAX_FEE());
+        console.log("fee recipient=%s", swap.FEE_RECIPIENT());
+        console.log("fee admin=%s", swap.feeAdmin());
     }
 
     function configFromEnv() public view returns (Config memory c) {
         c.fee = vm.envOr("PROTOCOL_FEE_WEI", uint256(0));
+        c.maxFee = vm.envOr("PROTOCOL_FEE_MAX_WEI", 4 * c.fee);
+        c.feeAdmin = vm.envOr("FEE_ADMIN", address(0));
         c.feeToken = vm.envOr("FEE_TOKEN", address(0));
         c.deployMockWmon = vm.envOr("DEPLOY_MOCK_WMON", false);
         c.feeRecipient = vm.envOr("FEE_RECIPIENT", address(0));
@@ -56,7 +67,7 @@ contract DeployIntents is Script {
             r.mockWmon = address(new MockWMON());
             feeToken = r.mockWmon;
         }
-        r.swap = address(new OnDealIntents(feeToken, c.fee, c.feeRecipient));
+        r.swap = address(new OnDealIntents(feeToken, c.fee, c.maxFee, c.feeRecipient, c.feeAdmin));
         vm.stopBroadcast();
     }
 }

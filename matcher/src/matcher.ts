@@ -1,6 +1,6 @@
 import { type Address, type Hex, isAddressEqual } from "viem";
 import { intentsAbi } from "./abi.ts";
-import type { Reader, Sender } from "./chain.ts";
+import { type Reader, type Sender, readFee } from "./chain.ts";
 import { checkIntent } from "./checks.ts";
 import { decodeRevert } from "./errors.ts";
 import { type Node, findCycles, selectCycles } from "./graph.ts";
@@ -53,10 +53,14 @@ export interface MatchReport {
   cooledDown: number;
 }
 
-/** Contract errors whose first argument is the index of the intent at fault, and what that means. */
+/**
+ * Contract errors whose first argument is the index of the intent at fault, and what that means.
+ * `WrongFee` is `stale`, not `rejected`: with a valid token it means the fee admin raised the fee
+ * above the intent's `maxFee`, and a later cut would make it settleable again (ADR 0018).
+ */
 const BROKEN_INTENT: Record<string, Status> = {
   BadSignature: "rejected",
-  WrongFee: "rejected",
+  WrongFee: "stale",
   InvalidMaker: "rejected",
   InvalidDeadline: "rejected",
   EmptySide: "rejected",
@@ -205,6 +209,8 @@ export class Matcher {
    */
   private async handleFailure(cycle: Row[], err: unknown, report: MatchReport): Promise<Outcome> {
     const offenders = new Map<Hex, Dropped>();
+    // Intents dropped for something the maker didn't do (a fee raise), so not held against them.
+    const excused = new Set<Hex>();
     const blame = (r: Row, status: Status, reason: string) =>
       offenders.set(r.hash, { hash: r.hash, status, reason });
 
@@ -213,7 +219,9 @@ export class Matcher {
       const first = revert.args[0];
       const status = BROKEN_INTENT[revert.name];
       if (status && typeof first === "bigint" && cycle[Number(first)]) {
-        blame(cycle[Number(first)]!, status, revert.name);
+        const r = cycle[Number(first)]!;
+        blame(r, status, revert.name);
+        if (revert.name === "WrongFee") excused.add(r.hash);
       } else if (revert.name === "NonceUsed") {
         const [maker, nonce] = revert.args as [Address, bigint];
         const r = cycle.find((c) => isAddressEqual(c.maker, maker) && c.intent.nonce === nonce);
@@ -232,9 +240,11 @@ export class Matcher {
     if (offenders.size === 0) {
       // A token-level revert (no balance, allowance or ownership) doesn't say whose. Ask the chain.
       const nowSec = Math.floor(Date.now() / 1000);
+      const fee = await readFee(this.reader, this.cfg.swap);
       for (const r of cycle) {
-        const p = await checkIntent(this.reader, this.cfg.swap, r.intent, nowSec);
+        const p = await checkIntent(this.reader, this.cfg.swap, r.intent, nowSec, fee);
         if (!p) continue;
+        if (p.code === "wrong_fee") excused.add(r.hash);
         blame(
           r,
           p.code === "expired" ? "expired" : p.code === "nonce_used" ? "consumed" : "stale",
@@ -253,8 +263,9 @@ export class Matcher {
     for (const o of offenders.values()) {
       const row = cycle.find((r) => r.hash === o.hash)!;
       if (!this.pool.store.setStatus(o.hash, o.status, o.reason)) continue;
-      // Only the maker's own doing counts against them: running late or being settled elsewhere doesn't.
-      if (o.status === "stale" || o.status === "rejected") {
+      // Only the maker's own doing counts against them: running late, being settled elsewhere or
+      // a fee raise doesn't.
+      if ((o.status === "stale" || o.status === "rejected") && !excused.has(o.hash)) {
         this.pool.store.recordFailure(row.maker, o.hash, o.reason, Date.now());
       }
       report.dropped.push(o);

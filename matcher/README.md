@@ -20,7 +20,7 @@ cd matcher && npm install && npm start      # http://127.0.0.1:8787
 
 The contract comes from `contracts/script/DeployIntents.s.sol` ([how to deploy](../contracts/script/README.md)). The key is the matcher's own account: it only pays gas and never holds anyone's assets. Use a key with testnet funds only. Real environment variables override `.env`.
 
-The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md)): every maker in a settled cycle pays a flat amount of WMON from their wallet to the fee recipient, and signs it into the intent. The matcher reads the fee token, amount and recipient from the contract at start and prints them; it never receives or holds any of it.
+The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md)): every maker in a settled cycle pays a flat amount of WMON from their wallet to the fee recipient, and signs the most they'll pay (`maxFee`) into the intent. The fee admin can change the amount ([ADR 0018](../docs/adr/0018-adjustable-protocol-fee.md)), so the matcher reads the token and recipient once at start but the amount for every submission, every prune pass and `/info`. An intent whose `maxFee` is below the fee is refused (`wrong_fee`), or goes `stale` if a raise priced it out (revived by a cut, and not counted against its maker). The matcher never receives or holds any of the fee.
 
 | Variable | Default | |
 |---|---|---|

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IFeeAdmin} from "./IFeeAdmin.sol";
+
 /// @title On Deal V2: generic multi-asset OTC escrow
 /// @notice The maker escrows up to `MAX_ASSETS_PER_SIDE` assets (native MON, ERC-20, ERC-721, in
 ///         any mix) and names up to as many assets in return. A taker fills the trade in one
@@ -12,7 +14,7 @@ pragma solidity ^0.8.24;
 ///      and docs/03-contract-design.md.
 ///      NFTs move with `transferFrom` only, and the contract has no `receive()`, no `fallback`
 ///      and no `IERC721Receiver`, so unsolicited transfers revert instead of getting stuck.
-interface IOnDealV2 {
+interface IOnDealV2 is IFeeAdmin {
     // ─────────────────────────────────────────────────────────────── Types
 
     enum Status {
@@ -75,6 +77,9 @@ interface IOnDealV2 {
         Status status;
         /// @notice Only this address may fill. address(0) = anyone.
         address taker;
+        /// @notice What each side of this deal pays: the fee in force when it was created. The
+        ///         taker or proposer sends this, not the current `fee()`.
+        uint96 fee;
         /// @notice Escrowed by the maker at creation, paid to the taker on fill.
         Asset[] offered;
         /// @notice Paid by the taker at fill, straight to the maker.
@@ -125,7 +130,7 @@ interface IOnDealV2 {
         uint256 id,
         uint256 amount
     );
-    /// @notice A deal completed and both sides' fee shares (`amount` = 2 × `FEE`) went to
+    /// @notice A deal completed and both sides' fee shares (`amount` = 2 × the trade's `fee`) went to
     ///         `recipient`, or were credited to it for `claim` if it rejected the MON. Not
     ///         emitted when the fee is 0.
     event FeeCharged(uint256 indexed tradeId, address indexed recipient, uint256 amount);
@@ -142,13 +147,10 @@ interface IOnDealV2 {
     /// @notice The same asset is on both sides, so the trade could never be filled.
     error SameAssetBothSides(uint256 offeredIndex, uint256 requestedIndex);
     error ExpiryInPast(uint64 expiry);
-    /// @notice `msg.value` isn't exactly the native amount for this call plus `FEE`, the caller's
-    ///         share of the protocol fee. `expected` already includes the fee.
+    /// @notice `msg.value` isn't exactly the native amount for this call plus the caller's share
+    ///         of the protocol fee (`fee()` at create, the trade's `fee` after). `expected`
+    ///         already includes the fee.
     error WrongNativeAmount(uint256 expected, uint256 sent);
-    /// @notice The constructor's fee is above `MAX_FEE`.
-    error FeeTooHigh(uint256 fee, uint256 max);
-    /// @notice The constructor's fee is not 0 but the recipient is the zero address.
-    error NoFeeRecipient();
     /// @notice The escrow received less than the maker offered (fee-on-transfer, rebasing or
     ///         otherwise non-standard token). Such tokens aren't supported.
     error UnsupportedToken(address token);
@@ -188,8 +190,9 @@ interface IOnDealV2 {
     // ─────────────────────────────────────────────────────────────── Mutating
 
     /// @notice Escrow `offered` and open a trade for `requested`. Send exactly the native
-    ///         amount listed in `offered` plus `FEE` as `msg.value`. The `FEE` share is held, and
-    ///         refunded if the trade is cancelled or reclaimed.
+    ///         amount listed in `offered` plus `fee()` as `msg.value`. That share is held, and
+    ///         refunded if the trade is cancelled or reclaimed. The trade records it as `fee`,
+    ///         which is what the other side pays too.
     function createTrade(
         Asset[] calldata offered,
         Asset[] calldata requested,
@@ -219,8 +222,8 @@ interface IOnDealV2 {
     ) external payable returns (uint256 tradeId);
 
     /// @notice Escrow `assets` as a proposal on an open offer. Send exactly the native amount
-    ///         listed in `assets` plus `FEE` as `msg.value`. The `FEE` share is held with the
-    ///         proposal and refunded on withdraw or reject.
+    ///         listed in `assets` plus the trade's `fee` as `msg.value`. That share is held with
+    ///         the proposal and refunded on withdraw or reject.
     function propose(uint256 tradeId, Asset[] calldata assets)
         external
         payable
@@ -240,7 +243,7 @@ interface IOnDealV2 {
     function acceptProposal(uint256 tradeId, uint256 proposalId) external;
 
     /// @notice Pay `requested` and receive `offered`. Send exactly the native amount listed in
-    ///         `requested` plus `FEE` as `msg.value`. Both sides' fee shares go to
+    ///         `requested` plus the trade's `fee` as `msg.value`. Both sides' fee shares go to
     ///         `FEE_RECIPIENT`.
     function fillTrade(uint256 tradeId) external payable;
 
@@ -263,10 +266,6 @@ interface IOnDealV2 {
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
     function MAX_NOTE_BYTES() external view returns (uint256);
     function MAX_SPEC_BYTES() external view returns (uint256);
-    /// @notice The native MON each side of a completed deal pays. Fixed at deploy.
-    function FEE() external view returns (uint256);
-    function FEE_RECIPIENT() external view returns (address);
-    function MAX_FEE() external view returns (uint256);
     function tradeCount() external view returns (uint256);
     function getTrade(uint256 tradeId) external view returns (Trade memory);
     function isExpired(uint256 tradeId) external view returns (bool);

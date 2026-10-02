@@ -20,7 +20,6 @@ import { useProposalsV2 } from "@/hooks/useProposalsV2";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTraitFill } from "@/hooks/useTraitFill";
 import { useDealV2 } from "@/hooks/useDealV2";
-import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
@@ -44,7 +43,8 @@ function DealDetailV2({ id }: { id: bigint }) {
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
-  const { fee } = useEscrowFee();
+  // Both sides pay the fee this deal was listed with, not the contract's current one (ADR 0018).
+  const fee = deal?.fee;
   // History needs to know which public deals this wallet filled (hooks/useFills.ts).
   const { record } = useFills(address, swapV2!.address);
 
@@ -222,7 +222,7 @@ function DealDetailV2({ id }: { id: bigint }) {
             canDecide={isMaker && status === "open"}
           />
         )}
-        {canPropose && <ProposalForm dealId={id} offered={deal.offered} />}
+        {canPropose && <ProposalForm dealId={id} offered={deal.offered} fee={deal.fee} />}
 
         {credits.length > 0 && (
           <div className="card space-y-3 p-5">

@@ -14,6 +14,7 @@ import { TxButton, TxStatus } from "@/components/Tx";
 import { useIntent, useSettlements } from "@/hooks/usePool";
 import { useIntentReadiness } from "@/hooks/useIntentReadiness";
 import { useNow } from "@/hooks/useNow";
+import { useIntentFee } from "@/hooks/useProtocolFee";
 import { useSignFlow } from "@/hooks/useSignFlow";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { explorerAddress } from "@/lib/config";
@@ -78,6 +79,8 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
     [settlements, row],
   );
   const { info } = useIntentsTokenInfo(useMemo(() => [row, ...(settlement?.cycle ?? [])], [row, settlement]));
+  // The fee charged is the contract's at settlement, which can be below what was signed (ADR 0018).
+  const { fee: currentFee } = useIntentFee();
   const received = settlement ? ringLegs(settlement.cycle).find((l) => l.row.hash === row.hash)?.received : undefined;
 
   const why = mine && status === "stale" ? reasonText(row.reason) : null;
@@ -120,9 +123,21 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
             </span>
           </Row>
           <Row label="Deadline">{formatDate(intent.deadline)}</Row>
-          {intent.fee > 0n && (
+          {intent.maxFee > 0n && (
             <Row label="Protocol fee">
-              {formatAsset(erc20Asset(intent.feeToken, intent.fee), info.get(intent.feeToken.toLowerCase()))}
+              {currentFee && currentFee.amount < intent.maxFee ? (
+                <>
+                  {formatAsset(erc20Asset(intent.feeToken, currentFee.amount), info.get(intent.feeToken.toLowerCase()))}
+                  <span className="block text-xs font-normal text-muted">
+                    Now. Signed for up to{" "}
+                    {formatAsset(erc20Asset(intent.feeToken, intent.maxFee), info.get(intent.feeToken.toLowerCase()))}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Up to {formatAsset(erc20Asset(intent.feeToken, intent.maxFee), info.get(intent.feeToken.toLowerCase()))}
+                </>
+              )}
               <span className="block text-xs font-normal text-muted">Charged to the maker only if it settles</span>
             </Row>
           )}
@@ -163,12 +178,20 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
   const invalidate = useTxFlow();
   const sign = useSignFlow();
   const { intent } = row;
+  const { fee: currentFee } = useIntentFee();
   const readiness = useIntentReadiness(
     intent.maker,
     stale ? intent.give : [],
     info,
     "token",
-    useMemo(() => ({ token: intent.feeToken, amount: intent.fee }), [intent.feeToken, intent.fee]),
+    // The maker needs WMON for the fee that would be charged now, never more than they signed.
+    useMemo(
+      () => ({
+        token: intent.feeToken,
+        amount: currentFee && currentFee.amount < intent.maxFee ? currentFee.amount : intent.maxFee,
+      }),
+      [intent.feeToken, intent.maxFee, currentFee],
+    ),
   );
   const fix = readiness.steps[0];
   const contract = swapIntents;

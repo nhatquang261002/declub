@@ -1,6 +1,6 @@
 # ADR 0015: A small flat protocol fee, paid by every side of a completed deal
 
-**Status:** Accepted · 2026-10-01 · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `OnDealV2` and `OnDealIntents`; `OnDeal` (v1) is unchanged. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
+**Status:** Accepted · 2026-10-01 · **Partly superseded by [ADR 0018](0018-adjustable-protocol-fee.md)** (2026-10-02): the amount is no longer fixed at deploy, the ceiling is set per deployment, an escrow deal records its own fee, and an intent signs a `maxFee`. Who pays, when, and in which token stand as below. · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `OnDealV2` and `OnDealIntents`; `OnDeal` (v1) is unchanged. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
 
 ## Context
 

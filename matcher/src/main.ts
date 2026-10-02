@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { makeReader, makeSender, readFeeTerms } from "./chain.ts";
+import { makeReader, makeSender, readFee, readFeeSetup } from "./chain.ts";
 import { loadConfig, loadRootEnv } from "./config.ts";
 import { Matcher, defaultMatcherConfig } from "./matcher.ts";
 import { Pool } from "./pool.ts";
@@ -16,8 +16,8 @@ mkdirSync(dirname(cfg.dbPath), { recursive: true });
 const store = new Store(cfg.dbPath);
 const reader = makeReader(cfg);
 const sender = makeSender(cfg, cfg.privateKey);
-// What the contract charges each maker. Every intent has to sign exactly this.
-const fee = await readFeeTerms(reader, cfg.swap);
+// The fee token and recipient are fixed; the amount can change, so it is read when needed.
+const feeSetup = await readFeeSetup(reader, cfg.swap);
 
 const pool = new Pool(
   store,
@@ -25,7 +25,7 @@ const pool = new Pool(
   {
     chainId: cfg.chainId,
     swap: cfg.swap,
-    fee,
+    feeToken: feeSetup.token,
     minTtlSec: 60,
     maxTtlSec: 7 * 24 * 60 * 60,
   },
@@ -37,13 +37,19 @@ const server = createPoolServer(pool, {
   chainId: cfg.chainId,
   swap: cfg.swap,
   matcher: sender.account.address,
-  fee: { token: fee.token, amount: fee.amount.toString(), recipient: fee.recipient },
+  fee: async () => ({
+    token: feeSetup.token,
+    amount: (await readFee(reader, cfg.swap)).toString(),
+    recipient: feeSetup.recipient,
+  }),
 });
 
 server.listen(cfg.port, cfg.host, () => {
   log(`pool listening on http://${cfg.host}:${cfg.port}`);
   log(`settling on chain ${cfg.chainId} via ${cfg.swap} as ${sender.account.address}`);
-  log(`protocol fee: ${fee.amount} of ${fee.token} per maker, to ${fee.recipient}`);
+  void readFee(reader, cfg.swap).then((amount) =>
+    log(`protocol fee: ${amount} of ${feeSetup.token} per maker, to ${feeSetup.recipient}`),
+  );
   matcher.start({ pollMs: cfg.pollMs, pruneMs: cfg.pruneMs });
 });
 

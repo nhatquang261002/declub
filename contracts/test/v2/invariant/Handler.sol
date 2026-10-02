@@ -16,6 +16,8 @@ import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 ///      the expected status per trade and a few counters that must stay 0.
 ///      The swap charges a protocol fee: every create, proposal and fill sends it with the call,
 ///      and the fee recipient is a MON-rejecting contract at times, so its credit is exercised.
+///      The fee admin changes the fee as the run goes, so trades carry different fees and every
+///      side must pay, and get back, its own trade's.
 contract Handler is Test {
     OnDealV2 public immutable swap;
     MockChog public immutable chog;
@@ -23,8 +25,7 @@ contract Handler is Test {
     BlocklistToken public immutable blk;
 
     MonReceiver public immutable treasury;
-    /// @dev The per-side fee, read once: a call made after `vm.prank` would spend the prank.
-    uint256 public immutable fee;
+    address public immutable feeAdmin;
 
     address[] public actors;
     mapping(uint256 tradeId => IOnDealV2.Status) public expectedStatus;
@@ -39,6 +40,7 @@ contract Handler is Test {
     uint256 public ghost_openOfferFilled; // V8: fillTrade must never settle an open offer
     uint256 public ghost_validProposalOpReverted; // valid propose / accept / reject / withdraw
     uint256 public ghost_completed; // deals that completed: a fill or an accepted proposal
+    uint256 public ghost_feesCharged; // V9: 2 × the trade's fee per completed deal
 
     mapping(bytes32 => uint256) public calls;
 
@@ -47,11 +49,12 @@ contract Handler is Test {
         MockChog chog_,
         MockERC20 usdc_,
         BlocklistToken blk_,
-        MonReceiver treasury_
+        MonReceiver treasury_,
+        address feeAdmin_
     ) {
         swap = swap_;
         treasury = treasury_;
-        fee = swap_.FEE();
+        feeAdmin = feeAdmin_;
         chog = chog_;
         usdc = usdc_;
         blk = blk_;
@@ -104,7 +107,8 @@ contract Handler is Test {
             _side(counterparty, requestedMask, nRequestedNft, amountSeed >> 16);
         if (offered.length == 0 || requested.length == 0) return;
 
-        uint256 value = _sum(offered, 0) + fee;
+        // Read before the prank: any call, even a view, would spend it.
+        uint256 value = _sum(offered, 0) + swap.fee();
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
         address taker = restrictTaker ? counterparty : address(0);
@@ -134,7 +138,7 @@ contract Handler is Test {
         uint256[3] memory makerBefore = _holdings(t.maker);
         uint256[3] memory takerBefore = _holdings(taker);
         vm.prank(taker);
-        try swap.fillTrade{value: _sum(t.requested, 0) + fee}(id) {
+        try swap.fillTrade{value: _sum(t.requested, 0) + t.fee}(id) {
             if (expired) ghost_expiredFills++;
             expectedStatus[id] = IOnDealV2.Status.Filled;
             _checkNfts(t.offered, taker);
@@ -145,10 +149,11 @@ contract Handler is Test {
                 ghost_badSettlements++;
             }
             // The taker also sends its fee share; the maker's was sent when it created the trade.
-            if (!_gained(taker, takerBefore, t.offered, t.requested, 0, fee)) {
+            if (!_gained(taker, takerBefore, t.offered, t.requested, 0, t.fee)) {
                 ghost_badSettlements++;
             }
             ghost_completed++;
+            ghost_feesCharged += 2 * uint256(t.fee);
             calls["fill"]++;
         } catch {
             if (!expired) ghost_validFillReverted++;
@@ -171,8 +176,9 @@ contract Handler is Test {
 
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
+        uint256 value = _sum(offered, 0) + swap.fee();
         vm.prank(maker);
-        uint256 id = swap.createOpenOffer{value: _sum(offered, 0) + fee}(
+        uint256 id = swap.createOpenOffer{value: value}(
             offered, restrictTaker ? counterparty : address(0), expiry, "note"
         );
         expectedStatus[id] = IOnDealV2.Status.Open;
@@ -197,7 +203,7 @@ contract Handler is Test {
         if (assets.length == 0) return;
 
         vm.prank(proposer);
-        try swap.propose{value: _sum(assets, 0) + fee}(id, assets) returns (uint256 pid) {
+        try swap.propose{value: _sum(assets, 0) + t.fee}(id, assets) returns (uint256 pid) {
             if (pid != swap.proposalCount(id) - 1) ghost_validProposalOpReverted++;
             expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Active;
             calls["propose"]++;
@@ -229,6 +235,7 @@ contract Handler is Test {
                 ghost_badSettlements++;
             }
             ghost_completed++;
+            ghost_feesCharged += 2 * uint256(t.fee);
             calls["accept"]++;
         } catch {
             ghost_validProposalOpReverted++;
@@ -249,7 +256,7 @@ contract Handler is Test {
         try swap.rejectProposal(id, pid) {
             expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Rejected;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), fee, 0)) {
+            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), t.fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["reject"]++;
@@ -267,13 +274,14 @@ contract Handler is Test {
         uint256 pid = proposalSeed % n;
         IOnDealV2.Proposal memory p = swap.getProposal(id, pid);
         if (p.status != IOnDealV2.ProposalStatus.Active) return;
+        uint256 share = swap.getTrade(id).fee;
 
         uint256[3] memory before = _holdings(p.proposer);
         vm.prank(p.proposer);
         try swap.withdrawProposal(id, pid) {
             expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Withdrawn;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), fee, 0)) {
+            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), share, 0)) {
                 ghost_badRefunds++;
             }
             calls["withdraw"]++;
@@ -291,7 +299,7 @@ contract Handler is Test {
         try swap.cancelTrade(id) {
             expectedStatus[id] = IOnDealV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, before, t.offered, new IOnDealV2.Asset[](0), fee, 0)) {
+            if (!_gained(t.maker, before, t.offered, new IOnDealV2.Asset[](0), t.fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["cancel"]++;
@@ -311,7 +319,7 @@ contract Handler is Test {
         try swap.reclaimExpired(id) {
             expectedStatus[id] = IOnDealV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, makerBefore, t.offered, new IOnDealV2.Asset[](0), fee, 0)) {
+            if (!_gained(t.maker, makerBefore, t.offered, new IOnDealV2.Asset[](0), t.fee, 0)) {
                 ghost_badRefunds++;
             }
             // A caller who isn't the maker gets nothing.
@@ -348,6 +356,21 @@ contract Handler is Test {
     /// @dev Flips whether the fee recipient takes MON, so fees are paid or credited.
     function acceptFees(bool accept) external {
         treasury.setAccept(accept);
+    }
+
+    /// @dev The fee admin moves the fee anywhere up to the ceiling. A raise waits out its delay
+    ///      and is applied, so it takes effect within the run.
+    function changeFee(uint256 seed) external {
+        uint256 newFee = bound(seed, 0, swap.MAX_FEE());
+        bool raise = newFee > swap.fee();
+        vm.prank(feeAdmin);
+        swap.setFee(newFee);
+        if (raise) {
+            vm.warp(block.timestamp + swap.FEE_RAISE_DELAY());
+            vm.prank(feeAdmin);
+            swap.applyFee();
+        }
+        calls["changeFee"]++;
     }
 
     function warp(uint256 secs) external {
@@ -457,7 +480,7 @@ contract Handler is Test {
         for (uint256 i; i < t.requested.length; ++i) {
             IOnDealV2.Asset memory a = t.requested[i];
             if (a.assetType == IOnDealV2.AssetType.Native) {
-                if (taker.balance < a.amount + fee) return false;
+                if (taker.balance < a.amount + t.fee) return false;
             } else if (a.assetType == IOnDealV2.AssetType.ERC20) {
                 if (IERC20Like(a.token).balanceOf(taker) < a.amount) return false;
                 // A blocked maker can't receive the blocklist token, which reverts the fill.

@@ -13,11 +13,14 @@ import {Handler} from "./Handler.sol";
 ///      N1 the contract never holds anything; N2 a nonce settles at most once and never after it
 ///      was invalidated; N5 nothing settles after its deadline. N3/N4 (assets only leave signers'
 ///      wallets, everyone is paid) show up as conservation: nothing is created or destroyed.
-///      The contract charges a fee in WMON: N6 the recipient has received exactly the fee for
-///      every maker in every settlement, and nothing otherwise.
+///      The contract charges a fee in WMON: N6 the recipient has received exactly the fee in
+///      force at each settlement for every maker in it, nothing otherwise, and nothing settles
+///      for a maker whose signed `maxFee` is below the fee. The fee admin changes the fee
+///      during the run.
 contract OnDealIntentsInvariantTest is Test {
     uint256 internal constant START = 100_000 ether;
     uint256 internal constant FEE = 2 ether;
+    address internal constant FEE_ADMIN = address(0xFEEAD);
 
     OnDealIntents internal swap;
     MockChog internal chog;
@@ -29,7 +32,7 @@ contract OnDealIntentsInvariantTest is Test {
 
     function setUp() public {
         wmon = new MockERC20("Wrapped MON", "WMON");
-        swap = new OnDealIntents(address(wmon), FEE, treasury);
+        swap = new OnDealIntents(address(wmon), FEE, 4 * FEE, treasury, FEE_ADMIN);
         chog = new MockChog();
         usdc = new MockERC20("USD Coin", "USDC");
         weth = new MockERC20("Wrapped Ether", "WETH");
@@ -52,7 +55,7 @@ contract OnDealIntentsInvariantTest is Test {
             wmon.approve(address(swap), type(uint256).max);
             vm.stopPrank();
         }
-        handler = new Handler(swap, chog, usdc, weth, actors, keys);
+        handler = new Handler(swap, chog, usdc, weth, actors, keys, FEE_ADMIN);
         targetContract(address(handler));
     }
 
@@ -79,9 +82,11 @@ contract OnDealIntentsInvariantTest is Test {
         assertEq(chogSum, 20);
     }
 
-    /// N6: every settled maker paid the fee, to the recipient, and nobody else paid anything.
+    /// N6: every settled maker paid the fee in force, to the recipient, and nobody else paid
+    ///     anything. Nobody paid more than they signed for.
     function invariant_N6_feesAreChargedPerSettledMaker() public view {
-        assertEq(wmon.balanceOf(treasury), FEE * handler.settledMakers());
+        assertEq(wmon.balanceOf(treasury), handler.feesPaid());
+        assertFalse(handler.settledBelowMaxFee());
         uint256 held;
         for (uint256 i; i < 4; ++i) {
             held += wmon.balanceOf(handler.actors(i));

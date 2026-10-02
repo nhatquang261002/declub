@@ -49,7 +49,7 @@ const FAQ: ReadonlyArray<[string, string]> = [
   ["Can I cancel my deal?", "Yes. The maker can cancel any open deal before it is filled. Your escrowed assets and offered MON are returned to your wallet."],
   ["What happens when a deal expires?", "An expired deal cannot be filled. The maker, or another wallet on the maker's behalf, can call Reclaim to return the escrowed assets."],
   ["Who can accept a deal?", "Public deals can be accepted by any wallet that owns all requested assets. A direct deal can only be accepted by the wallet named by the maker."],
-  ["Are there platform fees?", "Multi-asset and signed deals charge a small flat protocol fee per side, so both people pay the same. It is only charged when the deal completes: if you cancel, it expires, or an offer is rejected or withdrawn, nobody pays it. The screens show the exact amount before you confirm. In a locked deal it is sent in MON with your side and held with it, and refunded if the deal doesn't complete. In a signed swap it is taken in WMON (wrapped MON) from your wallet when the swap settles, and the first step wraps the MON you need. You also pay the Monad transaction cost. Deals on the original single-collection contract have no fee."],
+  ["Are there platform fees?", "Multi-asset and signed deals charge a small flat protocol fee per side, so both people pay the same. It is only charged when the deal completes: if you cancel, it expires, or an offer is rejected or withdrawn, nobody pays it. The screens show the exact amount before you confirm. In a locked deal it is sent in MON with your side and held with it, and refunded if the deal doesn't complete. In a signed swap it is taken in WMON (wrapped MON) from your wallet when the swap settles, and the first step wraps the MON you need. The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. A locked deal keeps the fee it was listed with, for both sides. A signed swap is signed with the most you'll pay, and if the fee is cut before it settles you pay less. You also pay the Monad transaction cost. Deals on the original single-collection contract (testnet only) have no fee."],
   ["Why do I need to approve On Deal?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
   ["Is this mainnet?", "The current demo runs on Monad testnet with test assets. Treat them as disposable and never send valuable assets to an unfamiliar contract."],
 ];
@@ -205,6 +205,13 @@ export default function GuidePage() {
               ))}
             </div>
           </section>
+          <p className="border-t border-black/10 pt-6 text-sm text-muted">
+            Still need help?{" "}
+            <a href="mailto:support@on-deal.app" className="font-semibold text-accent underline">
+              Contact support
+            </a>
+            .
+          </p>
         </div>
       </div>
     </div>

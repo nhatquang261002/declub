@@ -7,37 +7,31 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IOnDealV2} from "./interfaces/IOnDealV2.sol";
+import {FeeAdmin} from "./FeeAdmin.sol";
 
 /// @title OnDealV2: generic multi-asset OTC escrow
 /// @notice See IOnDealV2 for the behaviour spec, docs/adr/0005-generic-asset-model.md and
 ///         docs/adr/0007-open-offers.md for the reasoning.
-/// @dev No admin, no upgradeability, no token allowlist. Every mutating function is
-///      nonReentrant and follows checks → effects → interactions. Payouts out of escrow never
-///      revert: a recipient or token that rejects one gets a credit to `claim` instead.
+/// @dev No upgradeability, no token allowlist, and an admin over the fee amount only (FeeAdmin).
+///      Every mutating function is nonReentrant and follows checks → effects → interactions.
+///      Payouts out of escrow never revert: a recipient or token that rejects one gets a credit
+///      to `claim` instead.
 ///      Moving the *taker's* assets to the maker does revert on failure, so a fill is atomic.
 ///
-///      Protocol fee (docs/adr/0015-protocol-fee.md): every side of a completed deal pays `FEE`
-///      in native MON, to `FEE_RECIPIENT`. Each side sends its share with its own assets
-///      (`msg.value` = native amount + `FEE`), and the contract only *holds* it: both shares are
-///      released together when the deal completes (a fill or an accepted proposal) and refunded
-///      with that side's escrow on cancel, reclaim, reject and withdraw. Both values are
-///      immutable and there is no setter, so every deal owes the same share and no per-deal
-///      record is needed.
-contract OnDealV2 is IOnDealV2, ReentrancyGuard {
+///      Protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
+///      every side of a completed deal pays the same share in native MON, to `FEE_RECIPIENT`.
+///      A trade records `fee()` when it is created, and both sides pay that recorded `fee`, so
+///      a later change by the fee admin never touches a deal already listed. Each side sends its
+///      share with its own assets (`msg.value` = native amount + share), and the contract only
+///      *holds* it: both shares are released together when the deal completes (a fill or an
+///      accepted proposal) and refunded with that side's escrow on cancel, reclaim, reject and
+///      withdraw.
+contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
     uint256 public constant MAX_NOTE_BYTES = 280;
     uint256 public constant MAX_SPEC_BYTES = 1024;
-    /// @notice Ceiling for `FEE`, so a typo at deploy can't set an absurd fee. Roughly $2 stays
-    ///         well under it unless MON loses nearly all of its value.
-    uint256 public constant MAX_FEE = 500 ether;
-
-    /// @notice Native MON each side of a completed deal pays, escrowed with that side's assets.
-    uint256 public immutable FEE;
-    /// @notice Where the fees go when a deal completes.
-    address public immutable FEE_RECIPIENT;
-
     uint256 public tradeCount;
 
     mapping(uint256 tradeId => Trade) internal _trades;
@@ -48,14 +42,13 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
     ///      up; an NFT credit is 1.
     mapping(address account => mapping(bytes32 assetKey => uint256 amount)) internal _credits;
 
-    /// @param fee Per-side fee in wei. 0 charges nothing (tests, testnet).
-    /// @param feeRecipient Receives the fees. Required when `fee` is not 0.
-    constructor(uint256 fee, address feeRecipient) {
-        if (fee > MAX_FEE) revert FeeTooHigh(fee, MAX_FEE);
-        if (fee != 0 && feeRecipient == address(0)) revert NoFeeRecipient();
-        FEE = fee;
-        FEE_RECIPIENT = feeRecipient;
-    }
+    /// @param initialFee Per-side fee in wei for deals created from now on. 0 charges nothing.
+    /// @param maxFee Ceiling the fee admin can never go above, at most `MAX_FEE_LIMIT`.
+    /// @param feeRecipient Receives the fees. Required when `maxFee` is not 0.
+    /// @param admin May change the fee within `maxFee`. Zero fixes it for good.
+    constructor(uint256 initialFee, uint256 maxFee, address feeRecipient, address admin)
+        FeeAdmin(initialFee, maxFee, feeRecipient, admin)
+    {}
 
     // ─────────────────────────────────────────────────────────────── Mutating
 
@@ -91,7 +84,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         uint64 expiry,
         string calldata note
     ) external payable nonReentrant returns (uint256 tradeId) {
-        uint256 expectedValue = _validateSide(offered, false) + FEE;
+        uint256 expectedValue = _validateSide(offered, false) + _fee;
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
@@ -124,7 +117,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == t.maker) revert SelfPropose(tradeId);
 
-        uint256 expectedValue = _validateSide(assets, false) + FEE;
+        uint256 expectedValue = _validateSide(assets, false) + t.fee;
         _validateNoOverlap(t.offered, assets);
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
 
@@ -152,7 +145,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         emit ProposalWithdrawn(tradeId, proposalId);
 
         _payoutAll(p.assets, msg.sender);
-        _refundFee(msg.sender);
+        _refundFee(msg.sender, _trades[tradeId].fee);
     }
 
     /// @inheritdoc IOnDealV2
@@ -168,7 +161,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
 
         address proposer = p.proposer;
         _payoutAll(p.assets, proposer);
-        _refundFee(proposer);
+        _refundFee(proposer, t.fee);
     }
 
     /// @inheritdoc IOnDealV2
@@ -190,7 +183,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         // rejected one is credited for `claim`.
         _payoutAll(p.assets, msg.sender);
         _payoutAll(t.offered, proposer);
-        _chargeFee(tradeId);
+        _chargeFee(tradeId, t.fee);
     }
 
     /// @inheritdoc IOnDealV2
@@ -217,7 +210,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         emit TradeCancelled(tradeId, t.maker);
 
         _payoutAll(t.offered, t.maker);
-        _refundFee(t.maker);
+        _refundFee(t.maker, t.fee);
     }
 
     /// @inheritdoc IOnDealV2
@@ -230,7 +223,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         emit TradeReclaimed(tradeId, t.maker, msg.sender);
 
         _payoutAll(t.offered, t.maker);
-        _refundFee(t.maker);
+        _refundFee(t.maker, t.fee);
     }
 
     /// @inheritdoc IOnDealV2
@@ -386,7 +379,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         // Only `createTraitTrade` passes a spec (it rejects an empty one), and only it admits
         // trait assets.
         bool trait = bytes(spec).length != 0;
-        uint256 expectedValue = _validateSide(offered, false) + FEE;
+        uint256 expectedValue = _validateSide(offered, false) + _fee;
         _validateSide(requested, trait);
         if (trait && _countTrait(requested) == 0) revert NoTraitAsset();
         _validateNoOverlap(offered, requested);
@@ -419,7 +412,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         address taker = t.taker;
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == maker) revert SelfFill(tradeId);
-        uint256 expectedValue = _nativeAmount(t.requested) + FEE;
+        uint256 expectedValue = _nativeAmount(t.requested) + t.fee;
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // Every proof is checked before anything changes or moves.
         _verifyTraitFills(tradeId, t.requested, fills);
@@ -450,7 +443,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
             }
         }
         _payoutAll(t.offered, msg.sender);
-        _chargeFee(tradeId);
+        _chargeFee(tradeId, t.fee);
     }
 
     /// @dev `fills[k]` must answer the k-th trait asset: `amount` distinct ids, each with a
@@ -492,8 +485,8 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         }
     }
 
-    /// @dev Stores the trade header and the offered side. The caller adds `requested`, emits the
-    ///      creation event and deposits, in that order.
+    /// @dev Stores the trade header, with the fee in force, and the offered side. The caller adds
+    ///      `requested`, emits the creation event and deposits, in that order.
     function _newTrade(Asset[] calldata offered, address taker, uint64 expiry)
         private
         returns (uint256 tradeId)
@@ -504,6 +497,7 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
         t.expiry = expiry;
         t.status = Status.Open;
         t.taker = taker;
+        t.fee = _fee;
         for (uint256 i; i < offered.length; ++i) {
             t.offered.push(offered[i]);
         }
@@ -593,10 +587,9 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
 
     /// @dev A deal completed: both sides' shares (held since each side's own call) go to the
     ///      recipient in one send. Never reverts: a recipient that rejects MON gets a credit.
-    function _chargeFee(uint256 tradeId) private {
-        uint256 fee = FEE;
-        if (fee == 0) return;
-        uint256 amount = 2 * fee;
+    function _chargeFee(uint256 tradeId, uint256 share) private {
+        if (share == 0) return;
+        uint256 amount = 2 * share;
         address to = FEE_RECIPIENT;
         // forge-lint: disable-next-line(reentrancy-events)
         emit FeeCharged(tradeId, to, amount);
@@ -604,10 +597,9 @@ contract OnDealV2 is IOnDealV2, ReentrancyGuard {
     }
 
     /// @dev A side left without a deal: its share goes back with the rest of its escrow.
-    function _refundFee(address to) private {
-        uint256 fee = FEE;
-        if (fee == 0) return;
-        _pay(to, AssetType.Native, address(0), 0, fee);
+    function _refundFee(address to, uint256 share) private {
+        if (share == 0) return;
+        _pay(to, AssetType.Native, address(0), 0, share);
     }
 
     /// @dev Send from escrow. Returns false instead of reverting. Crediting after a *failed*

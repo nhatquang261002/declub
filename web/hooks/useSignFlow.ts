@@ -83,12 +83,13 @@ export function useSignFlow() {
     ({ give, want, ttlSeconds }: NewIntent): Promise<Hex | null> =>
       guarded(async (maker) => {
         const nonce = await freeNonce(config, maker);
-        // The fee is read from the contract at the moment of signing: it is what the wallet will
-        // show, and `settle` refuses an intent that signs anything else.
+        // The fee is read from the contract at the moment of signing and signed as the most this
+        // maker pays (ADR 0018): a later cut charges less, a later raise above it makes the intent
+        // stale until it is signed again.
         const [feeToken, fee] = await readContracts(config, {
           contracts: [
             { ...swapIntents!, functionName: "FEE_TOKEN" },
-            { ...swapIntents!, functionName: "FEE_AMOUNT" },
+            { ...swapIntents!, functionName: "fee" },
           ] as const,
           allowFailure: false,
         });
@@ -97,7 +98,7 @@ export function useSignFlow() {
           give,
           want,
           feeToken,
-          fee,
+          maxFee: fee,
           // Counted from the moment of signing, so a slow wallet doesn't eat into the lifetime.
           deadline: BigInt(Math.floor(Date.now() / 1000) + ttlSeconds),
           nonce,
