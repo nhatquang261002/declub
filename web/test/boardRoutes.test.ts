@@ -34,7 +34,7 @@ const req = (method: string, body?: unknown, headers: Record<string, string> = {
 
 const posts = postsHandlers(reg, deps);
 const post = async (text: string, extra: Record<string, unknown> = {}) => {
-  await store.del(`chogswap:rl:club-post-cd:${NFT.toLowerCase()}:${current}`, `chogswap:rl:club-post-hr:${NFT.toLowerCase()}:${current}`);
+  await store.del(`ondeal:rl:club-post-cd:${NFT.toLowerCase()}:${current}`, `ondeal:rl:club-post-hr:${NFT.toLowerCase()}:${current}`);
   return posts.POST(req("POST", { kind: "note", text, ...extra }), ctx());
 };
 
@@ -130,7 +130,7 @@ describe("reports, hiding, pinning, deleting", () => {
   let id = "";
   it("hides after three reports", async () => {
     as("m1");
-    await store.del(`chogswap:rl:club-post-cd:${NFT.toLowerCase()}:m1`);
+    await store.del(`ondeal:rl:club-post-cd:${NFT.toLowerCase()}:m1`);
     id = (await (await post("report me")).json()).post.id;
     const report = reportHandler(reg, deps);
     as("m1");

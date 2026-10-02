@@ -1,8 +1,309 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ChogSwap
+// MockChog
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const chogSwapAbi = [
+export const mockChogAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_MINT_PER_TX',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getApproved',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'operator', internalType: 'address', type: 'address' },
+    ],
+    name: 'isApprovedForAll',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'quantity', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [{ name: 'firstId', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'nextTokenId',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ownerOf',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'data', internalType: 'bytes', type: 'bytes' },
+    ],
+    name: 'safeTransferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'approved', internalType: 'bool', type: 'bool' },
+    ],
+    name: 'setApprovalForAll',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
+    name: 'supportsInterface',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenByIndex',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'tokenOfOwnerByIndex',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'tokenURI',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'traitsOf',
+    outputs: [
+      { name: 'hat', internalType: 'string', type: 'string' },
+      { name: 'eyes', internalType: 'string', type: 'string' },
+      { name: 'background', internalType: 'string', type: 'string' },
+    ],
+    stateMutability: 'pure',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'approved',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'operator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
+    ],
+    name: 'ApprovalForAll',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'tokenId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+    ],
+    name: 'Transfer',
+  },
+  { type: 'error', inputs: [], name: 'ERC721EnumerableForbiddenBatchMint' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+      { name: 'owner', internalType: 'address', type: 'address' },
+    ],
+    name: 'ERC721IncorrectOwner',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'operator', internalType: 'address', type: 'address' },
+      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721InsufficientApproval',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOperator',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidOwner',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC721InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
+    name: 'ERC721NonexistentToken',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'index', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC721OutOfBoundsIndex',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'quantity', internalType: 'uint256', type: 'uint256' }],
+    name: 'InvalidQuantity',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OnDeal
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const onDealAbi = [
   {
     type: 'constructor',
     inputs: [{ name: 'chog_', internalType: 'address', type: 'address' }],
@@ -81,14 +382,14 @@ export const chogSwapAbi = [
     outputs: [
       {
         name: '',
-        internalType: 'struct IChogSwap.Trade',
+        internalType: 'struct IOnDeal.Trade',
         type: 'tuple',
         components: [
           { name: 'maker', internalType: 'address', type: 'address' },
           { name: 'expiry', internalType: 'uint64', type: 'uint64' },
           {
             name: 'status',
-            internalType: 'enum IChogSwap.Status',
+            internalType: 'enum IOnDeal.Status',
             type: 'uint8',
           },
           { name: 'taker', internalType: 'address', type: 'address' },
@@ -454,10 +755,10 @@ export const chogSwapAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ChogSwapIntents
+// OnDealIntents
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const chogSwapIntentsAbi = [
+export const onDealIntentsAbi = [
   {
     type: 'constructor',
     inputs: [
@@ -536,18 +837,18 @@ export const chogSwapIntentsAbi = [
     inputs: [
       {
         name: 'intent',
-        internalType: 'struct IChogSwapIntents.Intent',
+        internalType: 'struct IOnDealIntents.Intent',
         type: 'tuple',
         components: [
           { name: 'maker', internalType: 'address', type: 'address' },
           {
             name: 'give',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -557,12 +858,12 @@ export const chogSwapIntentsAbi = [
           },
           {
             name: 'want',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -586,18 +887,18 @@ export const chogSwapIntentsAbi = [
     inputs: [
       {
         name: 'intent',
-        internalType: 'struct IChogSwapIntents.Intent',
+        internalType: 'struct IOnDealIntents.Intent',
         type: 'tuple',
         components: [
           { name: 'maker', internalType: 'address', type: 'address' },
           {
             name: 'give',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -607,12 +908,12 @@ export const chogSwapIntentsAbi = [
           },
           {
             name: 'want',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -656,18 +957,18 @@ export const chogSwapIntentsAbi = [
     inputs: [
       {
         name: 'cycle',
-        internalType: 'struct IChogSwapIntents.Intent[]',
+        internalType: 'struct IOnDealIntents.Intent[]',
         type: 'tuple[]',
         components: [
           { name: 'maker', internalType: 'address', type: 'address' },
           {
             name: 'give',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -677,12 +978,12 @@ export const chogSwapIntentsAbi = [
           },
           {
             name: 'want',
-            internalType: 'struct IChogSwapIntents.Asset[]',
+            internalType: 'struct IOnDealIntents.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapIntents.AssetType',
+                internalType: 'enum IOnDealIntents.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -929,10 +1230,10 @@ export const chogSwapIntentsAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ChogSwapV2
+// OnDealV2
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const chogSwapV2Abi = [
+export const onDealV2Abi = [
   {
     type: 'constructor',
     inputs: [
@@ -1005,7 +1306,7 @@ export const chogSwapV2Abi = [
     inputs: [
       {
         name: 'assetType',
-        internalType: 'enum IChogSwapV2.AssetType',
+        internalType: 'enum IOnDealV2.AssetType',
         type: 'uint8',
       },
       { name: 'token', internalType: 'address', type: 'address' },
@@ -1021,7 +1322,7 @@ export const chogSwapV2Abi = [
       { name: 'account', internalType: 'address', type: 'address' },
       {
         name: 'assetType',
-        internalType: 'enum IChogSwapV2.AssetType',
+        internalType: 'enum IOnDealV2.AssetType',
         type: 'uint8',
       },
       { name: 'token', internalType: 'address', type: 'address' },
@@ -1036,12 +1337,12 @@ export const chogSwapV2Abi = [
     inputs: [
       {
         name: 'offered',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1062,12 +1363,12 @@ export const chogSwapV2Abi = [
     inputs: [
       {
         name: 'offered',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1077,12 +1378,12 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'requested',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1102,12 +1403,12 @@ export const chogSwapV2Abi = [
     inputs: [
       {
         name: 'offered',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1117,12 +1418,12 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'requested',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1151,7 +1452,7 @@ export const chogSwapV2Abi = [
       { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
       {
         name: 'fills',
-        internalType: 'struct IChogSwapV2.TraitFill[]',
+        internalType: 'struct IOnDealV2.TraitFill[]',
         type: 'tuple[]',
         components: [
           { name: 'tokenIds', internalType: 'uint256[]', type: 'uint256[]' },
@@ -1173,23 +1474,23 @@ export const chogSwapV2Abi = [
     outputs: [
       {
         name: '',
-        internalType: 'struct IChogSwapV2.Proposal',
+        internalType: 'struct IOnDealV2.Proposal',
         type: 'tuple',
         components: [
           { name: 'proposer', internalType: 'address', type: 'address' },
           {
             name: 'status',
-            internalType: 'enum IChogSwapV2.ProposalStatus',
+            internalType: 'enum IOnDealV2.ProposalStatus',
             type: 'uint8',
           },
           {
             name: 'assets',
-            internalType: 'struct IChogSwapV2.Asset[]',
+            internalType: 'struct IOnDealV2.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapV2.AssetType',
+                internalType: 'enum IOnDealV2.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -1213,23 +1514,23 @@ export const chogSwapV2Abi = [
     outputs: [
       {
         name: 'page',
-        internalType: 'struct IChogSwapV2.Proposal[]',
+        internalType: 'struct IOnDealV2.Proposal[]',
         type: 'tuple[]',
         components: [
           { name: 'proposer', internalType: 'address', type: 'address' },
           {
             name: 'status',
-            internalType: 'enum IChogSwapV2.ProposalStatus',
+            internalType: 'enum IOnDealV2.ProposalStatus',
             type: 'uint8',
           },
           {
             name: 'assets',
-            internalType: 'struct IChogSwapV2.Asset[]',
+            internalType: 'struct IOnDealV2.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapV2.AssetType',
+                internalType: 'enum IOnDealV2.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -1249,25 +1550,25 @@ export const chogSwapV2Abi = [
     outputs: [
       {
         name: '',
-        internalType: 'struct IChogSwapV2.Trade',
+        internalType: 'struct IOnDealV2.Trade',
         type: 'tuple',
         components: [
           { name: 'maker', internalType: 'address', type: 'address' },
           { name: 'expiry', internalType: 'uint64', type: 'uint64' },
           {
             name: 'status',
-            internalType: 'enum IChogSwapV2.Status',
+            internalType: 'enum IOnDealV2.Status',
             type: 'uint8',
           },
           { name: 'taker', internalType: 'address', type: 'address' },
           {
             name: 'offered',
-            internalType: 'struct IChogSwapV2.Asset[]',
+            internalType: 'struct IOnDealV2.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapV2.AssetType',
+                internalType: 'enum IOnDealV2.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -1277,12 +1578,12 @@ export const chogSwapV2Abi = [
           },
           {
             name: 'requested',
-            internalType: 'struct IChogSwapV2.Asset[]',
+            internalType: 'struct IOnDealV2.Asset[]',
             type: 'tuple[]',
             components: [
               {
                 name: 'assetType',
-                internalType: 'enum IChogSwapV2.AssetType',
+                internalType: 'enum IOnDealV2.AssetType',
                 type: 'uint8',
               },
               { name: 'token', internalType: 'address', type: 'address' },
@@ -1322,12 +1623,12 @@ export const chogSwapV2Abi = [
       { name: 'tradeId', internalType: 'uint256', type: 'uint256' },
       {
         name: 'assets',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1399,7 +1700,7 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'assetType',
-        internalType: 'enum IChogSwapV2.AssetType',
+        internalType: 'enum IOnDealV2.AssetType',
         type: 'uint8',
         indexed: false,
       },
@@ -1431,7 +1732,7 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'assetType',
-        internalType: 'enum IChogSwapV2.AssetType',
+        internalType: 'enum IOnDealV2.AssetType',
         type: 'uint8',
         indexed: false,
       },
@@ -1527,12 +1828,12 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'assets',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1625,12 +1926,12 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'offered',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1641,12 +1942,12 @@ export const chogSwapV2Abi = [
       },
       {
         name: 'requested',
-        internalType: 'struct IChogSwapV2.Asset[]',
+        internalType: 'struct IOnDealV2.Asset[]',
         type: 'tuple[]',
         components: [
           {
             name: 'assetType',
-            internalType: 'enum IChogSwapV2.AssetType',
+            internalType: 'enum IOnDealV2.AssetType',
             type: 'uint8',
           },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1901,306 +2202,5 @@ export const chogSwapV2Abi = [
       { name: 'sent', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'WrongNativeAmount',
-  },
-] as const
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MockChog
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const mockChogAbi = [
-  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'MAX_MINT_PER_TX',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'approve',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'getApproved',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'owner', internalType: 'address', type: 'address' },
-      { name: 'operator', internalType: 'address', type: 'address' },
-    ],
-    name: 'isApprovedForAll',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'quantity', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'mint',
-    outputs: [{ name: 'firstId', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'name',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'nextTokenId',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'ownerOf',
-    outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address' },
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'safeTransferFrom',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address' },
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'data', internalType: 'bytes', type: 'bytes' },
-    ],
-    name: 'safeTransferFrom',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'operator', internalType: 'address', type: 'address' },
-      { name: 'approved', internalType: 'bool', type: 'bool' },
-    ],
-    name: 'setApprovalForAll',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'interfaceId', internalType: 'bytes4', type: 'bytes4' }],
-    name: 'supportsInterface',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'symbol',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'index', internalType: 'uint256', type: 'uint256' }],
-    name: 'tokenByIndex',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'owner', internalType: 'address', type: 'address' },
-      { name: 'index', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'tokenOfOwnerByIndex',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'tokenURI',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'totalSupply',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'traitsOf',
-    outputs: [
-      { name: 'hat', internalType: 'string', type: 'string' },
-      { name: 'eyes', internalType: 'string', type: 'string' },
-      { name: 'background', internalType: 'string', type: 'string' },
-    ],
-    stateMutability: 'pure',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address' },
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'transferFrom',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'approved',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'tokenId',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: true,
-      },
-    ],
-    name: 'Approval',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'operator',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      { name: 'approved', internalType: 'bool', type: 'bool', indexed: false },
-    ],
-    name: 'ApprovalForAll',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address', indexed: true },
-      { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      {
-        name: 'tokenId',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: true,
-      },
-    ],
-    name: 'Transfer',
-  },
-  { type: 'error', inputs: [], name: 'ERC721EnumerableForbiddenBatchMint' },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'sender', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-      { name: 'owner', internalType: 'address', type: 'address' },
-    ],
-    name: 'ERC721IncorrectOwner',
-  },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'operator', internalType: 'address', type: 'address' },
-      { name: 'tokenId', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'ERC721InsufficientApproval',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
-    name: 'ERC721InvalidApprover',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
-    name: 'ERC721InvalidOperator',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
-    name: 'ERC721InvalidOwner',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
-    name: 'ERC721InvalidReceiver',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
-    name: 'ERC721InvalidSender',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'tokenId', internalType: 'uint256', type: 'uint256' }],
-    name: 'ERC721NonexistentToken',
-  },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'owner', internalType: 'address', type: 'address' },
-      { name: 'index', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'ERC721OutOfBoundsIndex',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'quantity', internalType: 'uint256', type: 'uint256' }],
-    name: 'InvalidQuantity',
   },
 ] as const

@@ -2,13 +2,13 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ChogSwapIntents} from "../src/ChogSwapIntents.sol";
+import {OnDealIntents} from "../src/OnDealIntents.sol";
 import {MockWMON} from "../src/mocks/MockWMON.sol";
 
-/// @notice Deploys ChogSwapIntents with its protocol fee (any token can be traded). It needs no
+/// @notice Deploys OnDealIntents with its protocol fee (any token can be traded). It needs no
 ///         mock tokens: the existing mUSD and Chog collection from the other deployments work.
 /// @dev The off-chain pool and matcher (../matcher) read the address from
-///      NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS. ChogSwap and ChogSwapV2 are untouched.
+///      NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS. OnDeal and OnDealV2 are untouched.
 ///      Env (all optional; the fee is off unless PROTOCOL_FEE_WEI is set):
 ///        PROTOCOL_FEE_WEI  fee per maker in `FEE_TOKEN` units (18 decimals), at most `MAX_FEE`
 ///        FEE_TOKEN         the wrapped MON the fee is paid in; required when the fee is not 0
@@ -32,12 +32,12 @@ contract DeployIntents is Script {
 
     function run() external returns (Result memory r) {
         r = deploy(configFromEnv());
-        console.log("NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS=%s", r.swap);
-        console.log("NEXT_PUBLIC_CHOG_SWAP_INTENTS_DEPLOY_BLOCK=%s", r.deployBlock);
+        console.log("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS=%s", r.swap);
+        console.log("NEXT_PUBLIC_ON_DEAL_INTENTS_DEPLOY_BLOCK=%s", r.deployBlock);
         if (r.mockWmon != address(0)) console.log("MOCK_WMON_ADDRESS=%s", r.mockWmon);
-        console.log("fee token=%s", ChogSwapIntents(r.swap).FEE_TOKEN());
-        console.log("protocol fee per maker (wei)=%s", ChogSwapIntents(r.swap).FEE_AMOUNT());
-        console.log("fee recipient=%s", ChogSwapIntents(r.swap).FEE_RECIPIENT());
+        console.log("fee token=%s", OnDealIntents(r.swap).FEE_TOKEN());
+        console.log("protocol fee per maker (wei)=%s", OnDealIntents(r.swap).FEE_AMOUNT());
+        console.log("fee recipient=%s", OnDealIntents(r.swap).FEE_RECIPIENT());
     }
 
     function configFromEnv() public view returns (Config memory c) {
@@ -56,7 +56,7 @@ contract DeployIntents is Script {
             r.mockWmon = address(new MockWMON());
             feeToken = r.mockWmon;
         }
-        r.swap = address(new ChogSwapIntents(feeToken, c.fee, c.feeRecipient));
+        r.swap = address(new OnDealIntents(feeToken, c.fee, c.feeRecipient));
         vm.stopBroadcast();
     }
 }

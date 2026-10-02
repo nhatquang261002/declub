@@ -11,7 +11,7 @@ import { swapIntents, swapV2 } from "@/lib/contracts";
 // keep their buttons off until it is known.
 
 /**
- * What each side of a ChogSwapV2 deal sends, in MON, on top of the native amount in its assets.
+ * What each side of a OnDealV2 deal sends, in MON, on top of the native amount in its assets.
  * The contract holds it with that side's escrow, pays it out only when the deal completes and
  * hands it back otherwise.
  */
@@ -28,7 +28,7 @@ export function useEscrowFee() {
 export type IntentFee = { token: Address; amount: bigint };
 
 /**
- * What each maker in a settled ChogSwapIntents cycle pays, in the wrapped-MON token, from their
+ * What each maker in a settled OnDealIntents cycle pays, in the wrapped-MON token, from their
  * wallet. It is also signed into every intent.
  */
 export function useIntentFee() {

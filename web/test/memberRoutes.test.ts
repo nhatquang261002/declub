@@ -115,7 +115,7 @@ describe("joinClub / leaveClub", () => {
     assert.deepEqual(await clubsOf(store, "u1"), [COIN.toLowerCase()], "other Clubs are untouched");
   });
 });
-const userClubsKeyFor = (id: string) => `chogswap:user-clubs:${id}`;
+const userClubsKeyFor = (id: string) => `ondeal:user-clubs:${id}`;
 
 describe("syncMemberships", () => {
   const join = async (store = memoryStore()) => {

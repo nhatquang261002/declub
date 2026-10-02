@@ -33,7 +33,7 @@ const KIND_OPTIONS: Array<SelectOption<KindFilter>> = [
 ];
 
 /**
- * The multi-asset book: ChogSwapV2 deals (locked) and, when the intents contract is configured,
+ * The multi-asset book: OnDealV2 deals (locked) and, when the intents contract is configured,
  * signed swaps from the pool, in one list. Any mix of ERC-721 and ERC-20 on each side, plus MON
  * on locked deals.
  */

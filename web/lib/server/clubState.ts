@@ -11,12 +11,12 @@ import type { Store } from "./store";
  * log doesn't show.
  */
 const base = (token: string) => `${CHAIN_ID}:${token.toLowerCase()}`;
-export const rolesKey = (token: string) => `chogswap:club-roles:${base(token)}`;
-export const clubProfileKey = (token: string) => `chogswap:club-profile:${base(token)}`;
-export const logKey = (token: string) => `chogswap:club-log:${base(token)}`;
+export const rolesKey = (token: string) => `ondeal:club-roles:${base(token)}`;
+export const clubProfileKey = (token: string) => `ondeal:club-profile:${base(token)}`;
+export const logKey = (token: string) => `ondeal:club-log:${base(token)}`;
 /** Bans from one Club, or from every Club (`ALL`). */
 export const ALL = "all";
-export const banKey = (token: string) => `chogswap:club-ban:${token === ALL ? ALL : base(token)}`;
+export const banKey = (token: string) => `ondeal:club-ban:${token === ALL ? ALL : base(token)}`;
 
 /** The app admins: Privy user ids in CLUB_ADMIN_USER_IDS, comma separated. */
 export function adminIds(env: string | undefined = process.env.CLUB_ADMIN_USER_IDS): Set<string> {

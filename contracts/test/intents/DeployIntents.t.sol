@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ChogSwapIntents} from "../../src/ChogSwapIntents.sol";
-import {IChogSwapIntents} from "../../src/interfaces/IChogSwapIntents.sol";
+import {OnDealIntents} from "../../src/OnDealIntents.sol";
+import {IOnDealIntents} from "../../src/interfaces/IOnDealIntents.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 import {DeployIntents} from "../../script/DeployIntents.s.sol";
 
@@ -18,9 +18,9 @@ contract DeployIntentsTest is Test {
         DeployIntents.Config memory c;
         DeployIntents.Result memory r = script.deploy(c);
 
-        assertEq(ChogSwapIntents(r.swap).MAX_CYCLE(), 4);
-        assertEq(ChogSwapIntents(r.swap).MAX_ASSETS_PER_SIDE(), 10);
-        assertEq(ChogSwapIntents(r.swap).FEE_AMOUNT(), 0);
+        assertEq(OnDealIntents(r.swap).MAX_CYCLE(), 4);
+        assertEq(OnDealIntents(r.swap).MAX_ASSETS_PER_SIDE(), 10);
+        assertEq(OnDealIntents(r.swap).FEE_AMOUNT(), 0);
         assertEq(r.deployBlock, block.number);
     }
 
@@ -32,9 +32,9 @@ contract DeployIntentsTest is Test {
         c.feeRecipient = makeAddr("treasury");
         DeployIntents.Result memory r = script.deploy(c);
 
-        assertEq(ChogSwapIntents(r.swap).FEE_TOKEN(), address(wmon));
-        assertEq(ChogSwapIntents(r.swap).FEE_AMOUNT(), 3 ether);
-        assertEq(ChogSwapIntents(r.swap).FEE_RECIPIENT(), c.feeRecipient);
+        assertEq(OnDealIntents(r.swap).FEE_TOKEN(), address(wmon));
+        assertEq(OnDealIntents(r.swap).FEE_AMOUNT(), 3 ether);
+        assertEq(OnDealIntents(r.swap).FEE_RECIPIENT(), c.feeRecipient);
     }
 
     function test_deploysAMockWmonAsTheFeeToken() public {
@@ -45,7 +45,7 @@ contract DeployIntentsTest is Test {
         DeployIntents.Result memory r = script.deploy(c);
 
         assertTrue(r.mockWmon != address(0));
-        assertEq(ChogSwapIntents(r.swap).FEE_TOKEN(), r.mockWmon);
+        assertEq(OnDealIntents(r.swap).FEE_TOKEN(), r.mockWmon);
     }
 
     function test_aGivenFeeTokenWinsOverTheMock() public {
@@ -58,7 +58,7 @@ contract DeployIntentsTest is Test {
         DeployIntents.Result memory r = script.deploy(c);
 
         assertEq(r.mockWmon, address(0));
-        assertEq(ChogSwapIntents(r.swap).FEE_TOKEN(), address(wmon));
+        assertEq(OnDealIntents(r.swap).FEE_TOKEN(), address(wmon));
     }
 
     function test_refusesAFeeWithoutARecipient() public {
@@ -66,7 +66,7 @@ contract DeployIntentsTest is Test {
         DeployIntents.Config memory c;
         c.feeToken = address(wmon);
         c.fee = 1 ether;
-        vm.expectRevert(IChogSwapIntents.NoFeeRecipient.selector);
+        vm.expectRevert(IOnDealIntents.NoFeeRecipient.selector);
         script.deploy(c);
     }
 

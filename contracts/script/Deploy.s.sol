@@ -2,11 +2,11 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ChogSwap} from "../src/ChogSwap.sol";
+import {OnDeal} from "../src/OnDeal.sol";
 import {MockChog} from "../src/mocks/MockChog.sol";
 import {ChogGenesisMirror} from "../src/mocks/ChogGenesisMirror.sol";
 
-/// @notice Deploys the trait-enabled ChogSwap, and MockChog first if CHOG_ADDRESS is unset.
+/// @notice Deploys the trait-enabled OnDeal, and MockChog first if CHOG_ADDRESS is unset.
 /// @dev Env (all optional):
 ///        CHOG_ADDRESS          existing Chog collection; blank → deploy MockChog
 ///        DEMO_WALLETS          comma-separated addresses to mint MockChogs to
@@ -85,7 +85,7 @@ contract Deploy is Script {
             r.chog = c.chog;
         }
 
-        r.swap = address(new ChogSwap(r.chog));
+        r.swap = address(new OnDeal(r.chog));
 
         vm.stopBroadcast();
     }
@@ -103,16 +103,16 @@ contract Deploy is Script {
     function _log(Result memory r) internal pure {
         string memory kind = r.deployedMirror ? "(Chog Genesis mirror)" : (r.deployedMock ? "(MockChog)" : "(existing)");
         console.log("Chog      :", r.chog, kind);
-        console.log("ChogSwap  :", r.swap);
+        console.log("OnDeal  :", r.swap);
         console.log("");
         console.log("# paste into .env");
         console.log(string.concat("NEXT_PUBLIC_CHOG_ADDRESS=", vm.toString(r.chog)));
-        console.log(string.concat("NEXT_PUBLIC_CHOG_SWAP_ADDRESS=", vm.toString(r.swap)));
+        console.log(string.concat("NEXT_PUBLIC_ON_DEAL_ADDRESS=", vm.toString(r.swap)));
         // block.number here is the simulation block, before anything is mined. It's a safe
         // lower bound for event scans; the exact block is in broadcast/.../run-latest.json.
         console.log("# deploy block: lower bound; exact block is in the broadcast receipts");
         console.log(
-            string.concat("NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK=", vm.toString(r.deployBlock))
+            string.concat("NEXT_PUBLIC_ON_DEAL_DEPLOY_BLOCK=", vm.toString(r.deployBlock))
         );
     }
 }

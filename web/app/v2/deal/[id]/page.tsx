@@ -251,7 +251,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   );
 }
 
-/** Amounts ChogSwapV2 is holding for `account` from this deal's assets (rejected payouts). */
+/** Amounts OnDealV2 is holding for `account` from this deal's assets (rejected payouts). */
 function useCredits(account: `0x${string}` | undefined, assets: readonly Asset[]) {
   const unique = useMemo(() => {
     const out: Asset[] = [];

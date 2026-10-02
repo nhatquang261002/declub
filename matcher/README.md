@@ -1,6 +1,6 @@
 # Matcher: intent pool and local matcher
 
-The off-chain half of [ADR 0008](../docs/adr/0008-trade-intents.md) and [ADR 0009](../docs/adr/0009-ring-swaps.md). Makers sign `Intent`s (give / want, nothing escrowed) and post them here. The matcher finds intents that satisfy each other, in pairs or rings of up to four, and settles them through `ChogSwapIntents.settle`.
+The off-chain half of [ADR 0008](../docs/adr/0008-trade-intents.md) and [ADR 0009](../docs/adr/0009-ring-swaps.md). Makers sign `Intent`s (give / want, nothing escrowed) and post them here. The matcher finds intents that satisfy each other, in pairs or rings of up to four, and settles them through `OnDealIntents.settle`.
 
 It is one local Node process: an HTTP **pool** with a sqlite file, and a **matcher** loop that holds a funded testnet key and pays settlement gas. Only dependency: `viem`. Needs Node 24+ (it runs the `.ts` files directly and uses `node:sqlite`).
 
@@ -12,7 +12,7 @@ The contract checks every signature, nonce, deadline and transfer at settlement.
 
 ```bash
 # Root .env (see .env.example): the deployed contract and a funded TESTNET key
-NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS=0x…
+NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS=0x…
 MATCHER_PRIVATE_KEY=0x…
 
 cd matcher && npm install && npm start      # http://127.0.0.1:8787
@@ -24,7 +24,7 @@ The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md
 
 | Variable | Default | |
 |---|---|---|
-| `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS` | required | `ChogSwapIntents` |
+| `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` | required | `OnDealIntents` |
 | `MATCHER_PRIVATE_KEY` | required | pays settlement gas |
 | `MATCHER_RPC_URL` | `NEXT_PUBLIC_RPC_URL` | |
 | `NEXT_PUBLIC_CHAIN_ID` | `10143` | Multicall3 is used on 10143; set `MULTICALL3_ADDRESS` for other chains that have it |

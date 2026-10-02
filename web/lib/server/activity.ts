@@ -6,10 +6,10 @@ import {
   type Hex,
   type PublicClient,
 } from "viem";
-import { chogSwapV2Abi } from "../abi";
+import { onDealV2Abi } from "../abi";
 import { toAsset, type Asset, type RawAsset } from "../assets";
 import { chain } from "../chain";
-import { CHAIN_ID, CHOG_SWAP_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
 import type { ActivityEvent } from "../clubs";
 import type { ActivityKind } from "../momentum";
 import { registry } from "../verifiedAssets";
@@ -47,7 +47,7 @@ export type { ActivityEvent };
 /** The oldest events age out past this, per Club. */
 export const MAX_EVENTS_PER_CLUB = 5_000;
 
-export const activityKey = (token: string) => `chogswap:activity:${CHAIN_ID}:${token.toLowerCase()}`;
+export const activityKey = (token: string) => `ondeal:activity:${CHAIN_ID}:${token.toLowerCase()}`;
 
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
@@ -66,12 +66,12 @@ export function viemReader(): Reader {
       return Number((await client().getBlock({ blockNumber: block })).timestamp);
     },
     async trade(contract, id) {
-      return client().readContract({ address: contract, abi: chogSwapV2Abi, functionName: "getTrade", args: [id] });
+      return client().readContract({ address: contract, abi: onDealV2Abi, functionName: "getTrade", args: [id] });
     },
     async proposalAssets(contract, tradeId, proposalId) {
       const proposal = await client().readContract({
         address: contract,
-        abi: chogSwapV2Abi,
+        abi: onDealV2Abi,
         functionName: "getProposal",
         args: [tradeId, proposalId],
       });
@@ -80,8 +80,8 @@ export function viemReader(): Reader {
   };
 }
 
-/** The ChogSwapV2 contracts whose events count. V2 is optional (see lib/config.ts). */
-export const ACTIVITY_CONTRACTS: Address[] = CHOG_SWAP_V2_ADDRESS ? [CHOG_SWAP_V2_ADDRESS] : [];
+/** The OnDealV2 contracts whose events count. V2 is optional (see lib/config.ts). */
+export const ACTIVITY_CONTRACTS: Address[] = ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [];
 
 export type IngestOptions = {
   reader?: Reader;
@@ -116,12 +116,12 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   const watched = (options.contracts ?? ACTIVITY_CONTRACTS).map((c) => c.toLowerCase());
   const isClub = options.isClub ?? ((token: string) => registry.clubFor(token) !== null);
 
-  type Decoded = ReturnType<typeof decodeEventLog<typeof chogSwapV2Abi>>;
+  type Decoded = ReturnType<typeof decodeEventLog<typeof onDealV2Abi>>;
   const decoded: { log: ReceiptLike["logs"][number]; event: Decoded }[] = [];
   for (const log of receipt.logs) {
     if (!watched.includes(log.address.toLowerCase())) continue;
     try {
-      decoded.push({ log, event: decodeEventLog({ abi: chogSwapV2Abi, data: log.data, topics: log.topics as [Hex, ...Hex[]] }) });
+      decoded.push({ log, event: decodeEventLog({ abi: onDealV2Abi, data: log.data, topics: log.topics as [Hex, ...Hex[]] }) });
     } catch {
       // Not an event of this contract's ABI.
     }

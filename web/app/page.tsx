@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ChogSwapArt } from "@/components/ChogArt";
+import { OnDealArt } from "@/components/ChogArt";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
 const STEPS = [
@@ -52,7 +52,7 @@ export default function HomePage() {
               <CreateDealButton />
             </div>
           </div>
-          <ChogSwapArt />
+          <OnDealArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
           <div className="hero-stat"><strong>Non-custodial</strong><span>Your assets stay yours until a swap</span></div>

@@ -1,9 +1,9 @@
 "use client";
 
 import { Tabs } from "@/components/Tabs";
-import { CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
+import { ON_DEAL_V2_ADDRESS } from "@/lib/config";
 
-/** "v1" = ChogSwap (Chogs + MON, trait requests). "v2" = ChogSwapV2 (any ERC-721 / ERC-20 / MON). */
+/** "v1" = OnDeal (Chogs + MON, trait requests). "v2" = OnDealV2 (any ERC-721 / ERC-20 / MON). */
 export type DealVersion = "v1" | "v2";
 
 const OPTIONS: Array<[DealVersion, string]> = [
@@ -19,7 +19,7 @@ export function VersionSwitch({
   value: DealVersion;
   onChange: (version: DealVersion) => void;
 }) {
-  if (!CHOG_SWAP_V2_ADDRESS) return null;
+  if (!ON_DEAL_V2_ADDRESS) return null;
   return (
     <Tabs
       label="Contract version"

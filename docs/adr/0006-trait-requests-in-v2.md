@@ -1,6 +1,6 @@
-# ADR 0006: Trait requests in ChogSwapV2 as a fourth asset type
+# ADR 0006: Trait requests in OnDealV2 as a fourth asset type
 
-**Status:** Accepted, implemented, deployed (`ChogSwapV2` `0x7359…E1bB`, block 67163690) · 2026-09-30 · Phase 4. Contract, tests (31, 100% coverage of `ChogSwapV2`) and frontend are in the repo. It shipped in the same redeploy as ADR 0007's open offers. An earlier draft of this ADR was prototyped and taken out; this version adds the on-chain spec, several traits per request, and a scan that works for any collection.
+**Status:** Accepted, implemented, deployed (`OnDealV2` `0x7359…E1bB`, block 67163690) · 2026-09-30 · Phase 4. Contract, tests (31, 100% coverage of `OnDealV2`) and frontend are in the repo. It shipped in the same redeploy as ADR 0007's open offers. An earlier draft of this ADR was prototyped and taken out; this version adds the on-chain spec, several traits per request, and a scan that works for any collection.
 
 ## Context
 
@@ -63,10 +63,10 @@ Before a taker's client offers a fill, it rebuilds each set from the spec and th
 
 ## Consequences
 
-- `ChogSwapV2` is immutable, so this needs a **new deployment**. The V2 from ADR 0005 stays where it is and keeps working with its own ABI, but the app's V2 ABI is now this one. Trades in the old deployment are orphaned once the app points at the new address. It can share the redeploy with ADR 0007.
+- `OnDealV2` is immutable, so this needs a **new deployment**. The V2 from ADR 0005 stays where it is and keeps working with its own ABI, but the app's V2 ABI is now this one. Trades in the old deployment are orphaned once the app points at the new address. It can share the redeploy with ADR 0007.
 - V2 asset order matters when filling: `fills[k]` answers the k-th trait asset, and the k-th clause of the spec.
 - The maker's set is fixed at creation. NFTs whose traits change afterwards stay in or out of it; a mutable collection can make the rebuilt root differ, which blocks filling from the app.
 - The scan is a server feature, so it needs the Next.js server (not a static export), reads the RPC hard on first use of a collection, and refuses collections above 10,000 tokens. An indexer could replace it later without touching the contract.
 - The list of deals shows a trait request as "By trait, any N" and the collection. The traits themselves load on the deal page, which reads the spec.
 - v1's trait trades still work as before. Nothing about them changes, and the `requestedCount` flaw stays there.
-- Needs external review like the rest of V2. Verified so far: unit and fuzz tests, 100% coverage of `ChogSwapV2`, and the scan against the deployed MockChog. Not yet exercised: a deployed V2 with the new ABI, and the create and fill screens against it.
+- Needs external review like the rest of V2. Verified so far: unit and fuzz tests, 100% coverage of `OnDealV2`, and the scan against the deployed MockChog. Not yet exercised: a deployed V2 with the new ABI, and the create and fill screens against it.

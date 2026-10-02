@@ -44,7 +44,7 @@ export const CANCEL_TYPES = {
 } as const;
 
 export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "ChogSwapIntents", version: "2", chainId, verifyingContract }) as const;
+  ({ name: "OnDealIntents", version: "2", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,

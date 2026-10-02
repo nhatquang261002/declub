@@ -15,7 +15,7 @@ import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useDeals } from "@/hooks/useDeals";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { useIntents } from "@/hooks/usePool";
-import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "@/lib/config";
+import { ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS } from "@/lib/config";
 import { swapIntents, swapV2 } from "@/lib/contracts";
 import { intentAsListing } from "@/lib/intents";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
@@ -45,8 +45,8 @@ export default function HistoryPage() {
   const v2Deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
   const { info } = useDealsTokenInfo(v2Deals);
   // Fills are kept per contract, so each version reads its own record.
-  const v1Fills = useFills(address, CHOG_SWAP_ADDRESS);
-  const v2Fills = useFills(address, CHOG_SWAP_V2_ADDRESS ?? CHOG_SWAP_ADDRESS);
+  const v1Fills = useFills(address, ON_DEAL_ADDRESS);
+  const v2Fills = useFills(address, ON_DEAL_V2_ADDRESS ?? ON_DEAL_ADDRESS);
   const { error } = isV2 ? v2 : v1;
   const isLoading = (isV2 ? v2.isLoading || signed.isLoading : v1.isLoading) && !error;
   const deals: Array<Deal | DealV2> = isV2 ? v2Deals : v1.deals;

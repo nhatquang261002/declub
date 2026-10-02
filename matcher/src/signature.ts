@@ -7,7 +7,7 @@ const ERC1271_MAGIC = "0x1626ba7e";
 const SECP256K1_N_HALF = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0n;
 
 /**
- * Whether `signature` over `digest` is one `ChogSwapIntents.settle` would accept for `maker`.
+ * Whether `signature` over `digest` is one `OnDealIntents.settle` would accept for `maker`.
  * It mirrors OZ `SignatureChecker`: a contract maker is asked via ERC-1271, an EOA must produce
  * a 65-byte, non-malleable ECDSA signature with v of 27 or 28. (viem's own verifier also accepts
  * ERC-6492 wrappers and high-s signatures, which the contract would reject.)

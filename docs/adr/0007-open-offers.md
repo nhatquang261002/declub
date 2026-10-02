@@ -1,6 +1,6 @@
 # ADR 0007: Open offers ("make me an offer") with escrowed proposals
 
-**Status:** Accepted · 2026-09-30 · Phase 4. Implemented in `ChogSwapV2` (contract, unit and invariant tests; 100% coverage of the contract). Frontend built ([05](../05-frontend.md#chogswapv2-in-the-frontend-phase-4)). Deployed with ADR 0006 (`ChogSwapV2` `0x7359…E1bB`, block 67163690, Sourcify full match).
+**Status:** Accepted · 2026-09-30 · Phase 4. Implemented in `OnDealV2` (contract, unit and invariant tests; 100% coverage of the contract). Frontend built ([05](../05-frontend.md#ondealv2-in-the-frontend-phase-4)). Deployed with ADR 0006 (`OnDealV2` `0x7359…E1bB`, block 67163690, Sourcify full match).
 
 ## Context
 
@@ -82,7 +82,7 @@ Today `fillTrade` on a trade with an empty requested side would pay out the make
 
 ## Consequences
 
-- `ChogSwapV2` is immutable, so this needs a **new deployment**, like ADR 0006 planned. It can carry both changes at once. The deployed V2 keeps working with its own ABI.
+- `OnDealV2` is immutable, so this needs a **new deployment**, like ADR 0006 planned. It can carry both changes at once. The deployed V2 keeps working with its own ABI.
 - The frontend gets a "Make me an offer" mode on `/v2/create` (note field with a byte counter, no requested editor), a Propose action on the detail page that reuses the asset editor, and a proposals list for the maker with Accept and Reject. The notification bell can fire on "new proposal on your trade" and "your proposal was accepted".
 - Every open offer with proposals needs one read per proposal (`getProposal`), so the maker's detail page paginates.
 - The invariant suite grows: contract balances cover every active trade, every `Active` proposal and every credit; `Accepted` proposals pay out exactly once; V8 above.
@@ -90,6 +90,6 @@ Today `fillTrade` on a trade with an empty requested side would pay out the make
 
 ## Open questions
 
-- ~~Keep the name `ChogSwapV2` for the redeploy, or call the contract `V3`?~~ Decided: keep `ChogSwapV2`. The source changes in place, and the address on testnet changes when it's redeployed.
+- ~~Keep the name `OnDealV2` for the redeploy, or call the contract `V3`?~~ Decided: keep `OnDealV2`. The source changes in place, and the address on testnet changes when it's redeployed.
 - Should a fixed-price trade also accept proposals (a "buy now or make an offer" listing)? This design says no: proposals exist only on open offers.
 - Should a proposal carry a short note of its own?

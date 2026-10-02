@@ -1,10 +1,10 @@
-# Chog Swap
+# On Deal
 
 > **Trustless OTC trading and programmable escrow for Chogs on Monad.**
 >
 > *Trade what you have for what you actually want, without trusting the other side.*
 
-Chog Swap lets two people swap Chogs, optionally with MON on one side, through an on-chain escrow that settles atomically:
+On Deal lets two people swap Chogs, optionally with MON on one side, through an on-chain escrow that settles atomically:
 
 ```text
 Alice: Chog #421           ⇄           Bob: Chog #812 + 2 MON
@@ -16,22 +16,33 @@ cancel / expiry → #421 back to Alice. Nothing is ever stuck.
 
 ## Status
 
-- **Phase 1: protocol, done.** `ChogSwap` and `MockChog` are live and verified on Monad testnet, with 91 tests passing (unit, fuzz, invariant), 100% coverage and Slither triaged.
+- **Phase 1: protocol, done.** `OnDeal` and `MockChog` are live and verified on Monad testnet, with 91 tests passing (unit, fuzz, invariant), 100% coverage and Slither triaged.
 - **Phase 2: UI, in progress.** The Next.js app in [`web/`](web/) connects a wallet, lists trades and shows your Chogs (with a MockChog mint for demo wallets). Create, Trade Detail and History are next.
 
 See the [roadmap](docs/06-roadmap.md).
+
+## Built with Privy
+
+Privy is On Deal's identity layer for trading with strangers, not just its sign-in:
+
+- **Verified trader profiles:** a maker's X or Discord handle, read from Privy's linked accounts on the server, shows beside their wallet on every deal.
+- **Webhooks** keep those profiles and Club memberships accurate when an account is unlinked, transferred or deleted.
+- **One person, many wallets:** link a vault and a hot wallet. Club Holder badges count assets across all of them, and Club roles and bans follow the Privy user, not one wallet.
+- **Per-user server state** is authorized by verified Privy access tokens.
+
+Embedded wallets are deliberately off, because traders bring the wallet that already holds their collection. Details, the demo script and setup: [docs/10-privy.md](docs/10-privy.md).
 
 ## Deployments: Monad testnet (chain 10143)
 
 | Contract | Address                                                                                                                            | Block    |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| ChogSwap | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
+| OnDeal | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
 | MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
-| ChogSwapV2 | [`0x73591F76d7deE66F683A979cEffb4356982EE1bB`](https://testnet.monadvision.com/address/0x73591F76d7deE66F683A979cEffb4356982EE1bB) | 67163690 |
-| ChogSwapIntents | [`0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2`](https://testnet.monadvision.com/address/0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2) | 67194397 |
+| OnDealV2 | [`0x73591F76d7deE66F683A979cEffb4356982EE1bB`](https://testnet.monadvision.com/address/0x73591F76d7deE66F683A979cEffb4356982EE1bB) | 67163690 |
+| OnDealIntents | [`0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2`](https://testnet.monadvision.com/address/0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2) | 67194397 |
 | MockERC20 (mUSD) | [`0xd300f095f456D59AAc122B0100833fE195136F6c`](https://testnet.monadvision.com/address/0xd300f095f456D59AAc122B0100833fE195136F6c) | 66874652 |
 
-All five are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait requests and open offers; the earlier V2 at `0x8a05…CC75` (block 66874644) is superseded, and mUSD is shared. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction records: [`Deploy.s.sol`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) (v1) [`DeployV2.s.sol`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) (V2) and [`DeployIntents.s.sol`](contracts/broadcast/DeployIntents.s.sol/10143/run-latest.json) (intents; the matcher in [`matcher/`](matcher/README.md) settles through it).
+All five are source-verified on Sourcify, under the names they were deployed with (`ChogSwap`, `ChogSwapV2`, `ChogSwapIntents`) before the rename to On Deal. The intents contract signs with the EIP-712 domain name `ChogSwapIntents`, while the code now uses `OnDealIntents`, so signed intents need OnDealIntents redeployed and its address updated. OnDealV2 is the redeploy with trait requests and open offers; the earlier V2 at `0x8a05…CC75` (block 66874644) is superseded, and mUSD is shared. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction records: [`Deploy.s.sol`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) (v1) [`DeployV2.s.sol`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) (V2) and [`DeployIntents.s.sol`](contracts/broadcast/DeployIntents.s.sol/10143/run-latest.json) (intents; the matcher in [`matcher/`](matcher/README.md) settles through it).
 
 ## Repo map
 
@@ -44,8 +55,9 @@ All five are source-verified on Sourcify. ChogSwapV2 is the redeploy with trait 
 | [`docs/05-frontend.md`](docs/05-frontend.md)               | Screens → contract calls, tx flow, error copy                                       |
 | [`docs/06-roadmap.md`](docs/06-roadmap.md)                 | Phase checklist and open questions                                                  |
 | [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs and Momentum: a community per verified asset (spec, roles, data, API)         |
+| [`docs/10-privy.md`](docs/10-privy.md)                     | What Privy powers, why no embedded wallets, demo script and setup                   |
 | [`docs/adr/`](docs/adr/)                                   | Architecture decision records                                                       |
-| [`contracts/`](contracts/)                                 | Foundry project: `src/ChogSwap.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
+| [`contracts/`](contracts/)                                 | Foundry project: `src/OnDeal.sol`, `src/mocks/MockChog.sol`, tests, deploy script |
 | [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |
 | [`web/`](web/)                                             | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md))    |
 

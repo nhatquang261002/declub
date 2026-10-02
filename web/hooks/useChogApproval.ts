@@ -3,14 +3,14 @@
 import type { Address } from "viem";
 import { useReadContract } from "wagmi";
 import { chog } from "@/lib/contracts";
-import { CHOG_SWAP_ADDRESS } from "@/lib/config";
+import { ON_DEAL_ADDRESS } from "@/lib/config";
 
-/** Whether ChogSwap may move `owner`'s Chogs (setApprovalForAll). */
+/** Whether OnDeal may move `owner`'s Chogs (setApprovalForAll). */
 export function useChogApproval(owner: Address | undefined) {
   const result = useReadContract({
     ...chog,
     functionName: "isApprovedForAll",
-    args: owner ? [owner, CHOG_SWAP_ADDRESS] : undefined,
+    args: owner ? [owner, ON_DEAL_ADDRESS] : undefined,
     query: { enabled: !!owner },
   });
 
@@ -20,7 +20,7 @@ export function useChogApproval(owner: Address | undefined) {
     approveCall: {
       ...chog,
       functionName: "setApprovalForAll",
-      args: [CHOG_SWAP_ADDRESS, true],
+      args: [ON_DEAL_ADDRESS, true],
     } as const,
   };
 }

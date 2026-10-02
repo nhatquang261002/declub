@@ -1,6 +1,6 @@
 # web/
 
-The Chog Swap frontend: Next.js 16 (App Router) · wagmi 3 · viem · Tailwind 4. It has no backend and reads and writes Monad testnet directly.
+The On Deal frontend: Next.js 16 (App Router) · wagmi 3 · viem · Tailwind 4. It has no backend and reads and writes Monad testnet directly.
 
 **Status:** Phase 2 UI implementation complete. Open Deals, Create, Deal Detail and the wallet-free History preview are wired; testnet rehearsal remains.
 

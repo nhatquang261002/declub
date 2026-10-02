@@ -7,7 +7,7 @@ import { toDealV2 } from "@/lib/dealsV2";
 import { parseSpec } from "@/lib/traitSpec";
 
 /**
- * One ChogSwapV2 deal by id, with the maker's note if it is an open offer (empty otherwise) and the
+ * One OnDealV2 deal by id, with the maker's note if it is an open offer (empty otherwise) and the
  * trait-request description if it has trait assets.
  * `deal` is null for an id that doesn't exist.
  */

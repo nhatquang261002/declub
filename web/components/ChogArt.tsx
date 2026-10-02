@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-export function ChogSwapArt({ compact = false }: { compact?: boolean }) {
+export function OnDealArt({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`chog-art ${compact ? "chog-art-compact" : ""}`} aria-hidden>
       <div className="chog-art-glow" />

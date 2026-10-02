@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
-import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, ON_DEAL_ADDRESS } from "@/lib/config";
 import { useLocalFills } from "./useLocalFills";
 
 type FillsResponse = { enabled: false } | { enabled: true; ids: string[] };
@@ -14,7 +14,7 @@ type FillsResponse = { enabled: false } | { enabled: true; ids: string[] };
  * device (`reportTx`, called from useTxFlow). Without it, it is this browser's own record, as
  * before (hooks/useLocalFills.ts), and `record` is how a page adds to it.
  */
-export function useFills(account: Address | undefined, contract: Address = CHOG_SWAP_ADDRESS) {
+export function useFills(account: Address | undefined, contract: Address = ON_DEAL_ADDRESS) {
   const local = useLocalFills(account, contract);
   const query = useQuery({
     queryKey: ["fills", CHAIN_ID, contract.toLowerCase(), account?.toLowerCase()],

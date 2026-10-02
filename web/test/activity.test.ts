@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { encodeAbiParameters, encodeEventTopics, getAddress, zeroAddress, type Address, type Hex } from "viem";
-import { chogSwapV2Abi } from "../lib/abi";
-import { CHOG_SWAP_ADDRESS } from "../lib/config";
+import { onDealV2Abi } from "../lib/abi";
+import { ON_DEAL_ADDRESS } from "../lib/config";
 import { activityKey, ingestTx, readActivity, recordActivity, type ReceiptLike, type Reader } from "../lib/server/activity";
 import { fillsKey, listFills, recordFills } from "../lib/server/fills";
 import { memoryStore, type Store } from "../lib/server/store";
@@ -24,9 +24,9 @@ type Raw = ReturnType<typeof nft>;
 
 /** A log encoded the way the contract emits it, from the ABI. */
 function log(address: Address, eventName: string, args: Record<string, unknown>, logIndex = 0) {
-  const item = chogSwapV2Abi.find((i) => i.type === "event" && i.name === eventName);
+  const item = onDealV2Abi.find((i) => i.type === "event" && i.name === eventName);
   if (!item || item.type !== "event") throw new Error(`no event ${eventName}`);
-  const topics = encodeEventTopics({ abi: chogSwapV2Abi, eventName, args } as never) as Hex[];
+  const topics = encodeEventTopics({ abi: onDealV2Abi, eventName, args } as never) as Hex[];
   const data = encodeAbiParameters(
     item.inputs.filter((i) => !i.indexed),
     item.inputs.filter((i) => !i.indexed).map((i) => args[i.name as string]) as never,
@@ -190,15 +190,15 @@ describe("ingestTx", () => {
 describe("recordFills (shared with History)", () => {
   it("still records a fill under the taker", async () => {
     const store = memoryStore();
-    const fill = log(CHOG_SWAP_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(ON_DEAL_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill])), 1);
-    assert.deepEqual(await listFills(store, CHOG_SWAP_ADDRESS, taker), ["7"]);
-    assert.equal(fillsKey(CHOG_SWAP_ADDRESS, taker), fillsKey(CHOG_SWAP_ADDRESS, taker.toLowerCase()));
+    assert.deepEqual(await listFills(store, ON_DEAL_ADDRESS, taker), ["7"]);
+    assert.equal(fillsKey(ON_DEAL_ADDRESS, taker), fillsKey(ON_DEAL_ADDRESS, taker.toLowerCase()));
   });
 
   it("records nothing for a reverted transaction or another contract", async () => {
     const store = memoryStore();
-    const fill = log(CHOG_SWAP_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(ON_DEAL_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill], "reverted")), 0);
     assert.equal(await recordFills(store, receipt([log(OTHER, "TradeFilled", { tradeId: 7n, maker, taker })])), 0);
   });

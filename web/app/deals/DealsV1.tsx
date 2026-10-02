@@ -24,7 +24,7 @@ export const PAGE = 4;
 /** Searching needs the whole book, not just the pages the reader has opened so far. */
 export const SEARCH_LIMIT = 200;
 
-/** The ChogSwap (v1) book: Chogs and MON, plus trait requests. */
+/** The OnDeal (v1) book: Chogs and MON, plus trait requests. */
 export function DealsV1({ switcher }: { switcher: ReactNode }) {
   const { address } = useConnection();
   const now = useNow();

@@ -150,18 +150,18 @@ export function memoryStore(): Store {
 }
 
 // Kept on globalThis so a dev server's hot reloads don't empty the in-memory store.
-const g = globalThis as typeof globalThis & { __chogswapStore?: Store | null };
+const g = globalThis as typeof globalThis & { __ondealStore?: Store | null };
 
 /** The store, or `null` when this deployment has none (production without Upstash credentials). */
 export function getStore(): Store | null {
-  if (g.__chogswapStore !== undefined) return g.__chogswapStore;
+  if (g.__ondealStore !== undefined) return g.__ondealStore;
   const creds = credentials();
-  g.__chogswapStore = creds
+  g.__ondealStore = creds
     ? upstash(new Redis(creds))
     : process.env.NODE_ENV !== "production"
       ? memoryStore()
       : null;
-  return g.__chogswapStore;
+  return g.__ondealStore;
 }
 
 /** Best-effort caller id for rate limits. Only trustworthy behind a proxy that sets the header. */
@@ -172,7 +172,7 @@ export function clientId(request: Request): string {
 /** True while `id` is within `limit` hits per `windowSec`. A store that errors never blocks anyone. */
 export async function withinLimit(store: Store, name: string, id: string, limit: number, windowSec: number): Promise<boolean> {
   try {
-    return (await store.hit(`chogswap:rl:${name}:${id}`, windowSec)) <= limit;
+    return (await store.hit(`ondeal:rl:${name}:${id}`, windowSec)) <= limit;
   } catch {
     return true;
   }

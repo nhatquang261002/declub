@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { Address, Hex } from "viem";
-import { CHAIN_ID, CHOG_SWAP_INTENTS_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, ON_DEAL_INTENTS_ADDRESS } from "@/lib/config";
 import { getInfo, getIntent, listIntents, listSettlements, type ListParams } from "@/lib/pool";
 
 // Reads of the intent pool (matcher/). Polled, since the pool has no push channel. A pool that is
@@ -16,7 +16,7 @@ export function usePoolInfo() {
   const info = query.data;
   const mismatch =
     !!info &&
-    (info.chainId !== CHAIN_ID || info.swap.toLowerCase() !== CHOG_SWAP_INTENTS_ADDRESS?.toLowerCase());
+    (info.chainId !== CHAIN_ID || info.swap.toLowerCase() !== ON_DEAL_INTENTS_ADDRESS?.toLowerCase());
   return { info, mismatch, isLoading: query.isLoading, error: query.error };
 }
 
@@ -26,7 +26,7 @@ export function useIntents(params: ListParams & { enabled?: boolean } = {}) {
   const query = useQuery({
     queryKey: ["pool", "intents", list.status ?? "open", list.maker?.toLowerCase() ?? null, list.limit ?? null, list.token?.toLowerCase() ?? null],
     queryFn: () => listIntents(list),
-    enabled: enabled && !!CHOG_SWAP_INTENTS_ADDRESS,
+    enabled: enabled && !!ON_DEAL_INTENTS_ADDRESS,
     refetchInterval: POLL_MS,
     retry: 1,
   });
@@ -37,7 +37,7 @@ export function useIntent(hash: Hex | undefined) {
   const query = useQuery({
     queryKey: ["pool", "intent", hash],
     queryFn: () => getIntent(hash!),
-    enabled: !!hash && !!CHOG_SWAP_INTENTS_ADDRESS,
+    enabled: !!hash && !!ON_DEAL_INTENTS_ADDRESS,
     refetchInterval: POLL_MS,
     retry: 1,
   });
@@ -49,7 +49,7 @@ export function useSettlements({ maker, enabled = true }: { maker?: Address; ena
   const query = useQuery({
     queryKey: ["pool", "settlements", maker?.toLowerCase() ?? null],
     queryFn: () => listSettlements({ maker }),
-    enabled: enabled && !!CHOG_SWAP_INTENTS_ADDRESS,
+    enabled: enabled && !!ON_DEAL_INTENTS_ADDRESS,
     refetchInterval: POLL_MS,
     retry: 1,
   });

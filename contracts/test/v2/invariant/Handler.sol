@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ChogSwapV2} from "../../../src/ChogSwapV2.sol";
-import {IChogSwapV2} from "../../../src/interfaces/IChogSwapV2.sol";
+import {OnDealV2} from "../../../src/OnDealV2.sol";
+import {IOnDealV2} from "../../../src/interfaces/IOnDealV2.sol";
 import {MockChog} from "../../../src/mocks/MockChog.sol";
 import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 import {MonReceiver} from "../../utils/Actors.sol";
@@ -17,7 +17,7 @@ import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 ///      The swap charges a protocol fee: every create, proposal and fill sends it with the call,
 ///      and the fee recipient is a MON-rejecting contract at times, so its credit is exercised.
 contract Handler is Test {
-    ChogSwapV2 public immutable swap;
+    OnDealV2 public immutable swap;
     MockChog public immutable chog;
     MockERC20 public immutable usdc;
     BlocklistToken public immutable blk;
@@ -27,8 +27,8 @@ contract Handler is Test {
     uint256 public immutable fee;
 
     address[] public actors;
-    mapping(uint256 tradeId => IChogSwapV2.Status) public expectedStatus;
-    mapping(uint256 tradeId => mapping(uint256 proposalId => IChogSwapV2.ProposalStatus)) public
+    mapping(uint256 tradeId => IOnDealV2.Status) public expectedStatus;
+    mapping(uint256 tradeId => mapping(uint256 proposalId => IOnDealV2.ProposalStatus)) public
         expectedProposal;
 
     uint256 public ghost_expiredFills; // I6
@@ -43,7 +43,7 @@ contract Handler is Test {
     mapping(bytes32 => uint256) public calls;
 
     constructor(
-        ChogSwapV2 swap_,
+        OnDealV2 swap_,
         MockChog chog_,
         MockERC20 usdc_,
         BlocklistToken blk_,
@@ -99,8 +99,8 @@ contract Handler is Test {
 
         uint256 nOfferedNft = bound(nftSeed, 0, 2);
         uint256 nRequestedNft = bound(nftSeed >> 8, 0, 2);
-        IChogSwapV2.Asset[] memory offered = _side(maker, offeredMask, nOfferedNft, amountSeed);
-        IChogSwapV2.Asset[] memory requested =
+        IOnDealV2.Asset[] memory offered = _side(maker, offeredMask, nOfferedNft, amountSeed);
+        IOnDealV2.Asset[] memory requested =
             _side(counterparty, requestedMask, nRequestedNft, amountSeed >> 16);
         if (offered.length == 0 || requested.length == 0) return;
 
@@ -111,12 +111,12 @@ contract Handler is Test {
 
         vm.prank(maker);
         uint256 id = swap.createTrade{value: value}(offered, requested, taker, expiry);
-        expectedStatus[id] = IChogSwapV2.Status.Open;
+        expectedStatus[id] = IOnDealV2.Status.Open;
         calls["create"]++;
     }
 
     function fill(uint256 tradeSeed, uint256 takerSeed) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok) return;
 
         address taker = t.taker != address(0) ? t.taker : _actor(takerSeed);
@@ -136,12 +136,12 @@ contract Handler is Test {
         vm.prank(taker);
         try swap.fillTrade{value: _sum(t.requested, 0) + fee}(id) {
             if (expired) ghost_expiredFills++;
-            expectedStatus[id] = IChogSwapV2.Status.Filled;
+            expectedStatus[id] = IOnDealV2.Status.Filled;
             _checkNfts(t.offered, taker);
             _checkNfts(t.requested, t.maker);
             // The maker gains the requested side; the taker gains the offered side and pays the
             // requested one. A rejected payout shows up as a credit, which _holdings includes.
-            if (!_gained(t.maker, makerBefore, t.requested, new IChogSwapV2.Asset[](0), 0, 0)) {
+            if (!_gained(t.maker, makerBefore, t.requested, new IOnDealV2.Asset[](0), 0, 0)) {
                 ghost_badSettlements++;
             }
             // The taker also sends its fee share; the maker's was sent when it created the trade.
@@ -165,7 +165,7 @@ contract Handler is Test {
     ) external {
         address maker = _actor(makerSeed);
         address counterparty = _actor(makerSeed + 1 + (offeredMask >> 8) % 3);
-        IChogSwapV2.Asset[] memory offered =
+        IOnDealV2.Asset[] memory offered =
             _side(maker, offeredMask & 7, bound(nftSeed, 0, 2), amountSeed);
         if (offered.length == 0) return;
 
@@ -175,7 +175,7 @@ contract Handler is Test {
         uint256 id = swap.createOpenOffer{value: _sum(offered, 0) + fee}(
             offered, restrictTaker ? counterparty : address(0), expiry, "note"
         );
-        expectedStatus[id] = IChogSwapV2.Status.Open;
+        expectedStatus[id] = IOnDealV2.Status.Open;
         calls["offer"]++;
     }
 
@@ -186,20 +186,20 @@ contract Handler is Test {
         uint256 nftSeed,
         uint256 amountSeed
     ) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok || t.requested.length != 0 || swap.isExpired(id)) return;
 
         address proposer = t.taker != address(0) ? t.taker : _actor(proposerSeed);
         if (proposer == t.maker) return;
         // A proposal never repeats an asset the maker offers (SameAssetBothSides).
         mask = (mask & 7) & ~_maskOf(t.offered);
-        IChogSwapV2.Asset[] memory assets = _side(proposer, mask, bound(nftSeed, 0, 2), amountSeed);
+        IOnDealV2.Asset[] memory assets = _side(proposer, mask, bound(nftSeed, 0, 2), amountSeed);
         if (assets.length == 0) return;
 
         vm.prank(proposer);
         try swap.propose{value: _sum(assets, 0) + fee}(id, assets) returns (uint256 pid) {
             if (pid != swap.proposalCount(id) - 1) ghost_validProposalOpReverted++;
-            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Active;
+            expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Active;
             calls["propose"]++;
         } catch {
             ghost_validProposalOpReverted++;
@@ -207,23 +207,23 @@ contract Handler is Test {
     }
 
     function acceptProposal(uint256 tradeSeed, uint256 proposalSeed) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok || t.requested.length != 0 || swap.isExpired(id)) return;
         uint256 n = swap.proposalCount(id);
         if (n == 0) return;
         uint256 pid = proposalSeed % n;
-        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
-        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+        IOnDealV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IOnDealV2.ProposalStatus.Active) return;
 
         uint256[3] memory makerBefore = _holdings(t.maker);
         uint256[3] memory proposerBefore = _holdings(p.proposer);
         vm.prank(t.maker);
         try swap.acceptProposal(id, pid) {
-            expectedStatus[id] = IChogSwapV2.Status.Filled;
-            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Accepted;
+            expectedStatus[id] = IOnDealV2.Status.Filled;
+            expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Accepted;
             _checkNfts(p.assets, t.maker);
             _checkNfts(t.offered, p.proposer);
-            IChogSwapV2.Asset[] memory none = new IChogSwapV2.Asset[](0);
+            IOnDealV2.Asset[] memory none = new IOnDealV2.Asset[](0);
             if (!_gained(t.maker, makerBefore, p.assets, none, 0, 0)) ghost_badSettlements++;
             if (!_gained(p.proposer, proposerBefore, t.offered, none, 0, 0)) {
                 ghost_badSettlements++;
@@ -236,20 +236,20 @@ contract Handler is Test {
     }
 
     function rejectProposal(uint256 tradeSeed, uint256 proposalSeed) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok || t.requested.length != 0) return;
         uint256 n = swap.proposalCount(id);
         if (n == 0) return;
         uint256 pid = proposalSeed % n;
-        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
-        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+        IOnDealV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IOnDealV2.ProposalStatus.Active) return;
 
         uint256[3] memory before = _holdings(p.proposer);
         vm.prank(t.maker);
         try swap.rejectProposal(id, pid) {
-            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Rejected;
+            expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Rejected;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0), fee, 0)) {
+            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["reject"]++;
@@ -265,15 +265,15 @@ contract Handler is Test {
         uint256 n = swap.proposalCount(id);
         if (n == 0) return;
         uint256 pid = proposalSeed % n;
-        IChogSwapV2.Proposal memory p = swap.getProposal(id, pid);
-        if (p.status != IChogSwapV2.ProposalStatus.Active) return;
+        IOnDealV2.Proposal memory p = swap.getProposal(id, pid);
+        if (p.status != IOnDealV2.ProposalStatus.Active) return;
 
         uint256[3] memory before = _holdings(p.proposer);
         vm.prank(p.proposer);
         try swap.withdrawProposal(id, pid) {
-            expectedProposal[id][pid] = IChogSwapV2.ProposalStatus.Withdrawn;
+            expectedProposal[id][pid] = IOnDealV2.ProposalStatus.Withdrawn;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IChogSwapV2.Asset[](0), fee, 0)) {
+            if (!_gained(p.proposer, before, p.assets, new IOnDealV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["withdraw"]++;
@@ -283,15 +283,15 @@ contract Handler is Test {
     }
 
     function cancel(uint256 tradeSeed) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok) return;
 
         uint256[3] memory before = _holdings(t.maker);
         vm.prank(t.maker);
         try swap.cancelTrade(id) {
-            expectedStatus[id] = IChogSwapV2.Status.Cancelled;
+            expectedStatus[id] = IOnDealV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, before, t.offered, new IChogSwapV2.Asset[](0), fee, 0)) {
+            if (!_gained(t.maker, before, t.offered, new IOnDealV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             calls["cancel"]++;
@@ -301,7 +301,7 @@ contract Handler is Test {
     }
 
     function reclaim(uint256 tradeSeed, uint256 callerSeed) external {
-        (uint256 id, IChogSwapV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDealV2.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok || !swap.isExpired(id)) return;
 
         address caller = _actor(callerSeed);
@@ -309,9 +309,9 @@ contract Handler is Test {
         uint256[3] memory callerBefore = _holdings(caller);
         vm.prank(caller);
         try swap.reclaimExpired(id) {
-            expectedStatus[id] = IChogSwapV2.Status.Cancelled;
+            expectedStatus[id] = IOnDealV2.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, makerBefore, t.offered, new IChogSwapV2.Asset[](0), fee, 0)) {
+            if (!_gained(t.maker, makerBefore, t.offered, new IOnDealV2.Asset[](0), fee, 0)) {
                 ghost_badRefunds++;
             }
             // A caller who isn't the maker gets nothing.
@@ -329,7 +329,7 @@ contract Handler is Test {
 
     function claim(uint256 actorSeed, uint256 kind) external {
         address who = _actor(actorSeed);
-        (IChogSwapV2.AssetType t, address token) = _fungible(kind);
+        (IOnDealV2.AssetType t, address token) = _fungible(kind);
         vm.prank(who);
         try swap.claim(t, token, 0) {
             calls["claim"]++;
@@ -358,22 +358,22 @@ contract Handler is Test {
 
     /// @dev Native, usdc, blk: wallet balance plus anything credited for `claim`.
     function _holdings(address who) internal view returns (uint256[3] memory h) {
-        h[0] = who.balance + swap.claimable(who, IChogSwapV2.AssetType.Native, address(0), 0);
+        h[0] = who.balance + swap.claimable(who, IOnDealV2.AssetType.Native, address(0), 0);
         h[1] = usdc.balanceOf(who)
-            + swap.claimable(who, IChogSwapV2.AssetType.ERC20, address(usdc), 0);
+            + swap.claimable(who, IOnDealV2.AssetType.ERC20, address(usdc), 0);
         h[2] =
-            blk.balanceOf(who) + swap.claimable(who, IChogSwapV2.AssetType.ERC20, address(blk), 0);
+            blk.balanceOf(who) + swap.claimable(who, IOnDealV2.AssetType.ERC20, address(blk), 0);
     }
 
-    function _sum(IChogSwapV2.Asset[] memory assets, uint256 k)
+    function _sum(IOnDealV2.Asset[] memory assets, uint256 k)
         internal
         view
         returns (uint256 total)
     {
         for (uint256 i; i < assets.length; ++i) {
-            IChogSwapV2.Asset memory a = assets[i];
+            IOnDealV2.Asset memory a = assets[i];
             bool match_ = k == 0
-                ? a.assetType == IChogSwapV2.AssetType.Native
+                ? a.assetType == IOnDealV2.AssetType.Native
                 : a.token == (k == 1 ? address(usdc) : address(blk));
             if (match_) total += a.amount;
         }
@@ -384,8 +384,8 @@ contract Handler is Test {
     function _gained(
         address who,
         uint256[3] memory before,
-        IChogSwapV2.Asset[] memory gained,
-        IChogSwapV2.Asset[] memory paid,
+        IOnDealV2.Asset[] memory gained,
+        IOnDealV2.Asset[] memory paid,
         uint256 feeBack,
         uint256 feePaid
     ) internal view returns (bool) {
@@ -398,10 +398,10 @@ contract Handler is Test {
         return true;
     }
 
-    function _checkNfts(IChogSwapV2.Asset[] memory assets, address expectedOwner) internal {
+    function _checkNfts(IOnDealV2.Asset[] memory assets, address expectedOwner) internal {
         for (uint256 i; i < assets.length; ++i) {
             if (
-                assets[i].assetType == IChogSwapV2.AssetType.ERC721
+                assets[i].assetType == IOnDealV2.AssetType.ERC721
                     && chog.ownerOf(assets[i].id) != expectedOwner
             ) {
                 ghost_badSettlements++;
@@ -410,26 +410,26 @@ contract Handler is Test {
     }
 
     /// @dev Bitmask (bit0 native, bit1 usdc, bit2 blk) of the fungibles in `assets`.
-    function _maskOf(IChogSwapV2.Asset[] memory assets) internal view returns (uint256 mask) {
+    function _maskOf(IOnDealV2.Asset[] memory assets) internal view returns (uint256 mask) {
         for (uint256 i; i < assets.length; ++i) {
-            IChogSwapV2.Asset memory a = assets[i];
-            if (a.assetType == IChogSwapV2.AssetType.Native) mask |= 1;
+            IOnDealV2.Asset memory a = assets[i];
+            if (a.assetType == IOnDealV2.AssetType.Native) mask |= 1;
             else if (a.token == address(usdc)) mask |= 2;
             else if (a.token == address(blk)) mask |= 4;
         }
     }
 
-    function _fungible(uint256 kind) internal view returns (IChogSwapV2.AssetType, address) {
+    function _fungible(uint256 kind) internal view returns (IOnDealV2.AssetType, address) {
         kind %= 3;
-        if (kind == 0) return (IChogSwapV2.AssetType.Native, address(0));
-        if (kind == 1) return (IChogSwapV2.AssetType.ERC20, address(usdc));
-        return (IChogSwapV2.AssetType.ERC20, address(blk));
+        if (kind == 0) return (IOnDealV2.AssetType.Native, address(0));
+        if (kind == 1) return (IOnDealV2.AssetType.ERC20, address(usdc));
+        return (IOnDealV2.AssetType.ERC20, address(blk));
     }
 
     function _side(address owner, uint256 mask, uint256 nftCount, uint256 amountSeed)
         internal
         view
-        returns (IChogSwapV2.Asset[] memory out)
+        returns (IOnDealV2.Asset[] memory out)
     {
         uint256 bal = chog.balanceOf(owner);
         if (nftCount > bal) nftCount = bal;
@@ -437,28 +437,28 @@ contract Handler is Test {
         for (uint256 b; b < 3; ++b) {
             if (mask & (1 << b) != 0) ++n;
         }
-        out = new IChogSwapV2.Asset[](n);
+        out = new IOnDealV2.Asset[](n);
         uint256 k;
         for (uint256 b; b < 3; ++b) {
             if (mask & (1 << b) == 0) continue;
-            (IChogSwapV2.AssetType t, address token) = _fungible(b);
+            (IOnDealV2.AssetType t, address token) = _fungible(b);
             uint256 amount = bound(amountSeed >> (b * 4), 1, 50) * 1 ether;
-            out[k++] = IChogSwapV2.Asset(t, token, 0, amount);
+            out[k++] = IOnDealV2.Asset(t, token, 0, amount);
         }
         for (uint256 i; i < nftCount; ++i) {
-            out[k++] = IChogSwapV2.Asset(
-                IChogSwapV2.AssetType.ERC721, address(chog), chog.tokenOfOwnerByIndex(owner, i), 1
+            out[k++] = IOnDealV2.Asset(
+                IOnDealV2.AssetType.ERC721, address(chog), chog.tokenOfOwnerByIndex(owner, i), 1
             );
         }
     }
 
     /// @dev Only attempt fills a taker can really pay, so a revert means a bug.
-    function _canPay(address taker, IChogSwapV2.Trade memory t) internal view returns (bool) {
+    function _canPay(address taker, IOnDealV2.Trade memory t) internal view returns (bool) {
         for (uint256 i; i < t.requested.length; ++i) {
-            IChogSwapV2.Asset memory a = t.requested[i];
-            if (a.assetType == IChogSwapV2.AssetType.Native) {
+            IOnDealV2.Asset memory a = t.requested[i];
+            if (a.assetType == IOnDealV2.AssetType.Native) {
                 if (taker.balance < a.amount + fee) return false;
-            } else if (a.assetType == IChogSwapV2.AssetType.ERC20) {
+            } else if (a.assetType == IOnDealV2.AssetType.ERC20) {
                 if (IERC20Like(a.token).balanceOf(taker) < a.amount) return false;
                 // A blocked maker can't receive the blocklist token, which reverts the fill.
                 if (a.token == address(blk) && blk.blocked(t.maker)) return false;
@@ -476,13 +476,13 @@ contract Handler is Test {
     function _openTrade(uint256 seed)
         internal
         view
-        returns (uint256 id, IChogSwapV2.Trade memory t, bool ok)
+        returns (uint256 id, IOnDealV2.Trade memory t, bool ok)
     {
         uint256 count = swap.tradeCount();
         if (count == 0) return (0, t, false);
         id = (seed % count) + 1;
         t = swap.getTrade(id);
-        ok = t.status == IChogSwapV2.Status.Open;
+        ok = t.status == IOnDealV2.Status.Open;
     }
 }
 

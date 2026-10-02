@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createPublicClient, http, parseAbi, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { CHAIN_ID, CHOG_SWAP_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
 import {
   MAX_PINNED,
   POSTS_KEPT,
@@ -69,9 +69,9 @@ export type Actor = { userId: string; wallet: string };
 const nowOf = (deps: Deps) => deps.now?.() ?? Date.now();
 const isAdmin = (deps: Deps, userId: string) => (deps.admins ?? adminIds()).has(userId);
 
-export const postsKey = (token: string) => `chogswap:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
-export const postKey = (token: string, id: string) => `chogswap:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
-export const reportsKey = (token: string, id: string) => `chogswap:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const postsKey = (token: string) => `ondeal:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
+export const postKey = (token: string, id: string) => `ondeal:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const reportsKey = (token: string, id: string) => `ondeal:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
 /** The user's role in the Club, an app admin's outranking everything. */
 export async function roleIn(store: Store, token: string, userId: string, deps: Deps = {}): Promise<ClubRole> {
@@ -93,9 +93,9 @@ export async function resolveLink(link: PostLink): Promise<string[] | null> {
     const found = await getIntent(link.hash as `0x${string}`);
     return found ? tokensOf([...found.intent.give, ...found.intent.want]) : null;
   }
-  if (!CHOG_SWAP_V2_ADDRESS) return null;
+  if (!ON_DEAL_V2_ADDRESS) return null;
   try {
-    const trade = await viemReader().trade(CHOG_SWAP_V2_ADDRESS, BigInt(link.id));
+    const trade = await viemReader().trade(ON_DEAL_V2_ADDRESS, BigInt(link.id));
     const assets = [...trade.offered, ...trade.requested];
     if (assets.length === 0) return null;
     return tokensOf(assets.map(toAsset).filter((a) => a !== null));

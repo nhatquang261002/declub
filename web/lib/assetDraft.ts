@@ -45,7 +45,7 @@ export type SideResult = { assets: Asset[]; errors: string[] };
 
 /**
  * Turns typed rows into contract-ready assets, or says what is wrong with which row. The rules
- * mirror ChogSwapV2's validation so the contract's reverts are a backstop, not the UI.
+ * mirror OnDealV2's validation so the contract's reverts are a backstop, not the UI.
  * `decimalsOf` comes from the token contract itself (useTokenInfo), never from the user.
  */
 export function draftToAssets(

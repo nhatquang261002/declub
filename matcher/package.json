@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Off-chain intent pool and local matcher for ChogSwapIntents (ADR 0008, 0009)",
+  "description": "Off-chain intent pool and local matcher for OnDealIntents (ADR 0008, 0009)",
   "engines": {
     "node": ">=24"
   },

@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ChogSwapV2} from "../../src/ChogSwapV2.sol";
-import {IChogSwapV2} from "../../src/interfaces/IChogSwapV2.sol";
+import {OnDealV2} from "../../src/OnDealV2.sol";
+import {IOnDealV2} from "../../src/interfaces/IOnDealV2.sol";
 import {MockERC20} from "../../src/mocks/MockERC20.sol";
 import {DeployV2} from "../../script/DeployV2.s.sol";
 
@@ -18,8 +18,8 @@ contract DeployV2Test is Test {
         DeployV2.Config memory c;
         DeployV2.Result memory r = script.deploy(c);
 
-        assertEq(ChogSwapV2(r.swap).tradeCount(), 0);
-        assertEq(ChogSwapV2(r.swap).MAX_ASSETS_PER_SIDE(), 10);
+        assertEq(OnDealV2(r.swap).tradeCount(), 0);
+        assertEq(OnDealV2(r.swap).MAX_ASSETS_PER_SIDE(), 10);
         assertEq(r.mockErc20, address(0));
     }
 
@@ -45,14 +45,14 @@ contract DeployV2Test is Test {
         c.feeRecipient = makeAddr("treasury");
         DeployV2.Result memory r = script.deploy(c);
 
-        assertEq(ChogSwapV2(r.swap).FEE(), 3 ether);
-        assertEq(ChogSwapV2(r.swap).FEE_RECIPIENT(), c.feeRecipient);
+        assertEq(OnDealV2(r.swap).FEE(), 3 ether);
+        assertEq(OnDealV2(r.swap).FEE_RECIPIENT(), c.feeRecipient);
     }
 
     function test_refusesAFeeWithoutARecipient() public {
         DeployV2.Config memory c;
         c.fee = 1 ether;
-        vm.expectRevert(IChogSwapV2.NoFeeRecipient.selector);
+        vm.expectRevert(IOnDealV2.NoFeeRecipient.selector);
         script.deploy(c);
     }
 

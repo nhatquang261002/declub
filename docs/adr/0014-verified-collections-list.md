@@ -4,7 +4,7 @@
 
 ## Context
 
-On mainnet the app should trade any ERC-721 and ERC-20, not only Chogs. The contracts already do: `ChogSwapV2` has no allowlist and never trusts a token beyond its own balances, so a bad token can only hurt trades that name it ([ADR 0005](0005-generic-asset-model.md)).
+On mainnet the app should trade any ERC-721 and ERC-20, not only Chogs. The contracts already do: `OnDealV2` has no allowlist and never trusts a token beyond its own balances, so a bad token can only hurt trades that name it ([ADR 0005](0005-generic-asset-model.md)).
 
 What a user can't see is whether a contract is the real one. A contract can claim any name and symbol, and a clone of a popular collection looks the same in a picker. The signal has to come from somewhere other than the contract, and it can't live in the contracts, which have no admin and shouldn't get one.
 

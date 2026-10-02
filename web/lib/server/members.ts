@@ -26,9 +26,9 @@ import type { Store } from "./store";
  * badge is a balance read on the server and is out of date by at most a day.
  */
 
-export const membersKey = (token: string) => `chogswap:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
-export const memberKey = (token: string, userId: string) => `chogswap:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
-export const userClubsKey = (userId: string) => `chogswap:user-clubs:${userId}`;
+export const membersKey = (token: string) => `ondeal:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
+export const memberKey = (token: string, userId: string) => `ondeal:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
+export const userClubsKey = (userId: string) => `ondeal:user-clubs:${userId}`;
 
 /**
  * One balance per wallet, in the same order, or `null` when the chain can't be read. The same

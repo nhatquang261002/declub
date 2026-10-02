@@ -1,6 +1,6 @@
 # ADR 0008: Signed trade intents and an off-chain matcher
 
-**Status:** Accepted · 2026-10-01 · Phase 4. Open questions settled below. `ChogSwapIntents` is implemented and tested (65 tests, 100% coverage) and deployed to Monad testnet (see the README). The pool and local matcher are built and tested in [`matcher/`](../../matcher/README.md); the frontend screens are built in [`web/`](../05-frontend.md#intents-in-the-frontend-phase-4). [ADR 0009](0009-ring-swaps.md) builds on this one and shares its contract.
+**Status:** Accepted · 2026-10-01 · Phase 4. Open questions settled below. `OnDealIntents` is implemented and tested (65 tests, 100% coverage) and deployed to Monad testnet (see the README). The pool and local matcher are built and tested in [`matcher/`](../../matcher/README.md); the frontend screens are built in [`web/`](../05-frontend.md#intents-in-the-frontend-phase-4). [ADR 0009](0009-ring-swaps.md) builds on this one and shares its contract.
 
 ## Context
 
@@ -16,7 +16,7 @@ Intents are a third path beside fixed trades and open offers, not a replacement.
 
 ## Decision
 
-A new contract, **`ChogSwapIntents`**, separate from `ChogSwapV2` (which is immutable and live), plus an off-chain intent pool and matcher.
+A new contract, **`OnDealIntents`**, separate from `OnDealV2` (which is immutable and live), plus an off-chain intent pool and matcher.
 
 ### The intent
 
@@ -40,7 +40,7 @@ struct Intent {
 - **Native MON is not allowed.** It can't be pulled from a wallet by a contract, so it can't be part of an intent. Use WMON. This is the biggest difference from V2 and the UI must say so.
 - **No ERC-721 traits yet.** A trait want needs proofs supplied at settlement. See open questions.
 
-The EIP-712 domain is `{name: "ChogSwapIntents", version: "1", chainId, verifyingContract}`. The type hash covers every field, with the `Asset[]` arrays hashed per the EIP, so a signature can't be replayed on another chain or contract or with edited terms.
+The EIP-712 domain is `{name: "OnDealIntents", version: "1", chainId, verifyingContract}`. The type hash covers every field, with the `Asset[]` arrays hashed per the EIP, so a signature can't be replayed on another chain or contract or with edited terms.
 
 ### Settlement
 
@@ -90,7 +90,7 @@ This is the first backend in the project, and the first time [ADR 0003](0003-no-
 
 ### Approvals
 
-Because nothing is escrowed, the maker has to leave an **approval standing** on `ChogSwapIntents` until the intent settles, expires or is invalidated. That is a real change from V2, where approvals are used immediately at create:
+Because nothing is escrowed, the maker has to leave an **approval standing** on `OnDealIntents` until the intent settles, expires or is invalidated. That is a real change from V2, where approvals are used immediately at create:
 
 - The contract can move a maker's approved assets only under an unexpired, unused signature from that maker. It can't be tricked into anything else: no arbitrary calls, no delegatecall, no admin.
 - The UI should prefer the narrowest approval that works: `approve(id)` for a single NFT over `setApprovalForAll`, and an exact `approve(amount)` for ERC-20s. It must say plainly that signing and approving together let the intent execute without further confirmation.

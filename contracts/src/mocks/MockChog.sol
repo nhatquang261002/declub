@@ -54,7 +54,7 @@ contract MockChog is ERC721Enumerable {
         string memory json = string.concat(
             '{"name":"Mock Chog #',
             tokenId.toString(),
-            '","description":"Testnet stand-in for Chogs, used by Chog Swap.","image":"data:image/svg+xml;base64,',
+            '","description":"Testnet stand-in for Chogs, used by On Deal.","image":"data:image/svg+xml;base64,',
             Base64.encode(bytes(_svg(tokenId, hat, eyes, background))),
             '","attributes":[{"trait_type":"Hat","value":"',
             hat,

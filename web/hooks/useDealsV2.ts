@@ -6,7 +6,7 @@ import { swapV2 } from "@/lib/contracts";
 import { toDealV2, type DealV2 } from "@/lib/dealsV2";
 
 /**
- * The newest `limit` ChogSwapV2 deals, newest first. Same approach as `useDeals` (ADR 0004):
+ * The newest `limit` OnDealV2 deals, newest first. Same approach as `useDeals` (ADR 0004):
  * `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
  * Returns nothing while V2 isn't configured.
  */

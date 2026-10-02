@@ -3,7 +3,7 @@
 ## `Deploy.s.sol`
 
 1. If `CHOG_ADDRESS` is empty, deploy `MockChog` and mint `DEMO_MINT_PER_WALLET` (default 5) to each address in `DEMO_WALLETS`.
-2. Deploy the current trait-enabled `ChogSwap(chog)`.
+2. Deploy the current trait-enabled `OnDeal(chog)`.
    The contract supports both exact token-ID requests and collection-scoped Merkle trait requests.
    With `DEPLOY_CHOG_MIRROR=true`, the script deploys a `Chog Genesis` mirror using the real
    collection's IPFS metadata base and mints the 1,969-token catalog in batches.
@@ -39,7 +39,7 @@ forge script script/Deploy.s.sol --rpc-url monad_testnet --account deployer --br
 To verify manually afterwards:
 
 ```bash
-forge verify-contract <ChogSwap address> src/ChogSwap.sol:ChogSwap --chain 10143 \
+forge verify-contract <OnDeal address> src/OnDeal.sol:OnDeal --chain 10143 \
   --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/ \
   --constructor-args $(cast abi-encode "constructor(address)" <Chog address>)
 forge verify-contract <MockChog address> src/mocks/MockChog.sol:MockChog --chain 10143 \
@@ -56,7 +56,7 @@ deployed addresses. Local (31337) runs and dry runs are gitignored.
 
 ## `DeployIntents.s.sol`
 
-Deploys `ChogSwapIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)) with its protocol fee ([ADR 0015](../../docs/adr/0015-protocol-fee.md)). The existing mUSD and Chog collection work with it. A dry run estimated about **2.05M gas, roughly 0.42 MON** before the fee was added.
+Deploys `OnDealIntents` ([ADR 0008](../../docs/adr/0008-trade-intents.md), [0009](../../docs/adr/0009-ring-swaps.md)) with its protocol fee ([ADR 0015](../../docs/adr/0015-protocol-fee.md)). The existing mUSD and Chog collection work with it. A dry run estimated about **2.05M gas, roughly 0.42 MON** before the fee was added.
 
 Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset there is no fee):
 
@@ -77,4 +77,4 @@ forge script script/DeployIntents.s.sol --rpc-url monad_testnet --account deploy
   --verify --verifier sourcify --verifier-url https://sourcify-api-monad.blockvision.org/
 ```
 
-It prints `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS=…` for the root `.env`, which the matcher and (later) the app read.
+It prints `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS=…` for the root `.env`, which the matcher and (later) the app read.

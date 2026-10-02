@@ -1,5 +1,5 @@
 import type { Hash } from "viem";
-import { CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS } from "./config";
+import { ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS } from "./config";
 
 /** The writes that emit `TradeFilled` (an accepted proposal fills the deal for its proposer). */
 const FILL_FUNCTIONS = new Set(["fillTrade", "fillTraitTrade", "acceptProposal"]);
@@ -9,19 +9,19 @@ const CREATE_FUNCTIONS = new Set(["createTrade", "createTraitTrade", "createOpen
 /** True for a contract call whose receipt can hold a fill that History should know about. */
 export function mayFill(call: { address: string; functionName: unknown }): boolean {
   const target = call.address.toLowerCase();
-  const ours = target === CHOG_SWAP_ADDRESS.toLowerCase() || target === CHOG_SWAP_V2_ADDRESS?.toLowerCase();
+  const ours = target === ON_DEAL_ADDRESS.toLowerCase() || target === ON_DEAL_V2_ADDRESS?.toLowerCase();
   return ours && FILL_FUNCTIONS.has(String(call.functionName));
 }
 
 /**
  * True for a contract call whose receipt the server should read: a fill (see `mayFill`), or a
- * ChogSwapV2 call that starts a deal and so feeds a Club's activity (ADR 0016).
+ * OnDealV2 call that starts a deal and so feeds a Club's activity (ADR 0016).
  */
 export function mayReport(call: { address: string; functionName: unknown }): boolean {
   const target = call.address.toLowerCase();
   const name = String(call.functionName);
-  if (target === CHOG_SWAP_ADDRESS.toLowerCase()) return FILL_FUNCTIONS.has(name);
-  return target === CHOG_SWAP_V2_ADDRESS?.toLowerCase() && (FILL_FUNCTIONS.has(name) || CREATE_FUNCTIONS.has(name));
+  if (target === ON_DEAL_ADDRESS.toLowerCase()) return FILL_FUNCTIONS.has(name);
+  return target === ON_DEAL_V2_ADDRESS?.toLowerCase() && (FILL_FUNCTIONS.has(name) || CREATE_FUNCTIONS.has(name));
 }
 
 const RETRY_AFTER_MS = [0, 1_000, 2_000, 4_000];

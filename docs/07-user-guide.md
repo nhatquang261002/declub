@@ -1,19 +1,19 @@
 # 07 · User Guide
 
-Chog Swap is a peer-to-peer, non-custodial marketplace for dealing Chogs on Monad.
+On Deal is a peer-to-peer, non-custodial marketplace for dealing Chogs on Monad.
 
 ## How to deal
 
 1. **Connect** an injected wallet and switch to Monad testnet.
 2. **Create** a deal from any Create button. Pick a type (open offer, exact assets, or a trait), say what you want, then choose what you give and when it expires. Review it and confirm.
-3. **Approve** Chog Swap to transfer your offered Chogs. This is a collection-wide ERC-721 approval and normally only happens once.
+3. **Approve** On Deal to transfer your offered Chogs. This is a collection-wide ERC-721 approval and normally only happens once.
 4. **Create the deal.** Your offered NFTs and MON are locked in escrow in the same transaction.
 5. **Accept a deal** when you own every requested Chog. The taker approves the collection if needed and sends requested MON in the Accept & Swap transaction.
 6. **Settle, cancel, or reclaim.** A successful fill swaps both sides atomically. The maker can cancel an open deal, or reclaim it after expiry.
 
 ## Locked deals or signed swaps
 
-When signed swaps are enabled (`NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS`), step 1 of Create asks how the deal settles. Both end in the same list, tagged **Locked** or **Signed**.
+When signed swaps are enabled (`NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS`), step 1 of Create asks how the deal settles. Both end in the same list, tagged **Locked** or **Signed**.
 
 | | Lock assets now | Sign only |
 |---|---|---|
@@ -68,6 +68,6 @@ Clubs are community pages, not part of the contracts: nothing in a deal, a fee o
 - Multi-asset and signed deals charge a small flat protocol fee per side, only when the deal completes ([ADR 0015](adr/0015-protocol-fee.md)); the screens show the exact amount before you confirm. Single-collection deals on the original contract have no fee. Wallets also charge network gas.
 - The current deployment is a Monad testnet demo with MockChog. Do not use valuable mainnet assets.
 - Never approve or send assets to a contract address copied from an untrusted message.
-- A Club post or a profile link is written by a member, not checked by Chog Swap. A Holder badge or a high Momentum is not an endorsement. Check the deal itself before you sign.
+- A Club post or a profile link is written by a member, not checked by On Deal. A Holder badge or a high Momentum is not an endorsement. Check the deal itself before you sign.
 
 The in-app [Field Guide](../web/app/guide/page.tsx) contains the user-facing FAQ and walkthrough.

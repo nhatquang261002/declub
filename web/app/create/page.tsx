@@ -13,7 +13,7 @@ import { DEMO_CREATE } from "@/lib/config";
 import { swapIntents, swapV2 } from "@/lib/contracts";
 import { DEFAULT_TERMS, type Step, type Terms, type DealKind, type Settlement } from "@/lib/createFlow";
 
-// Open offers, exact requests and trait requests live on ChogSwapV2 (ADR 0005–0007). Without V2
+// Open offers, exact requests and trait requests live on OnDealV2 (ADR 0005–0007). Without V2
 // configured, exact and trait requests fall back to the original Chog contract.
 const AVAILABILITY: KindAvailability = {
   open: swapV2

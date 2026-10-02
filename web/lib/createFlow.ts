@@ -2,13 +2,13 @@ import { isAddress, zeroAddress, type Address } from "viem";
 
 /**
  * The three ways to start a deal. "open" (makers list assets, takers send offers) and, when
- * ChogSwapV2 is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
+ * OnDealV2 is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
  * and "trait" fall back to the Chog contract.
  */
 export type DealKind = "open" | "exact" | "trait";
 /**
- * How a deal settles. "escrow" locks the maker's side on-chain (ChogSwap / ChogSwapV2); "signed"
- * locks nothing and is settled by a matcher (ChogSwapIntents, ADR 0008).
+ * How a deal settles. "escrow" locks the maker's side on-chain (OnDeal / OnDealV2); "signed"
+ * locks nothing and is settled by a matcher (OnDealIntents, ADR 0008).
  */
 export type Settlement = "escrow" | "signed";
 export type Step = 1 | 2 | 3;

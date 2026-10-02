@@ -115,7 +115,7 @@ There's no on-chain "reject". It would cost the recipient gas and change nothing
 
 ## 10. Pitch
 
-> **Chog Swap is a trustless OTC marketplace for Chogs on Monad, powered by programmable escrow and atomic NFT swaps.**
+> **On Deal is a trustless OTC marketplace for Chogs on Monad, powered by programmable escrow and atomic NFT swaps.**
 >
 > *Trade what you have for what you actually want, without trusting the other side.*
 

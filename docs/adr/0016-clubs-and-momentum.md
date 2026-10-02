@@ -8,7 +8,7 @@ The app is a set of deals. Nothing gathers the people around one collection or t
 
 Constraints:
 
-- **No indexer.** The public RPC caps `eth_getLogs` at 100 blocks ([ADR 0003](0003-no-indexer-in-v1.md), [0004](0004-read-deals-from-storage.md)), and `ChogSwapV2` stores no creation or fill time.
+- **No indexer.** The public RPC caps `eth_getLogs` at 100 blocks ([ADR 0003](0003-no-indexer-in-v1.md), [0004](0004-read-deals-from-storage.md)), and `OnDealV2` stores no creation or fill time.
 - **Anything that scores people gets gamed.** A score needs a cost to fake.
 - **User-written text is new here.** Until now the server held only small, cosmetic or rebuildable data ([ADR 0011](0011-verified-profiles.md)).
 
@@ -20,7 +20,7 @@ Constraints:
 - **Anyone signed in can join. Holders get a badge.** The badge comes from an on-chain `balanceOf` across the member's linked wallets, rechecked daily. It is a badge, not a permission.
 - **Roles:** app admin (an environment variable), Owner, Moderator, Member. An Owner is claimed by a wallet that is the contract's `owner()`, or assigned by an admin. The Owner appoints Moderators. Every role change and moderation action is logged.
 - **Momentum is computed from receipt-verified activity only,** with a 7-day half-life: completed swaps weigh most, deals and intents weigh less and are capped per wallet, posts weigh nothing. The Club score is scaled by the breadth of distinct wallets, and a member's score damps repeat swaps with the same counterparty. A completed swap costs the flat protocol fee on every side ([ADR 0015](0015-protocol-fee.md)), which is what makes faking it cost something.
-- **The activity log comes from receipts the server reads itself.** `ingestTx(hash)` decodes `ChogSwapV2` creations and fills and appends them, idempotently, to the log of each Club token named; an event that names no Club asset is dropped. The client reports its own transactions, as fills are reported today. Signed swaps come from the matcher's `/settlements`. The matcher gains a `token=` filter. A later cron makes the log complete.
+- **The activity log comes from receipts the server reads itself.** `ingestTx(hash)` decodes `OnDealV2` creations and fills and appends them, idempotently, to the log of each Club token named; an event that names no Club asset is dropped. The client reports its own transactions, as fills are reported today. Signed swaps come from the matcher's `/settlements`. The matcher gains a `token=` filter. A later cron makes the log complete.
 - **Posts are short, plain text, from verified profiles.** 280 characters, no HTML, markdown or links. Only members with a shared verified profile can post, with per-user rate limits. Three distinct reports hide a post, and Moderators decide. A "Looking for" post can link a deal or intent, checked on the server to name the Club's asset.
 
 ## What it does not do

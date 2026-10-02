@@ -60,5 +60,5 @@ export function linkedEthereumWallets(accounts: readonly LinkedAccount[]): `0x${
   return [...out];
 }
 
-export const profileKey = (address: string) => `chogswap:profile:${address.toLowerCase()}`;
-export const userWalletsKey = (userId: string) => `chogswap:profile-user:${userId}`;
+export const profileKey = (address: string) => `ondeal:profile:${address.toLowerCase()}`;
+export const userWalletsKey = (userId: string) => `ondeal:profile-user:${userId}`;

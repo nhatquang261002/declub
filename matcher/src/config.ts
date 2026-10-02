@@ -44,8 +44,8 @@ function int(name: string, fallback: number): number {
 }
 
 export function loadConfig(): Config {
-  const swap = need("NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS");
-  if (!isAddress(swap)) throw new Error("NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS is not an address");
+  const swap = need("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS");
+  if (!isAddress(swap)) throw new Error("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is not an address");
   const key = need("MATCHER_PRIVATE_KEY");
   if (!isHex(key, { strict: true }) || key.length !== 66) {
     throw new Error("MATCHER_PRIVATE_KEY must be a 0x-prefixed 32-byte hex key");

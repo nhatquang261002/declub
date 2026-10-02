@@ -1,10 +1,10 @@
 # ADR 0015: A small flat protocol fee, paid by every side of a completed deal
 
-**Status:** Accepted · 2026-10-01 · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `ChogSwapV2` and `ChogSwapIntents`; `ChogSwap` (v1) is unchanged. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
+**Status:** Accepted · 2026-10-01 · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `OnDealV2` and `OnDealIntents`; `OnDeal` (v1) is unchanged. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
 
 ## Context
 
-The contracts take no fee today (`ChogSwapV2`: "no admin, no fees, no upgradeability"; `ChogSwapIntents`: "no admin, no fee"). For mainnet the project wants revenue, and the fee has to work for what the app trades:
+The contracts take no fee today (`OnDealV2`: "no admin, no fees, no upgradeability"; `OnDealIntents`: "no admin, no fee"). For mainnet the project wants revenue, and the fee has to work for what the app trades:
 
 - Most deals are NFT for NFT. They have no price, and the contracts have no oracle, so a percentage fee would earn nothing on the core flow.
 - The fee should stay small, **$2 per side**, and every side pays, so a two-party deal pays $4.
@@ -15,7 +15,7 @@ The contracts take no fee today (`ChogSwapV2`: "no admin, no fees, no upgradeabi
 
 **Both contracts charge a flat fee per side when a deal completes. Nobody pays for a deal that doesn't complete.** Both pay in MON, the chain's gas token: native in escrow, wrapped MON (WMON) in signed deals, because a wallet can't send native MON into a call it didn't make.
 
-### Escrow deals (`ChogSwapV2`): native MON, escrowed with each side
+### Escrow deals (`OnDealV2`): native MON, escrowed with each side
 
 `FEE` is an immutable amount of MON, equal for every side. A completed deal pays `2 × FEE`.
 
@@ -28,9 +28,9 @@ The contracts take no fee today (`ChogSwapV2`: "no admin, no fees, no upgradeabi
 - **No per-deal storage.** `FEE` is immutable, so every deal owes the same share and the contract knows what to refund or release.
 - **Paid and refunded with the existing fallback.** The fee and the refunds use the same try-send-then-credit logic as every other payout (`_payout`), so a recipient or a refund target that rejects MON can never block a fill or cancel. The credit is collected with `claim`.
 - **MON, not dollars, on chain.** The $2 is converted to MON at deploy time. MON's price will drift, so the amount is a launch parameter and a redeploy corrects it.
-- **As built.** Constructor `ChogSwapV2(fee, feeRecipient)`; `FEE`, `FEE_RECIPIENT` and `MAX_FEE` are public. `WrongNativeAmount(expected, sent)` now has the fee inside `expected`. A completed deal emits `FeeCharged(tradeId, recipient, 2 × FEE)` once. The refund shares and the fee use the same credit as every other payout, so a recipient or a maker that rejects MON gets a credit for `claim` (a refund merges with the maker's own native credit). The constructor reverts with `FeeTooHigh(fee, max)` above `MAX_FEE` and `NoFeeRecipient()` for a non-zero fee with the zero address.
+- **As built.** Constructor `OnDealV2(fee, feeRecipient)`; `FEE`, `FEE_RECIPIENT` and `MAX_FEE` are public. `WrongNativeAmount(expected, sent)` now has the fee inside `expected`. A completed deal emits `FeeCharged(tradeId, recipient, 2 × FEE)` once. The refund shares and the fee use the same credit as every other payout, so a recipient or a maker that rejects MON gets a credit for `claim` (a refund merges with the maker's own native credit). The constructor reverts with `FeeTooHigh(fee, max)` above `MAX_FEE` and `NoFeeRecipient()` for a non-zero fee with the zero address.
 
-### Signed intents (`ChogSwapIntents`): WMON, pulled at settlement
+### Signed intents (`OnDealIntents`): WMON, pulled at settlement
 
 Intents have no native leg and no escrow, and the contract holds nothing between calls ([ADR 0008](0008-trade-intents.md)). The fee follows the same wallet-to-wallet model.
 
@@ -38,7 +38,7 @@ Intents have no native leg and no escrow, and the contract holds nothing between
 - **Fee token and amount.** Immutable `FEE_TOKEN`, the chain's wrapped MON (WMON), and `FEE_AMOUNT`, the same $2 converted to MON at deploy time as in escrow. WMON is a plain wrapper with no issuer, so nobody can pause it or blacklist the recipient. The canonical mainnet address must be checked before deploy.
 - **Pulled at settlement, per maker.** For every maker in the cycle, `settle` transfers `FEE_AMOUNT` of `FEE_TOKEN` from the maker straight to the recipient, with the same pattern as an asset move. A pair pays $4, a three-way ring $6, a four-way ring $8: every side pays. A cycle that doesn't settle charges nothing, and there is no escrow to refund.
 - **Signed, so it's consented to.** The `Intent` struct gains `feeToken` and `fee` (after `want`, before `deadline`), and `settle` requires them to equal the contract's immutables, or reverts with `WrongFee(intent, feeToken, fee)`. The wallet's signing prompt then shows the fee, and a signature can't be reused with another one. This changes the type hash and bumps the EIP-712 domain version to `"2"`.
-- **As built.** Constructor `ChogSwapIntents(feeToken, feeAmount, feeRecipient)`; `FEE_TOKEN`, `FEE_AMOUNT`, `FEE_RECIPIENT` and `MAX_FEE` are public. After every `give` has moved, `settle` takes the fee from each maker with `safeTransferFrom` and emits one `FeeCharged(recipient, token, n × fee)`. The constructor refuses a fee above `MAX_FEE`, a non-zero fee with a non-contract token (`InvalidFeeToken`) or without a recipient (`NoFeeRecipient`); a zero fee needs neither. Because the fee moves after the gives, WMON that a maker receives in the same cycle could pay it, but the pool and the app don't count on that: they require the balance up front.
+- **As built.** Constructor `OnDealIntents(feeToken, feeAmount, feeRecipient)`; `FEE_TOKEN`, `FEE_AMOUNT`, `FEE_RECIPIENT` and `MAX_FEE` are public. After every `give` has moved, `settle` takes the fee from each maker with `safeTransferFrom` and emits one `FeeCharged(recipient, token, n × fee)`. The constructor refuses a fee above `MAX_FEE`, a non-zero fee with a non-contract token (`InvalidFeeToken`) or without a recipient (`NoFeeRecipient`); a zero fee needs neither. Because the fee moves after the gives, WMON that a maker receives in the same cycle could pay it, but the pool and the app don't count on that: they require the balance up front.
 - **Needs a balance and an approval.** A maker must hold WMON and approve the contract for it, as for any asset they give. If the maker also gives WMON, the balance and the allowance have to cover both. The review step offers "Wrap X MON into WMON" and then one approval, so a person with only MON needs no other token (the wrap step calls `deposit()`, the WETH9 interface). The pool refuses an intent whose maker lacks either (`fee_balance`, `fee_allowance`) or that signs another fee (`wrong_fee`), prunes live ones that lose them, and the matcher skips and blames them like any broken give.
 - **Still custody-free.** The contract never holds the fee: it goes from maker to recipient inside `settle`, so "never the owner or holder of any asset after a call" stays true.
 
@@ -54,7 +54,7 @@ Intents have no native leg and no escrow, and the contract holds nothing between
 - **No spam deterrent.** Escrow shares are refunded and intents charge only on settlement, so listing or signing junk costs only gas. A non-refundable listing fee would deter that, but it would charge deals that never complete. Not chosen.
 - **No discounts, tiers or exemptions.** In particular none by collection: the verified list ([ADR 0014](0014-verified-collections-list.md)) is off-chain and the contracts can't read it.
 - **No fee on price.** Value in a deal isn't measured.
-- **Doesn't touch v1.** `ChogSwap` stays fee-free.
+- **Doesn't touch v1.** `OnDeal` stays fee-free.
 
 ## Consequences
 
@@ -64,7 +64,7 @@ Intents have no native leg and no escrow, and the contract holds nothing between
 - **Price drift in both paths.** The fee is a fixed amount of MON, so its dollar value moves with MON's price. A redeploy corrects it. No stablecoin means no issuer risk, which a pausable or blacklisting token would have added.
 - **Accounting grows by the shares.** The escrow contract's native balance is open escrow plus shares held for open deals and active proposals plus unclaimed credits. The invariant tests must say so.
 - **Changing the fee means redeploying.** A new deployment costs little here (old trades finish under their old terms, and the app can point at the new address), but the screens must always read the fee from the contract.
-- **The ABI and signing change.** `ChogSwapV2`'s create, fill and propose value rules and constructor; `ChogSwapIntents`' `Intent` struct, domain version, constructor and `settle`. The V2 library layer and screens, the intent library (`web/lib/intents.ts`), the matcher and pool, and the error copy change with them. Following [ADR 0007](0007-open-offers.md), the sources change in place; nothing is on mainnet yet, and the testnet addresses change on redeploy.
+- **The ABI and signing change.** `OnDealV2`'s create, fill and propose value rules and constructor; `OnDealIntents`' `Intent` struct, domain version, constructor and `settle`. The V2 library layer and screens, the intent library (`web/lib/intents.ts`), the matcher and pool, and the error copy change with them. Following [ADR 0007](0007-open-offers.md), the sources change in place; nothing is on mainnet yet, and the testnet addresses change on redeploy.
 - **Tests:**
   - Escrow: the exact `msg.value` on every payable entry; both shares released on fill and on accept; every cancel, reclaim, reject and withdraw refunding the share; a recipient or refund target that rejects MON gets a credit and the call still succeeds; the invariants with shares.
   - Intents: every maker charged once per settlement; wrong `fee` or `feeToken` rejected; a maker without balance or approval reverts the whole cycle; the new digest matches the matcher's and the web's.

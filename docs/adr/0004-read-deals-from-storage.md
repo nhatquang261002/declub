@@ -23,5 +23,5 @@ This needs no contract change: `getTrade` already returns every field, including
 - Loading costs a few `eth_call`s whatever the chain height. The list pages newest-first ("Load older trades").
 - Filtering by maker or by the named `taker` happens client-side over the loaded trades.
 - **The one thing storage doesn't hold is who filled a public trade.** That's only in `TradeFilled`. Until there's an indexer, History lists trades this browser filled (saved to `localStorage` when the fill confirms) plus direct offers where `taker` is set. This is a known gap and one of the triggers for the indexer in ADR 0003.
-- `NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK` is unused for now. It's kept for the indexer's start block.
+- `NEXT_PUBLIC_ON_DEAL_DEPLOY_BLOCK` is unused for now. It's kept for the indexer's start block.
 - An RPC with a larger log range (a paid provider) would make event scans possible again, but the storage path stays simpler.

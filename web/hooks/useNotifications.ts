@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConnection } from "wagmi";
-import { CHAIN_ID, CHOG_SWAP_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, ON_DEAL_ADDRESS } from "@/lib/config";
 import {
   deriveIntentNotifications,
   deriveNotifications,
@@ -24,10 +24,10 @@ import { useIntents } from "./usePool";
 // copies are merged by union and neither can lose a mark. Whether to show browser alerts stays
 // per browser: it is that browser's own permission.
 
-const EVENT = "chogswap:notifications";
-const scope = `${CHAIN_ID}:${CHOG_SWAP_ADDRESS}`;
-const readKey = (account: string) => `chogswap:notifications:${scope}:${account.toLowerCase()}`;
-const ALERTS_KEY = "chogswap:notification-alerts";
+const EVENT = "ondeal:notifications";
+const scope = `${CHAIN_ID}:${ON_DEAL_ADDRESS}`;
+const readKey = (account: string) => `ondeal:notifications:${scope}:${account.toLowerCase()}`;
+const ALERTS_KEY = "ondeal:notification-alerts";
 
 function readStore(key: string | null): string {
   if (!key) return "";

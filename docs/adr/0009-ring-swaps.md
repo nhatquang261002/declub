@@ -1,6 +1,6 @@
 # ADR 0009: Multi-party ring swaps
 
-**Status:** Accepted · 2026-10-01 · Phase 4. Contract side implemented in `ChogSwapIntents` (rings of 2 to 4 tested, worst case 3.3M gas); the matcher's cycle search is built in [`matcher/`](../../matcher/README.md). Depends on [ADR 0008](0008-trade-intents.md): it uses the same `Intent`, signing, nonces and `settle`, and ships in the same contract.
+**Status:** Accepted · 2026-10-01 · Phase 4. Contract side implemented in `OnDealIntents` (rings of 2 to 4 tested, worst case 3.3M gas); the matcher's cycle search is built in [`matcher/`](../../matcher/README.md). Depends on [ADR 0008](0008-trade-intents.md): it uses the same `Intent`, signing, nonces and `settle`, and ships in the same contract.
 
 ## Context
 

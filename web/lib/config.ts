@@ -6,11 +6,11 @@ const env = {
   chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
   chog: process.env.NEXT_PUBLIC_CHOG_ADDRESS,
-  swap: process.env.NEXT_PUBLIC_CHOG_SWAP_ADDRESS,
-  deployBlock: process.env.NEXT_PUBLIC_CHOG_SWAP_DEPLOY_BLOCK,
-  swapV2: process.env.NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS,
+  swap: process.env.NEXT_PUBLIC_ON_DEAL_ADDRESS,
+  deployBlock: process.env.NEXT_PUBLIC_ON_DEAL_DEPLOY_BLOCK,
+  swapV2: process.env.NEXT_PUBLIC_ON_DEAL_V2_ADDRESS,
   mockErc20: process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS,
-  intents: process.env.NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS,
+  intents: process.env.NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS,
   poolUrl: process.env.NEXT_PUBLIC_POOL_URL,
   chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
   knownCollections: process.env.NEXT_PUBLIC_KNOWN_COLLECTIONS,
@@ -27,14 +27,14 @@ export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
 export const EXPLORER_URL = "https://testnet.monadvision.com";
 
 export const CHOG_ADDRESS = address(env.chog, "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
-export const CHOG_SWAP_ADDRESS = address(env.swap, "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298");
-export const CHOG_SWAP_DEPLOY_BLOCK = BigInt(env.deployBlock || 66352698);
+export const ON_DEAL_ADDRESS = address(env.swap, "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298");
+export const ON_DEAL_DEPLOY_BLOCK = BigInt(env.deployBlock || 66352698);
 
 /**
  * The generic multi-asset contract (Phase 4, ADR 0005). Optional: it isn't in the Phase 1
- * deployment, so V2 features stay off until NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS is set.
+ * deployment, so V2 features stay off until NEXT_PUBLIC_ON_DEAL_V2_ADDRESS is set.
  */
-export const CHOG_SWAP_V2_ADDRESS: Address | undefined = env.swapV2?.trim()
+export const ON_DEAL_V2_ADDRESS: Address | undefined = env.swapV2?.trim()
   ? getAddress(env.swapV2.trim())
   : undefined;
 /** Test ERC-20 with an open mint, for demoing V2 on testnet. */
@@ -43,10 +43,10 @@ export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
   : undefined;
 
 /**
- * ChogSwapIntents (ADR 0008): signed swap intents settled by an off-chain matcher. Optional:
- * the intent screens stay off until NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS is set.
+ * OnDealIntents (ADR 0008): signed swap intents settled by an off-chain matcher. Optional:
+ * the intent screens stay off until NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is set.
  */
-export const CHOG_SWAP_INTENTS_ADDRESS: Address | undefined = env.intents?.trim()
+export const ON_DEAL_INTENTS_ADDRESS: Address | undefined = env.intents?.trim()
   ? getAddress(env.intents.trim())
   : undefined;
 /** The intent pool's HTTP API (matcher/). The matcher binds to loopback by default. */
@@ -87,9 +87,9 @@ export const PRIVY_APP_ID = env.privyAppId?.trim() || undefined;
 export const PRIVY_EMBEDDED_WALLETS = env.privyEmbedded === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
-/** ChogSwapV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
+/** OnDealV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
 export const MAX_NOTE_BYTES = 280;
-/** ChogSwapV2.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */
+/** OnDealV2.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */
 export const MAX_SPEC_BYTES = 1024;
 
 export const explorerTx = (hash: string) => `${EXPLORER_URL}/tx/${hash}`;

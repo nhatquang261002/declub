@@ -84,7 +84,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
 
   it("has an ABI that is a subset of the built contract's", () => {
     const built = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, "../../contracts/out/ChogSwapIntents.sol/ChogSwapIntents.json"), "utf8"),
+      readFileSync(resolve(import.meta.dirname, "../../contracts/out/OnDealIntents.sol/OnDealIntents.json"), "utf8"),
     ) as { abi: Parameters<typeof formatAbiItem>[0][] };
     const sig = (i: Parameters<typeof formatAbiItem>[0]) => `${i.type} ${formatAbiItem(i)}`;
     const have = new Set(built.abi.filter((i) => ["function", "event", "error"].includes(i.type)).map(sig));

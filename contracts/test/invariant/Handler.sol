@@ -2,21 +2,21 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ChogSwap} from "../../src/ChogSwap.sol";
-import {IChogSwap} from "../../src/interfaces/IChogSwap.sol";
+import {OnDeal} from "../../src/OnDeal.sol";
+import {IOnDeal} from "../../src/interfaces/IOnDeal.sol";
 import {MockChog} from "../../src/mocks/MockChog.sol";
 import {MonReceiver} from "../utils/Actors.sol";
 
 /// @dev Drives random create / fill / cancel / reclaim / withdraw / warp sequences through a
 ///      fixed set of actors (3 EOAs + 1 contract that rejects MON) and keeps ghost state for
-///      the invariants in ChogSwap.invariant.t.sol.
+///      the invariants in OnDeal.invariant.t.sol.
 contract Handler is Test {
-    ChogSwap public immutable swap;
+    OnDeal public immutable swap;
     MockChog public immutable chog;
 
     address[] public actors;
     uint256[] public tradeIds;
-    mapping(uint256 tradeId => IChogSwap.Status) public expectedStatus;
+    mapping(uint256 tradeId => IOnDeal.Status) public expectedStatus;
 
     // Ghost counters: every one must stay 0.
     uint256 public ghost_expiredFills; // I6
@@ -27,7 +27,7 @@ contract Handler is Test {
     // Call counters, for the summary.
     mapping(bytes32 => uint256) public calls;
 
-    constructor(ChogSwap swap_, MockChog chog_) {
+    constructor(OnDeal swap_, MockChog chog_) {
         swap = swap_;
         chog = chog_;
 
@@ -88,12 +88,12 @@ contract Handler is Test {
             swap.createTrade{value: offeredMon}(offered, requested, requestedMon, taker, expiry);
 
         tradeIds.push(id);
-        expectedStatus[id] = IChogSwap.Status.Open;
+        expectedStatus[id] = IOnDeal.Status.Open;
         calls["create"]++;
     }
 
     function fill(uint256 tradeSeed, uint256 takerSeed) external {
-        (uint256 id, IChogSwap.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDeal.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok) return;
 
         address taker;
@@ -109,7 +109,7 @@ contract Handler is Test {
         vm.prank(taker);
         try swap.fillTrade{value: t.requestedMon}(id) {
             if (expired) ghost_expiredFills++;
-            expectedStatus[id] = IChogSwap.Status.Filled;
+            expectedStatus[id] = IOnDeal.Status.Filled;
             for (uint256 i; i < t.offeredIds.length; ++i) {
                 if (chog.ownerOf(t.offeredIds[i]) != taker) ghost_badSettlements++;
             }
@@ -124,25 +124,25 @@ contract Handler is Test {
     }
 
     function cancel(uint256 tradeSeed) external {
-        (uint256 id, IChogSwap.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDeal.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok) return;
 
         vm.prank(t.maker);
         swap.cancelTrade(id);
 
-        expectedStatus[id] = IChogSwap.Status.Cancelled;
+        expectedStatus[id] = IOnDeal.Status.Cancelled;
         _checkRefunded(t);
         calls["cancel"]++;
     }
 
     function reclaim(uint256 tradeSeed, uint256 callerSeed) external {
-        (uint256 id, IChogSwap.Trade memory t, bool ok) = _openTrade(tradeSeed);
+        (uint256 id, IOnDeal.Trade memory t, bool ok) = _openTrade(tradeSeed);
         if (!ok || !swap.isExpired(id)) return;
 
         vm.prank(_actor(callerSeed));
         swap.reclaimExpired(id);
 
-        expectedStatus[id] = IChogSwap.Status.Cancelled;
+        expectedStatus[id] = IOnDeal.Status.Cancelled;
         _checkRefunded(t);
         calls["reclaim"]++;
     }
@@ -182,15 +182,15 @@ contract Handler is Test {
     function _openTrade(uint256 seed)
         private
         view
-        returns (uint256 id, IChogSwap.Trade memory t, bool ok)
+        returns (uint256 id, IOnDeal.Trade memory t, bool ok)
     {
         if (tradeIds.length == 0) return (0, t, false);
         id = tradeIds[seed % tradeIds.length];
         t = swap.getTrade(id);
-        ok = t.status == IChogSwap.Status.Open;
+        ok = t.status == IOnDeal.Status.Open;
     }
 
-    function _checkRefunded(IChogSwap.Trade memory t) private {
+    function _checkRefunded(IOnDeal.Trade memory t) private {
         for (uint256 i; i < t.offeredIds.length; ++i) {
             if (chog.ownerOf(t.offeredIds[i]) != t.maker) ghost_badRefunds++;
         }

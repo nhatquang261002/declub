@@ -1,6 +1,6 @@
 import type { Settlement } from "./intents";
 import type { AssetEntry } from "./verifiedAssets";
-import { CHOG_SWAP_INTENTS_ADDRESS } from "./config";
+import { ON_DEAL_INTENTS_ADDRESS } from "./config";
 import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
 /**
@@ -15,7 +15,7 @@ export type ActivityEvent = {
   kind: ActivityKind;
   /** The contract that emitted it, lowercase. */
   contract: string;
-  /** The ChogSwapV2 trade id; for a signed swap, the settlement's transaction hash. */
+  /** The OnDealV2 trade id; for a signed swap, the settlement's transaction hash. */
   deal: string;
   block: number;
   /** Unix seconds (the block's timestamp). */
@@ -72,7 +72,7 @@ export function settlementEvents(settlements: readonly Settlement[]): ActivityEv
     return {
       id: `${s.txHash.toLowerCase()}:settled`,
       kind: "swapped" as const,
-      contract: (CHOG_SWAP_INTENTS_ADDRESS ?? "").toLowerCase(),
+      contract: (ON_DEAL_INTENTS_ADDRESS ?? "").toLowerCase(),
       deal: s.txHash.toLowerCase(),
       block: s.blockNumber,
       at: Math.floor(s.at / 1000),

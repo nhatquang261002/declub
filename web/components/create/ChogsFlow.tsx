@@ -10,7 +10,7 @@ import { TxButton, TxStatus } from "@/components/Tx";
 import { useChogApproval } from "@/hooks/useChogApproval";
 import { useChogCatalog, useChogOwners, useOwnedChogs } from "@/hooks/useChogs";
 import { useTxFlow } from "@/hooks/useTxFlow";
-import { chogSwapAbi } from "@/lib/abi";
+import { onDealAbi } from "@/lib/abi";
 import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE } from "@/lib/config";
 import { swap } from "@/lib/contracts";
 import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from "@/lib/createFlow";
@@ -33,7 +33,7 @@ type Props = {
 const NO_IDS: bigint[] = [];
 
 /**
- * Chogs and MON on the original ChogSwap contract: exact Chog requests (when V2 isn't
+ * Chogs and MON on the original OnDeal contract: exact Chog requests (when V2 isn't
  * configured) and trait requests, which only exist here (ADR 0006).
  */
 export function ChogsFlow({ kind, step, onStep, terms, onTerms, preview }: Props) {
@@ -108,7 +108,7 @@ export function ChogsFlow({ kind, step, onStep, terms, onTerms, preview }: Props
     );
     if (!receipt) return;
     const logs = parseEventLogs({
-      abi: chogSwapAbi,
+      abi: onDealAbi,
       eventName: isTrait ? "TraitTradeCreated" : "TradeCreated",
       logs: receipt.logs,
     });

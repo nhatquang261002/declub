@@ -3,7 +3,7 @@ import { toAsset, type Asset, type RawAsset } from "./assets";
 import { CHOG_ADDRESS } from "./config";
 import type { Deal, DealStatus } from "./deals";
 
-/** A ChogSwapV2 deal: two lists of assets instead of v1's Chog ids + one MON amount. */
+/** A OnDealV2 deal: two lists of assets instead of v1's Chog ids + one MON amount. */
 export type DealV2 = {
   id: bigint;
   maker: Address;
@@ -16,7 +16,7 @@ export type DealV2 = {
   requested: readonly Asset[];
 };
 
-/** The shape `getTrade` returns (IChogSwapV2.Deal). */
+/** The shape `getTrade` returns (IOnDealV2.Deal). */
 export type RawDealV2 = {
   maker: Address;
   expiry: bigint;

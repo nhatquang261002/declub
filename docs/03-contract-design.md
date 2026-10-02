@@ -1,7 +1,7 @@
 # 03 · Contract Design
 
-Interface (source of truth): [`contracts/src/interfaces/IChogSwap.sol`](../contracts/src/interfaces/IChogSwap.sol)
-Implementation: [`contracts/src/ChogSwap.sol`](../contracts/src/ChogSwap.sol)
+Interface (source of truth): [`contracts/src/interfaces/IOnDeal.sol`](../contracts/src/interfaces/IOnDeal.sol)
+Implementation: [`contracts/src/OnDeal.sol`](../contracts/src/OnDeal.sol)
 
 ## Scope of v1
 
@@ -143,7 +143,7 @@ _sendMon(to, amt):
 
 `EmptySide`, `MonOnBothSides`, `TooManyTokens(count, max)`, `ExpiryInPast(expiry)`, `TradeNotOpen(id)`, `TradeIsExpired(id)`, `TradeNotExpired(id)`, `NotMaker(id)`, `NotAllowedTaker(id)`, `SelfFill(id)`, `WrongMonAmount(expected, sent)`, `InvalidTraitRequest`, `InvalidTraitProof(tokenId)`, `NothingToWithdraw`, `WithdrawFailed`.
 
-Deploy-time only (declared on `ChogSwap`, not the interface): `InvalidCollection(chog)`, raised when the collection address has no code, which includes `address(0)`.
+Deploy-time only (declared on `OnDeal`, not the interface): `InvalidCollection(chog)`, raised when the collection address has no code, which includes `address(0)`.
 
 The frontend maps each error to a readable message ([05 · Frontend](05-frontend.md#error-messages)).
 
@@ -160,7 +160,7 @@ Measured with `forge test --gas-report`:
 | `cancelTrade` | ~115k | ~177k |
 | `reclaimExpired` | ~171k | ~198k |
 | `withdraw` | ~42k | |
-| Deploy | MockChog ~1.97M, ChogSwap ~1.14M (estimated against Monad testnet) | |
+| Deploy | MockChog ~1.97M, OnDeal ~1.14M (estimated against Monad testnet) | |
 
 Most of `createTrade`'s cost is storing both id arrays. That's what lets `getTrade` return a trade's full terms after it closes.
 
@@ -181,7 +181,7 @@ Most of `createTrade`'s cost is storing both id arrays. That's what lets `getTra
 [`contracts/script/Deploy.s.sol`](../contracts/script/Deploy.s.sol):
 
 1. If `CHOG_ADDRESS` is empty, deploy `MockChog` and mint `DEMO_MINT_PER_WALLET` Chogs to each address in `DEMO_WALLETS`.
-2. Deploy `ChogSwap(chog)`.
+2. Deploy `OnDeal(chog)`.
 3. Log both addresses and the deploy block as ready-to-paste `NEXT_PUBLIC_*` lines.
 
 `run()` only parses the env into a `Config` and calls `deploy(Config)`, so tests can call `deploy` directly. Env vars are process-wide and Forge runs tests in parallel. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
@@ -217,9 +217,9 @@ struct Asset { AssetType assetType; address token; uint256 tokenId; uint256 amou
 
 Replace `offeredIds/offeredMon` with `Asset[] offered` and do the same for the requested side. Add a token allowlist (or accept any token and warn in the UI). ERC-20 transfers use `SafeERC20`, and fee-on-transfer tokens are rejected by checking balances before and after. Multi-party ring swaps become an `n`-leg trade where every leg's assets are escrowed and settlement runs once all legs are funded, with refunds after expiry.
 
-## Phase 4: `ChogSwapV2` (generic assets)
+## Phase 4: `OnDealV2` (generic assets)
 
-Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IChogSwapV2.sol`](../contracts/src/interfaces/IChogSwapV2.sol). Implementation: [`ChogSwapV2.sol`](../contracts/src/ChogSwapV2.sol). It's a separate contract that works with any token, and v1 is untouched. Its constructor takes only the protocol fee and where it goes (see [Protocol fee](#protocol-fee-chogswapv2)).
+Reasoning: [ADR 0005](adr/0005-generic-asset-model.md). Interface: [`IOnDealV2.sol`](../contracts/src/interfaces/IOnDealV2.sol). Implementation: [`OnDealV2.sol`](../contracts/src/OnDealV2.sol). It's a separate contract that works with any token, and v1 is untouched. Its constructor takes only the protocol fee and where it goes (see [Protocol fee](#protocol-fee-ondealv2)).
 
 ```solidity
 enum AssetType { Native, ERC20, ERC721, ERC721Trait }
@@ -272,7 +272,7 @@ _payout(to, asset):                      // never reverts
 
 `TradeCreated(id, maker, taker, offered[], requested[], expiry)`, `TradeFilled`, `TradeCancelled`, `TradeReclaimed` (same shape as v1), plus `AssetCredited(account, token, assetType, id, amount)`, `Claimed(...)` and `FeeCharged(id, recipient, amount)` (once per completed deal; not emitted when the fee is 0).
 
-### Protocol fee (`ChogSwapV2`)
+### Protocol fee (`OnDealV2`)
 
 Reasoning: [ADR 0015](adr/0015-protocol-fee.md). `constructor(uint256 fee, address feeRecipient)`: `FEE` and `FEE_RECIPIENT` are immutable, `MAX_FEE` is 500 MON, `FeeTooHigh` and `NoFeeRecipient` guard the constructor, and a fee of 0 (tests, testnet) charges and emits nothing.
 
@@ -293,13 +293,13 @@ A completed deal sends `2 × FEE` to the recipient in one payout. Fee payouts an
 
 Create **2.2M**, fill **0.9M**. A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
 
-## ChogSwapIntents (Phase 4)
+## OnDealIntents (Phase 4)
 
-A third contract beside `ChogSwap` and `ChogSwapV2`: settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)). Spec in `src/interfaces/IChogSwapIntents.sol`.
+A third contract beside `OnDeal` and `OnDealV2`: settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)). Spec in `src/interfaces/IOnDealIntents.sol`.
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents; `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces, so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`ChogSwapIntents`, version `2`), ECDSA or ERC-1271; malleable signatures are refused. `Intent` is `(maker, give, want, feeToken, fee, deadline, nonce)`.
+- Signatures: EIP-712 (`OnDealIntents`, version `2`), ECDSA or ERC-1271; malleable signatures are refused. `Intent` is `(maker, give, want, feeToken, fee, deadline, nonce)`.
 - Protocol fee ([ADR 0015](adr/0015-protocol-fee.md)): `constructor(feeToken, feeAmount, feeRecipient)`, all immutable, with `MAX_FEE` at 500 tokens. Each intent signs `feeToken` and `fee`, and `settle` reverts with `WrongFee(intent, feeToken, fee)` unless they equal `FEE_TOKEN` and `FEE_AMOUNT`. After every `give` has moved, each maker in the cycle pays `FEE_AMOUNT` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
 - ERC-20 only moves if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert, as in V2); NFTs are checked with `ownerOf`.
 - Only `ERC20` and `ERC721` assets. Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.

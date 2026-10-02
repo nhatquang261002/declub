@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { Providers } from "@/components/Providers";
-import { explorerAddress, CHOG_SWAP_ADDRESS } from "@/lib/config";
+import { explorerAddress, ON_DEAL_ADDRESS } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <footer className="border-t border-line/70 px-4 py-5 text-center text-xs text-muted">
             Monad testnet ·{" "}
             <a
-              href={explorerAddress(CHOG_SWAP_ADDRESS)}
+              href={explorerAddress(ON_DEAL_ADDRESS)}
               target="_blank"
               rel="noreferrer"
               className="font-mono underline hover:text-white"

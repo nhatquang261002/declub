@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useBalance, useReadContracts } from "wagmi";
-import { CHAIN_ID, CHOG_SWAP_INTENTS_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, ON_DEAL_INTENTS_ADDRESS } from "@/lib/config";
 import { erc20Abi, erc721Abi, wmonAbi } from "@/lib/contracts";
 import { erc20Asset, formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { sameAddress } from "@/lib/deals";
@@ -18,7 +18,7 @@ export type NftScope = "token" | "collection";
 
 /**
  * Whether `owner` can honour an intent that gives `give`, the way the pool and the contract will
- * check it: they hold everything, and ChogSwapIntents may move it (it holds nothing itself, the
+ * check it: they hold everything, and OnDealIntents may move it (it holds nothing itself, the
  * approval is what lets a signed intent execute without another confirmation).
  *
  * `problems` are things an approval can't fix (not enough balance, not the owner). `steps` are
@@ -38,7 +38,7 @@ export function useIntentReadiness(
   scope: NftScope = "token",
   fee?: IntentFee,
 ) {
-  const spender = CHOG_SWAP_INTENTS_ADDRESS;
+  const spender = ON_DEAL_INTENTS_ADDRESS;
   const feeToken = fee && fee.amount > 0n ? fee : undefined;
   // Every ERC-20 the wallet has to hold and approve: what it gives, plus the fee token. When the
   // fee token is also given, one approval has to cover both.

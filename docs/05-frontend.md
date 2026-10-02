@@ -73,7 +73,7 @@ scattering hex values through JSX or utility definitions.
 
 ### ABIs
 
-`@wagmi/cli` with the Foundry plugin reads `contracts/out/{ChogSwap,MockChog}.sol` and writes `lib/abi.ts` (`chogSwapAbi`, `mockChogAbi`, both `as const`). It isn't generating hooks. The generic wagmi hooks are fully typed from the `as const` ABIs, which is enough. The file is committed so the app builds without Foundry; run `npm run abi` after changing a contract.
+`@wagmi/cli` with the Foundry plugin reads `contracts/out/{OnDeal,MockChog}.sol` and writes `lib/abi.ts` (`onDealAbi`, `mockChogAbi`, both `as const`). It isn't generating hooks. The generic wagmi hooks are fully typed from the `as const` ABIs, which is enough. The file is committed so the app builds without Foundry; run `npm run abi` after changing a contract.
 
 ## Screens → contract calls
 
@@ -112,9 +112,9 @@ A bell in the header (connected wallets only). There is no event stream to subsc
 
 Read state is a set of `kind:dealId` keys in localStorage, per wallet. On the first visit of a wallet, existing Accepted items are marked read so old deals don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It can't reach a closed tab; that needs a server-side trigger.
 
-### ChogSwapV2 in the frontend (Phase 4)
+### OnDealV2 in the frontend (Phase 4)
 
-V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is optional: nothing changes until `NEXT_PUBLIC_CHOG_SWAP_V2_ADDRESS` is set, and `swapV2` in `lib/contracts.ts` is `undefined` before that.
+V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is optional: nothing changes until `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` is set, and `swapV2` in `lib/contracts.ts` is `undefined` before that.
 
 **Reused as is:** wallet, header, providers, `useTxFlow`, `TxButton`, `errors.ts` (V2 error copy added), `format.ts`, `useNow`, the Chog art and thumbnails, `useChogs`, and the notifications and deal-filter logic.
 
@@ -180,7 +180,7 @@ Choices worth knowing:
 
 ### Intents in the frontend (Phase 4)
 
-Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) are optional: the screens appear once `NEXT_PUBLIC_CHOG_SWAP_INTENTS_ADDRESS` is set, and `swapIntents` in `lib/contracts.ts` is `undefined` before that. They are not a separate product in the UI: a signed swap is a **deal that settles differently**, so it shares the Create wizard, the deals list and History with locked deals. They read and write the matcher's pool over HTTP (`NEXT_PUBLIC_POOL_URL`, default `http://127.0.0.1:8787`), so the matcher has to be running ([matcher/README.md](../matcher/README.md)). A pool that is down only costs the signed swaps (a notice in the list, an error on the sign step); locked deals read straight from the chain.
+Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) are optional: the screens appear once `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` is set, and `swapIntents` in `lib/contracts.ts` is `undefined` before that. They are not a separate product in the UI: a signed swap is a **deal that settles differently**, so it shares the Create wizard, the deals list and History with locked deals. They read and write the matcher's pool over HTTP (`NEXT_PUBLIC_POOL_URL`, default `http://127.0.0.1:8787`), so the matcher has to be running ([matcher/README.md](../matcher/README.md)). A pool that is down only costs the signed swaps (a notice in the list, an error on the sign step); locked deals read straight from the chain.
 
 | Where | What |
 |---|---|
@@ -318,12 +318,12 @@ Where errors show up:
 | `ExpiryInPast` | Pick an expiry in the future. |
 | `NothingToWithdraw` | There's nothing to withdraw. |
 | `WithdrawFailed` | Your wallet couldn't receive the MON. |
-| ERC-721 `ERC721InsufficientApproval` | Approve Chog Swap to move your Chogs first. |
+| ERC-721 `ERC721InsufficientApproval` | Approve On Deal to move your Chogs first. |
 | ERC-721 `ERC721IncorrectOwner` | A Chog in this deal isn't owned by the wallet sending it. |
 | ERC-721 `ERC721NonexistentToken` | One of these Chogs doesn't exist. |
 | MockChog `InvalidQuantity` | Mint between 1 and 20 at a time. |
 
-The ERC-721 errors are raised by the Chog contract and bubble up through ChogSwap. `lib/contracts.ts` appends them to the swap ABI so viem can decode them by name.
+The ERC-721 errors are raised by the Chog contract and bubble up through OnDeal. `lib/contracts.ts` appends them to the swap ABI so viem can decode them by name.
 
 ## Create wizard
 
@@ -333,17 +333,17 @@ The header has no Create tab, but a Create button sits beside the wallet. `/crea
 2. **Your assets.** What you give, plus the optional "only this wallet" address and the expiry (1h / 24h / 7d / never, default 24h).
 3. **Confirm.** Both sides, the terms, then the approval and Create buttons.
 
-The wizard picks a contract per kind. With `ChogSwapV2` configured, all three kinds use it; without it, exact and trait requests fall back to the Chog contract ([ADR 0006](adr/0006-trait-requests-in-v2.md)):
+The wizard picks a contract per kind. With `OnDealV2` configured, all three kinds use it; without it, exact and trait requests fall back to the Chog contract ([ADR 0006](adr/0006-trait-requests-in-v2.md)):
 
 | Kind | Contract | Assets | Component |
 |---|---|---|---|
-| Open offer | `ChogSwapV2` | any | `MultiFlow` |
-| Exact request | `ChogSwapV2`, or the Chog contract when V2 isn't configured | any, or Chogs + MON | `MultiFlow` / `ChogsFlow` |
-| By trait | `ChogSwapV2`, or the Chog contract when V2 isn't configured | any collection with readable traits (+ optional exact assets), or Chogs + MON | `MultiFlow` / `ChogsFlow` |
+| Open offer | `OnDealV2` | any | `MultiFlow` |
+| Exact request | `OnDealV2`, or the Chog contract when V2 isn't configured | any, or Chogs + MON | `MultiFlow` / `ChogsFlow` |
+| By trait | `OnDealV2`, or the Chog contract when V2 isn't configured | any collection with readable traits (+ optional exact assets), or Chogs + MON | `MultiFlow` / `ChogsFlow` |
 
 ### Protocol fee in the app
 
-[ADR 0015](adr/0015-protocol-fee.md). The fee is read from the contracts, never from config (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `ChogSwapV2.FEE()`, `useIntentFee()` reads `ChogSwapIntents.FEE_TOKEN()` and `FEE_AMOUNT()`), and the buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0) wherever it is paid, saying it is only charged if the deal completes:
+[ADR 0015](adr/0015-protocol-fee.md). The fee is read from the contracts, never from config (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `OnDealV2.FEE()`, `useIntentFee()` reads `OnDealIntents.FEE_TOKEN()` and `FEE_AMOUNT()`), and the buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0) wherever it is paid, saying it is only charged if the deal completes:
 
 - **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): the create, fill and propose calls send `native amount + fee` as `value`. The deal page also checks for a native `claimable` credit even when the deal has no MON, because a refused fee refund is credited as MON.
 - **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads the fee from the contract at the moment of signing and puts `feeToken` and `fee` into the signed `Intent` (EIP-712 domain version `2`, `lib/intents.ts`). `useIntentReadiness` counts the fee on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.

@@ -36,7 +36,7 @@ type Props = {
 };
 
 /**
- * Open offers, exact requests and trait requests on ChogSwapV2: any mix of MON, ERC-20s and NFTs
+ * Open offers, exact requests and trait requests on OnDealV2: any mix of MON, ERC-20s and NFTs
  * on each side (ADR 0005, 0006, 0007).
  * Owns the asset rows, so going back a step or switching between the two kinds keeps them.
  */

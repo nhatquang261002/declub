@@ -103,15 +103,15 @@ What Momentum doesn't say: that a Club is good, that its asset is safe, or that 
 
 ## Where the activity comes from
 
-There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0003](adr/0003-no-indexer-in-v1.md), [0004](adr/0004-read-deals-from-storage.md)). `ChogSwapV2` stores no creation or fill time either. So the log is built from **receipts the server verifies itself**, the way `ingestFills` already works ([ADR 0012](adr/0012-server-side-saves.md)).
+There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0003](adr/0003-no-indexer-in-v1.md), [0004](adr/0004-read-deals-from-storage.md)). `OnDealV2` stores no creation or fill time either. So the log is built from **receipts the server verifies itself**, the way `ingestFills` already works ([ADR 0012](adr/0012-server-side-saves.md)).
 
 - **`ingestTx(store, hash)`** in `web/lib/server/activity.ts` fetches the receipt and decodes it (`recordActivity` is the part after the receipt is in hand). Each event becomes `{id, kind, contract, deal, block, at, parties[], tokens[]}`, with `id` = `txHash:logIndex`, so a replay is the same event. It goes into the log of every Club token it names, and an event that names no Club asset is dropped, so the log can't grow unbounded.
-  - `ChogSwapV2` only: `TradeCreated` is a `created` event; `TradeFilled` is a `swapped` one. The deal's assets come from `getTrade`, plus the proposal's assets when the same receipt holds the `ProposalAccepted` that filled it. A swap's parties are the maker and the taker. Native MON never counts as a token. A reverted transaction records nothing.
+  - `OnDealV2` only: `TradeCreated` is a `created` event; `TradeFilled` is a `swapped` one. The deal's assets come from `getTrade`, plus the proposal's assets when the same receipt holds the `ProposalAccepted` that filled it. A swap's parties are the maker and the taker. Native MON never counts as a token. A reverted transaction records nothing.
   - The log is one sorted set per Club, scored by block time, whose members are the events as JSON. Trimming at 5000 therefore leaves nothing behind, and storing the same event twice is a no-op.
 - **`POST /api/activity {hash}`** reads the receipt once and feeds both History (`recordFills`, the part of `ingestFills` after the receipt) and the Club log. `POST /api/fills` stays for older clients.
 - **Client:** `web/lib/fillReport.ts` has `mayFill` (a fill: awaited, History needs it before it refetches), `mayReport` (a fill, or a V2 `createTrade`, `createTraitTrade` or `createOpenOffer`: fire-and-forget) and `reportTx`. Accepting a proposal is a fill.
 - **Signed swaps** are not in `ingestTx`, and are not copied into the store. The Club routes read the matcher's `/settlements?token=` when asked (cached 30 s per Club in the server process) and merge it with the log by event id. A settled cycle is one swap with every maker in it as a party. A pool that is down only costs the signed swaps. This needs no cursor, and it relies on the matcher keeping its history.
-- **ChogSwap (v1)** isn't logged: it is Chog-only and superseded by V2.
+- **OnDeal (v1)** isn't logged: it is Chog-only and superseded by V2.
 - **A Club added later has no past:** only events recorded while its asset was on the list count, until the watcher backfills.
 - **Matcher:** `GET /intents` and `/settlements` take `?token=`: any intent naming that address on either side, whatever the id (it matches the address inside the `intent_assets` key, so there is no schema change). `/settlements` also takes `?after=` (milliseconds; later cycles only, oldest first) for a reader that pages forward. `web/lib/pool.ts` passes `token`.
 - **Deals feed** stays client-side in v1: `useDealsV2` loads the newest 200 and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` filter them (`useClubMarket`).
@@ -143,7 +143,7 @@ This is the first user-written content in the app.
 
 ## Data (Upstash)
 
-All keys start with `chogswap:` and are per chain.
+All keys start with `ondeal:` and are per chain.
 
 | Key | Holds |
 |---|---|

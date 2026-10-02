@@ -1,6 +1,6 @@
 import type { Address, Hex } from "viem";
 
-/** Numerically aligned with `IChogSwapIntents.AssetType` (and V2). Native is never valid here. */
+/** Numerically aligned with `IOnDealIntents.AssetType` (and V2). Native is never valid here. */
 export const AssetType = { Native: 0, ERC20: 1, ERC721: 2 } as const;
 
 export interface Asset {
@@ -10,7 +10,7 @@ export interface Asset {
   amount: bigint;
 }
 
-/** What a maker signs. Mirrors `IChogSwapIntents.Intent`. */
+/** What a maker signs. Mirrors `IOnDealIntents.Intent`. */
 export interface Intent {
   maker: Address;
   give: Asset[];

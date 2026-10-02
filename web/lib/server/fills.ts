@@ -1,6 +1,6 @@
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { CHAIN_ID, CHOG_SWAP_ADDRESS, CHOG_SWAP_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
 import type { ReceiptLike } from "./activity";
 import type { Store } from "./store";
 
@@ -17,13 +17,13 @@ import type { Store } from "./store";
 const abi = parseAbi(["event TradeFilled(uint256 indexed tradeId, address indexed maker, address indexed taker)"]);
 
 /** The swap contracts whose fills are kept. V2 is optional (see lib/config.ts). */
-export const FILL_CONTRACTS: Address[] = [CHOG_SWAP_ADDRESS, ...(CHOG_SWAP_V2_ADDRESS ? [CHOG_SWAP_V2_ADDRESS] : [])];
+export const FILL_CONTRACTS: Address[] = [ON_DEAL_ADDRESS, ...(ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [])];
 
 /** A wallet can't have filled more than this many deals; the oldest records age out past it. */
 const MAX_FILLS_PER_ACCOUNT = 2_000;
 
 export const fillsKey = (contract: string, account: string) =>
-  `chogswap:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
+  `ondeal:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
 
 export const isFillContract = (address: string) => FILL_CONTRACTS.some((c) => c.toLowerCase() === address.toLowerCase());
 

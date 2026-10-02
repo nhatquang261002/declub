@@ -31,7 +31,7 @@ type Props = {
 };
 
 /**
- * A signed swap on ChogSwapIntents (ADR 0008, 0009): the same three steps as an exact request,
+ * A signed swap on OnDealIntents (ADR 0008, 0009): the same three steps as an exact request,
  * but nothing is locked. The maker signs what they give and what they want; the only
  * transactions are approvals, so the contract can move the assets when a match settles.
  * Owns the asset rows, so going back a step keeps them.

@@ -50,7 +50,7 @@ export const isFeatured = (address: string) =>
 
 export const RECENT_KEY = "ondeal:recent-collections";
 /** Fired on this tab after the list changes; other tabs get the browser's own `storage` event. */
-export const RECENT_EVENT = "chogswap:recents";
+export const RECENT_EVENT = "ondeal:recents";
 const RECENT_MAX = 8;
 
 /** The saved list as stored. Storage can be blocked or full; the picker works without it. */

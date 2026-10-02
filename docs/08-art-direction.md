@@ -1,6 +1,6 @@
 # 08 · Art Direction
 
-Chog Swap uses the supplied Chog character design and community NFT artwork as visual texture
+On Deal uses the supplied Chog character design and community NFT artwork as visual texture
 around the trading experience.
 
 ## Usage

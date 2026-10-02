@@ -1,14 +1,14 @@
-# ADR 0005: Generic asset model in a separate `ChogSwapV2`
+# ADR 0005: Generic asset model in a separate `OnDealV2`
 
 **Status:** Accepted · 2026-09-29 · Phase 4, first item
 
 ## Context
 
-`ChogSwap` (v1) is written around one immutable ERC-721 collection plus native MON: `offeredIds` / `requestedIds` and a single `offeredMon` / `requestedMon` per trade. Phase 4 needs any ERC-721, ERC-20s and native in one trade, in any mix. It has no admin and no proxy ([03](../03-contract-design.md#scope-of-v1)), so the model can't change in place. v1 is also live and verified on testnet, with open trades in it.
+`OnDeal` (v1) is written around one immutable ERC-721 collection plus native MON: `offeredIds` / `requestedIds` and a single `offeredMon` / `requestedMon` per trade. Phase 4 needs any ERC-721, ERC-20s and native in one trade, in any mix. It has no admin and no proxy ([03](../03-contract-design.md#scope-of-v1)), so the model can't change in place. v1 is also live and verified on testnet, with open trades in it.
 
 ## Decision
 
-Ship a new contract, **`ChogSwapV2`**, next to v1. v1 stays as deployed and the frontend keeps supporting both until v1's open trades run out. The rest of this record is V2's design.
+Ship a new contract, **`OnDealV2`**, next to v1. v1 stays as deployed and the frontend keeps supporting both until v1's open trades run out. The rest of this record is V2's design.
 
 **Asset model.** A trade is two `Asset[]`, offered and requested:
 

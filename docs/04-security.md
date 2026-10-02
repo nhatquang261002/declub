@@ -55,39 +55,39 @@ Each one becomes a Foundry invariant or property test in Phase 1.
 ## Accepted limitations (v1)
 
 - **No price oracle and no slippage protection.** Terms are exact and set by the maker.
-- **Approvals.** The UI asks for `setApprovalForAll(ChogSwap)`. That's standard for NFT marketplaces, but it means a hypothetical bug in ChogSwap could move any approved Chog. Mitigations: small audited-style surface, no upgradeability, and the UI shows a "Revoke approval" option.
+- **Approvals.** The UI asks for `setApprovalForAll(OnDeal)`. That's standard for NFT marketplaces, but it means a hypothetical bug in OnDeal could move any approved Chog. Mitigations: small audited-style surface, no upgradeability, and the UI shows a "Revoke approval" option.
 - **Stale requests.** A trade can ask for a Chog that is later sold elsewhere. It stays fillable only by whoever owns that Chog next. The UI shows the current owner.
 
 ## Test suite
 
 ```text
 contracts/test/
-├── ChogSwap.create.t.sol      validation errors, escrow pulled, event fields, max side size
-├── ChogSwap.fill.t.sol        spec 4.1–4.3, multi-Chog, MON-only sides, every revert, worst-case gas
-├── ChogSwap.cancel.t.sol      cancel before/after expiry, non-maker, named taker, after fill, twice
-├── ChogSwap.reclaim.t.sol     expiry boundary, caller gets nothing, no-expiry trades, terminal states
-├── ChogSwap.withdraw.t.sol    MON-rejecting maker/taker credited on fill/cancel/reclaim; withdraw
-├── ChogSwap.reentrancy.t.sol  re-entry from every MON payout into cancel/fill/withdraw/create
-├── ChogSwap.guards.t.sol      constructor checks, views, direct MON / safeTransfer rejected
-├── ChogSwap.fuzz.t.sol        MON conservation, wrong msg.value, expiry boundary, access control
+├── OnDeal.create.t.sol      validation errors, escrow pulled, event fields, max side size
+├── OnDeal.fill.t.sol        spec 4.1–4.3, multi-Chog, MON-only sides, every revert, worst-case gas
+├── OnDeal.cancel.t.sol      cancel before/after expiry, non-maker, named taker, after fill, twice
+├── OnDeal.reclaim.t.sol     expiry boundary, caller gets nothing, no-expiry trades, terminal states
+├── OnDeal.withdraw.t.sol    MON-rejecting maker/taker credited on fill/cancel/reclaim; withdraw
+├── OnDeal.reentrancy.t.sol  re-entry from every MON payout into cancel/fill/withdraw/create
+├── OnDeal.guards.t.sol      constructor checks, views, direct MON / safeTransfer rejected
+├── OnDeal.fuzz.t.sol        MON conservation, wrong msg.value, expiry boundary, access control
 ├── MockChog.t.sol             mint, traits, tokenURI
 ├── Deploy.t.sol               deploy script: mock vs existing collection, demo mints, CSV parsing
-├── utils/                     shared fixture (ChogSwapBase), MonReceiver, ReentrantReceiver
+├── utils/                     shared fixture (OnDealBase), MonReceiver, ReentrantReceiver
 └── invariant/
     ├── Handler.sol            random create/fill/cancel/reclaim/withdraw/warp across 3 EOAs
     │                          and 1 MON-rejecting contract, with ghost accounting
-    └── ChogSwap.invariant.t.sol   I1–I7, plus liveness: a valid fill never reverts
+    └── OnDeal.invariant.t.sol   I1–I7, plus liveness: a valid fill never reverts
 ```
 
 **Exit criteria, all met:**
 
 - `forge test`: 91 tests pass.
-- `forge coverage`: 100% of lines, statements, branches and functions on `ChogSwap.sol` and `MockChog.sol`.
+- `forge coverage`: 100% of lines, statements, branches and functions on `OnDeal.sol` and `MockChog.sol`.
 - Invariants hold at 256 runs × depth 64 (16,384 handler calls per run).
 
 ## Static analysis
 
-**Slither** (`slither src/ChogSwap.sol --exclude-informational --exclude-optimization`) returned 9 results:
+**Slither** (`slither src/OnDeal.sol --exclude-informational --exclude-optimization`) returned 9 results:
 
 | Detector | Impact | Verdict |
 |---|---|---|
@@ -100,7 +100,7 @@ contracts/test/
 
 Before any mainnet deploy with real Chogs: an external review, a re-run of Slither (triaged as above), and a public testnet period.
 
-## `ChogSwapV2` (Phase 4)
+## `OnDealV2` (Phase 4)
 
 Design: [ADR 0005](adr/0005-generic-asset-model.md). The guarantee is the same, and the trust model is v1's with `withdraw()` replaced by `claim()`. The differences that matter:
 
@@ -119,7 +119,7 @@ Recomputed from the trades themselves in `test/v2/invariant/`, over native, two 
 | V8 | `fillTrade` never settles an open offer, and every valid proposal call succeeds. |
 | Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
 
-**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md)). The invariant suite runs with a 3 MON fee and a fee recipient that sometimes rejects MON. V1 becomes `balance == Σ native offered by Open trades + 1 fee share per Open trade and per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler. The fee suite (`ChogSwapV2.fee.t.sol`, 28 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
+**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md)). The invariant suite runs with a 3 MON fee and a fee recipient that sometimes rejects MON. V1 becomes `balance == Σ native offered by Open trades + 1 fee share per Open trade and per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler. The fee suite (`OnDealV2.fee.t.sol`, 28 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
 
 Mutation checks: removing the credit on a failed payout, redirecting reclaimed assets to the caller, and allowing fills after expiry each make the invariant suite fail.
 
@@ -129,7 +129,7 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 |---|---|---|
 | **Fee-on-transfer / rebasing / lying ERC-20** breaks escrow accounting | Balance-delta check on every ERC-20 deposit (`UnsupportedToken`) | `test_feeOnTransferTokenIsRejectedAsOffered`, `test_tokenThatLiesAboutTransferIsRejected` |
 | **Lying ERC-721** | `ownerOf(id) == escrow` after the deposit (`NftNotReceived`) | `test_nftThatLiesAboutTransferIsRejected` |
-| **Blocklisted recipient (USDC-style) locks a refund or fill** | Payouts out of escrow never revert: they become credits for `claim` | `ChogSwapV2.claim.t.sol` (native, ERC-20, ERC-721; fill, cancel, reclaim) |
+| **Blocklisted recipient (USDC-style) locks a refund or fill** | Payouts out of escrow never revert: they become credits for `claim` | `OnDealV2.claim.t.sol` (native, ERC-20, ERC-721; fill, cancel, reclaim) |
 | **Token hook re-enters** (ERC-777 style) | `nonReentrant` on every mutating function, including `claim` | `test_tokenHookCannotReenterDuring{Deposit,Fill,Cancel}`, `test_nativeReceiver*` |
 | **USDT-style token with no return value** | `SafeERC20` | `test_noReturnTokenWorksOnBothSides` |
 | **Unfillable trade** (same asset both sides, duplicates) | Rejected at creation | `test_revertsSameAssetOnBothSides`, `test_revertsDuplicateAssetOnOneSide` |
@@ -149,41 +149,41 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 
 ```text
 contracts/test/v2/
-├── ChogSwapV2Base.sol            fixture: 3 wallets with Chogs, two ERC-20s and MON; asset builders
-├── ChogSwapV2.create.t.sol       every validation error, escrow of each asset type, event, max size
-├── ChogSwapV2.fill.t.sol         every type pairing, mixed bundles, atomicity, boundaries, worst-case gas
-├── ChogSwapV2.cancel.t.sol       cancel and reclaim: refunds, access control, states
-├── ChogSwapV2.claim.t.sol        rejected payouts become credits: native, ERC-20, ERC-721
-├── ChogSwapV2.tokens.t.sol       fee / lying / no-return tokens, re-entry, stray deposits
-├── ChogSwapV2.fuzz.t.sol         conservation, exact refunds, wrong value, expiry boundary, access
+├── OnDealV2Base.sol            fixture: 3 wallets with Chogs, two ERC-20s and MON; asset builders
+├── OnDealV2.create.t.sol       every validation error, escrow of each asset type, event, max size
+├── OnDealV2.fill.t.sol         every type pairing, mixed bundles, atomicity, boundaries, worst-case gas
+├── OnDealV2.cancel.t.sol       cancel and reclaim: refunds, access control, states
+├── OnDealV2.claim.t.sol        rejected payouts become credits: native, ERC-20, ERC-721
+├── OnDealV2.tokens.t.sol       fee / lying / no-return tokens, re-entry, stray deposits
+├── OnDealV2.fuzz.t.sol         conservation, exact refunds, wrong value, expiry boundary, access
 ├── invariant/                    handler + invariants V1–V7 and liveness
 ├── DeployV2.t.sol, MockERC20.t.sol
 contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook tokens
 ```
 
-`forge test --match-path "test/v2/*"` runs 185 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapV2.sol` is 100% of lines, statements, branches and functions.
+`forge test --match-path "test/v2/*"` runs 185 tests (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealV2.sol` is 100% of lines, statements, branches and functions.
 
-## ChogSwapIntents
+## OnDealIntents
 
 [ADR 0008](adr/0008-trade-intents.md) and [0009](adr/0009-ring-swaps.md). Standing approvals make this contract more sensitive than the escrow ones, so it has no admin, no arbitrary calls and no way to move an asset without a valid unexpired signature from its owner.
 
 ```text
 contracts/test/intents/
-├── ChogSwapIntentsBase.sol          fixture: 4 wallets with keys, Chogs and ERC-20s; intent and signing helpers
-├── ChogSwapIntents.settle.t.sol     pairs, surplus, 10-asset swaps, rings of 2–4, rotation, events
-├── ChogSwapIntents.reverts.t.sol    every error, want coverage, moved/revoked assets, atomic failure, per-token NFT approvals
-├── ChogSwapIntents.signatures.t.sol EIP-712 digest checked against the spec, wrong key/contract/chain, malleability, ERC-1271 wallets
-├── ChogSwapIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
-├── ChogSwapIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
-├── ChogSwapIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
-├── ChogSwapIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
-├── ChogSwapIntents.fee.t.sol        the protocol fee (ADR 0015)
+├── OnDealIntentsBase.sol          fixture: 4 wallets with keys, Chogs and ERC-20s; intent and signing helpers
+├── OnDealIntents.settle.t.sol     pairs, surplus, 10-asset swaps, rings of 2–4, rotation, events
+├── OnDealIntents.reverts.t.sol    every error, want coverage, moved/revoked assets, atomic failure, per-token NFT approvals
+├── OnDealIntents.signatures.t.sol EIP-712 digest checked against the spec, wrong key/contract/chain, malleability, ERC-1271 wallets
+├── OnDealIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
+├── OnDealIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
+├── OnDealIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
+├── OnDealIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
+├── OnDealIntents.fee.t.sol        the protocol fee (ADR 0015)
 └── invariant/                       handler + invariants N1, N2, N5, N6 and conservation
 ```
 
-`forge test --match-path "test/intents/*"` runs 95 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `ChogSwapIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
+`forge test --match-path "test/intents/*"` runs 95 tests (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
 
-Protocol fee: every maker in a settled cycle pays `FEE_AMOUNT` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements); the deployer picks it once and it can't change. The fee is signed into each intent, so a signature carries consent to exactly one amount. `ChogSwapIntents.fee.t.sol` (22 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, wrong or missing fee terms, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
+Protocol fee: every maker in a settled cycle pays `FEE_AMOUNT` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements); the deployer picks it once and it can't change. The fee is signed into each intent, so a signature carries consent to exactly one amount. `OnDealIntents.fee.t.sol` (22 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, wrong or missing fee terms, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
 
 Invariants checked: **N1** the contract holds no native, ERC-20 or ERC-721 (and no fee token); **N2** a nonce settles at most once and never after it was invalidated; **N5** nothing settles after its deadline; **N6** the recipient holds exactly the fee for every maker in every settled cycle, and nobody else paid; plus conservation (nothing is created or destroyed), which covers N3 and N4 for the handler's scenarios. N3 and N4 are also asserted directly in the unit and fuzz tests.
 
