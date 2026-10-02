@@ -103,7 +103,7 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
     if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
     const nowSec = deps.now?.() ?? Math.floor(Date.now() / 1000);
-    const events = await clubEvents(store, entry.address, deps);
+    const events = await clubEvents(store, entry, deps);
     const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps);
     return Response.json(
       { enabled: true, ...view },

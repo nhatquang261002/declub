@@ -1,58 +1,90 @@
 import Link from "next/link";
-import { initials, type ClubInfo, type ClubStats } from "@/lib/clubs";
+import type { ClubInfo, ClubStats } from "@/lib/clubs";
 import { ago } from "@/lib/format";
-import { MomentumBadge } from "./MomentumBadge";
+import { ClubAvatar, ClubCover } from "./ClubArt";
+import { BadgeCheckIcon } from "./Icons";
+import { formatMomentum, HeatMeter, MomentumChange } from "./MomentumBadge";
 
-export const KIND_LABEL = { erc721: "NFT collection", erc20: "Token" } as const;
+export const KIND_LABEL = { erc721: "NFT collection", erc20: "Memecoin" } as const;
 
-/** A tile with the asset's initials, until collections have art of their own. */
-export function ClubTile({ name, className = "size-12 text-sm" }: { name: string; className?: string }) {
+/** What the Club is about in a line: "MCHOG · NFT collection", or both symbols for a paired Club. */
+export const clubLabel = (club: ClubInfo) =>
+  club.linked ? `${club.symbol} + ${club.linked.symbol} · Collection & memecoin` : `${club.symbol} · ${KIND_LABEL[club.kind]}`;
+
+function Figure({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <span
-      aria-hidden
-      className={`grid shrink-0 place-items-center rounded-2xl border border-line bg-panel-2 font-black tracking-tight uppercase ${className}`}
-    >
-      {initials(name)}
-    </span>
+    <div className="min-w-0">
+      <dt className="kicker">{label}</dt>
+      <dd className="mt-0.5 flex items-baseline gap-1.5 text-lg font-black tabular-nums">{children}</dd>
+    </div>
   );
 }
 
-export function ClubCard({ club, stats, members, now }: { club: ClubInfo; stats?: ClubStats; members?: number; now: number }) {
+/**
+ * One Club in the list: its cover and face, how busy it is in words and bars, and the three numbers
+ * that say the most (Momentum, members, swaps this week). `rank` is its place by Momentum, shown
+ * only once it has some.
+ */
+export function ClubCard({
+  club,
+  stats,
+  members,
+  now,
+  rank,
+  joined = false,
+}: {
+  club: ClubInfo;
+  stats?: ClubStats;
+  members?: number;
+  now: number;
+  rank?: number;
+  joined?: boolean;
+}) {
+  const ranked = rank !== undefined && (stats?.momentum ?? 0) >= 0.5;
   return (
-    <Link href={`/clubs/${club.token}`} className="page-section flex flex-col gap-4 p-5 transition-transform hover:-translate-y-0.5">
-      <div className="flex items-center gap-3">
-        <ClubTile name={club.name} />
-        <div className="min-w-0">
-          <h2 className="truncate text-lg leading-tight font-extrabold">{club.name}</h2>
-          <p className="text-xs text-muted">
-            {club.symbol} · {KIND_LABEL[club.kind]}
-          </p>
+    <Link href={`/clubs/${club.token}`} className="club-card group">
+      <ClubCover club={club} className="h-24" markClassName="text-[4.5rem] opacity-[0.1]">
+        <div className="relative z-10 flex items-start justify-between gap-2 p-3">
+          {ranked ? <span className="chip chip-dark">#{rank}</span> : <span />}
+          <span className="flex gap-1.5">
+            {joined && <span className="chip chip-peach">Joined</span>}
+            {club.archived && <span className="chip">Archived</span>}
+          </span>
         </div>
-        {club.archived && <span className="ml-auto rounded-full border border-line px-2 py-0.5 text-xs text-muted">Archived</span>}
-      </div>
-      {stats ? (
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted">Momentum</p>
-            <MomentumBadge value={stats.momentum} change={stats.change} />
-          </div>
-          <dl className="grid grid-cols-2 gap-x-5 text-right text-xs">
-            <dt className="text-muted">Swaps, 7d</dt>
-            <dt className="text-muted">Traders, 30d</dt>
-            <dd className="text-base font-bold tabular-nums">{stats.completed7d}</dd>
-            <dd className="text-base font-bold tabular-nums">{stats.traders30d}</dd>
-          </dl>
+      </ClubCover>
+
+      <div className="flex flex-1 flex-col px-5 pb-5">
+        <div className="-mt-9 flex items-end justify-between gap-3">
+          <ClubAvatar club={club} className="relative z-10 size-[4.25rem] text-xl" sizes="68px" />
+          {stats && <HeatMeter value={stats.momentum} />}
         </div>
-      ) : (
-        <p className="text-xs text-muted">Momentum isn’t available right now.</p>
-      )}
-      {(members !== undefined || stats?.lastActive != null) && (
-        <p className="text-xs text-muted">
-          {members !== undefined && `${members.toLocaleString()} ${members === 1 ? "member" : "members"}`}
-          {members !== undefined && stats?.lastActive != null && " · "}
-          {stats?.lastActive != null && `Last activity ${ago(stats.lastActive, now)}`}
+
+        <h2 className="mt-3 flex items-center gap-1.5 text-lg leading-tight font-black tracking-tight">
+          <span className="truncate group-hover:underline group-hover:decoration-2 group-hover:underline-offset-4">{club.name}</span>
+          <BadgeCheckIcon className="size-[1.1rem] shrink-0 text-[#315ea8]" />
+          <span className="sr-only">(verified)</span>
+        </h2>
+        <p className="text-xs font-semibold text-muted">
+          {clubLabel(club)}
         </p>
-      )}
+
+        {stats ? (
+          <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-[#111318]/12 pt-3">
+            <Figure label="Momentum">
+              {formatMomentum(stats.momentum)}
+              <MomentumChange change={stats.change} />
+            </Figure>
+            <Figure label="Members">{members !== undefined ? members.toLocaleString() : "—"}</Figure>
+            <Figure label="Swaps · 7d">{stats.completed7d.toLocaleString()}</Figure>
+          </dl>
+        ) : (
+          <p className="mt-4 border-t border-[#111318]/12 pt-3 text-xs text-muted">Momentum isn’t available right now.</p>
+        )}
+
+        <p className="mt-auto pt-3 text-xs text-muted">
+          {stats?.lastActive != null ? `Last activity ${ago(stats.lastActive, now)}` : stats ? "No trades yet. Be the first." : " "}
+        </p>
+      </div>
     </Link>
   );
 }

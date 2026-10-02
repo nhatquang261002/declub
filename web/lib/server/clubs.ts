@@ -3,7 +3,7 @@ import { completedSwaps, mergeEvents, settlementEvents, summarize, toClubInfo, t
 import type { Settlement } from "../intents";
 import { listSettlements } from "../pool";
 import { ON_DEAL_INTENTS_ADDRESS } from "../config";
-import type { AssetEntry } from "../verifiedAssets";
+import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { readActivity } from "./activity";
 import { holderCount, memberCount } from "./members";
 import type { Store } from "./store";
@@ -43,18 +43,23 @@ async function poolEvents(token: Address, deps: Deps): Promise<ActivityEvent[]> 
   }
 }
 
-/** Every event known for a Club, newest first. */
-export async function clubEvents(store: Store | null, token: Address, deps: Deps = {}): Promise<ActivityEvent[]> {
-  const logged = store ? await readActivity(store, token).catch(() => []) : [];
-  return mergeEvents(logged, await poolEvents(token, deps));
+/**
+ * Every event known for a Club, newest first. The log keeps one list per Club, under its own
+ * asset, whichever of its assets a deal named; the pool is asked about each asset, and a swap
+ * that names both counts once.
+ */
+export async function clubEvents(store: Store | null, club: ClubEntry, deps: Deps = {}): Promise<ActivityEvent[]> {
+  const logged = store ? await readActivity(store, club.address).catch(() => []) : [];
+  const pooled = await Promise.all(clubAssets(club).map((asset) => poolEvents(asset.address, deps)));
+  return mergeEvents(logged, ...pooled);
 }
 
-export async function clubList(store: Store | null, entries: readonly AssetEntry[], deps: Deps = {}): Promise<ClubSummary[]> {
+export async function clubList(store: Store | null, entries: readonly ClubEntry[], deps: Deps = {}): Promise<ClubSummary[]> {
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);
   const rows = await Promise.all(
     entries.map(async (entry) => ({
       ...toClubInfo(entry),
-      stats: summarize(await clubEvents(store, entry.address, deps), now),
+      stats: summarize(await clubEvents(store, entry, deps), now),
       members: store ? await memberCount(store, entry.address).catch(() => 0) : 0,
     })),
   );
@@ -68,9 +73,9 @@ export async function clubList(store: Store | null, entries: readonly AssetEntry
 /** How many completed swaps the Market tab lists. */
 export const RECENT_LIMIT = 20;
 
-export async function clubDetail(store: Store | null, entry: AssetEntry, deps: Deps = {}): Promise<ClubDetail> {
+export async function clubDetail(store: Store | null, entry: ClubEntry, deps: Deps = {}): Promise<ClubDetail> {
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);
-  const events = await clubEvents(store, entry.address, deps);
+  const events = await clubEvents(store, entry, deps);
   return {
     club: {
       ...toClubInfo(entry),

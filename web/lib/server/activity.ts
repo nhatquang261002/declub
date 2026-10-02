@@ -21,8 +21,9 @@ import type { Store } from "./store";
  * transaction it sends and the server reads the receipt itself: nothing in the request but the
  * hash is trusted, and a fake or repeated report records nothing new.
  *
- * One event goes into the log of every Club token it names. Deals made outside the app are missed
- * until a watcher feeds the same function (docs/09-clubs.md).
+ * One event goes into the log of every Club it names, once per Club however many of the Club's
+ * assets it names. Deals made outside the app are missed until a watcher feeds the same function
+ * (docs/09-clubs.md).
  */
 
 /** What this module needs from a receipt, so tests can hand one in without a node. */
@@ -86,8 +87,11 @@ export const ACTIVITY_CONTRACTS: Address[] = ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_AD
 export type IngestOptions = {
   reader?: Reader;
   contracts?: readonly Address[];
-  /** Which tokens have a Club. Events that name none are dropped, so the log can't grow unbounded. */
-  isClub?: (token: string) => boolean;
+  /**
+   * The Club a token belongs to (its own asset's address), or null. Events that name no Club are
+   * dropped, so the log can't grow unbounded.
+   */
+  clubOf?: (token: string) => string | null;
 };
 
 export type ActivityResult =
@@ -114,7 +118,8 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   if (receipt.status !== "success") return 0;
   const reader = options.reader ?? viemReader();
   const watched = (options.contracts ?? ACTIVITY_CONTRACTS).map((c) => c.toLowerCase());
-  const isClub = options.isClub ?? ((token: string) => registry.clubFor(token) !== null);
+  const clubOf = options.clubOf ?? ((token: string) => registry.clubFor(token)?.address ?? null);
+  const clubsOf = (tokens: readonly string[]) => distinct(tokens.map(clubOf).filter((c): c is string => c !== null).map((c) => c.toLowerCase()));
 
   type Decoded = ReturnType<typeof decodeEventLog<typeof onDealV2Abi>>;
   const decoded: { log: ReceiptLike["logs"][number]; event: Decoded }[] = [];
@@ -156,7 +161,7 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
     }
   }
 
-  const relevant = found.filter((f) => f.tokens.some(isClub));
+  const relevant = found.filter((f) => clubsOf(f.tokens).length > 0);
   if (relevant.length === 0) return 0;
 
   const at = await reader.timestamp(receipt.blockNumber);
@@ -164,8 +169,9 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   for (const f of relevant) {
     const event: ActivityEvent = { id: f.id, kind: f.kind, contract: f.contract, deal: f.deal.toString(), block, at, parties: f.parties, tokens: f.tokens };
     const member = JSON.stringify(event);
-    for (const token of f.tokens.filter(isClub)) {
-      await store.rank(activityKey(token), [{ member, score: at }], MAX_EVENTS_PER_CLUB);
+    // A deal naming both assets of one Club is logged for it once.
+    for (const club of clubsOf(f.tokens)) {
+      await store.rank(activityKey(club), [{ member, score: at }], MAX_EVENTS_PER_CLUB);
     }
   }
   return relevant.length;

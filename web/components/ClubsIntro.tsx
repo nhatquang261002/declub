@@ -1,0 +1,74 @@
+import Link from "next/link";
+import { ChatIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { HeatBars } from "@/components/MomentumBadge";
+import { HEAT } from "@/lib/clubs";
+import { MOMENTUM } from "@/lib/momentum";
+import { ClubsTeaser } from "./ClubsTeaser";
+
+const WHAT = [
+  { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
+  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after and attach your deal so holders can take it." },
+  { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges." },
+];
+
+const HOW = [
+  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} for each side of a finished trade. Each side pays the fee, so faking it costs real money.` },
+  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} for each new deal or intent, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
+  { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by trading.` },
+];
+
+/** The home page's introduction to Clubs and Momentum. The Clubs themselves live at /clubs. */
+export function ClubsIntro() {
+  return (
+    <section id="clubs" aria-labelledby="clubs-title" className="mb-12 scroll-mt-24">
+      <div className="grid items-start gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <div>
+          <p className="kicker text-[#a9282f]!">Clubs</p>
+          <h2 id="clubs-title" className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+            Every collection gets a clubhouse.
+          </h2>
+          <p className="mt-3 max-w-xl leading-7 text-muted">
+            Each verified NFT collection and memecoin has a Club: one place to find what’s up for trade, post what you’re after,
+            and see who really trades it. A memecoin made for a collection shares that collection’s Club.
+          </p>
+          <ul className="mt-6 grid gap-4 sm:grid-cols-3">
+            {WHAT.map((item) => (
+              <li key={item.title}>
+                <span className="grid size-10 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735] shadow-[0.15rem_0.15rem_0_#111318]">
+                  {item.icon}
+                </span>
+                <p className="mt-2.5 font-extrabold">{item.title}</p>
+                <p className="mt-1 text-sm leading-6 text-muted">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+          <Link href="/clubs" className="btn-primary mt-7">
+            Explore Clubs <span aria-hidden>→</span>
+          </Link>
+        </div>
+        <ClubsTeaser />
+      </div>
+
+      <h3 className="mt-12 text-xl font-black tracking-tight">How Momentum works</h3>
+      <p className="mt-1 text-sm text-muted">Clubs are ranked by Momentum. It measures trading, not hype, and doesn’t say an asset is safe or valuable.</p>
+      <ol className="mt-5 grid gap-3 md:grid-cols-3">
+        {HOW.map((step, i) => (
+          <li key={step.title} className="page-section p-6">
+            <span className="font-mono text-sm font-semibold text-accent">0{i + 1}</span>
+            <h4 className="mt-3 text-lg font-semibold">{step.title}</h4>
+            <p className="mt-2 text-sm leading-6 text-muted">{step.body}</p>
+          </li>
+        ))}
+      </ol>
+      <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label="Heat scale">
+        {HEAT.map((step, level) => (
+          <li key={step.label} className="chip gap-2 bg-white py-1">
+            <HeatBars level={level} />
+            {step.label}
+            <span className="font-semibold text-muted tabular-nums">{level === 0 ? "0" : `${step.min}+`}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { DEMO_CLUBS } from "../demoClubs";
 
 /**
  * The one place the web server keeps state that isn't in a contract (ADR 0011): Upstash Redis over
@@ -159,9 +160,25 @@ export function getStore(): Store | null {
   g.__ondealStore = creds
     ? upstash(new Redis(creds))
     : process.env.NODE_ENV !== "production"
-      ? memoryStore()
+      ? devStore()
       : null;
   return g.__ondealStore;
+}
+
+/**
+ * Development's in-memory store, filled with mock Clubs (lib/server/demoClubs.ts) unless
+ * NEXT_PUBLIC_DEMO_CLUBS=false. Every call waits for the seeding, so no request sees it half done. The
+ * import is dynamic because the seeding reaches modules that import this one.
+ */
+function devStore(): Store {
+  const store = memoryStore();
+  if (!DEMO_CLUBS) return store;
+  const ready = import("./demoClubs")
+    .then((demo) => demo.seedDemoClubs(store))
+    .catch((error) => console.warn("Mock Clubs weren't seeded:", error));
+  return Object.fromEntries(
+    Object.entries(store).map(([name, method]) => [name, async (...args: unknown[]) => (await ready, (method as (...a: unknown[]) => unknown)(...args))]),
+  ) as Store;
 }
 
 /** Best-effort caller id for rate limits. Only trustworthy behind a proxy that sets the header. */

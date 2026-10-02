@@ -24,7 +24,7 @@ import {
 import { applyRole, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type ClubRole, type RoleChange } from "../clubRoles";
 import { toAsset } from "../assets";
 import { getIntent } from "../pool";
-import type { AssetEntry } from "../verifiedAssets";
+import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
 import { activityKey, viemReader } from "./activity";
 import {
   ALL,
@@ -116,7 +116,7 @@ export type PostInput = { kind: unknown; text: unknown; link?: unknown };
 
 export async function createPost(
   store: Store,
-  entry: AssetEntry,
+  entry: ClubEntry,
   userId: string,
   input: PostInput,
   deps: Deps = {},
@@ -149,7 +149,8 @@ export async function createPost(
       return { ok: false, reason: "link_unavailable" };
     }
     if (!tokens) return { ok: false, reason: "link_not_found" };
-    if (!tokens.includes(token)) return { ok: false, reason: "link_mismatch" };
+    // Either asset of a paired Club will do: a CHOG deal belongs on the Chogs' board.
+    if (!clubAssets(entry).some((asset) => tokens.includes(asset.address.toLowerCase()))) return { ok: false, reason: "link_mismatch" };
     link = parsed;
   }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { getAddress, type Address, type Hex } from "viem";
-import { completedSwaps, initials, mergeEvents, settlementEvents, summarize, toClubInfo, type ActivityEvent } from "../lib/clubs";
+import { completedSwaps, heat, initials, mergeEvents, settlementEvents, summarize, toClubInfo, type ActivityEvent } from "../lib/clubs";
 import { involvesToken, offersToken, requestsToken } from "../lib/dealFiltersV2";
 import type { DealV2 } from "../lib/dealsV2";
 import type { Settlement } from "../lib/intents";
@@ -164,7 +164,7 @@ describe("Club data", () => {
 
   it("reads the log and the pool together", async () => {
     await log(swap({ id: "log:0", at: NOW - 5 }));
-    const events = await clubEvents(store, NFT, {
+    const events = await clubEvents(store, entry!, {
       settlements: async () => [
         { txHash: "0x02", blockNumber: 1, at: (NOW - 1) * 1000, cycle: [{ intent: { maker: alice, give: [{ kind: "erc721", token: NFT, id: 1n, amount: 1n }], want: [] } }, { intent: { maker: bob, give: [], want: [{ kind: "erc721", token: NFT, id: 1n, amount: 1n }] } }] },
       ] as unknown as Settlement[],
@@ -177,10 +177,10 @@ describe("Club data", () => {
     const down = async () => {
       throw new Error("unreachable");
     };
-    assert.equal((await clubEvents(store, NFT, { settlements: down })).length, 1);
+    assert.equal((await clubEvents(store, entry!, { settlements: down })).length, 1);
     const pool = async () => [{ txHash: "0x03", blockNumber: 1, at: NOW * 1000, cycle: [{ intent: { maker: alice, give: [{ kind: "erc721", token: NFT }], want: [] } }, { intent: { maker: bob, give: [], want: [{ kind: "erc721", token: NFT }] } }] }] as unknown as Settlement[];
-    assert.equal((await clubEvents(null, NFT, { settlements: pool })).length, 1);
-    assert.deepEqual(await clubEvents(null, NFT, { settlements: down }), []);
+    assert.equal((await clubEvents(null, entry!, { settlements: pool })).length, 1);
+    assert.deepEqual(await clubEvents(null, entry!, { settlements: down }), []);
   });
 
   it("builds a Club's detail: stats and the latest completed swaps", async () => {
@@ -196,12 +196,23 @@ describe("Club data", () => {
   it("lists Clubs busiest first, and keeps list order for ties", async () => {
     const entries = parseAssets([
       { chainId: 10143, address: NFT, kind: "erc721", name: "Quiet", symbol: "Q", status: "verified", note: "x" },
-      { chainId: 10143, address: USD, kind: "erc20", name: "Busy", symbol: "B", status: "verified", note: "x" },
-      { chainId: 10143, address: OTHER, kind: "erc20", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
+      { chainId: 10143, address: USD, kind: "erc20", category: "memecoin", name: "Busy", symbol: "B", status: "verified", note: "x" },
+      { chainId: 10143, address: OTHER, kind: "erc20", category: "memecoin", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
     ]);
     await store.rank(activityKey(USD), [{ member: JSON.stringify(swap({ id: "u:0", tokens: [USD.toLowerCase()] })), score: NOW }], 10);
     const rows = await clubList(store, entries, { now: () => NOW, settlements: async () => [] });
     assert.deepEqual(rows.map((r) => r.symbol), ["B", "Q", "Q2"]);
     assert.equal(makeRegistry(entries).clubs(10143).length, 3);
+  });
+});
+
+describe("heat", () => {
+  it("puts Momentum into words", () => {
+    assert.deepEqual(heat(0), { level: 0, label: "Quiet" });
+    assert.equal(heat(0.4).label, "Quiet");
+    assert.equal(heat(1).label, "Stirring");
+    assert.equal(heat(10).label, "Active", "one fresh swap");
+    assert.equal(heat(30).label, "Busy");
+    assert.deepEqual(heat(500), { level: 4, label: "Hot" });
   });
 });

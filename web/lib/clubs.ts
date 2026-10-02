@@ -1,5 +1,5 @@
 import type { Settlement } from "./intents";
-import type { AssetEntry } from "./verifiedAssets";
+import type { AssetEntry, ClubEntry } from "./verifiedAssets";
 import { ON_DEAL_INTENTS_ADDRESS } from "./config";
 import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
@@ -95,6 +95,9 @@ export const completedSwaps = (events: readonly ActivityEvent[], limit: number) 
 
 
 
+/** One asset of a Club. */
+export type ClubAsset = { token: string; kind: "erc721" | "erc20"; name: string; symbol: string };
+
 /** What a Club is, from the assets list (the part that doesn't change with activity). */
 export type ClubInfo = {
   /** Lowercase address. */
@@ -104,16 +107,27 @@ export type ClubInfo = {
   kind: "erc721" | "erc20";
   archived: boolean;
   note: string;
+  /** The Club's art, a path under `public/`, when the list gives one. */
+  image?: string;
+  /** The asset that shares this Club: the memecoin of a collection's Club, or the other way round. */
+  linked?: ClubAsset;
 };
 
-export const toClubInfo = (entry: AssetEntry): ClubInfo => ({
+const toAsset = (entry: AssetEntry): ClubAsset => ({ token: entry.address.toLowerCase(), kind: entry.kind, name: entry.name, symbol: entry.symbol });
+
+export const toClubInfo = (entry: ClubEntry): ClubInfo => ({
   token: entry.address.toLowerCase(),
   name: entry.name,
   symbol: entry.symbol,
   kind: entry.kind,
   archived: entry.club === "archived",
   note: entry.note,
+  ...(entry.image ? { image: entry.image } : {}),
+  ...(entry.linked ? { linked: toAsset(entry.linked) } : {}),
 });
+
+/** Every asset of the Club, its own first. */
+export const infoAssets = (info: ClubInfo): ClubAsset[] => [info, ...(info.linked ? [info.linked] : [])];
 
 /** A Club as the list and the detail show it. */
 export type ClubSummary = ClubInfo & { stats: ClubStats; members: number };
@@ -130,3 +144,25 @@ export const initials = (name: string) =>
     .map((word) => word[0])
     .join("")
     .toUpperCase();
+
+/**
+ * Momentum in words, so a number nobody has a feel for still says something. One fresh swap
+ * between two wallets scores about 10 (lib/momentum.ts), which sets the steps: a single trade is
+ * "Active", a handful in a week is "Busy".
+ */
+export const HEAT = [
+  { min: 0, label: "Quiet" },
+  { min: 0.5, label: "Stirring" },
+  { min: 5, label: "Active" },
+  { min: 25, label: "Busy" },
+  { min: 75, label: "Hot" },
+] as const;
+
+/** The heat step for a Momentum: 0 (quiet) to 4 (hot), with its label. */
+export function heat(momentum: number): { level: number; label: string } {
+  let level = 0;
+  HEAT.forEach((step, i) => {
+    if (momentum >= step.min) level = i;
+  });
+  return { level, label: HEAT[level].label };
+}

@@ -27,3 +27,6 @@ registerHooks({
     return next(found ? found.href : specifier, context);
   },
 });
+
+// Tests start from an empty store, and the verified list without the mock Clubs (lib/demoClubs.ts).
+process.env.NEXT_PUBLIC_DEMO_CLUBS = "false";

@@ -1,6 +1,6 @@
 # ADR 0014: A curated list marks which collections and tokens are verified
 
-**Status:** Accepted · 2026-10-02 (the list file; the UI badges and warnings are still to build) · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md). [ADR 0016](0016-clubs-and-momentum.md) opens a Club for each verified entry.
+**Status:** Accepted · 2026-10-02 (the list file; the UI badges and warnings are still to build) · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md). [ADR 0016](0016-clubs-and-momentum.md) opens a Club for each verified collection and memecoin.
 
 ## Context
 
@@ -12,7 +12,7 @@ What a user can't see is whether a contract is the real one. A contract can clai
 
 **A list the maintainer curates, shipped with the web app, marks assets as verified or blocked. It only changes what the UI shows.**
 
-- **One file in the repo**, `web/data/assets.json`, reviewed and changed by pull request. Each entry has the chain id, the checksummed address, the kind (`erc721` or `erc20`), a name and symbol for display, a `status` (`verified` or `blocked`), and a short `note` saying why. It is bundled into the build, so no server, store or env var is involved.
+- **One file in the repo**, `web/data/assets.json`, reviewed and changed by pull request. Each entry has the chain id, the checksummed address, the kind (`erc721` or `erc20`), for an ERC-20 a `category` (`memecoin`, `stablecoin`, `wrapped` or `other`), a name and symbol for display, a `status` (`verified` or `blocked`), and a short `note` saying why. It is bundled into the build, so no server, store or env var is involved.
 - **Three tiers:**
   - **Verified:** a badge in pickers, asset rows, deal cards and the review step. Verified collections are the ones the NFT picker offers first (this replaces `NEXT_PUBLIC_KNOWN_COLLECTIONS`, which stays as a development override).
   - **Unverified** (the default, anything not on the list): tradable, with the full address always shown, a plain warning, and one extra confirm in the create and fill steps.

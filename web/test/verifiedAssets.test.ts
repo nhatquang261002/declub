@@ -25,7 +25,8 @@ describe("assets.json", () => {
 
   it("accepts a minimal entry and the optional fields", () => {
     assert.equal(parseAssets([entry()]).length, 1);
-    assert.equal(parseAssets([entry({ club: "archived" }), entry({ address: B, kind: "erc20", minHolding: "5" })]).length, 2);
+    assert.equal(parseAssets([entry({ club: "archived" }), entry({ address: B, kind: "erc20", category: "memecoin", minHolding: "5" })]).length, 2);
+    assert.equal(parseAssets([entry({ image: "/art/chogs/chog-01.png" })]).length, 1);
   });
 
   it("rejects what would mislead", () => {
@@ -38,9 +39,18 @@ describe("assets.json", () => {
       ["empty note", [entry({ note: "  " })]],
       ["empty name", [entry({ name: "" })]],
       ["bad club", [entry({ club: "yes" })]],
+      ["remote image", [entry({ image: "https://example.com/a.png" })]],
+      ["image outside public", [entry({ image: "/../secret.png" })]],
+      ["image without an extension", [entry({ image: "/art/chog" })]],
       ["minHolding on an NFT", [entry({ minHolding: "1" })]],
-      ["minHolding zero", [entry({ kind: "erc20", minHolding: "0" })]],
+      ["minHolding zero", [entry({ kind: "erc20", category: "memecoin", minHolding: "0" })]],
       ["duplicate on a chain", [entry(), entry()]],
+      ["erc20 without a category", [entry({ kind: "erc20" })]],
+      ["unknown category", [entry({ kind: "erc20", category: "governance" })]],
+      ["category on an NFT", [entry({ category: "memecoin" })]],
+      ["a Club for a stablecoin", [entry({ kind: "erc20", category: "stablecoin", club: true })]],
+      ["an archived Club for wrapped MON", [entry({ kind: "erc20", category: "wrapped", club: "archived" })]],
+      ["a Club address in lowercase", [entry({ address: B, kind: "erc20", category: "memecoin", club: A.toLowerCase() })]],
     ];
     for (const [name, list] of bad) assert.throws(() => parseAssets(list), Error, name);
   });
@@ -53,7 +63,7 @@ describe("assets.json", () => {
 describe("registry", () => {
   const list: AssetEntry[] = parseAssets([
     entry(),
-    entry({ address: B, kind: "erc20", symbol: "mUSD", club: false }),
+    entry({ address: B, kind: "erc20", category: "stablecoin", symbol: "mUSD" }),
     entry({ address: "0x73591F76d7deE66F683A979cEffb4356982EE1bB", status: "blocked", note: "Scam clone." }),
     entry({ chainId: 143, address: "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298", club: "archived" }),
   ]);
@@ -85,5 +95,61 @@ describe("registry", () => {
 
   it("ships a Club for the project's own test collection", () => {
     assert.ok(registry.clubFor(A, 10143));
+  });
+
+  it("gives collections and memecoins a Club, and no other token", () => {
+    const tokens = makeRegistry(
+      parseAssets(
+        (["memecoin", "stablecoin", "wrapped", "other"] as const).map((category, i) =>
+          entry({ address: `0x${String(i + 1).padStart(40, "0")}`, kind: "erc20", category, symbol: category }),
+        ),
+      ),
+    );
+    assert.deepEqual(tokens.clubs(10143).map((e) => e.symbol), ["memecoin"]);
+    assert.equal(tokens.tier(`0x${"2".padStart(40, "0")}`, 10143), "verified");
+  });
+});
+
+describe("paired Clubs", () => {
+  const C = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
+  const coin = (over: Record<string, unknown> = {}) => entry({ address: B, kind: "erc20", category: "memecoin", symbol: "CHOG", club: A, ...over });
+
+  it("puts a memecoin in its collection's Club", () => {
+    const r = makeRegistry(parseAssets([entry(), coin()]));
+    assert.deepEqual(r.clubs(10143).map((e) => e.address), [A], "one Club, not two");
+    assert.equal(r.clubFor(B, 10143)?.address, A, "the coin's address finds the collection's Club");
+    assert.equal(r.clubFor(A, 10143)?.linked?.symbol, "CHOG");
+    assert.equal(r.clubFor(B.toLowerCase(), 10143)?.linked?.address, B);
+  });
+
+  it("works the other way round: a collection in its memecoin's Club", () => {
+    const r = makeRegistry(parseAssets([entry({ club: B }), coin({ club: undefined })]));
+    assert.deepEqual(r.clubs(10143).map((e) => e.symbol), ["CHOG"]);
+    assert.equal(r.clubFor(A, 10143)?.symbol, "CHOG");
+  });
+
+  it("keeps the collection's archive setting for both", () => {
+    const r = makeRegistry(parseAssets([entry({ club: "archived" }), coin()]));
+    assert.equal(r.clubFor(B, 10143)?.club, "archived");
+  });
+
+  it("drops a blocked asset from the pairing without breaking the Club", () => {
+    const r = makeRegistry(parseAssets([entry(), coin({ status: "blocked" })]));
+    assert.equal(r.clubFor(A, 10143)?.linked, undefined);
+    assert.equal(r.clubFor(B, 10143), null);
+  });
+
+  it("refuses a pairing that can't work", () => {
+    const third = entry({ address: C, kind: "erc20", category: "memecoin", symbol: "PURP", club: A });
+    const bad: [string, AssetEntry[]][] = [
+      ["a Club that isn't listed", parseAssets([coin()])],
+      ["a Club switched off", parseAssets([entry({ club: false }), coin()])],
+      ["a Club with no community", parseAssets([entry({ address: C, kind: "erc20", category: "stablecoin", symbol: "USD" }), coin({ club: C })])],
+      ["two of a kind", parseAssets([entry(), entry({ address: C, symbol: "MORE", club: A })])],
+      ["a second asset", parseAssets([entry(), coin(), third])],
+      ["a chain of Clubs", parseAssets([entry(), coin(), entry({ address: C, symbol: "PET", club: B })])],
+      ["another chain's Club", parseAssets([entry({ chainId: 143 }), coin()])],
+    ];
+    for (const [name, list] of bad) assert.throws(() => makeRegistry(list), Error, name);
   });
 });

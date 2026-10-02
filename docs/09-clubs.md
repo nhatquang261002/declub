@@ -22,13 +22,26 @@ Clubs change nothing on chain. No contract, matcher rule or pool rule depends on
 
 ## Which assets get a Club
 
-Only entries marked `verified` in `web/data/assets.json` ([ADR 0014](adr/0014-verified-collections-list.md)). A cloned collection can't get a Club, and moderation stays bounded. Chog and MockChog are the first entries. A `blocked` entry never has a visible Club.
+Only NFT collections and memecoins marked `verified` in `web/data/assets.json` ([ADR 0014](adr/0014-verified-collections-list.md)). A cloned collection can't get a Club, and moderation stays bounded. A `blocked` entry never has a visible Club.
+
+Verified isn't the same as having a community. Every ERC-20 entry has a `category`: `memecoin`, `stablecoin`, `wrapped` (WMON) or `other`, and only a memecoin gets a Club. Mock USD is verified, so its deals are trusted, and has none. Setting `club` on a token that can't have one fails the build.
+
+**A memecoin and its collection share one Club.** The joining entry's `club` is the other's address:
+
+```json
+{ "address": "0x…CHOG token", "kind": "erc20", "category": "memecoin", "club": "0x…Chogs collection", … }
+```
+
+- Everything the Club keeps (members, posts, roles, bans, the activity log) is under the address of the asset that has the Club. `/clubs/<either address>` opens it (the other redirects), and every route takes either.
+- A deal in either asset counts toward the Club's Momentum, once even when it names both. Its Market lists offers and requests for both, and a "Looking for" post can link a deal in either.
+- Holding either earns the Holder badge (the NFT, or `minHolding` of the coin). The Owner is claimed with the `owner()` of the Club's own asset.
+- One collection and one memecoin at most: two of a kind, a third asset, a chain of joins, or a Club that is off, unlisted or on another chain fails the build (`makeRegistry`).
 
 ### Lifecycle
 
 | Step | How |
 |---|---|
-| **Create** | Add a `verified` entry, merge it, deploy the web app. No contract deploy. Club data lives in the store, so it survives web deploys. `club: false` keeps an entry verified without opening a Club. |
+| **Create** | Add a `verified` collection or memecoin, merge it, deploy the web app. No contract deploy. Club data lives in the store, so it survives web deploys. `club: false` keeps an entry verified without opening a Club; `club: "<address>"` joins another's. |
 | **Archive** | Set `club: "archived"`. The Club becomes read-only: no joins, no posts, board frozen. Members, posts and history are kept, and its deals still show. An Owner asks, the maintainer merges. |
 | **Hide** | Turn the entry to `blocked`. The Club is hidden on the next deploy. Its data stays in the store, unseen. |
 | **Purge** | An app admin calls `DELETE /api/clubs/[token]` on a hidden Club to delete its stored data. Nothing is purged automatically. |
@@ -56,16 +69,24 @@ Rules:
 
 ## Screens
 
+**Home page** (`#clubs`): what a Club is (Market, Board, Members), the three Momentum rules with their weights, the heat scale, and the three busiest Clubs. The explaining lives here so `/clubs` can be all directory.
+
 **`/clubs`**
 
-- A "Your Clubs" row of the Clubs you belong to (when signed in), and each card shows its member count.
-- A grid of Clubs by Momentum. Each card: a tile with the name's initials, Momentum, the change since last week (▲ or ▼), completed swaps in 7 days, traders in 30 days, and the last activity. The cards draw from the assets list at once; the numbers fill in from the server, and are left out, with a note, if it can't be reached.
+- Totals: Clubs, active Clubs, members, completed swaps this week. A "Your Clubs" row when signed in.
+- **Most active right now:** the top three Clubs by Momentum, as cards (cover, avatar, rank, heat, Momentum and its change, members, swaps in 7 days, last activity). Only Clubs with some Momentum; otherwise a note that it's quiet.
+- **Rising this week** (largest weekly gain) and **Most traded · 7 days** (completed swaps), five each.
+- **All Clubs:** search (name, symbol, address, of either asset of a paired Club), Collections / Memecoins (a paired Club is in both), and sorts: busiest, rising, most traded, most members, recently active, A–Z. A list view by default (rank, Club, heat, Momentum, members, swaps in 7 days, last active), or cards; the choice is remembered per browser. Twelve at a time with "Show more". Archived Clubs go last.
+- The directory draws from the assets list at once; the numbers fill in from the server, and are left out, with a note, if it can't be reached.
 
 **`/clubs/[address]` header**
 
-- Name, symbol, kind, a Verified chip (its tooltip is the list's note), the address linked to the explorer, an Archived chip, and Club Momentum with its trend and an explanation. The tile shows the name's initials until collections have art of their own.
-- Join / Leave. Signed out it offers "Sign in to join"; without sign-in or a store it shows nothing and the Club is read-only. A member sees a Holder badge when they hold the asset. Beside Join: "Joining shows your wallet on the Members list."
-- Stats: members · holders · swaps in 7 days · new deals in 7 days · traders in 30 days · last activity.
+- A cover in one of the brand colours, picked from the address. The avatar is the asset's `image` from the assets list (a path under `web/public`), or its initials until it has one.
+- Name, symbol, kind, a Verified chip (its tooltip is the list's note), when it was last active, an Archived chip, the description and links.
+- Join / Leave. Signed out it offers "Sign in to join"; without sign-in or a store it shows nothing and the Club is read-only. A member sees a Holder badge when they hold the asset, and Leave in the "⋯" menu beside it. Under Join: "Shows your wallet on the Members list."
+- Stats: Momentum and its trend (with an explanation) · members and holders · swaps in 7 days · new deals in 7 days · traders in 30 days · heat.
+- A side column: the heat scale (Quiet, Stirring, Active, Busy, Hot) with this Club's step marked, the top five traders, and the contract, kind and why it is verified.
+- The open tab is in the URL, `?tab=market|board|members|manage`.
 
 **Market tab**
 
@@ -99,13 +120,13 @@ Pure functions in `web/lib/momentum.ts`, computed from the Club's activity log o
 - All constants live in one exported object, so they can be tuned without touching logic.
 - Results are cached per Club in the store for 60 seconds.
 
-What Momentum doesn't say: that a Club is good, that its asset is safe, or that a member is honest. It says "this market has been busy". A well-funded actor can still inflate it, at $2 a side plus gas.
+What Momentum doesn't say: that a Club is good, that its asset is safe, or that a member is honest. It says "this market has been busy". A well-funded actor can still inflate it, at the protocol fee on every side plus gas.
 
 ## Where the activity comes from
 
 There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0003](adr/0003-no-indexer-in-v1.md), [0004](adr/0004-read-deals-from-storage.md)). `OnDealV2` stores no creation or fill time either. So the log is built from **receipts the server verifies itself**, the way `ingestFills` already works ([ADR 0012](adr/0012-server-side-saves.md)).
 
-- **`ingestTx(store, hash)`** in `web/lib/server/activity.ts` fetches the receipt and decodes it (`recordActivity` is the part after the receipt is in hand). Each event becomes `{id, kind, contract, deal, block, at, parties[], tokens[]}`, with `id` = `txHash:logIndex`, so a replay is the same event. It goes into the log of every Club token it names, and an event that names no Club asset is dropped, so the log can't grow unbounded.
+- **`ingestTx(store, hash)`** in `web/lib/server/activity.ts` fetches the receipt and decodes it (`recordActivity` is the part after the receipt is in hand). Each event becomes `{id, kind, contract, deal, block, at, parties[], tokens[]}`, with `id` = `txHash:logIndex`, so a replay is the same event. It goes into the log of every Club it names, once per Club, under the Club's own asset; an event that names no Club asset is dropped, so the log can't grow unbounded.
   - `OnDealV2` only: `TradeCreated` is a `created` event; `TradeFilled` is a `swapped` one. The deal's assets come from `getTrade`, plus the proposal's assets when the same receipt holds the `ProposalAccepted` that filled it. A swap's parties are the maker and the taker. Native MON never counts as a token. A reverted transaction records nothing.
   - The log is one sorted set per Club, scored by block time, whose members are the events as JSON. Trimming at 5000 therefore leaves nothing behind, and storing the same event twice is a no-op.
 - **`POST /api/activity {hash}`** reads the receipt once and feeds both History (`recordFills`, the part of `ingestFills` after the receipt) and the Club log. `POST /api/fills` stays for older clients.
@@ -120,7 +141,7 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 ## Membership and the Holder badge
 
 - **Join:** needs sign-in and at least one linked wallet (422 `no_wallet` otherwise). The member row snapshots `linkedEthereumWallets(user.linked_accounts)` (`web/lib/profiles.ts`), never anything from the request. The display wallet, the one the Members list shows, is the first with a shared profile, else the first. Joining twice is the same as once; an archived Club refuses (409 `archived`); a Club stops at 2,000 members (409 `full`). **Joining publishes the display wallet**, so the button says so.
-- **Holder:** ERC-721 `balanceOf ≥ 1` across the member's wallets, or ERC-20 `balanceOf ≥ minHolding` (an optional `assets.json` field). Checked on join, then rechecked when the row is over 24 hours old and the members list is read: one `multicall` per member, at most 50 members per read (oldest check first), so the badge is at most a day old. A read that fails keeps the old badge and tries again next time. Without `minHolding`, an ERC-20 Holder holds any amount.
+- **Holder:** ERC-721 `balanceOf ≥ 1` across the member's wallets, or ERC-20 `balanceOf ≥ minHolding` (an optional `assets.json` field); in a paired Club, either. If one asset can't be read and the other doesn't make the member a Holder, the old badge stays. Checked on join, then rechecked when the row is over 24 hours old and the members list is read: one `multicall` per member, at most 50 members per read (oldest check first), so the badge is at most a day old. A read that fails keeps the old badge and tries again next time. Without `minHolding`, an ERC-20 Holder holds any amount.
 - **Wallets kept in step:** the Privy webhook handler, the profile route (share or stop sharing) and every signed-in `GET .../membership` re-sync `wallets[]` and the display wallet in every Club the user belongs to (`syncMemberships`). New wallets reset the balance check. Unlinking a wallet drops its Momentum from that member. **A user left with no linked wallet (or deleted) leaves every Club,** since there is nothing to show or score; joining again takes a wallet.
 - **Leave** deletes the row and the set entries, and any role with it. The Owner can't leave without handing the Club over (409 `owner_cannot_leave`).
 - **Public list:** `GET .../members` never includes a user id. A member is their display wallet, with holder flag, join date, Momentum and completed swaps (events the log and pool know of, where one of their wallets was a party). It shows the first 100 of the sort and counts everyone.
@@ -171,7 +192,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | Route | What |
 |---|---|
 | `GET /api/clubs` | `{logging, clubs}`: each Club's info, stats and `members`, busiest first (public, cached 30 s). `logging` is false when this server keeps no activity log, and then only signed swaps count. Built. |
-| `GET /api/clubs/[token]` | `{logging, club, recent, holders}`: the Club's info, stats, member and holder counts and its latest 20 completed swaps. 400 for a bad address, 404 for an asset with no Club (blocked, unlisted or `club: false`). Archived Clubs are served. Built. |
+| `GET /api/clubs/[token]` | `{logging, club, recent, holders}`: the Club's info, stats, member and holder counts and its latest 20 completed swaps. 400 for a bad address, 404 for an asset with no Club (blocked, unlisted, `club: false`, or a token that isn't a memecoin). A paired asset's address serves its Club. Archived Clubs are served. Built. |
 | `GET /api/clubs/[token]/members?sort=momentum\|new` | `{enabled, members, total, holders}` (public, cached 15 s). 400 for another `sort`. Built. |
 | `GET` / `POST` / `DELETE /api/clubs/[token]/membership` | Your membership `{member, wallet?, holder?, joinedAt?, role}` / join / leave (gated). A `GET` also re-syncs your wallets. Built. |
 | `GET /api/me/clubs` | `{clubs}`: the Clubs you belong to, leaving out ones that no longer exist (gated). Built. |

@@ -24,7 +24,7 @@ const W2 = "0x00000000000000000000000000000000000000b2";
 const entry = (address: string, over: Record<string, unknown> = {}) => ({
   chainId: 10143, address, kind: "erc721", name: "Name", symbol: "SYM", status: "verified", note: "Why.", ...over,
 });
-const reg = makeRegistry(parseAssets([entry(NFT), entry(COIN, { kind: "erc20", minHolding: "100" }), entry(OLD, { club: "archived" }), entry(NOCLUB, { club: false })]));
+const reg = makeRegistry(parseAssets([entry(NFT), entry(COIN, { kind: "erc20", category: "memecoin", minHolding: "100" }), entry(OLD, { club: "archived" }), entry(NOCLUB, { club: false })]));
 const club = reg.clubFor(NFT)!;
 const coin = reg.clubFor(COIN)!;
 const archived = reg.clubFor(OLD)!;
@@ -39,6 +39,35 @@ function holdings(balances: Record<string, bigint>) {
   return { fn, calls };
 }
 const broken: Holdings = async () => null;
+
+describe("a paired Club", () => {
+  const paired = makeRegistry(parseAssets([entry(NFT), entry(COIN, { kind: "erc20", category: "memecoin", minHolding: "100", club: NFT })])).clubFor(COIN)!;
+
+  it("makes a holder of either asset a Holder", async () => {
+    const byToken = (balances: Record<string, bigint>): Holdings => async (token) => [balances[token.toLowerCase()] ?? 0n];
+    const coinOnly = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [COIN.toLowerCase()]: 100n }) });
+    const nftOnly = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [NFT.toLowerCase()]: 1n }) });
+    const tooFew = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [COIN.toLowerCase()]: 99n }) });
+    assert.ok(coinOnly.ok && coinOnly.row.holder);
+    assert.ok(nftOnly.ok && nftOnly.row.holder);
+    assert.ok(tooFew.ok && !tooFew.row.holder);
+  });
+
+  it("settles Holder from one asset when the other can't be read, and waits when neither says so", async () => {
+    const half = (answer: bigint): Holdings => async (token) => (token.toLowerCase() === NFT.toLowerCase() ? null : [answer]);
+    const yes = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: half(100n), now: () => 7 });
+    const unsure = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: half(0n), now: () => 7 });
+    assert.ok(yes.ok && yes.row.holder && yes.row.holderCheckedAt === 7);
+    assert.ok(unsure.ok && !unsure.row.holder && unsure.row.holderCheckedAt === 0, "checked again on the next read");
+  });
+
+  it("keeps one membership, under the Club's own asset", async () => {
+    const store = memoryStore();
+    await joinClub(store, paired, "u1", [W1], { holdings: holdings({}).fn });
+    assert.deepEqual(await store.members(membersKey(NFT)), ["u1"]);
+    assert.deepEqual(await store.members(membersKey(COIN)), []);
+  });
+});
 
 describe("joinClub / leaveClub", () => {
   it("joins with the user's wallets and Holder status, and indexes the membership both ways", async () => {

@@ -38,6 +38,26 @@ export const ClockIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5"
 export const SwapIcon = (p: P) => (<Icon {...p}><path d="M5 8h13l-3-3" /><path d="M19 16H6l3 3" /></Icon>);
 export const PauseIcon = (p: P) => (<Icon {...p}><path d="M9 6v12M15 6v12" /></Icon>);
 export const CrossIcon = (p: P) => (<Icon {...p}><path d="M6 6l12 12M18 6 6 18" /></Icon>);
+export const MoreIcon = (p: P) => (<Icon {...p}><circle cx="5.5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="18.5" cy="12" r="1" fill="currentColor" /></Icon>);
+export const ArrowLeftIcon = (p: P) => (<Icon {...p}><path d="M19 12H5" /><path d="m11 6-6 6 6 6" /></Icon>);
+export const SearchIcon = (p: P) => (<Icon {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></Icon>);
+export const PinIcon = (p: P) => (<Icon {...p}><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" /><path d="M12 14v6" /></Icon>);
+export const FlagIcon = (p: P) => (<Icon {...p}><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></Icon>);
+export const TrashIcon = (p: P) => (<Icon {...p}><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6.5 7l1 12.5h9l1-12.5" /></Icon>);
+export const EyeIcon = (p: P) => (<Icon {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></Icon>);
+export const EyeOffIcon = (p: P) => (<Icon {...p}><path d="M4 4l16 16" /><path d="M9.9 5.8A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4M6.3 7.6A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5a8.9 8.9 0 0 0 4.1-1" /></Icon>);
+export const BanIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Icon>);
+export const ShieldIcon = (p: P) => (<Icon {...p}><path d="M12 3.5 19 6v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-2.5Z" /></Icon>);
+export const CrownIcon = (p: P) => (<Icon {...p}><path d="M4 8l4 4 4-6 4 6 4-4-1.5 10h-13L4 8Z" /></Icon>);
+export const UsersIcon = (p: P) => (<Icon {...p}><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.8c1.8.6 3.1 2.2 3.5 4.7" /></Icon>);
+export const ChatIcon = (p: P) => (<Icon {...p}><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z" /></Icon>);
+export const TagIcon = (p: P) => (<Icon {...p}><path d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8L21 12l-9 9-8.5-8.5Z" /><circle cx="8.5" cy="8.5" r="1.3" /></Icon>);
+export const LinkIcon = (p: P) => (<Icon {...p}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></Icon>);
+export const FlameIcon = (p: P) => (<Icon {...p}><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.4 2.4-5.4 3.6-8.3.4 2 1.4 3.2 2.6 3.7C12 7 13 4.6 15.4 3c-.2 3 1.2 4.6 2.2 6.2.9 1.4 1.4 2.7 1.4 4.6 0 4.2-3 7.2-7 7.2Z" /></Icon>);
+export const ListIcon = (p: P) => (<Icon {...p}><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r=".9" fill="currentColor" /><circle cx="4.5" cy="12" r=".9" fill="currentColor" /><circle cx="4.5" cy="18" r=".9" fill="currentColor" /></Icon>);
+export const GridIcon = (p: P) => (<Icon {...p}><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></Icon>);
+export const TrendUpIcon = (p: P) => (<Icon {...p}><path d="m3.5 17 6-6 4 4 7-7.5" /><path d="M15 7.5h5.5V13" /></Icon>);
+export const BadgeCheckIcon = (p: P) => (<Icon {...p}><path d="M12 2.8l2.2 1.6 2.7-.1.8 2.6 2.2 1.6-.8 2.6.8 2.6-2.2 1.6-.8 2.6-2.7-.1L12 21.2l-2.2-1.6-2.7.1-.8-2.6-2.2-1.6.8-2.6-.8-2.6 2.2-1.6.8-2.6 2.7.1L12 2.8Z" /><path d="m8.8 12.2 2.2 2.2 4.3-4.6" /></Icon>);
 
 /** The X logo. Filled rather than stroked, so it doesn't use the shared stroke icon frame. */
 export const XLogoIcon = ({ className = "size-3" }: P) => (

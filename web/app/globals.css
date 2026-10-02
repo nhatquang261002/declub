@@ -1214,3 +1214,430 @@ body {
   color: #a9282f;
   box-shadow: 0.2rem 0.2rem 0 #a9282f;
 }
+
+/* In the components layer, so a utility on the same element (a size, a padding) wins. */
+@layer components {
+/*
+ * Clubs (app/clubs, components/Club*.tsx). Each Club wears one of a few covers cut from the brand
+ * palette, picked from its address, so a Club looks the same everywhere without anyone choosing.
+ * --club-ink is the colour that reads on that cover.
+ */
+.club-theme-0 { --club-a: #f0b735; --club-b: #ffd978; --club-dot: rgb(17 19 24 / 0.13); --club-ink: #111318; }
+.club-theme-1 { --club-a: #c4303a; --club-b: #ef6970; --club-dot: rgb(255 244 207 / 0.2); --club-ink: #fff4cf; }
+.club-theme-2 { --club-a: #202735; --club-b: #315ea8; --club-dot: rgb(255 244 207 / 0.15); --club-ink: #fff4cf; }
+.club-theme-3 { --club-a: #3f9f7b; --club-b: #9bdcbf; --club-dot: rgb(17 19 24 / 0.12); --club-ink: #111318; }
+.club-theme-4 { --club-a: #315ea8; --club-b: #86aaea; --club-dot: rgb(255 244 207 / 0.2); --club-ink: #fff4cf; }
+
+.club-cover {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(var(--club-dot) 1.2px, transparent 1.7px) 0 0 / 14px 14px,
+    linear-gradient(120deg, var(--club-a), var(--club-b));
+}
+
+/* A band of light across the cover, like the shine on a sticker. */
+.club-cover::after {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: 62%;
+  width: 4.5rem;
+  background: rgb(255 255 255 / 0.13);
+  content: "";
+  transform: rotate(22deg);
+  pointer-events: none;
+}
+
+/* The Club's name, huge and faint, as a watermark on its cover. */
+.club-cover-mark {
+  position: absolute;
+  right: -0.04em;
+  bottom: -0.28em;
+  color: var(--club-ink);
+  font-size: 7rem;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  opacity: 0.12;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Collections get a rounded square, tokens a coin. */
+.club-avatar {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 28%;
+  background: linear-gradient(135deg, var(--club-a), var(--club-b));
+  box-shadow: 0.2rem 0.2rem 0 #111318;
+  color: var(--club-ink);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.club-avatar-coin {
+  border-radius: 9999px;
+}
+
+/* A coin's inner rim. */
+.club-avatar-coin::after {
+  position: absolute;
+  inset: 12%;
+  border: 1.5px solid var(--club-ink);
+  border-radius: 9999px;
+  content: "";
+  opacity: 0.35;
+}
+
+.club-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Cards and panels: the cream sticker of page-section, without its tape (a page of tape is noise). */
+.club-card,
+.club-panel {
+  border: 2px solid #111318;
+  border-radius: 1rem;
+  background: var(--chog-cream-500);
+  color: #111318;
+  box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
+}
+
+.club-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.club-card:hover {
+  border-color: var(--action-primary);
+  box-shadow: 0.45rem 0.5rem 0 rgb(0 0 0 / 0.2);
+  transform: translateY(-3px);
+}
+
+.club-card:focus-visible {
+  outline: 3px solid var(--action-primary);
+  outline-offset: 3px;
+}
+
+.club-hero {
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 1.5rem;
+  background: var(--chog-cream-500);
+  color: #111318;
+  box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
+}
+
+:is(.club-card, .club-panel, .club-hero) .text-muted { color: #4e5968; }
+:is(.club-card, .club-panel, .club-hero) .text-danger { color: #a9282f; }
+:is(.club-card, .club-panel, .club-hero) .text-mint { color: #1f7a55; }
+:is(.club-card, .club-panel, .club-hero) .text-warn { color: #8a5a00; }
+
+:is(.club-panel, .club-hero) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip) {
+  color: #a9282f;
+}
+
+:is(.club-panel, .club-hero) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover {
+  color: #315ea8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .club-card { transition: none; }
+  .club-card:hover { transform: none; }
+}
+
+/* The stats along the bottom of a Club's header. */
+.club-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 2px solid #111318;
+  background: #fdf3c4;
+}
+
+@media (min-width: 640px) {
+  .club-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .club-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+.club-stat {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 1.25rem;
+  box-shadow: inset -1px -1px 0 rgb(17 19 24 / 0.12);
+}
+
+.club-stat dt,
+.kicker {
+  color: #4e5968;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.club-stat dd {
+  overflow: hidden;
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.club-stat dd small {
+  margin-left: 0.3rem;
+  color: #4e5968;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Small labels: kind of post, roles, Verified, Holder. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1.5px solid rgb(17 19 24 / 0.22);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.6);
+  padding: 0.15rem 0.55rem;
+  color: #111318;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.chip svg { width: 0.8rem; height: 0.8rem; }
+.chip-mint { border-color: #1f7a55; background: #e3f5ec; color: #1f7a55; }
+.chip-peach { border-color: #111318; background: var(--chog-peach-500); }
+.chip-dark { border-color: #111318; background: #111318; color: var(--chog-cream-500); }
+.chip-blue { border-color: #315ea8; background: #e8eefb; color: #24467f; }
+.chip-warn { border-color: #b27500; background: #fff3d1; color: #6b4600; }
+.chip-danger { border-color: #a9282f; background: #fde8ea; color: #a9282f; }
+
+a.chip:hover { border-color: #111318; background: white; }
+
+/* Momentum as five rising bars, lit up to the Club's heat (heat() in lib/clubs.ts). */
+.heat {
+  display: inline-flex;
+  height: 0.95rem;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.heat i {
+  width: 4px;
+  border-radius: 2px;
+  background: rgb(17 19 24 / 0.16);
+}
+
+.heat i:nth-child(1) { height: 28%; }
+.heat i:nth-child(2) { height: 46%; }
+.heat i:nth-child(3) { height: 64%; }
+.heat i:nth-child(4) { height: 82%; }
+.heat i:nth-child(5) { height: 100%; }
+.heat i[data-on] { background: var(--heat, #111318); }
+.heat-1 { --heat: #3f9f7b; }
+.heat-2 { --heat: #d99a12; }
+.heat-3 { --heat: #e46a2e; }
+.heat-4 { --heat: #d83b45; }
+
+/* A row of section tabs: the tab bar, with an icon and a count in each tab. */
+.tab-count {
+  display: inline-grid;
+  min-width: 1.35rem;
+  place-items: center;
+  margin-left: 0.15rem;
+  border-radius: 9999px;
+  background: rgb(17 19 24 / 0.08);
+  padding: 0.05rem 0.35rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[aria-pressed="true"] .tab-count { background: rgb(17 19 24 / 0.14); }
+
+/* "⋯" buttons and the menus they open: actions that don't need to be on screen all the time. */
+.icon-btn {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: #4e5968;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.icon-btn:hover,
+.icon-btn[aria-expanded="true"] {
+  background: rgb(17 19 24 / 0.08);
+  color: #111318;
+}
+
+.icon-btn:focus-visible {
+  outline: 3px solid var(--chog-pink-500);
+  outline-offset: 1px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  min-width: 12.5rem;
+  padding: 0.25rem;
+  border: 2px solid #111318;
+  border-radius: 0.75rem;
+  background: var(--chog-cream-500);
+  box-shadow: 0.3rem 0.3rem 0 #111318;
+  color: #111318;
+  animation: pop-in 120ms ease-out;
+  transform-origin: top right;
+}
+
+.menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-item svg { width: 1rem; height: 1rem; flex: 0 0 auto; opacity: 0.75; }
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible { background: white; outline: none; }
+.menu-item:disabled { cursor: not-allowed; opacity: 0.5; }
+.menu-item-danger { color: #a9282f; }
+.menu-sep { height: 1px; margin: 0.25rem 0.35rem; background: rgb(17 19 24 / 0.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu { animation: none; }
+}
+
+/* A post on a Club's board. */
+.post {
+  display: flex;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+}
+
+.post + .post { border-top: 1px solid rgb(17 19 24 / 0.12); }
+.post-pinned { background: rgb(240 183 53 / 0.14); }
+.post-hidden { background: repeating-linear-gradient(-45deg, transparent 0 10px, rgb(17 19 24 / 0.03) 10px 20px); }
+.post-hidden .post-text { opacity: 0.6; }
+
+/* The deal or signed swap a "Looking for" post points at. */
+.post-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  border: 2px solid #111318;
+  border-radius: 0.6rem;
+  background: white;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0.15rem 0.15rem 0 #111318;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.club-panel a.post-link { color: #111318; }
+.club-panel a.post-link:hover { color: #111318; box-shadow: 0.25rem 0.25rem 0 #111318; transform: translate(-1px, -1px); }
+
+/* The characters left in a post, as a ring that fills. */
+.char-ring {
+  --p: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: conic-gradient(var(--ring, #315ea8) calc(var(--p) * 1%), rgb(17 19 24 / 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 55%, #000 57%);
+  mask: radial-gradient(circle, transparent 55%, #000 57%);
+}
+
+/* A member's share of the top score, under their row on the leaderboard. */
+.meter {
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(17 19 24 / 0.1);
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--chog-peach-500), var(--chog-pink-500));
+}
+
+/* First, second and third on a leaderboard. */
+.rank {
+  display: inline-grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9999px;
+  color: #4e5968;
+  font-size: 0.8rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.rank-1, .rank-2, .rank-3 { border: 2px solid #111318; box-shadow: 0.12rem 0.12rem 0 #111318; color: #111318; }
+.rank-1 { background: #f0b735; }
+.rank-2 { background: #dfe3ea; }
+.rank-3 { background: #e8a777; }
+
+/* A second-level switch inside a section (For trade / Wanted, sort orders): lighter than the tab bar above it. */
+.pills {
+  display: inline-flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1.5px solid rgb(17 19 24 / 0.22);
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  color: #4e5968;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.pill:hover:not([aria-pressed="true"]) { border-color: #111318; background: white; color: #111318; }
+.pill[aria-pressed="true"] { border-color: #111318; background: #111318; color: var(--chog-cream-500); }
+.pill:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 2px; }
+.pill-count { font-variant-numeric: tabular-nums; opacity: 0.7; }
+}

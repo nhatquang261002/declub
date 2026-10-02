@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
+import { BanIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon } from "@/components/Icons";
+import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import type { PostLink, PublicPost } from "@/lib/clubPosts";
 import { isOwnerOrAdmin, isStaff } from "@/lib/clubRoles";
@@ -21,13 +24,11 @@ export type PostActions = {
 
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
 
-const act = "text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink";
-
 /**
  * One post. The text is plain text: React escapes it and nothing here turns it into a link, so
  * what a member types can't become markup or a clickable address. What each viewer may do is
- * decided by the server; the buttons only follow the viewer's role so they aren't offered
- * actions that would be refused.
+ * decided by the server; the menu only follows the viewer's role so they aren't offered actions
+ * that would be refused.
  */
 export function PostItem({
   post,
@@ -43,62 +44,73 @@ export function PostItem({
 }) {
   const staff = role !== undefined && isStaff(role);
   const owner = role !== undefined && isOwnerOrAdmin(role);
-  const confirm = (message: string, run: () => void) => {
-    if (window.confirm(message)) run();
-  };
+
+  const own: MenuAction[] = [];
+  if (role !== undefined && !post.mine && !post.hidden) {
+    own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post to the Club’s moderators?", onSelect: () => actions.report(post.id) });
+  }
+  if (role !== undefined && (post.mine || staff)) {
+    own.push({ label: "Delete", icon: <TrashIcon />, danger: true, confirm: "Delete this post?", onSelect: () => actions.remove(post.id) });
+  }
+  const moderate: MenuAction[] = [];
+  if (owner && !post.hidden) {
+    moderate.push({ label: post.pinned ? "Unpin" : "Pin to top", icon: <PinIcon />, onSelect: () => actions.pin(post.id, !post.pinned) });
+  }
+  if (staff && !post.mine) {
+    moderate.push({
+      label: post.hidden ? "Restore" : "Hide",
+      icon: post.hidden ? <EyeIcon /> : <EyeOffIcon />,
+      onSelect: () => actions.hide(post.id, !post.hidden),
+    });
+    moderate.push({
+      label: "Ban author",
+      icon: <BanIcon />,
+      danger: true,
+      confirm: "Ban this member from the Club? They are removed and can’t rejoin.",
+      onSelect: () => actions.ban(post.id),
+    });
+  }
 
   return (
-    <li className="page-section flex flex-col gap-2 px-5 py-4 text-sm">
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <Who address={post.wallet} mine={post.mine} plain />
-        {post.kind === "looking" && <span className="rounded-full border border-line px-2 py-0.5 text-xs">Looking for</span>}
-        {post.pinned && <span className="rounded-full border border-line px-2 py-0.5 text-xs">Pinned</span>}
-        <span className="text-xs text-muted">{ago(Math.floor(post.at / 1000), now)}</span>
-      </div>
-
-      {post.hidden && (
-        <p className="text-xs text-warn">
-          {HIDDEN_NOTE[post.hidden]}
-          {post.text !== null && " (only you and the Club’s moderators can see it)"}
-          {post.reports !== undefined && ` · ${post.reports} ${post.reports === 1 ? "report" : "reports"}`}
-        </p>
-      )}
-      {post.text !== null && <p className="break-words whitespace-pre-wrap">{post.text}</p>}
-      {post.link && (
-        <Link href={linkHref(post.link)} className="w-fit text-xs font-semibold underline">
-          {linkLabel(post.link)} →
-        </Link>
-      )}
-
-      {role !== undefined && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {!post.mine && !post.hidden && (
-            <button type="button" className={act} onClick={() => confirm("Report this post to the Club’s moderators?", () => actions.report(post.id))}>
-              Report
-            </button>
-          )}
-          {(post.mine || staff) && (
-            <button type="button" className={act} onClick={() => confirm("Delete this post?", () => actions.remove(post.id))}>
-              Delete
-            </button>
-          )}
-          {staff && !post.mine && (
-            <button type="button" className={act} onClick={() => actions.hide(post.id, !post.hidden)}>
-              {post.hidden ? "Restore" : "Hide"}
-            </button>
-          )}
-          {owner && !post.hidden && (
-            <button type="button" className={act} onClick={() => actions.pin(post.id, !post.pinned)}>
-              {post.pinned ? "Unpin" : "Pin"}
-            </button>
-          )}
-          {staff && !post.mine && (
-            <button type="button" className={act} onClick={() => confirm("Ban this member from the Club? They are removed and can’t rejoin.", () => actions.ban(post.id))}>
-              Ban author
-            </button>
-          )}
+    <li className={`post ${post.pinned ? "post-pinned" : ""} ${post.hidden ? "post-hidden" : ""}`}>
+      <WalletAvatar seed={post.wallet} size="2.5rem" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex items-start gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <Who address={post.wallet} mine={post.mine} />
+            <span className="text-xs text-muted">· {ago(Math.floor(post.at / 1000), now)}</span>
+            {post.pinned && (
+              <span className="chip">
+                <PinIcon />
+                Pinned
+              </span>
+            )}
+            {post.kind === "looking" && <span className="chip chip-peach">Looking for</span>}
+          </div>
+          <div className="-my-1 -mr-1">
+            <ActionMenu label="Post actions" groups={[own, moderate]} />
+          </div>
         </div>
-      )}
+
+        {post.hidden && (
+          <p className="w-fit">
+            <span className="chip chip-warn">
+              <EyeOffIcon />
+              {HIDDEN_NOTE[post.hidden]}
+              {post.reports !== undefined && ` · ${post.reports} ${post.reports === 1 ? "report" : "reports"}`}
+            </span>
+            {post.text !== null && <span className="ml-2 text-xs text-muted">Only you and the Club’s moderators can see it.</span>}
+          </p>
+        )}
+        {post.text !== null && <p className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap">{post.text}</p>}
+        {post.link && (
+          <Link href={linkHref(post.link)} className="post-link mt-1">
+            <SwapIcon className="size-4" />
+            {linkLabel(post.link)}
+            <span aria-hidden>→</span>
+          </Link>
+        )}
+      </div>
     </li>
   );
 }

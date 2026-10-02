@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { OnDealArt } from "@/components/ChogArt";
+import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
 const STEPS = [
@@ -75,6 +76,8 @@ export default function HomePage() {
           ))}
         </ol>
       </section>
+
+      <ClubsIntro />
 
       <section className="page-section flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
         <div>

@@ -59,8 +59,8 @@ function fakeReader(over: { receipt?: Reader["receipt"]; trade?: { offered: Raw[
   return { reader, calls };
 }
 
-const isClub = (token: string) => [NFT, USD].some((t) => t.toLowerCase() === token.toLowerCase());
-const opts = (reader: Reader) => ({ reader, contracts: [V2], isClub });
+const clubOf = (token: string) => [NFT, USD].find((t) => t.toLowerCase() === token.toLowerCase()) ?? null;
+const opts = (reader: Reader) => ({ reader, contracts: [V2], clubOf });
 
 describe("recordActivity", () => {
   let store: Store;
@@ -86,6 +86,14 @@ describe("recordActivity", () => {
       });
     }
     assert.deepEqual(await readActivity(store, OTHER), []);
+  });
+
+  it("logs a deal once in a Club whose two assets it names, under the Club's own asset", async () => {
+    const { reader } = fakeReader();
+    const paired = { ...opts(reader), clubOf: (token: string) => ([NFT, USD].some((t) => t.toLowerCase() === token.toLowerCase()) ? NFT : null) };
+    assert.equal(await recordActivity(store, HASH, receipt([created([nft(NFT)], [erc20(USD)])]), paired), 1);
+    assert.equal((await readActivity(store, NFT)).length, 1);
+    assert.deepEqual(await readActivity(store, USD), []);
   });
 
   it("leaves native MON out of a deal's tokens", async () => {

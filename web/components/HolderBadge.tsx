@@ -1,3 +1,4 @@
+import { CheckIcon } from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
 
 /**
@@ -10,7 +11,10 @@ export function HolderBadge({ symbol }: { symbol?: string }) {
       content={`Held ${symbol ?? "this asset"} when the Club last checked, at most a day ago. It isn’t a guarantee, and it doesn’t unlock anything.`}
       className="cursor-help"
     >
-      <span className="rounded-full border border-mint/50 px-2 py-0.5 text-xs font-semibold text-mint">Holder</span>
+      <span className="chip chip-mint">
+        <CheckIcon />
+        Holder
+      </span>
     </Tooltip>
   );
 }

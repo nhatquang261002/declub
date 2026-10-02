@@ -18,8 +18,8 @@ web/
 │   ├── create/page.tsx         ✓ Create a deal: three-step wizard (deal type → assets → confirm). /v2/create redirects here
 │   ├── deal/[id]/page.tsx     ✓ Deal Detail + actions
 │   ├── history/page.tsx        ✓ my deals + withdraw
-│   ├── clubs/page.tsx          ✓ Clubs index: Your Clubs row + Clubs by Momentum
-│   ├── clubs/[address]/        ✓ one Club: page.tsx + ClubMarket · ClubBoard · ClubMembers · ClubManage
+│   ├── clubs/page.tsx          ✓ Clubs directory: totals, Your Clubs, Most active + Rising + Most traded, All Clubs (search, filter, sort, list/cards)
+│   ├── clubs/[address]/        ✓ one Club: page.tsx + ClubMarket · ClubBoard · ClubMembers · ClubManage · ClubSidebar · parts
 │   └── guide/page.tsx          ✓ deal guide + FAQ
 ├── components/
 │   ├── Providers.tsx           ✓ WagmiProvider + QueryClientProvider
@@ -236,18 +236,27 @@ The **Escrow panel** keeps the spec's picture: `Maker ✓ deposited` (always tru
 | Screen | Reads | Writes |
 |---|---|---|
 | **Clubs** `/clubs` | the verified list (`web/data/assets.json`) at once; `/api/clubs` fills in Momentum and counts; `/api/me/clubs` for "Your Clubs" | — |
+| **Home** `/` (`#clubs`) | `ClubsIntro`: what Clubs are and how Momentum works; `ClubsTeaser` reads `/api/clubs` for the three busiest | — |
 | **Club** `/clubs/[address]` | `/api/clubs/[token]`, the Market from `useClubMarket` (newest 200 deals + the pool's `token=` filter), `/members`, `/posts`, `/membership`, `/profile` | join/leave, post, report, and the staff actions below |
 
 **Without a store or Privy,** the routes return `{enabled:false}` and the screens show a read-only Club with a "not configured" note (like `NotConfigured` on the Account page). The cards still draw from the list; only the numbers are missing, and a note says so.
 
-**Tabs** (`components/Tabs.tsx`): Market, Board, Members, and Manage for staff only. Which one you see comes from the `role` returned by `GET .../membership`.
+**Explaining vs. using.** The home page explains Clubs (`components/ClubsIntro.tsx`: the three parts of a Club, the Momentum rules, the heat scale) and `/clubs` only works with them. `/clubs` is built for many Clubs: totals as chips, "Your Clubs", **Most active right now** (the top three by Momentum, as cards), **Rising this week** (biggest weekly gain) and **Most traded · 7 days** boards, then **All Clubs**: search by name, symbol or address, Collections / Memecoins, six sorts (busiest, rising, most traded, most members, recently active, A–Z), a list view (`ClubRow`, the default) or cards, remembered per browser, and "Show more" by 12. Archived Clubs sort last.
 
-- **Market** (`ClubMarket.tsx`): Have and Wanted use `DealGridV2` and `ListingGrid`; Completed is the Club's latest swaps. It says when the 200-deal scan limit was hit or the pool didn't answer.
-- **Board** (`ClubBoard.tsx`, `PostItem.tsx`): a composer for members (Note or Looking for, with a 280-character counter and the link field) and the list, pinned first. Each post offers Report, Delete (author or staff), and for staff Hide or Restore, and for the Owner Pin. A hidden post shows "hidden after reports" to everyone else.
-- **Members** (`ClubMembers.tsx`): the leaderboard with a Newest sort, `HolderBadge`, and Owner/Moderator badges. Staff get buttons by role: make or remove moderator, hand over, ban. Each is shown only when the viewer's role may act on that row (`mayActOn` in `lib/clubRoles.ts`, the same rule the server applies), and the server decides regardless.
-- **Manage** (`ClubManage.tsx`): the page editor (description, up to 3 `https://` links, "holders only can post"), the ban list, the "ownership changed on-chain" note (admins) and the moderation log.
+**Mock Clubs.** Outside production, `lib/demoClubs.ts` adds mock assets to `registry`: 11 Clubs at every pace (hot, busy, rising, steady, fading, quiet, one archived), two memecoins that share a collection's Club (CHOG with Mock Chog, TOADZ with Testnet Toads), and wrapped MON and a stablecoin, verified with no Club. The dev server's in-memory store is seeded with members, verified handles, posts, roles, swaps and a moderation log for every Club (`lib/server/demoClubs.ts`), through the same keys the real writes use. `NEXT_PUBLIC_DEMO_CLUBS=false` turns both off; the tests do. The seed runs once per server start.
 
-**Header** (`app/clubs/[address]/page.tsx`): name, symbol, Verified chip, Archived chip, `MomentumBadge`, stats (members, holders, swaps and new deals in 7 days, traders in 30 days, last activity), `JoinClubButton`, the description and links, and a **Claim** prompt for a member whose wallet is the token's `owner()` when the Club has no Owner.
+**Look.** Each Club wears one of five brand covers (`.club-theme-N` in `globals.css`), picked from its address by `clubTheme()` in `components/ClubArt.tsx`, so it looks the same everywhere. `ClubAvatar` shows the asset's `image` from the assets list, or its initials on the cover colours; a collection is a rounded square, a token a coin. Cards and panels use `.club-card` / `.club-panel` (the cream sticker of `page-section` without the tape). `HeatMeter` puts Momentum into words with five bars: Quiet, Stirring, Active, Busy, Hot (`heat()` in `lib/clubs.ts`). The Club styles sit in `@layer components`, so a utility on the same element wins.
+
+**Tabs:** Market, Board, Members, and Manage for staff only, each with its count, in the sticker tab bar. Which one is open lives in the URL (`?tab=board`), so a section can be linked; Manage needs the `role` returned by `GET .../membership`. Inside a section, second-level switches (For trade / Wanted / Recent swaps, the Board filter, the Members sort) use the lighter `components/Pills.tsx`. Per-row actions (report, delete, hide, pin, ban, roles, leave) sit behind a "⋯" `components/ActionMenu.tsx`, which asks `window.confirm` for what can't be undone.
+
+- **Market** (`ClubMarket.tsx`): For trade and Wanted use `ListingGrid`; Recent swaps is the Club's latest completed swaps, with both sides. The page loads `useClubMarket` once and passes it down, so the tab count and the tab agree. An empty list says what would be there and offers Create deal. It says when the 200-deal scan limit was hit or the pool didn't answer.
+- **Board** (`ClubBoard.tsx`, `PostItem.tsx`): a composer for members (Note or Looking for, a ring counting down the 280 characters, the link field) and the feed, pinned first, with an All / Looking for filter. A visitor sees a "Join the conversation" panel; a member who doesn't hold the asset in a holders-only Club is told why they can't post. Each post's menu offers Report, Delete (author or staff), and for staff Hide or Restore and Ban author, and for the Owner Pin. A hidden post shows "hidden after reports" to everyone else.
+- **Members** (`ClubMembers.tsx`): the leaderboard, with a podium for the top three once three members have traded, a bar for each member's share of the top score, a Newest sort, `HolderBadge`, and Owner/Moderator chips. Staff get a menu by role: make or remove moderator, hand over, ban. It is shown only when the viewer's role may act on that row (`mayActOn` in `lib/clubRoles.ts`, the same rule the server applies), and the server decides regardless.
+- **Manage** (`ClubManage.tsx`): the page editor (description, up to 3 `https://` links, "holders only can post"), the ban list, the "ownership changed on-chain" note (admins) and the moderation log as a timeline.
+
+**Side column** (`ClubSidebar.tsx`): the heat scale with this Club's step marked, the top five traders (hidden while the Members tab is open) and the asset's details: contract with copy and explorer link, kind, and why it is verified. Below `lg` it follows the tab content.
+
+**Header** (`app/clubs/[address]/page.tsx`): the cover with the avatar over its edge, name, symbol and kind, a Verified chip (its tooltip is the list's note), when it was last active, `JoinClubButton` (Leave sits in its "⋯" menu), the description and links, and a stats strip (Momentum and its weekly change, members and holders, swaps and new deals in 7 days, traders in 30 days, heat). Under it, as alerts: a **Claim** prompt for a member whose wallet is the token's `owner()` when the Club has no Owner, the archived note, and the activity-log note.
 
 **Sign-in and writes.** `hooks/useSignIn.ts` opens Privy; `hooks/useClubMembership.ts`, `useClubBoard.ts` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`) use React Query and `useAccessToken`, send the Privy access token, and report errors through `useToast`. A failed load uses `LoadError`. Server refusals (`banned`, `cooldown`, `rate_limited`, `link_mismatch`, …) arrive as `{error, message}` and the message is what the toast shows.
 
@@ -255,7 +264,7 @@ The **Escrow panel** keeps the spec's picture: `Maker ✓ deposited` (always tru
 
 **Reporting activity.** `lib/fillReport.ts` (`mayReport`, `reportTx`) posts a transaction hash to `/api/activity` after a fill or a V2 create, so Momentum counts the deal. It is fire-and-forget, except a fill, which History waits for.
 
-**Not built:** the banner image, notifications for Club posts and deals, and in-app requests for new Clubs.
+**Not built:** an uploaded banner image (the cover is generated, and the avatar art comes from the assets list), notifications for Club posts and deals, and in-app requests for new Clubs.
 
 ## Listing a wallet's Chogs
 

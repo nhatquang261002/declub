@@ -15,7 +15,7 @@ import {
 } from "../members";
 import { score } from "../momentum";
 import { profileKey, userWalletsKey, type StoredProfile } from "../profiles";
-import type { AssetEntry } from "../verifiedAssets";
+import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { withoutUser } from "../clubRoles";
 import { isBanned, loadRoles, saveRoles } from "./clubState";
 import type { Store } from "./store";
@@ -70,11 +70,20 @@ export async function sharedWallets(store: Store, userId: string): Promise<Set<s
 
 export const getMember = (store: Store, token: string, userId: string) => store.get<MemberRow>(memberKey(token, userId));
 
-/** The row's holder flag as of now, or the old one if the chain couldn't be read. */
-async function checked(entry: AssetEntry, row: MemberRow, deps: MemberDeps): Promise<MemberRow> {
-  const balances = await (deps.holdings ?? viemHoldings)(entry.address, row.wallets as Address[]).catch(() => null);
-  if (!balances) return row;
-  return { ...row, holder: isHolder(entry, balances), holderCheckedAt: nowOf(deps) };
+/**
+ * The row's holder flag as of now: holding any of the Club's assets earns it. The old row comes
+ * back when the chain couldn't be read and what it could read doesn't already settle it.
+ */
+async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps): Promise<MemberRow> {
+  const read = deps.holdings ?? viemHoldings;
+  const results = await Promise.all(
+    clubAssets(entry).map(async (asset) => {
+      const balances = await read(asset.address, row.wallets as Address[]).catch(() => null);
+      return balances && isHolder(asset, balances);
+    }),
+  );
+  if (!results.includes(true) && results.includes(null)) return row;
+  return { ...row, holder: results.includes(true), holderCheckedAt: nowOf(deps) };
 }
 
 export type JoinResult =
@@ -84,7 +93,7 @@ export type JoinResult =
 /** Joins `userId` to the Club. Joining twice is the same as once. */
 export async function joinClub(
   store: Store,
-  entry: AssetEntry,
+  entry: ClubEntry,
   userId: string,
   wallets: readonly string[],
   deps: MemberDeps = {},
@@ -164,7 +173,7 @@ export const memberCount = (store: Store, token: string) => store.countMembers(m
  */
 export async function listMembers(
   store: Store,
-  entry: AssetEntry,
+  entry: ClubEntry,
   events: readonly ActivityEvent[],
   sort: MemberSort,
   nowSec: number,

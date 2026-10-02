@@ -6,12 +6,14 @@
     "name": "Mock Chog",
     "symbol": "MCHOG",
     "status": "verified",
-    "note": "The project's own test collection on Monad testnet, deployed from this repo (source-verified on Sourcify)."
+    "note": "The project's own test collection on Monad testnet, deployed from this repo (source-verified on Sourcify).",
+    "image": "/art/chogs/chog-01.png"
   },
   {
     "chainId": 10143,
     "address": "0xd300f095f456D59AAc122B0100833fE195136F6c",
     "kind": "erc20",
+    "category": "stablecoin",
     "name": "Mock USD",
     "symbol": "mUSD",
     "status": "verified",
