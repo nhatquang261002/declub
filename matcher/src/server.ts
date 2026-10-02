@@ -70,10 +70,10 @@ function send(res: ServerResponse, status: number, body: unknown) {
  * The pool's HTTP API:
  *   GET    /info                       chain, contract, matcher address and the protocol fee
  *   POST   /intents      {intent, signature}   verify and store
- *   GET    /intents      ?status=&maker=&give=&want=&limit=   the book (default: open)
+ *   GET    /intents      ?status=&maker=&give=&want=&token=&limit=   the book (default: open)
  *   GET    /intents/:hash
  *   DELETE /intents/:hash   {signature}  drop it; signed by the maker over CancelIntent(hash)
- *   GET    /settlements  ?maker=&limit=  settled cycles, with their intents
+ *   GET    /settlements  ?maker=&token=&after=&limit=  settled cycles, with their intents
  */
 export function createPoolServer(pool: Pool, info: ServerInfo): Server {
   const settlementJson = (s: Settlement) => ({
@@ -107,6 +107,8 @@ export function createPoolServer(pool: Pool, info: ServerInfo): Server {
         if (!STATUSES.has(status)) throw new HttpError(400, "bad_request", "unknown status");
         const maker = q.get("maker");
         if (maker && !isAddress(maker)) throw new HttpError(400, "bad_request", "bad maker");
+        const token = q.get("token");
+        if (token && !isAddress(token)) throw new HttpError(400, "bad_request", "bad token");
         const limit = q.has("limit") ? Number(q.get("limit")) : undefined;
         if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) {
           throw new HttpError(400, "bad_request", "bad limit");
@@ -116,6 +118,7 @@ export function createPoolServer(pool: Pool, info: ServerInfo): Server {
           maker: (maker as `0x${string}` | null) ?? undefined,
           give: q.get("give") ?? undefined,
           want: q.get("want") ?? undefined,
+          token: (token as `0x${string}` | null) ?? undefined,
           limit,
         });
         return send(res, 200, { intents: rows.map(rowJson) });
@@ -141,9 +144,21 @@ export function createPoolServer(pool: Pool, info: ServerInfo): Server {
     if (req.method === "GET" && parts.length === 1 && parts[0] === "settlements") {
       const maker = q.get("maker");
       if (maker && !isAddress(maker)) throw new HttpError(400, "bad_request", "bad maker");
+      const token = q.get("token");
+      if (token && !isAddress(token)) throw new HttpError(400, "bad_request", "bad token");
+      const after = q.has("after") ? Number(q.get("after")) : undefined;
+      if (after !== undefined && !(Number.isInteger(after) && after >= 0)) {
+        throw new HttpError(400, "bad_request", "bad after");
+      }
+      const limit = q.has("limit") ? Number(q.get("limit")) : undefined;
+      if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) {
+        throw new HttpError(400, "bad_request", "bad limit");
+      }
       const rows = pool.store.settlements({
         maker: (maker as `0x${string}` | null) ?? undefined,
-        limit: q.has("limit") ? Number(q.get("limit")) : undefined,
+        token: (token as `0x${string}` | null) ?? undefined,
+        after,
+        limit,
       });
       return send(res, 200, { settlements: rows.map(settlementJson) });
     }

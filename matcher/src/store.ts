@@ -33,8 +33,16 @@ export interface ListFilter {
   /** An `assetKey` that must be on the give / want side. */
   give?: string;
   want?: string;
+  /** A token address: the intent names it, as any type or id, on either side. */
+  token?: Address;
   limit?: number;
 }
+
+/**
+ * SQL for "this `intent_assets` row (alias `a`) is for token `?`". The key is `type:token:id`
+ * with a one-digit type, so the address starts at the third character (`assetKey`, intent.ts).
+ */
+const NAMES_TOKEN = "substr(a.key, 3, 42) = ?";
 
 type DbRow = Record<string, string | number | bigint | null | Uint8Array>;
 
@@ -143,6 +151,10 @@ export class Store {
         args.push(side, key.toLowerCase());
       }
     }
+    if (f.token) {
+      where.push(`EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND ${NAMES_TOKEN})`);
+      args.push(f.token.toLowerCase());
+    }
     const sql = `SELECT i.* FROM intents i ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
                  ORDER BY i.created_at ASC, i.hash ASC LIMIT ?`;
     args.push(Math.min(f.limit ?? 100, 500));
@@ -176,19 +188,33 @@ export class Store {
       .run(s.txHash, s.blockNumber, s.at, JSON.stringify(s.hashes));
   }
 
-  settlements(f: { maker?: Address; limit?: number } = {}): Settlement[] {
+  /**
+   * Settled cycles, newest first. `token` keeps the cycles with an intent that names that token.
+   * `after` (milliseconds) keeps only later ones and returns them oldest first, so a reader can
+   * page forward from where it stopped without skipping any.
+   */
+  settlements(f: { maker?: Address; token?: Address; after?: number; limit?: number } = {}): Settlement[] {
     const limit = Math.min(f.limit ?? 50, 200);
-    const rows = (
-      f.maker
-        ? this.db
-            .prepare(
-              `SELECT * FROM settlements
-               WHERE tx_hash IN (SELECT settlement_tx FROM intents WHERE maker = ?)
-               ORDER BY at DESC LIMIT ?`,
-            )
-            .all(f.maker.toLowerCase(), limit)
-        : this.db.prepare("SELECT * FROM settlements ORDER BY at DESC LIMIT ?").all(limit)
-    ) as DbRow[];
+    const where: string[] = [];
+    const args: SQLInputValue[] = [];
+    if (f.maker) {
+      where.push("tx_hash IN (SELECT settlement_tx FROM intents WHERE maker = ?)");
+      args.push(f.maker.toLowerCase());
+    }
+    if (f.token) {
+      where.push(
+        `tx_hash IN (SELECT i.settlement_tx FROM intents i JOIN intent_assets a ON a.hash = i.hash
+                     WHERE i.settlement_tx IS NOT NULL AND ${NAMES_TOKEN})`,
+      );
+      args.push(f.token.toLowerCase());
+    }
+    if (f.after !== undefined) {
+      where.push("at > ?");
+      args.push(f.after);
+    }
+    const sql = `SELECT * FROM settlements ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+                 ORDER BY at ${f.after !== undefined ? "ASC" : "DESC"}, tx_hash LIMIT ?`;
+    const rows = this.db.prepare(sql).all(...args, limit) as DbRow[];
     return rows.map((r) => ({
       txHash: r.tx_hash as Hex,
       blockNumber: Number(r.block_number),

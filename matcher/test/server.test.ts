@@ -85,6 +85,11 @@ describe("pool HTTP API", { skip }, () => {
     assert.equal((await call("GET", `/intents?maker=${w.alice.address}&give=${give}`)).json.intents.length, 1);
     assert.equal((await call("GET", `/intents?maker=${w.bob.address}&give=${give}`)).json.intents.length, 0);
     assert.equal((await call("GET", `/intents?give=${give}&status=settled`)).json.intents.length, 0);
+    const collection = w.chogOf(id).token;
+    const byToken = await call("GET", `/intents?token=${collection}`);
+    assert.ok(byToken.json.intents.some((i: { hash: Hex }) => i.hash === hash), "any id of the collection");
+    assert.equal((await call("GET", `/intents?token=${w.wmon}&maker=${w.alice.address}`)).json.intents.length, 0);
+    assert.equal((await call("GET", "/intents?token=nope")).status, 400);
 
     const one = await call("GET", `/intents/${hash}`);
     assert.equal(one.status, 200);
@@ -157,5 +162,17 @@ describe("pool HTTP API", { skip }, () => {
     const forBob = await call("GET", `/settlements?maker=${w.bob.address}`);
     assert.ok(!forBob.json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash));
     assert.equal((await call("GET", "/settlements?maker=nope")).status, 400);
+
+    const byToken = await call("GET", `/settlements?token=${w.chogOf(id!).token}`);
+    assert.ok(byToken.json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash));
+    assert.ok(byToken.json.settlements.every((s: { cycle: { intent: { give: { token: string }[]; want: { token: string }[] } }[] }) =>
+      s.cycle.some((i) => [...i.intent.give, ...i.intent.want].some((a) => a.token.toLowerCase() === w.chogOf(id!).token.toLowerCase())),
+    ), "every cycle names the token");
+    const later = await call("GET", `/settlements?after=${mine.at}`);
+    assert.ok(!later.json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash), "after is exclusive");
+    assert.ok((await call("GET", "/settlements?after=0")).json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash));
+    for (const bad of ["token=nope", "after=-1", "after=x", "limit=0"]) {
+      assert.equal((await call("GET", `/settlements?${bad}`)).status, 400, bad);
+    }
   });
 });
