@@ -16,8 +16,27 @@ for (const [key, value] of Object.entries(root)) {
   if (key.startsWith("NEXT_PUBLIC_")) process.env[key] ??= value;
 }
 
+/**
+ * Sent with every response. The app may not be framed by anyone (clickjacking a signing or deal
+ * button), though it frames others itself: Privy's auth.privy.io iframe lives inside our pages, and
+ * these headers on our responses don't affect it. Only `frame-ancestors` is set in the CSP: a
+ * script policy would have to allow Privy, WalletConnect and the wallets' own scripts.
+ * Permissions-Policy turns off only features the app never uses; WebAuthn (passkeys) and payment
+ * stay available to Privy's frames.
+ */
+const SECURITY_HEADERS = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+];
+
 const nextConfig: NextConfig = {
   turbopack: { root: __dirname },
+  async headers() {
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+  },
 };
 
 export default nextConfig;

@@ -31,6 +31,8 @@ export type StoredPost = {
   /** Epoch ms. */
   at: number;
   hidden?: HiddenBy;
+  /** Someone has reported it since it was posted or last restored (so staff are shown the count). */
+  reported?: true;
 };
 
 /** A post as one viewer sees it. */
@@ -45,7 +47,7 @@ export type PublicPost = {
   hidden: HiddenBy | null;
   pinned: boolean;
   mine: boolean;
-  /** Moderators only: how many members reported it. */
+  /** Moderators only, on a reported post: how many members reported it. */
   reports?: number;
 };
 

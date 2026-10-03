@@ -31,6 +31,11 @@ export function mayActOn(actor: ClubRole, target: ClubRole): boolean {
   return false;
 }
 
+const RANK: Record<ClubRole, number> = { member: 0, moderator: 1, owner: 2, admin: 3 };
+
+/** Whether `actor` ranks at least as high as `required` (admin > owner > moderator > member). */
+export const atLeast = (actor: ClubRole, required: ClubRole) => RANK[actor] >= RANK[required];
+
 /** Pinning, appointing Moderators and editing the Club's profile. */
 export const isOwnerOrAdmin = (role: ClubRole) => role === "owner" || role === "admin";
 

@@ -181,9 +181,37 @@ function devStore(): Store {
   ) as Store;
 }
 
-/** Best-effort caller id for rate limits. Only trustworthy behind a proxy that sets the header. */
-export function clientId(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+/**
+ * The caller's IP for rate limits, taken only from headers this deployment's own proxy sets:
+ *
+ * - On Vercel (`VERCEL` is set), the platform's `x-vercel-forwarded-for` / `x-real-ip`, which
+ *   Vercel overwrites, so a client can't choose them.
+ * - Behind another proxy, set TRUST_PROXY to the number of proxies in front of the app (`true`
+ *   means 1): the entry that many places from the right of `x-forwarded-for` is the one the
+ *   outermost trusted proxy appended. Anything to its left was written by the client.
+ * - Otherwise every header is the client's word, so none is used and all callers share one bucket.
+ */
+export function clientId(request: Request, env: { VERCEL?: string; TRUST_PROXY?: string; [name: string]: string | undefined } = process.env): string {
+  const h = request.headers;
+  if (env.VERCEL) {
+    const ip = h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim();
+    if (ip) return ip;
+  }
+  const hops = trustedHops(env.TRUST_PROXY);
+  if (hops > 0) {
+    const chain = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const ip = chain[chain.length - hops];
+    if (ip) return ip;
+  }
+  return "unknown";
+}
+
+function trustedHops(value: string | undefined): number {
+  const v = value?.trim().toLowerCase();
+  if (!v || v === "false" || v === "0") return 0;
+  if (v === "true") return 1;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
 /** True while `id` is within `limit` hits per `windowSec`. A store that errors never blocks anyone. */

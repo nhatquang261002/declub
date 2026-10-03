@@ -42,6 +42,7 @@ Without Upstash credentials, the server store is off in production; outside prod
 | `CRON_SECRET` | `web/.env.local` | Guards `GET /api/cron/fills`. Blank = the fill watcher is off |
 | `FILL_WATCHER_START_BLOCK` | `web/.env.local` | Where the watcher's first run starts. Blank = the current head |
 | `CLUB_ADMIN_USER_IDS` | `web/.env.local` | Clubs' app admins (Privy user ids, comma-separated) |
+| `TRUST_PROXY` | host environment | Self-hosting behind a proxy: how many proxies append to `X-Forwarded-For` (`true` = 1), so rate limits see the caller's IP. Not needed on Vercel. Blank = no forwarding header is trusted and all callers share one limit |
 
 `NEXT_PUBLIC_CHOG_MINTABLE` is still read in `lib/config.ts` but nothing uses it since the mint panel was removed.
 

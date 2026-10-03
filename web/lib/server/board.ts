@@ -21,7 +21,7 @@ import {
   type PublicPost,
   type StoredPost,
 } from "../clubPosts";
-import { applyRole, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type ClubRole, type RoleChange } from "../clubRoles";
+import { applyRole, atLeast, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type ClubRole, type RoleChange } from "../clubRoles";
 import { toAsset } from "../assets";
 import { getIntent } from "../pool";
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
@@ -31,6 +31,7 @@ import {
   adminIds,
   appendLog,
   banKey,
+  banRole,
   clubProfileKey,
   isBanned,
   loadBans,
@@ -72,6 +73,8 @@ const isAdmin = (deps: Deps, userId: string) => (deps.admins ?? adminIds()).has(
 export const postsKey = (token: string) => `ondeal:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
 export const postKey = (token: string, id: string) => `ondeal:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 export const reportsKey = (token: string, id: string) => `ondeal:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+/** The reports that count toward hiding a post: those filed by Holders and staff. */
+export const countedReportsKey = (token: string, id: string) => `ondeal:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
 /** The user's role in the Club, an app admin's outranking everything. */
 export async function roleIn(store: Store, token: string, userId: string, deps: Deps = {}): Promise<ClubRole> {
@@ -196,16 +199,21 @@ export async function listPosts(
   const rows = await store.getMany<StoredPost>(wanted.map((id) => postKey(token, id)));
   const live = new Map(rows.flatMap((row) => (row ? [[row.id, row] as const] : [])));
   const recent = ids.flatMap((id) => (live.has(id) ? [live.get(id)!] : [])).slice(0, POSTS_SHOWN);
-  const older = profile.pinned.flatMap((id) => (live.has(id) && !recent.some((p) => p.id === id) ? [live.get(id)!] : []));
-  const ordered = pinnedFirst([...recent, ...older], profile.pinned);
+  // Reports may hide a pinned post without unpinning it (so a restore puts it back). Until then it
+  // isn't shown as pinned, except to staff, who need to see what they'd be restoring.
+  const pinned = staff ? profile.pinned : profile.pinned.filter((id) => !live.get(id)?.hidden);
+  const older = pinned.flatMap((id) => (live.has(id) && !recent.some((p) => p.id === id) ? [live.get(id)!] : []));
+  const ordered = pinnedFirst([...recent, ...older], pinned);
 
+  // Staff see the report count of every reported post, hidden or not: reports that don't count
+  // toward hiding (from members who aren't Holders) still reach them for review.
   const counts = new Map<string, number>();
   if (staff) {
     await Promise.all(
-      ordered.filter((p) => p.hidden).map(async (p) => counts.set(p.id, await store.countMembers(reportsKey(token, p.id)))),
+      ordered.filter((p) => p.hidden || p.reported).map(async (p) => counts.set(p.id, await store.countMembers(reportsKey(token, p.id)))),
     );
   }
-  return { posts: ordered.map((p) => viewPost(p, { userId: viewer.userId, staff }, profile.pinned.includes(p.id), counts.get(p.id))), role };
+  return { posts: ordered.map((p) => viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id))), role };
 }
 
 export type Refusal = "archived" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden";
@@ -221,13 +229,20 @@ export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, 
     const mine = roleOf(roles, actor.userId, isAdmin(deps, actor.userId));
     if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
   }
-  await store.del(postKey(token, id), reportsKey(token, id));
+  await store.del(postKey(token, id), reportsKey(token, id), countedReportsKey(token, id));
   await unpin(store, token, id);
   if (!own) await log(store, entry, actor, "delete_post", id);
   return { ok: true };
 }
 
-/** A member's report. At `REPORTS_TO_HIDE` distinct reports the post is hidden. */
+/**
+ * A member's report. Every report is kept and shown to staff, but only those from Holders and staff
+ * count toward hiding: at `REPORTS_TO_HIDE` of those the post is hidden. Joining a Club is free, so
+ * otherwise a handful of throwaway accounts could hide any post. A post by staff (Owner, Moderator
+ * or app admin) is never hidden by reports: only someone who outranks its author may hide it.
+ *
+ * A hidden post stays pinned (it isn't shown as pinned while hidden), so a restore puts it back.
+ */
 export async function reportPost(
   store: Store,
   entry: AssetEntry,
@@ -237,25 +252,31 @@ export async function reportPost(
 ): Promise<{ ok: true; hidden: boolean } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   if (entry.club === "archived") return { ok: false, reason: "archived" };
-  if (!(await getMember(store, token, userId))) return { ok: false, reason: "not_member" };
+  const row = await getMember(store, token, userId);
+  if (!row) return { ok: false, reason: "not_member" };
   if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
   const post = await getPost(store, token, id);
   if (!post) return { ok: false, reason: "not_found" };
   if (post.userId === userId) return { ok: false, reason: "own_post" };
   if (!(await withinLimit(store, "club-report", userId, REPORTS_PER_DAY, 86_400))) return { ok: false, reason: "rate_limited" };
 
+  const roles = await loadRoles(store, token);
+  const reporterStaff = isStaff(roleOf(roles, userId, isAdmin(deps, userId)));
+  const authorStaff = isStaff(roleOf(roles, post.userId, isAdmin(deps, post.userId)));
+
   await store.addMember(reportsKey(token, id), userId);
-  const reports = await store.countMembers(reportsKey(token, id));
-  if (reports >= REPORTS_TO_HIDE && !post.hidden) {
-    await store.set(postKey(token, id), { ...post, hidden: "reports" } satisfies StoredPost);
-    await unpin(store, token, id);
-    await appendLog(store, token, { actor: "reports", action: "auto_hide", target: id, detail: `${reports} reports` }, nowOf(deps));
+  if (row.holder || reporterStaff) await store.addMember(countedReportsKey(token, id), userId);
+  const counted = await store.countMembers(countedReportsKey(token, id));
+  if (counted >= REPORTS_TO_HIDE && !post.hidden && !authorStaff) {
+    await store.set(postKey(token, id), { ...post, reported: true, hidden: "reports" } satisfies StoredPost);
+    await appendLog(store, token, { actor: "reports", action: "auto_hide", target: id, detail: `${counted} reports` }, nowOf(deps));
     return { ok: true, hidden: true };
   }
+  if (!post.reported) await store.set(postKey(token, id), { ...post, reported: true } satisfies StoredPost);
   return { ok: true, hidden: !!post.hidden };
 }
 
-/** A hidden post isn't left pinned at the top of the board. */
+/** Takes a post off the pinned list. */
 async function unpin(store: Store, token: string, id: string): Promise<void> {
   const profile = await loadProfile(store, token);
   if (profile.pinned.includes(id)) await saveProfile(store, token, { ...profile, pinned: profile.pinned.filter((p) => p !== id) });
@@ -272,13 +293,15 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
   if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
 
   if (hide) {
+    // A deliberate hide by staff also unpins; a hide by reports doesn't (see `reportPost`).
     await store.set(postKey(token, id), { ...post, hidden: "moderator" } satisfies StoredPost);
     await unpin(store, token, id);
   } else {
     const visible: StoredPost = { ...post };
     delete visible.hidden;
+    delete visible.reported;
     await store.set(postKey(token, id), visible);
-    await store.del(reportsKey(token, id));
+    await store.del(reportsKey(token, id), countedReportsKey(token, id));
   }
   await log(store, entry, actor, hide ? "hide_post" : "restore_post", id);
   return { ok: true };
@@ -307,10 +330,14 @@ export async function pinPost(store: Store, entry: AssetEntry, actor: Actor, id:
 // ---------------------------------------------------------------------------------------------
 // Bans
 
-/** The member whose display or linked wallet is `wallet`. */
+/**
+ * The member whose Club wallet (the one shown on the board and in the member list) is `wallet`.
+ * Their other linked wallets don't match: staff name members by what the Club shows, and matching
+ * a wallet the member never showed would tell staff who owns it.
+ */
 async function memberByWallet(store: Store, token: string, wallet: string) {
   const w = wallet.toLowerCase();
-  return (await allRows(store, token)).find((row) => row.displayWallet === w || row.wallets.includes(w)) ?? null;
+  return (await allRows(store, token)).find((row) => row.displayWallet === w) ?? null;
 }
 
 export type BanTarget = { wallet?: unknown; post?: unknown };
@@ -350,7 +377,7 @@ export async function banUser(
 
   const scope = everywhere ? ALL : token;
   const bans = await loadBans(store, scope);
-  await saveBans(store, scope, { ...bans, [userId]: { wallet, at: nowOf(deps), by: actor.wallet } satisfies Ban });
+  await saveBans(store, scope, { ...bans, [userId]: { wallet, at: nowOf(deps), by: actor.wallet, role: mine } satisfies Ban });
   if (everywhere) {
     await Promise.all((await store.members(userClubsKey(userId))).map((t) => leaveClub(store, t, userId)));
   } else {
@@ -360,7 +387,10 @@ export async function banUser(
   return { ok: true, wallet };
 }
 
-/** Lifts a ban made in this Club, or (admins) everywhere. It doesn't put the user back in. */
+/**
+ * Lifts a ban made in this Club, or (admins) everywhere. It doesn't put the user back in. Only
+ * someone of at least the banner's rank may lift it.
+ */
 export async function unbanUser(store: Store, entry: AssetEntry, actor: Actor, wallet: string, everywhere: boolean, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   const mine = await roleIn(store, token, actor.userId, deps);
@@ -369,6 +399,7 @@ export async function unbanUser(store: Store, entry: AssetEntry, actor: Actor, w
   const bans = await loadBans(store, scope);
   const found = Object.entries(bans).find(([, ban]) => ban.wallet === wallet.toLowerCase());
   if (!found) return { ok: false, reason: "not_found" };
+  if (!atLeast(mine, banRole(found[1]))) return { ok: false, reason: "forbidden" };
   const rest = { ...bans };
   delete rest[found[0]];
   await saveBans(store, scope, rest);
@@ -479,7 +510,7 @@ export async function purgeClub(store: Store, token: string): Promise<PurgeCount
   await store.del(...ids.map((id) => memberKey(lower, id)), membersKey(lower));
 
   const postIds = await store.ranked(postsKey(lower), POSTS_KEPT);
-  await store.del(...postIds.flatMap((id) => [postKey(lower, id), reportsKey(lower, id)]), postsKey(lower));
+  await store.del(...postIds.flatMap((id) => [postKey(lower, id), reportsKey(lower, id), countedReportsKey(lower, id)]), postsKey(lower));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
   return { members: ids.length, posts: postIds.length };
 }

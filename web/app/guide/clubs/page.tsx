@@ -199,7 +199,8 @@ export default function ClubsGuidePage() {
               </h3>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
                 Report a post that&apos;s spam or abuse, once per post and never your own. When {REPORTS_TO_HIDE} different
-                members have reported it, the post is hidden from everyone except its author and the staff.
+                Holders (or staff) have reported it, the post is hidden from everyone except its author and the staff.
+                Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A moderator then restores it or deletes it.</p>
             </div>

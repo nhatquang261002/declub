@@ -43,7 +43,8 @@ describe("setup", () => {
     for (const [id, n] of Object.entries(users)) {
       await store.set(profileKey(wallet(n)), { provider: "twitter", handle: `u${n}`, userId: id, updatedAt: 1 });
       await store.setMembers(userWalletsKey(id), [wallet(n)]);
-      assert.ok((await joinClub(store, reg.clubFor(NFT)!, id, [wallet(n)], { holdings: async () => [0n] })).ok);
+      // m2 holds the token: only Holders' (and staff's) reports count toward hiding a post.
+      assert.ok((await joinClub(store, reg.clubFor(NFT)!, id, [wallet(n)], { holdings: async () => [id === "m2" ? 1n : 0n] })).ok);
     }
   });
 });

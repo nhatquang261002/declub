@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CHAIN_ID } from "../config";
 import { NO_PROFILE, type ClubProfile } from "../clubPosts";
-import { NO_ROLES, type Roles } from "../clubRoles";
+import { NO_ROLES, type ClubRole, type Roles } from "../clubRoles";
 import type { Store } from "./store";
 
 /**
@@ -34,7 +34,15 @@ export async function loadProfile(store: Store, token: string): Promise<ClubProf
 }
 export const saveProfile = (store: Store, token: string, profile: ClubProfile) => store.set(clubProfileKey(token), profile);
 
-export type Ban = { wallet: string; at: number; by: string };
+/**
+ * `role` is the banner's role when they banned: lifting the ban takes at least that rank, so a
+ * Moderator can't undo the Owner's or an admin's ban. Bans stored before it was recorded have none
+ * and count as the Owner's (`banRole`).
+ */
+export type Ban = { wallet: string; at: number; by: string; role?: ClubRole };
+
+/** The rank needed to lift `ban`. Older bans without a role are treated as made by the Owner. */
+export const banRole = (ban: Ban): ClubRole => ban.role ?? "owner";
 export type Bans = Record<string, Ban>;
 
 export async function loadBans(store: Store, token: string): Promise<Bans> {

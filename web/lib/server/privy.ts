@@ -24,13 +24,32 @@ function client(): PrivyClient {
  * from Privy by user id, never taken from the request.
  */
 export async function authenticate(request: Request): Promise<User | null> {
+  const userId = await verifiedUserId(request);
+  return userId ? userById(userId) : null;
+}
+
+/**
+ * The Privy user id in a valid `Authorization: Bearer` access token, or `null`. The signature is
+ * checked against the app's keys, which are fetched once and cached, so this costs no per-request
+ * call to Privy; `userById` is that call.
+ */
+export async function verifiedUserId(request: Request): Promise<string | null> {
   if (!privyServerConfigured) return null;
   const header = request.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
   if (!token) return null;
   try {
-    const claims = await client().utils().auth().verifyAccessToken(token);
-    return await client().users()._get(claims.user_id);
+    return (await client().utils().auth().verifyAccessToken(token)).user_id;
+  } catch {
+    return null;
+  }
+}
+
+/** The user and their linked accounts, read from Privy; `null` when the lookup fails. */
+export async function userById(userId: string): Promise<User | null> {
+  if (!privyServerConfigured) return null;
+  try {
+    return await client().users()._get(userId);
   } catch {
     return null;
   }

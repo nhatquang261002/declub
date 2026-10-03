@@ -175,7 +175,7 @@ describe("reports", () => {
   it("hides a post at three distinct reports, never counting one member twice", async () => {
     const { store, deps } = await club1();
     const id = await posted(store, "m1", "scam");
-    const reporters = [await member(store, "r1", 11), await member(store, "r2", 12), await member(store, "r3", 13)];
+    const reporters = [await member(store, "r1", 11, { holder: true }), await member(store, "r2", 12, { holder: true }), await member(store, "r3", 13, { holder: true })];
     assert.deepEqual(await reportPost(store, club, "r1", id, deps), { ok: true, hidden: false });
     assert.deepEqual(await reportPost(store, club, "r1", id, deps), { ok: true, hidden: false }, "the same member again adds nothing");
     assert.deepEqual(await reportPost(store, club, "r2", id, deps), { ok: true, hidden: false });
@@ -218,26 +218,71 @@ describe("reports", () => {
     const { store, mod, deps } = await club1();
     const id = await posted(store, "m1");
     for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) {
-      await member(store, u, n);
+      await member(store, u, n, { holder: true });
       await reportPost(store, club, u, id, deps);
     }
     assert.ok((await hidePost(store, club, mod, id, false, deps)).ok);
     assert.equal((await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!.hidden, null);
-    await member(store, "r4", 14);
+    assert.equal((await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!.reports, undefined, "no reports left to show");
+    await member(store, "r4", 14, { holder: true });
     assert.deepEqual(await reportPost(store, club, "r4", id, deps), { ok: true, hidden: false }, "one new report is not three");
   });
 });
 
+describe("who reports count", () => {
+  it("counts only Holders' and staff's reports toward hiding, but shows staff every report", async () => {
+    const { store, deps } = await club1();
+    const id = await posted(store, "m1", "contested");
+    for (const [u, n] of [["f1", 31], ["f2", 32], ["f3", 33], ["f4", 34]] as const) {
+      await member(store, u, n);
+      assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false }, `${u} isn't a Holder`);
+    }
+    assert.equal((await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!.reports, undefined, "members don't see counts");
+    const asMod = (await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!;
+    assert.equal(asMod.hidden, null);
+    assert.equal(asMod.reports, 4, "staff see reports on a post that is still up");
+
+    await member(store, "h1", 35, { holder: true });
+    await member(store, "h2", 36, { holder: true });
+    assert.deepEqual(await reportPost(store, club, "h1", id, deps), { ok: true, hidden: false });
+    assert.deepEqual(await reportPost(store, club, "h2", id, deps), { ok: true, hidden: false });
+    // A Moderator's report counts like a Holder's: they could hide it themselves anyway.
+    assert.deepEqual(await reportPost(store, club, "mod", id, deps), { ok: true, hidden: true });
+    assert.equal((await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!.reports, 7);
+  });
+
+  it("never hides a post by the Owner, a Moderator or an admin", async () => {
+    const { store, deps } = await club1();
+    await member(store, "adm", 99);
+    const ids = [await posted(store, "own", "owner"), await posted(store, "mod", "moderator"), await posted(store, "adm", "admin")];
+    for (const [u, n] of [["h1", 41], ["h2", 42], ["h3", 43], ["h4", 44]] as const) {
+      await member(store, u, n, { holder: true });
+      for (const id of ids) assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false });
+    }
+    const seen = (await listPosts(store, club, { userId: "own" }, deps)).posts;
+    assert.deepEqual(seen.map((p) => p.hidden), [null, null, null]);
+    assert.deepEqual(seen.map((p) => p.reports), [4, 4, 4], "the reports still reach staff");
+  });
+});
+
 describe("moderating posts", () => {
-  it("unpins a post that reports hid", async () => {
-    const { store, own, deps } = await club1();
-    const id = await posted(store, "m1");
+  it("keeps the pin on a post that reports hid, shows it unpinned until restored, then pinned again", async () => {
+    const { store, own, mod, deps } = await club1();
+    const id = await posted(store, "m1", "pinned");
+    await posted(store, "m2", "newer");
     await pinPost(store, club, own, id, true, deps);
     for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) {
-      await member(store, u, n);
+      await member(store, u, n, { holder: true });
       await reportPost(store, club, u, id, deps);
     }
-    assert.deepEqual((await loadProfile(store, token)).pinned, []);
+    assert.deepEqual((await loadProfile(store, token)).pinned, [id], "the pin is kept");
+    const asMember = (await listPosts(store, club, { userId: "m2" }, deps)).posts;
+    assert.deepEqual(asMember.find((p) => p.id === id), { ...asMember.find((p) => p.id === id)!, text: null, pinned: false }, "not shown as pinned while hidden");
+    assert.equal((await listPosts(store, club, { userId: "own" }, deps)).posts[0]!.pinned, true, "staff see it is still pinned");
+
+    assert.ok((await hidePost(store, club, mod, id, false, deps)).ok);
+    const restored = (await listPosts(store, club, { userId: "m2" }, deps)).posts;
+    assert.deepEqual(restored.map((p) => [p.text, p.pinned]), [["pinned", true], ["newer", false]]);
   });
 
   it("lets staff hide and restore a member's post, logged", async () => {
@@ -373,6 +418,37 @@ describe("bans", () => {
     await banUser(store, club, adm, { wallet: wallet(4) }, true, deps);
     assert.deepEqual(await unbanUser(store, club, own, wallet(4), true, deps), { ok: false, reason: "forbidden" });
     assert.ok((await unbanUser(store, club, adm, wallet(4), true, deps)).ok);
+  });
+
+  it("takes at least the banner's rank to lift a ban; older bans without one count as the Owner's", async () => {
+    const { store, own, mod, deps, adm } = await club1();
+    await banUser(store, club, own, { wallet: wallet(3) }, false, deps);
+    assert.equal((await loadBans(store, token)).m1?.role, "owner");
+    assert.deepEqual(await unbanUser(store, club, mod, wallet(3), false, deps), { ok: false, reason: "forbidden" }, "a Moderator can't lift the Owner's ban");
+    assert.ok((await unbanUser(store, club, own, wallet(3), false, deps)).ok);
+
+    await banUser(store, club, adm, { wallet: wallet(4) }, false, deps);
+    assert.deepEqual(await unbanUser(store, club, own, wallet(4), false, deps), { ok: false, reason: "forbidden" }, "nor the Owner an admin's");
+    assert.ok((await unbanUser(store, club, adm, wallet(4), false, deps)).ok);
+
+    assert.ok((await joinClub(store, club, "m1", [wallet(3)], { holdings: noHold })).ok);
+    assert.ok((await banUser(store, club, mod, { wallet: wallet(3) }, false, deps)).ok);
+    assert.ok((await unbanUser(store, club, mod, wallet(3), false, deps)).ok, "a Moderator lifts a Moderator's ban");
+
+    // A ban stored before the role was recorded.
+    await store.set(`ondeal:club-ban:10143:${token}`, { m2: { wallet: wallet(4), at: 1, by: wallet(2) } });
+    assert.deepEqual(await unbanUser(store, club, mod, wallet(4), false, deps), { ok: false, reason: "forbidden" });
+    assert.ok((await unbanUser(store, club, own, wallet(4), false, deps)).ok);
+  });
+
+  it("names a member by their Club wallet only, never by another linked wallet", async () => {
+    const { store, own, deps } = await club1();
+    // m1 also links a second wallet, which the Club never shows.
+    await joinClub(store, club, "m1", [wallet(3), wallet(60)], { holdings: noHold });
+    assert.equal((await getMember(store, token, "m1"))?.displayWallet, wallet(3));
+    assert.deepEqual(await banUser(store, club, own, { wallet: wallet(60) }, false, deps), { ok: false, reason: "not_found" });
+    assert.deepEqual(await setRole(store, club, own, wallet(60), "moderator", deps), { ok: false, reason: "not_found" });
+    assert.ok((await setRole(store, club, own, wallet(3), "moderator", deps)).ok);
   });
 
   it("shows the ban list to staff only", async () => {

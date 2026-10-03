@@ -53,7 +53,8 @@ export function PostItem({
     own.push({ label: "Delete", icon: <TrashIcon />, danger: true, confirm: "Delete this post?", onSelect: () => actions.remove(post.id) });
   }
   const moderate: MenuAction[] = [];
-  if (owner && !post.hidden) {
+  // A post hidden by reports keeps its pin (a restore puts it back); the Owner may still take it off.
+  if (owner && (!post.hidden || post.pinned)) {
     moderate.push({ label: post.pinned ? "Unpin" : "Pin to top", icon: <PinIcon />, onSelect: () => actions.pin(post.id, !post.pinned) });
   }
   if (staff && !post.mine) {
@@ -100,6 +101,14 @@ export function PostItem({
               {post.reports !== undefined && ` · ${post.reports} ${post.reports === 1 ? "report" : "reports"}`}
             </span>
             {post.text !== null && <span className="ml-2 text-xs text-muted">Only you and the Club’s moderators can see it.</span>}
+          </p>
+        )}
+        {!post.hidden && post.reports !== undefined && post.reports > 0 && (
+          <p className="w-fit">
+            <span className="chip chip-warn">
+              <FlagIcon />
+              {post.reports} {post.reports === 1 ? "report" : "reports"}
+            </span>
           </p>
         )}
         {post.text !== null && <p className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap">{post.text}</p>}

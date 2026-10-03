@@ -110,7 +110,7 @@ A **Club** is the community for one verified NFT collection or memecoin, such as
 
 **Posting.** You need to be a member and to have shared a verified X or Discord profile (Account page). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
 
-**Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different members have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it.
+**Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different Holders (or staff) have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it. Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
 
 ### Roles
 
