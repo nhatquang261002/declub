@@ -3,9 +3,9 @@ import { intentsAbi } from "./abi.ts";
 import { type Reader, type Sender, readFee } from "./chain.ts";
 import { checkIntent } from "./checks.ts";
 import { decodeRevert } from "./errors.ts";
-import { type Node, findCycles, selectCycles } from "./graph.ts";
+import { MAX_SEARCH_STEPS, type Node, searchCycles, selectCycles } from "./graph.ts";
 import { MAX_CYCLE } from "./intent.ts";
-import type { Pool } from "./pool.ts";
+import { type Pool, intentTokens } from "./pool.ts";
 import type { Row } from "./store.ts";
 import type { Status } from "./types.ts";
 
@@ -27,6 +27,19 @@ export interface MatcherConfig {
    * succeed too, and a token can burn gas on purpose. The contract's worst case is 3.4M (with the fee).
    */
   maxGas: bigint;
+  /** Edges the cycle search may look at per pass (`MAX_SEARCH_STEPS`). */
+  maxSearchSteps: number;
+  /** Open intents read per pass, oldest first. */
+  window: number;
+  /**
+   * A settlement that passed its simulation but reverted on-chain is a token (or a contract
+   * maker) acting differently when it counts. Every token in it that isn't allowlisted or the
+   * fee token is suspended this long, and posting or matching anything naming it is refused.
+   */
+  tokenBanMs: number;
+  /** A maker with this many such reverts inside `strikeWindowMs` is left out of matching. */
+  maxStrikes: number;
+  strikeWindowMs: number;
 }
 
 export const defaultMatcherConfig = (swap: Address): MatcherConfig => ({
@@ -38,6 +51,11 @@ export const defaultMatcherConfig = (swap: Address): MatcherConfig => ({
   maxRounds: 20,
   gasBufferPct: 10n,
   maxGas: 5_000_000n,
+  maxSearchSteps: MAX_SEARCH_STEPS,
+  window: 500,
+  tokenBanMs: 24 * 60 * 60 * 1000,
+  maxStrikes: 3,
+  strikeWindowMs: 30 * 24 * 60 * 60 * 1000,
 });
 
 export interface Dropped {
@@ -51,6 +69,10 @@ export interface MatchReport {
   dropped: Dropped[];
   /** Cycles skipped because they failed for a reason that couldn't be pinned on one intent. */
   cooledDown: number;
+  /** Settlements that passed the simulation and reverted on-chain. */
+  reverted: { txHash: Hex; hashes: Hex[]; bannedTokens: string[]; struck: Address[] }[];
+  /** The cycle search hit its step or cycle cap at least once. */
+  searchTruncated: boolean;
 }
 
 /**
@@ -71,7 +93,7 @@ const BROKEN_INTENT: Record<string, Status> = {
   IntentExpired: "expired",
 };
 
-type Outcome = "settled" | "dropped" | "cooled";
+type Outcome = "settled" | "dropped" | "cooled" | "reverted";
 
 /**
  * Finds cycles of intents that satisfy each other (ADR 0008 pairs, ADR 0009 rings), checks each
@@ -105,41 +127,54 @@ export class Matcher {
 
   /** One matching pass: settle what can be settled, drop what can't, repeat until nothing changes. */
   async runOnce(): Promise<MatchReport> {
-    const report: MatchReport = { settled: [], dropped: [], cooledDown: 0 };
+    const report: MatchReport = {
+      settled: [], dropped: [], cooledDown: 0, reverted: [], searchTruncated: false,
+    };
+    const start = Date.now();
+    for (const [k, until] of this.cooldown) if (until <= start) this.cooldown.delete(k);
     for (let round = 0; round < this.cfg.maxRounds; round++) {
-      const cycles = this.plan(Date.now());
+      const cycles = this.plan(Date.now(), report);
       if (cycles.length === 0) break;
       let progressed = false;
       for (const cycle of cycles) {
         const outcome = await this.trySettle(cycle, report);
         if (outcome === "cooled") report.cooledDown++;
-        else progressed = true;
+        else if (outcome !== "reverted") progressed = true;
       }
       if (!progressed) break;
     }
     return report;
   }
 
-  /** Cycles worth trying right now, best first. Pure aside from reading the pool and cooldowns. */
-  private plan(now: number): Row[][] {
-    const minDeadline = Math.floor(now / 1000) + this.cfg.minRemainingSec;
-    const banned = new Map<string, boolean>();
-    const usable = (r: Row) => {
-      if (r.deadline < minDeadline) return false;
-      const k = r.maker.toLowerCase();
-      let b = banned.get(k);
-      if (b === undefined) {
-        b = this.pool.store.failureCount(r.maker, now - this.cfg.failureWindowMs) >= this.cfg.maxFailures;
-        banned.set(k, b);
-      }
-      return !b;
-    };
-
-    const rows = this.pool.store.list({ status: "open", limit: 500 }).filter(usable);
+  /**
+   * Cycles worth trying right now, best first. Pure aside from reading the pool and cooldowns.
+   * Banned makers, banned tokens and (with an allowlist) unlisted tokens are left out in the
+   * query, so they can't take up the window.
+   */
+  private plan(now: number, report: MatchReport): Row[][] {
+    const { store, cfg: poolCfg } = this.pool;
+    const allow = poolCfg.tokenAllowlist;
+    const rows = store.matchable({
+      limit: this.cfg.window,
+      minDeadline: Math.floor(now / 1000) + this.cfg.minRemainingSec,
+      excludeMakers: store.bannedMakers({
+        failuresSince: now - this.cfg.failureWindowMs,
+        maxFailures: this.cfg.maxFailures,
+        strikesSince: now - this.cfg.strikeWindowMs,
+        maxStrikes: this.cfg.maxStrikes,
+      }),
+      excludeTokens: store.bannedTokens(now),
+      onlyTokens: allow ? new Set([...allow, poolCfg.feeToken.toLowerCase()]) : null,
+    });
     const nodes: Node[] = rows.map((r) => ({ hash: r.hash, intent: r.intent, createdAt: r.createdAt }));
-    return selectCycles(nodes, findCycles(nodes, { maxCycle: MAX_CYCLE }))
-      .map((c) => c.map((i) => rows[i]!))
-      .filter((c) => (this.cooldown.get(cycleKey(c)) ?? 0) <= now);
+    const found = searchCycles(nodes, { maxCycle: MAX_CYCLE, maxSteps: this.cfg.maxSearchSteps });
+    if (found.truncated && !report.searchTruncated) {
+      report.searchTruncated = true;
+      this.log(`? cycle search stopped early (${found.steps} steps, ${found.cycles.length} cycles over ${nodes.length} intents)`);
+    }
+    // Cooling cycles go before selection, so they don't hold their makers back from other cycles.
+    const ready = found.cycles.filter((c) => (this.cooldown.get(cycleKey(c.map((i) => rows[i]!))) ?? 0) <= now);
+    return selectCycles(nodes, ready).map((c) => c.map((i) => rows[i]!));
   }
 
   private async trySettle(cycle: Row[], report: MatchReport): Promise<Outcome> {
@@ -184,10 +219,8 @@ export class Matcher {
     const receipt = await this.reader.waitForTransactionReceipt({ hash: txHash });
 
     if (receipt.status !== "success") {
-      // It passed the simulation but reverted on-chain: state moved in between.
-      this.log(`! ${tag} reverted on-chain (${txHash})`);
-      this.cooldown.set(cycleKey(cycle), Date.now() + this.cfg.cooldownMs);
-      return "cooled";
+      await this.handleOnChainRevert(cycle, txHash, report);
+      return "reverted";
     }
 
     const hashes = cycle.map((r) => r.hash);
@@ -272,6 +305,52 @@ export class Matcher {
       this.log(`- dropped ${o.hash.slice(0, 10)} (${o.status}: ${o.reason})`);
     }
     return "dropped";
+  }
+
+  /**
+   * The cycle passed `eth_call` and the gas estimate, then reverted on-chain, and the matcher paid
+   * for it. Either state moved in between (a maker spent or revoked something), or something in
+   * the cycle acts differently in a real transaction than in a simulation, which a fresh nonce
+   * could repeat for free. So: suspend every token in the cycle that isn't allowlisted or the fee
+   * token, and give a strike to the makers who could be behind it (those giving a suspended token,
+   * and contract makers; everyone if that's nobody). A maker with `maxStrikes` is left out.
+   */
+  private async handleOnChainRevert(cycle: Row[], txHash: Hex, report: MatchReport) {
+    const now = Date.now();
+    const { store, cfg: poolCfg } = this.pool;
+    const fee = poolCfg.feeToken.toLowerCase();
+    const allow = poolCfg.tokenAllowlist;
+
+    const suspect = new Set<string>();
+    for (const r of cycle) {
+      for (const t of intentTokens(r.intent)) if (t !== fee && !allow?.has(t)) suspect.add(t);
+    }
+    for (const t of suspect) store.banToken(t as Address, now + this.cfg.tokenBanMs, `settlement ${txHash} reverted on-chain`);
+
+    const isContract = await Promise.all(
+      cycle.map(async (r) => {
+        try {
+          const code = await this.reader.getCode({ address: r.maker });
+          return code !== undefined && code !== "0x";
+        } catch {
+          return false;
+        }
+      }),
+    );
+    let struck = cycle.filter(
+      (r, i) => isContract[i] || r.intent.give.some((a) => suspect.has(a.token.toLowerCase())),
+    );
+    if (struck.length === 0) struck = cycle;
+    const makers = [...new Map(struck.map((r) => [r.maker.toLowerCase(), r.maker])).values()];
+    for (const m of makers) store.recordStrike(m, txHash, now);
+
+    this.cooldown.set(cycleKey(cycle), now + this.cfg.cooldownMs);
+    report.reverted.push({ txHash, hashes: cycle.map((r) => r.hash), bannedTokens: [...suspect], struck: makers });
+    const tag = cycle.map((r) => r.hash.slice(0, 10)).join(" → ");
+    this.log(
+      `! ${tag} reverted on-chain (${txHash}) after a clean simulation; ` +
+        `suspended ${suspect.size ? [...suspect].join(", ") : "no token"}, strike for ${makers.join(", ")}`,
+    );
   }
 
   // ── Background loop ──────────────────────────────────────────────────────

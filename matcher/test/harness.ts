@@ -16,7 +16,8 @@ import { mnemonicToAccount } from "viem/accounts";
 import { type Reader, makeChain, makeReader, makeSender } from "../src/chain.ts";
 import { domain, types } from "../src/intent.ts";
 import { Matcher, type MatcherConfig, defaultMatcherConfig } from "../src/matcher.ts";
-import { Pool } from "../src/pool.ts";
+import { Pool, type PoolConfig } from "../src/pool.ts";
+import type { RateLimiter } from "../src/ratelimit.ts";
 import { Store } from "../src/store.ts";
 import { AssetType, type Asset, type Intent } from "../src/types.ts";
 import { intentToWire } from "../src/wire.ts";
@@ -136,7 +137,11 @@ export interface World {
    * clock a week ahead of the wall clock: only do that in a world of its own.
    */
   setFee(newFee: bigint): Promise<void>;
-  fresh(over?: Partial<MatcherConfig>): { store: Store; pool: Pool; matcher: Matcher };
+  fresh(
+    over?: Partial<MatcherConfig>,
+    poolOver?: Partial<PoolConfig>,
+    hooks?: { makerLimit?: RateLimiter },
+  ): { store: Store; pool: Pool; matcher: Matcher };
   chogOf(id: bigint): Asset;
   tokenOf(token: Address, amount: bigint): Asset;
 }
@@ -259,13 +264,13 @@ export async function startWorld(): Promise<World> {
         await tx(feeAdmin.wallet.writeContract({ address: swap, abi: swapAbi, functionName: "applyFee" }));
       }
     },
-    fresh(over = {}) {
+    fresh(over = {}, poolOver = {}, hooks = {}) {
       const store = new Store();
       const matcherRef: { current?: Matcher } = {};
       const pool = new Pool(
         store, reader,
-        { chainId: CHAIN_ID, swap, feeToken: wmon, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600 },
-        { onNew: () => matcherRef.current?.kick() },
+        { chainId: CHAIN_ID, swap, feeToken: wmon, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600, ...poolOver },
+        { onNew: () => matcherRef.current?.kick(), ...hooks },
       );
       const matcher = new Matcher(pool, matcherSender, { ...defaultMatcherConfig(swap), ...over });
       matcherRef.current = matcher;

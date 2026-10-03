@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import { type Address, getAddress, type Hex } from "viem";
 import { Store } from "../src/store.ts";
@@ -90,5 +93,78 @@ describe("settlements", () => {
     assert.deepEqual(store.settlements({ token: OTHER_NFT, maker: CAROL }).map((s) => s.txHash), [hash(901)]);
     assert.deepEqual(store.settlements({ token: OTHER_NFT, maker: ALICE }), []);
     assert.deepEqual(store.settlements({ token: COLLECTION, after: 5_000 }), []);
+  });
+});
+
+describe("limits and bans", () => {
+  let store: Store;
+  const at = (n: number, maker: Address, give: Asset[], want: Asset[], deadline = 1_000n) =>
+    store.insert(hash(n), { ...intent(maker, give, want), deadline, nonce: BigInt(n) }, SIG, n);
+  beforeEach(() => {
+    store = new Store();
+    at(1, ALICE, [nft(1n, COLLECTION)], [erc20(TOKEN)]);
+    at(2, ALICE, [nft(2n, COLLECTION)], [erc20(TOKEN)]);
+    at(3, BOB, [erc20(TOKEN)], [nft(1n, COLLECTION)]);
+    at(4, CAROL, [nft(1n, OTHER_NFT)], [erc20(WMON)], 50n);
+  });
+
+  it("counts a maker's live intents, stale ones too, but not terminal ones", () => {
+    assert.equal(store.countLive(ALICE), 2);
+    store.setStatus(hash(1), "stale", "allowance");
+    assert.equal(store.countLive(ALICE), 2);
+    store.setStatus(hash(2), "cancelled");
+    assert.equal(store.countLive(ALICE), 1);
+    assert.deepEqual(store.liveByMaker(ALICE.toLowerCase() as Address).map((r) => r.hash), [hash(1)]);
+  });
+
+  it("pages through live intents from a cursor", () => {
+    const first = store.live({ limit: 3 });
+    assert.deepEqual(first.map((r) => r.hash), [hash(1), hash(2), hash(3)]);
+    const last = first[2]!;
+    assert.deepEqual(store.live({ after: { createdAt: last.createdAt, hash: last.hash }, limit: 3 }).map((r) => r.hash), [hash(4)]);
+    assert.equal(store.live().length, 4);
+  });
+
+  it("leaves banned makers, banned tokens, unlisted tokens and near deadlines out of the matchable window", () => {
+    const hashes = (f: Partial<Parameters<Store["matchable"]>[0]>) =>
+      store.matchable({ limit: 500, minDeadline: 0, ...f }).map((r) => r.hash);
+    assert.deepEqual(hashes({}), [hash(1), hash(2), hash(3), hash(4)]);
+    assert.deepEqual(hashes({ minDeadline: 100 }), [hash(1), hash(2), hash(3)]);
+    assert.deepEqual(hashes({ excludeMakers: [ALICE.toLowerCase()] }), [hash(3), hash(4)]);
+    assert.deepEqual(hashes({ excludeTokens: [TOKEN.toLowerCase()] }), [hash(4)]);
+    assert.deepEqual(hashes({ onlyTokens: new Set([COLLECTION, TOKEN].map((t) => t.toLowerCase())) }), [hash(1), hash(2), hash(3)]);
+    assert.deepEqual(hashes({ limit: 2, excludeMakers: [ALICE.toLowerCase()] }), [hash(3), hash(4)], "excluded rows don't use up the limit");
+  });
+
+  it("bans tokens until a time, never shortening a ban, and keeps bans and strikes across restarts", () => {
+    const dir = mkdtempSync(join(tmpdir(), "matcher-store-"));
+    try {
+      const path = join(dir, "pool.sqlite");
+      const disk = new Store(path);
+      disk.banToken(TOKEN, 5_000, "reverted");
+      disk.banToken(TOKEN, 2_000, "again"); // shorter: keeps 5_000
+      disk.recordStrike(BOB, hash(9), 1);
+      disk.close();
+      const again = new Store(path);
+      assert.deepEqual([...again.bannedTokens(4_999)], [TOKEN.toLowerCase()]);
+      assert.deepEqual([...again.bannedTokens(5_000)], []);
+      assert.equal(again.strikeCount(BOB, 0), 1);
+      again.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("bans makers on failures or on strikes, each in its own window", () => {
+    const opts = { failuresSince: 100, maxFailures: 2, strikesSince: 10, maxStrikes: 2 };
+    store.recordFailure(ALICE, hash(1), "allowance", 150);
+    assert.deepEqual([...store.bannedMakers(opts)], []);
+    store.recordFailure(ALICE, hash(1), "allowance", 160);
+    store.recordStrike(BOB, hash(9), 20);
+    assert.deepEqual([...store.bannedMakers(opts)], [ALICE.toLowerCase()]);
+    store.recordStrike(BOB, hash(10), 30);
+    assert.deepEqual([...store.bannedMakers(opts)].sort(), [ALICE, BOB].map((a) => a.toLowerCase()).sort());
+    assert.deepEqual([...store.bannedMakers({ ...opts, strikesSince: 25 })], [ALICE.toLowerCase()]);
+    assert.equal(store.strikeCount(BOB, 0), 2);
   });
 });

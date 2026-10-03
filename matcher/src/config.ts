@@ -25,6 +25,23 @@ export interface Config {
   dbPath: string;
   pollMs: number;
   pruneMs: number;
+  /** Live intents one maker may have in the pool. */
+  maxIntentsPerMaker: number;
+  /** Intents re-checked per prune pass. */
+  pruneBatch: number;
+  /** Edges the cycle search may look at per pass. */
+  maxSearchSteps: number;
+  /** `POST`/`DELETE` requests per minute per client IP, and intents per minute per maker; 0 is off. */
+  rateLimitIp: number;
+  rateLimitMaker: number;
+  /** Read the client IP from `X-Forwarded-For` (only behind a proxy that sets it). */
+  trustProxy: boolean;
+  /** Lower-case token addresses; null means any token. */
+  tokenAllowlist: Set<string> | null;
+  /** How long a token whose settlement reverted on-chain is suspended. */
+  tokenBanMs: number;
+  /** On-chain reverts after which a maker is left out (within 30 days). */
+  maxStrikes: number;
 }
 
 function need(name: string, ...alts: string[]): string {
@@ -41,6 +58,34 @@ function int(name: string, fallback: number): number {
   const n = Number(v);
   if (!Number.isInteger(n) || n <= 0) throw new Error(`${name} must be a positive integer`);
   return n;
+}
+
+/** Like `int`, but 0 is allowed (it turns the thing off). */
+function count(name: string, fallback: number): number {
+  const v = process.env[name]?.trim();
+  if (!v) return fallback;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) throw new Error(`${name} must be a non-negative integer`);
+  return n;
+}
+
+function flag(name: string): boolean {
+  const v = process.env[name]?.trim().toLowerCase();
+  if (!v || v === "0" || v === "false" || v === "no") return false;
+  if (v === "1" || v === "true" || v === "yes") return true;
+  throw new Error(`${name} must be true or false`);
+}
+
+/** A comma-separated list of addresses, lower-cased; unset or empty means no list. */
+function addressList(name: string): Set<string> | null {
+  const v = process.env[name]?.trim();
+  if (!v) return null;
+  const out = new Set<string>();
+  for (const part of v.split(",").map((s) => s.trim()).filter(Boolean)) {
+    if (!isAddress(part, { strict: false })) throw new Error(`${name}: ${part} is not an address`);
+    out.add(part.toLowerCase());
+  }
+  return out.size ? out : null;
 }
 
 export function loadConfig(): Config {
@@ -69,5 +114,14 @@ export function loadConfig(): Config {
     dbPath: process.env.MATCHER_DB_PATH?.trim() || resolve(import.meta.dirname, "../data/pool.sqlite"),
     pollMs: int("MATCHER_POLL_MS", 5000),
     pruneMs: int("MATCHER_PRUNE_MS", 30000),
+    maxIntentsPerMaker: int("MATCHER_MAX_INTENTS_PER_MAKER", 20),
+    pruneBatch: int("MATCHER_PRUNE_BATCH", 500),
+    maxSearchSteps: int("MATCHER_MAX_SEARCH_STEPS", 200_000),
+    rateLimitIp: count("MATCHER_RATE_LIMIT_IP", 60),
+    rateLimitMaker: count("MATCHER_RATE_LIMIT_MAKER", 20),
+    trustProxy: flag("MATCHER_TRUST_PROXY"),
+    tokenAllowlist: addressList("MATCHER_TOKEN_ALLOWLIST"),
+    tokenBanMs: int("MATCHER_TOKEN_BAN_MS", 24 * 60 * 60 * 1000),
+    maxStrikes: int("MATCHER_MAX_STRIKES", 3),
   };
 }

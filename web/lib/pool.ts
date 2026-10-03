@@ -39,6 +39,12 @@ const COPY: Record<string, string> = {
   bad_token: "One of the tokens isn't a readable ERC-20 or NFT.",
   not_cancellable: "This intent is no longer in the pool.",
   not_found: "The pool doesn't know this intent.",
+  too_many_intents: "This wallet already has the most signed swaps the pool holds at once. Cancel one first.",
+  nft_committed: "Another of your signed swaps already gives this NFT. Cancel that one first.",
+  balance_committed: "Together with your other signed swaps, this gives more of a token than your wallet holds.",
+  token_not_allowed: "The pool doesn't match one of these tokens.",
+  token_banned: "The pool has suspended one of these tokens after a failed settlement.",
+  rate_limited: "Too many requests. Wait a minute and try again.",
 };
 
 async function call(path: string, init?: RequestInit): Promise<unknown> {

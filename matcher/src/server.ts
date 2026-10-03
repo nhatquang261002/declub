@@ -3,7 +3,8 @@ import type { Hex } from "viem";
 import { isAddress, isHex } from "viem";
 import { MAX_CYCLE } from "./intent.ts";
 import { Pool, PoolError } from "./pool.ts";
-import type { Row, Settlement } from "./store.ts";
+import type { RateLimiter } from "./ratelimit.ts";
+import { type Row, type Settlement, isTerminal } from "./store.ts";
 import type { Status } from "./types.ts";
 import { WireError, hexString, intentToWire } from "./wire.ts";
 
@@ -23,6 +24,14 @@ export interface ServerInfo {
   fee: () => Promise<{ token: string; amount: string; recipient: string }>;
 }
 
+/**
+ * Stands in for the signature of an intent that is no longer live. A cancelled intent's signature
+ * would let anyone settle what its maker took out of this pool, and a settled, expired, consumed or
+ * rejected one has no use, so the pool stops handing them out. Still a string, so readers that
+ * expect one keep working.
+ */
+export const WITHHELD_SIGNATURE = "0x";
+
 const rowJson = (r: Row) => ({
   hash: r.hash,
   status: r.status,
@@ -30,8 +39,30 @@ const rowJson = (r: Row) => ({
   createdAt: r.createdAt,
   settlementTx: r.settlementTx,
   intent: intentToWire(r.intent),
-  signature: r.signature,
+  signature: isTerminal(r.status) ? WITHHELD_SIGNATURE : r.signature,
 });
+
+export interface ServerOptions {
+  /** Limits `POST` and `DELETE` per client IP. */
+  ipLimit?: RateLimiter;
+  /**
+   * Take the client IP from the last `X-Forwarded-For` entry (the one the proxy in front added)
+   * instead of the socket. Only set this behind a proxy that sets the header, or anyone can claim
+   * any IP.
+   */
+  trustProxy?: boolean;
+}
+
+/** The client's IP: the socket's peer, or with `trustProxy` the address the proxy saw. */
+export function clientIp(req: IncomingMessage, trustProxy = false): string {
+  if (trustProxy) {
+    const xff = req.headers["x-forwarded-for"];
+    const raw = Array.isArray(xff) ? xff.join(",") : xff;
+    const last = raw?.split(",").map((s) => s.trim()).filter(Boolean).pop();
+    if (last) return last;
+  }
+  return req.socket.remoteAddress ?? "unknown";
+}
 
 class HttpError extends Error {
   readonly status: number;
@@ -58,8 +89,9 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
   }
 }
 
-function send(res: ServerResponse, status: number, body: unknown) {
+function send(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}) {
   res.writeHead(status, {
+    ...extra,
     "content-type": "application/json",
     // The book is public data and nothing here uses cookies, so any web page may read it.
     "access-control-allow-origin": "*",
@@ -78,7 +110,7 @@ function send(res: ServerResponse, status: number, body: unknown) {
  *   DELETE /intents/:hash   {signature}  drop it; signed by the maker over CancelIntent(hash)
  *   GET    /settlements  ?maker=&token=&after=&limit=  settled cycles, with their intents
  */
-export function createPoolServer(pool: Pool, info: ServerInfo): Server {
+export function createPoolServer(pool: Pool, info: ServerInfo, opts: ServerOptions = {}): Server {
   const settlementJson = (s: Settlement) => ({
     txHash: s.txHash,
     blockNumber: s.blockNumber,
@@ -95,6 +127,20 @@ export function createPoolServer(pool: Pool, info: ServerInfo): Server {
     const q = url.searchParams;
 
     if (req.method === "OPTIONS") return send(res, 204, null);
+
+    if ((req.method === "POST" || req.method === "DELETE") && opts.ipLimit) {
+      const wait = opts.ipLimit.take(clientIp(req, opts.trustProxy));
+      if (wait > 0) {
+        const sec = Math.ceil(wait / 1000);
+        // Don't read the body: closing the request early is the point.
+        return send(
+          res,
+          429,
+          { error: "rate_limited", message: `too many requests; retry in ${sec}s` },
+          { "retry-after": String(sec) },
+        );
+      }
+    }
 
     if (req.method === "GET" && parts.length === 1 && parts[0] === "info") {
       return send(res, 200, { ...info, fee: await info.fee(), maxCycle: MAX_CYCLE });

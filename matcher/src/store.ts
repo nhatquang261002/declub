@@ -80,7 +80,36 @@ CREATE TABLE IF NOT EXISTS failures (
   reason TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS failures_maker ON failures (maker, at);
+CREATE TABLE IF NOT EXISTS strikes (
+  maker   TEXT NOT NULL,
+  at      INTEGER NOT NULL,
+  tx_hash TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS strikes_maker ON strikes (maker, at);
+CREATE TABLE IF NOT EXISTS token_bans (
+  token  TEXT PRIMARY KEY,
+  until  INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
 `;
+
+/** Where `live` left off: the last row it returned, in `(created_at, hash)` order. */
+export interface LiveCursor {
+  createdAt: number;
+  hash: Hex;
+}
+
+export interface MatchableFilter {
+  limit: number;
+  /** Seconds: skip intents whose deadline is earlier. */
+  minDeadline: number;
+  /** Lower-case maker addresses to leave out. */
+  excludeMakers?: Iterable<string>;
+  /** Lower-case token addresses: leave out any intent naming one, on either side. */
+  excludeTokens?: Iterable<string>;
+  /** Lower-case token addresses: when set, leave out any intent naming a token not in it. */
+  onlyTokens?: Iterable<string> | null;
+}
 
 export class Store {
   readonly db: DatabaseSync;
@@ -161,13 +190,74 @@ export class Store {
     return (this.db.prepare(sql).all(...args) as DbRow[]).map(toRow);
   }
 
-  /** Intents that can still change state: matched (`open`) or waiting on the chain (`stale`). */
-  live(): Row[] {
+  /**
+   * Intents that can still change state: matched (`open`) or waiting on the chain (`stale`), in
+   * `(created_at, hash)` order. `after` and `limit` page through them a slice at a time.
+   */
+  live(page: { after?: LiveCursor | null; limit?: number } = {}): Row[] {
+    const args: SQLInputValue[] = [];
+    let where = "status IN ('open', 'stale')";
+    if (page.after) {
+      where += " AND (created_at > ? OR (created_at = ? AND hash > ?))";
+      args.push(page.after.createdAt, page.after.createdAt, page.after.hash);
+    }
+    let sql = `SELECT * FROM intents WHERE ${where} ORDER BY created_at, hash`;
+    if (page.limit !== undefined) {
+      sql += " LIMIT ?";
+      args.push(page.limit);
+    }
+    return (this.db.prepare(sql).all(...args) as DbRow[]).map(toRow);
+  }
+
+  /** A maker's live (`open` or `stale`) intents, oldest first. */
+  liveByMaker(maker: Address): Row[] {
     return (
       this.db
-        .prepare("SELECT * FROM intents WHERE status IN ('open', 'stale') ORDER BY created_at, hash")
-        .all() as DbRow[]
+        .prepare(
+          `SELECT * FROM intents WHERE maker = ? AND status IN ('open', 'stale')
+           ORDER BY created_at, hash`,
+        )
+        .all(maker.toLowerCase()) as DbRow[]
     ).map(toRow);
+  }
+
+  countLive(maker: Address): number {
+    const r = this.db
+      .prepare("SELECT COUNT(*) AS n FROM intents WHERE maker = ? AND status IN ('open', 'stale')")
+      .get(maker.toLowerCase()) as DbRow;
+    return Number(r.n);
+  }
+
+  /**
+   * The open intents the matcher may use, oldest first: not too close to their deadline, from no
+   * excluded maker and naming no excluded (or, with `onlyTokens`, unlisted) token. Filtering here
+   * rather than after the `LIMIT` keeps excluded intents from filling the window.
+   */
+  matchable(f: MatchableFilter): Row[] {
+    const where = ["i.status = 'open'", "i.deadline >= ?"];
+    const args: SQLInputValue[] = [f.minDeadline];
+    const list = (xs: Iterable<string>) => {
+      const a = [...xs];
+      args.push(...a);
+      return a.map(() => "?").join(", ");
+    };
+    const makers = [...(f.excludeMakers ?? [])];
+    if (makers.length) where.push(`i.maker NOT IN (${list(makers)})`);
+    const banned = [...(f.excludeTokens ?? [])];
+    if (banned.length) {
+      where.push(
+        `NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) IN (${list(banned)}))`,
+      );
+    }
+    if (f.onlyTokens) {
+      where.push(
+        `NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) NOT IN (${list(f.onlyTokens)}))`,
+      );
+    }
+    args.push(f.limit);
+    const sql = `SELECT i.* FROM intents i WHERE ${where.join(" AND ")}
+                 ORDER BY i.created_at ASC, i.hash ASC LIMIT ?`;
+    return (this.db.prepare(sql).all(...args) as DbRow[]).map(toRow);
   }
 
   /** Never moves an intent out of a terminal state. Returns whether it changed. */
@@ -227,6 +317,56 @@ export class Store {
     this.db
       .prepare("INSERT INTO failures (maker, at, hash, reason) VALUES (?, ?, ?, ?)")
       .run(maker.toLowerCase(), now, hash, reason);
+  }
+
+  /**
+   * Makers left out of matching right now: `maxFailures` or more failures since `failuresSince`,
+   * or `maxStrikes` or more on-chain reverts since `strikesSince`. Lower-case.
+   */
+  bannedMakers(b: {
+    failuresSince: number;
+    maxFailures: number;
+    strikesSince: number;
+    maxStrikes: number;
+  }): Set<string> {
+    const rows = this.db
+      .prepare(
+        `SELECT maker FROM failures WHERE at >= ? GROUP BY maker HAVING COUNT(*) >= ?
+         UNION
+         SELECT maker FROM strikes WHERE at >= ? GROUP BY maker HAVING COUNT(*) >= ?`,
+      )
+      .all(b.failuresSince, b.maxFailures, b.strikesSince, b.maxStrikes) as DbRow[];
+    return new Set(rows.map((r) => r.maker as string));
+  }
+
+  /** A settlement that passed its simulation reverted on-chain with this maker in the cycle. */
+  recordStrike(maker: Address, txHash: Hex, now: number) {
+    this.db
+      .prepare("INSERT INTO strikes (maker, at, tx_hash) VALUES (?, ?, ?)")
+      .run(maker.toLowerCase(), now, txHash);
+  }
+
+  strikeCount(maker: Address, sinceMs: number): number {
+    const r = this.db
+      .prepare("SELECT COUNT(*) AS n FROM strikes WHERE maker = ? AND at >= ?")
+      .get(maker.toLowerCase(), sinceMs) as DbRow;
+    return Number(r.n);
+  }
+
+  /** Leave `token` out of matching (and refuse it on posting) until `until` ms. Never shortens a ban. */
+  banToken(token: Address, until: number, reason: string) {
+    this.db
+      .prepare(
+        `INSERT INTO token_bans (token, until, reason) VALUES (?, ?, ?)
+         ON CONFLICT (token) DO UPDATE SET until = MAX(until, excluded.until), reason = excluded.reason`,
+      )
+      .run(token.toLowerCase(), until, reason);
+  }
+
+  /** Tokens banned at `now`, lower-case. */
+  bannedTokens(now: number): Set<string> {
+    const rows = this.db.prepare("SELECT token FROM token_bans WHERE until > ?").all(now) as DbRow[];
+    return new Set(rows.map((r) => r.token as string));
   }
 
   failureCount(maker: Address, sinceMs: number): number {

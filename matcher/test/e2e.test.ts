@@ -5,6 +5,7 @@ import { formatAbiItem } from "viem/utils";
 import { intentsAbi } from "../src/abi.ts";
 import { cancelTypes, domain, intentDigest, intentHash } from "../src/intent.ts";
 import { PoolError } from "../src/pool.ts";
+import { RateLimiter } from "../src/ratelimit.ts";
 import { type World, CHAIN_ID, FEE, skipReason, startWorld, walletAbi } from "./harness.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -274,6 +275,25 @@ describe("pool and matcher against a local chain", { skip }, () => {
     assert.match(store.get(hash)!.reason!, /not_owner/);
   });
 
+  it("re-checks at most pruneBatch intents per prune pass, and carries on from there", async () => {
+    const { pool, store } = w.fresh({}, { pruneBatch: 2 });
+    const ids = await w.mintChogs(w.alice.address, 3);
+    const hashes: `0x${string}`[] = [];
+    for (const id of ids) hashes.push(await postNft(pool, w.alice, id, [w.tokenOf(w.usd, ONE)]));
+    for (const id of ids) await w.revokeChog(w.alice, id);
+
+    const first = await pool.prune();
+    assert.deepEqual([first.checked, first.changed.length], [2, 2]);
+    assert.equal(store.get(hashes[2]!)!.status, "open", "not reached yet");
+    const second = await pool.prune();
+    assert.deepEqual([second.checked, second.changed.length], [1, 1]);
+    assert.equal(store.get(hashes[2]!)!.status, "stale");
+    // And round again from the start.
+    for (const id of ids) await w.approveChog(w.alice, id);
+    const third = await pool.prune();
+    assert.deepEqual(third.changed.map((c) => c.hash), hashes.slice(0, 2));
+  });
+
   it("won't send a cycle that needs more gas than its cap", async () => {
     const { pool, matcher } = w.fresh({ maxGas: 100_000n });
     const [chogId] = await w.mintChogs(w.alice.address, 1);
@@ -384,6 +404,72 @@ describe("pool and matcher against a local chain", { skip }, () => {
       assert.equal(store.get(hash)!.status, "open");
       assert.equal((await pool.cancel(hash, await sign(w.alice))).status, "cancelled");
       await assert.rejects(pool.cancel(hash, await sign(w.alice)), (e) => e instanceof PoolError && e.status === 409);
+    });
+
+    it("caps how many live intents one maker can have", async () => {
+      const { pool, store } = w.fresh({}, { maxLivePerMaker: 2 });
+      const ids = await w.mintChogs(w.alice.address, 3);
+      const [h1] = [await postNft(pool, w.alice, ids[0]!, [w.tokenOf(w.usd, ONE)])];
+      await postNft(pool, w.alice, ids[1]!, [w.tokenOf(w.usd, ONE)]);
+      await w.approveChog(w.alice, ids[2]!);
+      const third = w.intent(w.alice.address, [w.chogOf(ids[2]!)], [w.tokenOf(w.usd, ONE)]);
+      await reject(pool.submit(await w.body(w.alice, third)), "too_many_intents");
+      // Someone else isn't affected, and a slot frees up when one leaves the book.
+      await postToken(pool, w.bob, w.tokenOf(w.usd, ONE), [w.chogOf(ids[0]!)]);
+      store.setStatus(h1, "cancelled");
+      assert.equal((await pool.submit(await w.body(w.alice, third))).status, "open");
+    });
+
+    it("won't let two of a maker's live intents give the same NFT", async () => {
+      const { pool } = w.fresh();
+      const [id] = await w.mintChogs(w.alice.address, 1);
+      const first = await postNft(pool, w.alice, id!, [w.tokenOf(w.usd, ONE)]);
+      const again = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.weth, ONE)]);
+      await assert.rejects(
+        pool.submit(await w.body(w.alice, again)),
+        (e) => e instanceof PoolError && e.code === "nft_committed" && e.message.includes(first),
+      );
+    });
+
+    it("won't let a maker's live intents together give more of a token than they hold", async () => {
+      const { pool } = w.fresh();
+      await w.mintToken(w.usd, w.dave.address, 10n * ONE);
+      await w.approveToken(w.dave, w.usd, 2n ** 256n - 1n);
+      const held = await w.balanceOf(w.usd, w.dave.address);
+      const [id] = await w.mintChogs(w.alice.address, 1);
+      const big = w.intent(w.dave.address, [w.tokenOf(w.usd, held - ONE)], [w.chogOf(id!)]);
+      assert.equal((await pool.submit(await w.body(w.dave, big))).status, "open");
+      const over = w.intent(w.dave.address, [w.tokenOf(w.usd, 2n * ONE)], [w.chogOf(id! + 1000n)]);
+      await reject(pool.submit(await w.body(w.dave, over)), "balance_committed");
+      const exact = w.intent(w.dave.address, [w.tokenOf(w.usd, ONE)], [w.chogOf(id! + 1000n)]);
+      assert.equal((await pool.submit(await w.body(w.dave, exact))).status, "open", "up to the balance is fine");
+    });
+
+    it("rate-limits a maker, counting only posts that carry the maker's real signature", async () => {
+      const { pool } = w.fresh({}, {}, { makerLimit: new RateLimiter({ perMinute: 1, burst: 1 }) });
+      const ids = await w.mintChogs(w.carol.address, 2);
+      for (const id of ids) await w.approveChog(w.carol, id);
+      const one = w.intent(w.carol.address, [w.chogOf(ids[0]!)], [w.tokenOf(w.usd, ONE)]);
+      const two = w.intent(w.carol.address, [w.chogOf(ids[1]!)], [w.tokenOf(w.usd, ONE)]);
+      // Someone posting in carol's name with their own signature doesn't use up her budget.
+      await reject(pool.submit({ ...(await w.body(w.carol, one)), signature: await w.sign(w.bob, one) }), "bad_signature");
+      assert.equal((await pool.submit(await w.body(w.carol, one))).status, "open");
+      await assert.rejects(
+        pool.submit(await w.body(w.carol, two)),
+        (e) => e instanceof PoolError && e.code === "rate_limited" && e.status === 429,
+      );
+      // Another maker has a budget of their own.
+      const [mine] = await w.mintChogs(w.dave.address, 1);
+      await postNft(pool, w.dave, mine!, [w.tokenOf(w.usd, ONE)]);
+    });
+
+    it("refuses an intent naming a suspended token", async () => {
+      const { pool, store } = w.fresh();
+      const [id] = await w.mintChogs(w.alice.address, 1);
+      await w.approveChog(w.alice, id!);
+      store.banToken(w.weth, Date.now() + 60_000, "test");
+      const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.weth, ONE)]);
+      await reject(pool.submit(await w.body(w.alice, intent)), "token_banned");
     });
 
     it("cannot reuse an intent signature as a cancel", async () => {

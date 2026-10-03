@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Address, Hex } from "viem";
-import { findCycles, selectCycles, type Node } from "../src/graph.ts";
+import { type Address, type Hex, isAddressEqual } from "viem";
+import { MAX_SEARCH_STEPS, findCycles, searchCycles, selectCycles, type Node } from "../src/graph.ts";
+import { assetKey, covers } from "../src/intent.ts";
 import { AssetType, type Asset, type Intent } from "../src/types.ts";
 
 const addr = (n: number) => `0x${n.toString(16).padStart(40, "0")}` as Address;
@@ -136,6 +137,136 @@ describe("findCycles", () => {
     for (let i = 0; i < 30; i++) nodes.push(node(100 + i, [nft(1)], [erc20(1)]));
     for (let i = 0; i < 30; i++) nodes.push(node(200 + i, [erc20(1)], [nft(1)]));
     assert.equal(findCycles(nodes, { maxCycles: 50 }).length, 50);
+  });
+});
+
+/** The search as it was before the step budget, as a reference for "same answers". */
+function referenceCycles(nodes: Node[], maxCycle = 4, maxCycles = 5000): number[][] {
+  const givers = new Map<string, number[]>();
+  nodes.forEach((n, i) => {
+    for (const a of n.intent.give) {
+      const k = assetKey(a);
+      const list = givers.get(k);
+      if (list) list.push(i);
+      else givers.set(k, [i]);
+    }
+  });
+  const succ: number[][] = nodes.map(() => []);
+  nodes.forEach((j, jIdx) => {
+    const first = j.intent.want[0];
+    if (!first) return;
+    for (const iIdx of givers.get(assetKey(first)) ?? []) {
+      const i = nodes[iIdx]!;
+      if (iIdx === jIdx || isAddressEqual(i.intent.maker, j.intent.maker)) continue;
+      if (covers(i.intent.give, j.intent.want)) succ[iIdx]!.push(jIdx);
+    }
+  });
+  const out: number[][] = [];
+  const makerIn = (path: number[], idx: number) =>
+    path.some((p) => isAddressEqual(nodes[p]!.intent.maker, nodes[idx]!.intent.maker));
+  for (let start = 0; start < nodes.length && out.length < maxCycles; start++) {
+    const path = [start];
+    const walk = () => {
+      const last = path[path.length - 1]!;
+      for (const next of succ[last]!) {
+        if (out.length >= maxCycles) return;
+        if (next === start) {
+          if (path.length >= 2) out.push([...path]);
+        } else if (next > start && path.length < maxCycle && !makerIn(path, next)) {
+          path.push(next);
+          walk();
+          path.pop();
+        }
+      }
+    };
+    walk();
+  }
+  return out;
+}
+
+/**
+ * The hostile shape: `makers` makers, each with `perLayer` intents; every intent of layer k gives
+ * token k+1 and wants token k, so every layer feeds the next and nothing feeds layer 0. No cycle
+ * ever closes, but there are perLayer^makers paths to walk.
+ */
+function layered(perLayer: number, makers = 4): Node[] {
+  const nodes: Node[] = [];
+  for (let layer = 0; layer < makers; layer++) {
+    for (let i = 0; i < perLayer; i++) {
+      nodes.push(node(0xa00 + layer, [erc20(1, addr(0x1000 + layer + 1))], [erc20(1, addr(0x1000 + layer))]));
+    }
+  }
+  return nodes;
+}
+
+describe("the cycle search's work bound", () => {
+  it("gives up on a hostile layered graph quickly instead of walking every path", () => {
+    const nodes = layered(75); // ~75^4 = 31M paths unbounded
+    const t = performance.now();
+    const r = searchCycles(nodes);
+    const ms = performance.now() - t;
+    assert.deepEqual(r.cycles, []);
+    assert.equal(r.truncated, true);
+    assert.equal(r.steps, MAX_SEARCH_STEPS);
+    assert.ok(ms < 1000, `took ${ms.toFixed(0)} ms`);
+  });
+
+  it("stays fast when the layered graph is much bigger, even at a higher budget", () => {
+    const t = performance.now();
+    const r = searchCycles(layered(125), { maxSteps: 1_000_000 });
+    assert.equal(r.steps, 1_000_000);
+    assert.ok(performance.now() - t < 2000);
+  });
+
+  it("finds everything and says so when the budget isn't reached", () => {
+    const nodes = layered(5);
+    const r = searchCycles(nodes);
+    assert.deepEqual([r.cycles, r.truncated], [[], false]);
+    assert.ok(r.steps > 0 && r.steps < MAX_SEARCH_STEPS);
+  });
+
+  it("stops at maxSteps even when cycles are still being found", () => {
+    const nodes: Node[] = [];
+    for (let i = 0; i < 40; i++) nodes.push(node(100 + i, [nft(1)], [erc20(1)]));
+    for (let i = 0; i < 40; i++) nodes.push(node(200 + i, [erc20(1)], [nft(1)]));
+    const r = searchCycles(nodes, { maxSteps: 100 });
+    assert.equal(r.truncated, true);
+    assert.ok(r.steps <= 100);
+    assert.ok(r.cycles.length > 0 && r.cycles.length <= 100);
+  });
+
+  it("returns exactly what the unbounded search did on ordinary books", () => {
+    // Small random books over a few makers, NFTs and token amounts: plenty of pairs and rings.
+    let seed = 42;
+    const rand = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2 ** 31;
+      return (seed >>> 16) % n; // the high bits: an LCG's low bits cycle fast
+    };
+    const asset = (): Asset =>
+      rand(2) === 0 ? nft(rand(3)) : erc20(10 * (1 + rand(3)), [USD, WETH][rand(2)]!);
+    let total = 0;
+    for (let round = 0; round < 200; round++) {
+      const nodes: Node[] = [];
+      const n = 4 + rand(36);
+      for (let i = 0; i < n; i++) {
+        // Valid intents only (as `shapeProblem` enforces): no asset twice, nor on both sides.
+        const gives = [asset()];
+        if (rand(4) === 0) {
+          const extra = asset();
+          if (!gives.some((g) => assetKey(g) === assetKey(extra))) gives.push(extra);
+        }
+        let want = asset();
+        while (gives.some((g) => assetKey(g) === assetKey(want))) want = asset();
+        nodes.push(node(1 + rand(8), gives, [want]));
+      }
+      const expected = referenceCycles(nodes);
+      assert.deepEqual(findCycles(nodes), expected);
+      // Mixed-case maker addresses compare the same as before.
+      const shouty = nodes.map((x) => ({ ...x, intent: { ...x.intent, maker: x.intent.maker.toUpperCase().replace("0X", "0x") as Address } }));
+      assert.deepEqual(findCycles(shouty), expected);
+      total += expected.length;
+    }
+    assert.ok(total > 1000, `only ${total} cycles: the books are too sparse to compare`);
   });
 });
 
