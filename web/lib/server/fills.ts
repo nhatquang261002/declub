@@ -1,6 +1,6 @@
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { CHAIN_ID, ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
 import type { ReceiptLike } from "./activity";
 import type { Store } from "./store";
 
@@ -11,13 +11,13 @@ import type { Store } from "./store";
  * in the request but the transaction hash. A fake or repeated report records nothing new.
  *
  * `TradeFilled(tradeId, maker, taker)` is emitted by `fillTrade`, `fillTraitTrade` and, for an
- * accepted proposal (the proposer is the taker), `acceptProposal`, in both contracts, so one event
- * covers every way a deal gets filled.
+ * accepted proposal (the proposer is the taker), `acceptProposal`, so one event covers every way a
+ * deal gets filled.
  */
 const abi = parseAbi(["event TradeFilled(uint256 indexed tradeId, address indexed maker, address indexed taker)"]);
 
-/** The swap contracts whose fills are kept. V2 is optional (see lib/config.ts). */
-export const FILL_CONTRACTS: Address[] = [ON_DEAL_ADDRESS, ...(ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [])];
+/** The swap contracts whose fills are kept: OnDealV2, when configured (see lib/config.ts). */
+export const FILL_CONTRACTS: Address[] = ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [];
 
 /** A wallet can't have filled more than this many deals; the oldest records age out past it. */
 const MAX_FILLS_PER_ACCOUNT = 2_000;

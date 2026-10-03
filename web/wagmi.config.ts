@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     foundry({
       project: "../contracts",
-      include: ["OnDeal.sol/**", "OnDealV2.sol/**", "OnDealIntents.sol/**", "MockChog.sol/**"],
+      include: ["OnDealV2.sol/**", "OnDealIntents.sol/**", "MockChog.sol/**"],
     }),
   ],
 });

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConnection } from "wagmi";
-import { CHAIN_ID, ON_DEAL_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, ON_DEAL_V2_ADDRESS } from "@/lib/config";
 import {
   deriveIntentNotifications,
   deriveNotifications,
@@ -13,7 +13,7 @@ import {
 import { loadState, saveState } from "@/lib/userState";
 import { useAccessToken } from "./useAccessToken";
 import { useNow } from "./useNow";
-import { useDeals } from "./useDeals";
+import { useDealsV2 } from "./useDealsV2";
 import { useIntents } from "./usePool";
 
 // Notifications are derived from deal state (lib/notifications.ts). All that is stored is which
@@ -25,7 +25,8 @@ import { useIntents } from "./usePool";
 // per browser: it is that browser's own permission.
 
 const EVENT = "ondeal:notifications";
-const scope = `${CHAIN_ID}:${ON_DEAL_ADDRESS}`;
+// Keys name deal ids, so read markers are kept per deal contract.
+const scope = `${CHAIN_ID}:${ON_DEAL_V2_ADDRESS ?? "none"}`;
 const readKey = (account: string) => `ondeal:notifications:${scope}:${account.toLowerCase()}`;
 const ALERTS_KEY = "ondeal:notification-alerts";
 
@@ -70,7 +71,7 @@ const canAlert = () => typeof window !== "undefined" && "Notification" in window
 export function useNotifications() {
   const { address } = useConnection();
   const now = useNow(30_000);
-  const { deals, isLoading: dealsLoading } = useDeals({ limit: 200, enabled: !!address });
+  const { deals, isLoading: dealsLoading } = useDealsV2({ limit: 200, enabled: !!address });
 
   // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
   const intents = useIntents({ status: "all", maker: address, enabled: !!address });

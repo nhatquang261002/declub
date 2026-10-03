@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import type { Address } from "viem";
-import { CHAIN_ID, ON_DEAL_ADDRESS } from "@/lib/config";
+import { CHAIN_ID } from "@/lib/config";
 
 // This browser's own record of the deals it filled. It is History's data only when the server
 // store is off (ADR 0012, hooks/useFills.ts): who filled a public deal is recorded only in the
@@ -12,8 +12,8 @@ const EVENT = "ondeal:fills";
 const key = (contract: string, account: string) =>
   `ondeal:fills:${CHAIN_ID}:${contract}:${account.toLowerCase()}`;
 
-function read(contract: string, account: string | undefined): string {
-  if (!account) return "[]";
+function read(contract: string | undefined, account: string | undefined): string {
+  if (!contract || !account) return "[]";
   try {
     return localStorage.getItem(key(contract, account)) ?? "[]";
   } catch {
@@ -30,8 +30,8 @@ function subscribe(onChange: () => void) {
   };
 }
 
-/** Fills are recorded per swap contract, so v1 and V2 deal ids don't mix. Defaults to v1. */
-export function useLocalFills(account: Address | undefined, contract: Address = ON_DEAL_ADDRESS) {
+/** Fills are recorded per swap contract, so deal ids from different deployments don't mix. */
+export function useLocalFills(account: Address | undefined, contract: Address | undefined) {
   // Snapshot is the raw string so React can compare it by value.
   const raw = useSyncExternalStore(
     subscribe,
@@ -43,7 +43,7 @@ export function useLocalFills(account: Address | undefined, contract: Address = 
 
   const record = useCallback(
     (dealId: bigint) => {
-      if (!account) return;
+      if (!contract || !account) return;
       const next = new Set(parse(read(contract, account)).map(String));
       next.add(dealId.toString());
       try {

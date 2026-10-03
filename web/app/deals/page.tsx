@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
-import { SHOW_INTENTS, SHOW_V2 } from "@/lib/config";
-import { DealsV1 } from "./DealsV1";
+import { EmptyState, PageHeader } from "@/components/Page";
+import { SHOW_V2 } from "@/lib/config";
 import { DealsV2 } from "./DealsV2";
 
 export default function DealsPage() {
-  const [version, setVersion] = // Signed swaps share the multi-asset book, so open on it once they exist.
-  useState<DealVersion>(SHOW_V2 && SHOW_INTENTS ? "v2" : "v1");
-  const switcher = <VersionSwitch value={version} onChange={setVersion} />;
-  return version === "v2" ? <DealsV2 switcher={switcher} /> : <DealsV1 switcher={switcher} />;
+  if (!SHOW_V2) {
+    return (
+      <>
+        <PageHeader title="Open deals" />
+        <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>
+      </>
+    );
+  }
+  return <DealsV2 />;
 }

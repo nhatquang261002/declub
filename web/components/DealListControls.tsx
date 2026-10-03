@@ -10,8 +10,7 @@ import {
   type DealFilters,
   type DealSort,
 } from "@/lib/dealFilters";
-
-export type DealTab = "open" | "for-you" | "all";
+import type { DealTab } from "@/lib/dealBook";
 
 const MON_OPTIONS: Array<SelectOption<MonFilter>> = [
   { value: "any", label: "Any MON" },
@@ -49,14 +48,11 @@ export function DealFilterBar({
   filters,
   onChange,
   placeholder,
-  suggestions,
   extra,
 }: {
   filters: DealFilters;
   onChange: (patch: Partial<DealFilters>) => void;
   placeholder: string;
-  /** Optional search suggestions (v1 offers trait labels). */
-  suggestions?: string[];
   /** More controls, placed before the Clear button. */
   extra?: ReactNode;
 }) {
@@ -67,17 +63,9 @@ export function DealFilterBar({
         className="input min-w-52 flex-1"
         placeholder={placeholder}
         aria-label="Search deals"
-        list={suggestions ? "deal-suggestions" : undefined}
         value={filters.query}
         onChange={(e) => onChange({ query: e.target.value })}
       />
-      {suggestions && (
-        <datalist id="deal-suggestions">
-          {suggestions.map((label) => (
-            <option key={label} value={label} />
-          ))}
-        </datalist>
-      )}
       <Select
         className="w-auto"
         aria-label="Filter by MON"

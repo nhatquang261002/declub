@@ -4,7 +4,7 @@ import { OnDealArt } from "@/components/ChogArt";
 import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
 import { LogoMark, Wordmark } from "@/components/Logo";
-import { explorerAddress, ON_DEAL_ADDRESS } from "@/lib/config";
+import { explorerAddress, ON_DEAL_V2_ADDRESS } from "@/lib/config";
 
 const STEPS = [
   {
@@ -129,9 +129,11 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">On-chain</p>
               <nav className="mt-3 grid gap-2 text-white/70">
-                <a href={explorerAddress(ON_DEAL_ADDRESS)} target="_blank" rel="noreferrer" className="hover:text-white">
-                  View On Deal contract <span aria-hidden>↗</span>
-                </a>
+                {ON_DEAL_V2_ADDRESS && (
+                  <a href={explorerAddress(ON_DEAL_V2_ADDRESS)} target="_blank" rel="noreferrer" className="hover:text-white">
+                    View On Deal contract <span aria-hidden>↗</span>
+                  </a>
+                )}
                 <span>Monad testnet</span>
                 <span className="font-mono text-xs text-white/50">Chain ID 10143</span>
               </nav>

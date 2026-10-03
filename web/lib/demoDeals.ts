@@ -1,16 +1,14 @@
 import { getAddress, keccak256, toHex, type Address, type Hex } from "viem";
 import { erc20Asset, nativeAsset, nftAsset, type Asset, type TokenInfo } from "./assets";
-import { CHOG_ADDRESS, DEMO_DEALS, ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS } from "./config";
-import type { Deal } from "./deals";
+import { CHOG_ADDRESS, DEMO_DEALS, ON_DEAL_V2_ADDRESS } from "./config";
 import type { DealV2 } from "./dealsV2";
-import type { IntentStatus, PoolIntent, Settlement } from "./intents";
+import { intentHash, type IntentStatus, type PoolIntent, type Settlement } from "./intents";
 import type { ProposalV2 } from "./proposals";
 
 /**
  * Mock deals for development, so every deal screen can be seen in every state without a wallet,
- * testnet deals, the V2 contract or the intent pool: v1 Chog deals, V2 multi-asset deals (exact
- * swaps, open offers with offers on them, private offers, a big bundle), and signed swaps
- * including a settled ring of three. With a wallet connected, some are made by it or addressed
+ * testnet deals, the deal contract or the intent pool: deals (exact swaps, open offers with offers
+ * on them, private offers, a big bundle), and signed swaps including a settled ring of three. With a wallet connected, some are made by it or addressed
  * to it, so the maker's and the taker's views show too.
  *
  * They replace the live lists while NEXT_PUBLIC_DEMO_DEALS is on (the default outside production;
@@ -69,41 +67,6 @@ const toad = (id: number) => nftAsset(DEMO_TOKENS.toads, BigInt(id));
 const CHOGS = { a: 1159, b: 1376, c: 143, d: 67, e: 909 } as const;
 
 const FEE = mon(0.01);
-
-// ─────────────────────────────────────────────────────────────── v1 (Chogs + MON)
-
-export function demoDeals(me?: Address): Deal[] {
-  const you = me ?? W.you;
-  const base = { requestedRoot: undefined, requestedCount: undefined };
-  const ids = (...n: number[]) => n.map(BigInt);
-  return [
-    { ...base, id: 9012n, maker: W.ana, taker: null, expiry: at(2 * DAY), status: "open", offeredIds: ids(CHOGS.a, CHOGS.c), offeredMon: mon(1.25), requestedIds: ids(CHOGS.b, CHOGS.e), requestedMon: 0n },
-    { ...base, id: 9011n, maker: W.bo, taker: you, expiry: at(6 * HOUR), status: "open", offeredIds: ids(CHOGS.d, CHOGS.e), offeredMon: 0n, requestedIds: [], requestedMon: mon(1.5) },
-    {
-      id: 9010n,
-      maker: W.cy,
-      taker: null,
-      expiry: at(DAY),
-      status: "open",
-      offeredIds: ids(CHOGS.b),
-      offeredMon: mon(0.5),
-      requestedIds: [],
-      requestedMon: 0n,
-      // A trait request: any 1 Chog from the committed set. The root is made up.
-      requestedRoot: keccak256(toHex("on-deal demo trait root")),
-      requestedCount: 1n,
-    },
-    { ...base, id: 9009n, maker: you, taker: null, expiry: at(3 * DAY), status: "open", offeredIds: ids(CHOGS.c), offeredMon: 0n, requestedIds: ids(CHOGS.a), requestedMon: mon(0.25) },
-    { ...base, id: 9008n, maker: W.dee, taker: null, expiry: at(40 * 60), status: "open", offeredIds: [], offeredMon: mon(2), requestedIds: ids(CHOGS.e), requestedMon: 0n },
-    { ...base, id: 9007n, maker: W.eli, taker: null, expiry: 0n, status: "open", offeredIds: ids(CHOGS.a, CHOGS.e), offeredMon: 0n, requestedIds: [], requestedMon: mon(1.75) },
-    { ...base, id: 9006n, maker: W.fen, taker: W.gus, expiry: at(12 * HOUR), status: "open", offeredIds: ids(CHOGS.d), offeredMon: 0n, requestedIds: ids(CHOGS.c), requestedMon: 0n },
-    { ...base, id: 9005n, maker: W.gus, taker: null, expiry: at(-2 * HOUR), status: "open", offeredIds: ids(CHOGS.d), offeredMon: 0n, requestedIds: ids(CHOGS.c), requestedMon: 0n },
-    { ...base, id: 9004n, maker: W.ana, taker: null, expiry: at(DAY), status: "filled", offeredIds: ids(CHOGS.e), offeredMon: 0n, requestedIds: ids(CHOGS.d, CHOGS.c), requestedMon: 0n },
-    { ...base, id: 9003n, maker: you, taker: null, expiry: at(DAY), status: "filled", offeredIds: ids(CHOGS.b), offeredMon: 0n, requestedIds: [], requestedMon: mon(3) },
-    { ...base, id: 9002n, maker: W.bo, taker: null, expiry: at(2 * DAY), status: "cancelled", offeredIds: ids(CHOGS.a), offeredMon: 0n, requestedIds: ids(CHOGS.b), requestedMon: 0n },
-    { ...base, id: 9001n, maker: W.cy, taker: null, expiry: at(5 * DAY), status: "open", offeredIds: ids(CHOGS.d), offeredMon: mon(2.5), requestedIds: ids(CHOGS.b, CHOGS.c), requestedMon: 0n },
-  ];
-}
 
 // ─────────────────────────────────────────────────────────────── V2 (any assets)
 
@@ -210,13 +173,15 @@ function intentRow(
   deadline: bigint,
   extra: Partial<Pick<PoolIntent, "reason" | "settlementTx">> = {},
 ): PoolIntent {
+  const intent = { maker, give, want, feeToken: DEMO_TOKENS.wmon, maxFee: FEE, deadline, nonce: BigInt(n) };
   return {
-    hash: keccak256(toHex(`on-deal demo intent ${n}`)),
+    // The real hash of the terms, so a mock row passes the same check a pool's row does.
+    hash: intentHash(intent),
     status,
     reason: extra.reason ?? null,
     createdAt: T0 - n * 600,
     settlementTx: extra.settlementTx ?? null,
-    intent: { maker, give, want, feeToken: DEMO_TOKENS.wmon, maxFee: FEE, deadline, nonce: BigInt(n) },
+    intent,
     signature: `0x${"ab".repeat(65)}`,
   };
 }
@@ -256,7 +221,7 @@ export function demoSettlements(me?: Address): Settlement[] {
 
 // ─────────────────────────────────────────────────────────────── Writes
 
-const DEMO_IDS = new Set([...demoDeals().map((d) => d.id), ...demoV2().map((d) => d.id)]);
+const DEMO_IDS = new Set(demoV2().map((d) => d.id));
 
 /** A mock deal's id, which no contract knows. */
 export const isDemoDealId = (id: bigint) => DEMO_DEALS && DEMO_IDS.has(id);
@@ -268,7 +233,7 @@ export const isDemoDealId = (id: bigint) => DEMO_DEALS && DEMO_IDS.has(id);
 export function isDemoWrite(call: { address?: Address; args?: readonly unknown[] }): boolean {
   if (!DEMO_DEALS) return false;
   if (!call.address) return true;
-  const deal = sameAddr(call.address, ON_DEAL_ADDRESS) || (!!ON_DEAL_V2_ADDRESS && sameAddr(call.address, ON_DEAL_V2_ADDRESS));
+  const deal = !!ON_DEAL_V2_ADDRESS && sameAddr(call.address, ON_DEAL_V2_ADDRESS);
   const first = call.args?.[0];
   return deal && typeof first === "bigint" && DEMO_IDS.has(first);
 }

@@ -1,6 +1,6 @@
 # ADR 0003: No indexer in v1
 
-**Status:** Accepted · 2026-09-28 · step 1 amended by [ADR 0004](0004-read-deals-from-storage.md): the public RPC caps `eth_getLogs` at 100 blocks, so trades are read from storage instead of logs. Fill history is partly lifted out of the browser by [ADR 0012](0012-server-side-saves.md), still without an indexer
+**Status:** Accepted · 2026-09-28 · step 1 amended by [ADR 0004](0004-read-deals-from-storage.md): the public RPC caps `eth_getLogs` at 100 blocks, so trades are read from storage instead of logs. Fill history is partly lifted out of the browser by [ADR 0012](0012-server-side-saves.md), and search and filters by [ADR 0020](0020-server-side-deal-book.md), both still without an indexer
 
 ## Context
 

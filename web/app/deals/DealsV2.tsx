@@ -1,99 +1,59 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useConnection } from "wagmi";
 import { Alert } from "@/components/Alert";
 import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { Pagination } from "@/components/Pagination";
-import { DealFilterBar, DealTabs, type DealTab } from "@/components/DealListControls";
+import { DealFilterBar, DealTabs } from "@/components/DealListControls";
 import { ListingGrid } from "@/components/IntentParts";
 import { Select, type SelectOption } from "@/components/Select";
 import { useNow } from "@/hooks/useNow";
-import { useIntents } from "@/hooks/usePool";
-import { useTokenInfo } from "@/hooks/useTokenInfo";
-import { useDealsV2 } from "@/hooks/useDealsV2";
-import { erc20Tokens } from "@/lib/assets";
+import { useDealBook } from "@/hooks/useDealBook";
+import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { SHOW_INTENTS } from "@/lib/config";
-import { describeError } from "@/lib/errors";
-import { intentAsListing } from "@/lib/intents";
+import type { BookKind, DealTab } from "@/lib/dealBook";
 import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
-import { applyDealFiltersV2 } from "@/lib/dealFiltersV2";
-import type { DealV2 } from "@/lib/dealsV2";
-import { isExpired, sameAddress } from "@/lib/deals";
-import { PAGE, SEARCH_LIMIT } from "./DealsV1";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
-/** Which settlement to show: both, deals with locked assets, or signed swaps (ADR 0008). */
-type KindFilter = "any" | "locked" | "signed";
-const KIND_OPTIONS: Array<SelectOption<KindFilter>> = [
+export const PAGE = 4;
+/** Typing waits this long before it asks the server, so a search isn't sent per keystroke. */
+const SEARCH_DELAY_MS = 250;
+
+const KIND_OPTIONS: Array<SelectOption<BookKind>> = [
   { value: "any", label: "All types" },
   { value: "locked", label: "Locked" },
   { value: "signed", label: "Signed" },
 ];
 
 /**
- * The multi-asset book: OnDealV2 deals (locked) and, when the intents contract is configured,
- * signed swaps from the pool, in one list. Any mix of ERC-721 and ERC-20 on each side, plus MON
- * on locked deals.
+ * The deal book: OnDealV2 deals (locked) and, when the intents contract is configured, signed swaps
+ * from the pool, in one list. Any mix of ERC-721 and ERC-20 on each side, plus MON on locked deals.
+ * The server searches, filters and pages the whole book (ADR 0020); this page only shows a page.
  */
-export function DealsV2({ switcher }: { switcher: ReactNode }) {
+export function DealsV2() {
   const { address } = useConnection();
   const now = useNow();
   const [tab, setTab] = useState<DealTab>("open");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<DealFilters>(DEFAULT_FILTERS);
-  const [kind, setKind] = useState<KindFilter>("any");
+  const [kind, setKind] = useState<BookKind>("any");
+  const query = useDebounced(filters.query, SEARCH_DELAY_MS);
   const filtering = isFiltering(filters) || kind !== "any";
-  const limit = filtering ? SEARCH_LIMIT : page * PAGE;
-  const showLocked = kind !== "signed";
-  const showSigned = SHOW_INTENTS && kind !== "locked";
-  const { deals, total, hasMore, isLoading: dealsLoading, error } = useDealsV2({ limit, enabled: showLocked });
 
-  // The pool being down only costs the signed swaps: locked deals read straight from the chain.
-  const openSigned = useIntents({ status: "open", enabled: showSigned });
-  const allSigned = useIntents({ status: "all", enabled: showSigned && tab === "all" });
-  const signedListings = useMemo(
-    () => ({
-      open: showSigned ? openSigned.intents.map(intentAsListing) : [],
-      all: showSigned ? (tab === "all" ? allSigned.intents : openSigned.intents).map(intentAsListing) : [],
-    }),
-    [showSigned, tab, openSigned.intents, allSigned.intents],
-  );
-
-  const isLoading = dealsLoading || (showSigned && openSigned.isLoading);
-
-  const tokens = useMemo(
-    () =>
-      erc20Tokens(
-        [...deals, ...signedListings.all, ...signedListings.open].flatMap((t) => [...t.offered, ...t.requested]),
-      ),
-    [deals, signedListings],
-  );
-  const { info } = useTokenInfo(tokens);
-
-  const lists = useMemo(() => {
-    const isLive = (t: DealV2) => t.status === "open" && !isExpired(t, now);
-    // Signed swaps first: they carry no timestamp or id to order them against deals by, and
-    // "Ending soon" re-sorts the two together anyway.
-    const live = applyDealFiltersV2([...signedListings.open, ...deals], filters, now, info);
-    const everything = applyDealFiltersV2([...signedListings.all, ...deals], filters, now, info);
-    return {
-      // Public offers plus private ones addressed to me. A signed swap is open to any counterparty.
-      open: live.filter((t) => isLive(t) && (!t.taker || sameAddress(t.taker, address))),
-      // Only a locked deal can be addressed to one wallet.
-      "for-you": live.filter((t) => isLive(t) && !!address && sameAddress(t.taker, address)),
-      all: everything,
-    } satisfies Record<DealTab, DealV2[]>;
-  }, [deals, signedListings, filters, now, info, address]);
-
-  const currentList = lists[tab];
-  const signedInTab = tab === "for-you" ? 0 : (tab === "all" ? signedListings.all : signedListings.open).length;
-  const totalPages = Math.max(
-    1,
-    Math.ceil((filtering ? currentList.length : Number(total) + signedInTab) / PAGE),
-  );
-  const shown = currentList.slice((page - 1) * PAGE, page * PAGE);
+  const book = useDealBook({
+    tab,
+    filters: { ...filters, query },
+    kind: SHOW_INTENTS ? kind : "locked",
+    viewer: address,
+    tokens: [],
+    page,
+    size: PAGE,
+  });
+  const { items, total, counts, signedError, isLoading, error } = book;
+  const { info } = useDealsTokenInfo(items);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE));
 
   const updateFilters = (patch: Partial<DealFilters>) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -104,15 +64,14 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
     <>
       <PageHeader title="Open deals">
         <div className="flex flex-wrap items-center gap-2">
-          {switcher}
           <DealTabs
             tab={tab}
             onTab={(next) => {
               setTab(next);
               setPage(1);
             }}
-            openCount={lists.open.length}
-            forYouCount={lists["for-you"].length}
+            openCount={counts.open}
+            forYouCount={counts.forYou}
           />
           <CreateDealButton />
         </div>
@@ -138,19 +97,21 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
         }
       />
 
-      {showSigned && openSigned.error && (
+      {signedError && (
         <Alert tone="warn" title="Signed swaps are unavailable right now" className="mb-5">
-          {describeError(openSigned.error).message} Deals you can accept on-chain are still listed below.
+          {signedError} Deals you can accept on-chain are still listed below.
         </Alert>
       )}
 
-      {error ? (
+      {error && items.length === 0 ? (
         <LoadError title="Couldn&apos;t load deals" error={error} />
+      ) : !book.enabled ? (
+        <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>
       ) : isLoading ? (
         <EmptyState>Loading deals…</EmptyState>
-      ) : shown.length === 0 && filtering ? (
+      ) : items.length === 0 && filtering ? (
         <EmptyState>No deals match your search or filters.</EmptyState>
-      ) : shown.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState>
           <p>
             {tab === "for-you"
@@ -162,18 +123,22 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
           <CreateDealButton className="mt-5" />
         </EmptyState>
       ) : (
-        <ListingGrid listings={shown} now={now} me={address} info={info} />
+        <ListingGrid listings={items} now={now} me={address} info={info} />
       )}
 
-      {currentList.length > 0 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPage={setPage}
-          loading={isLoading}
-          nextDisabled={!hasMore && page >= Math.ceil(deals.length / PAGE)}
-        />
+      {total > 0 && (
+        <Pagination page={page} totalPages={totalPages} onPage={setPage} loading={isLoading || book.isFetching} />
       )}
     </>
   );
+}
+
+/** `value`, once it has stopped changing for `delayMs`. */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return settled;
 }

@@ -41,7 +41,7 @@ import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
-import { ON_DEAL_ADDRESS, SHOW_V2 } from "@/lib/config";
+import { ON_DEAL_V2_ADDRESS, SHOW_V2 } from "@/lib/config";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
 import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
@@ -51,7 +51,7 @@ const NO_ASSETS: readonly Asset[] = [];
 
 export default function DealV2Page() {
   const params = useParams<{ id: string }>();
-  if (!SHOW_V2) return <EmptyState>Multi-asset deals aren&apos;t enabled on this deployment yet.</EmptyState>;
+  if (!SHOW_V2) return <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>;
   if (!/^\d+$/.test(params.id)) return <EmptyState>Invalid deal id.</EmptyState>;
   return <DealDetailV2 id={BigInt(params.id)} />;
 }
@@ -65,7 +65,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   // Both sides pay the fee this deal was listed with, not the contract's current one (ADR 0018).
   const fee = deal?.fee;
   // History needs to know which public deals this wallet filled (hooks/useFills.ts).
-  const { record } = useFills(address, swapV2?.address ?? ON_DEAL_ADDRESS);
+  const { record } = useFills(address, ON_DEAL_V2_ADDRESS);
 
   // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
   const openOffer = !!deal && isOpenOffer(deal);

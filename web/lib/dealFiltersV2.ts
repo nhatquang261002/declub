@@ -46,7 +46,7 @@ function matchesMon(deal: DealV2, mon: MonFilter): boolean {
   }
 }
 
-/** Same query, MON filter and sorting as `applyDealFilters`, for V2 deals. */
+/** Free-text query, MON filter and sorting (lib/dealFilters.ts) over V2 deals and signed swaps. */
 export function applyDealFiltersV2<T extends DealV2>(
   deals: T[],
   filters: DealFilters,

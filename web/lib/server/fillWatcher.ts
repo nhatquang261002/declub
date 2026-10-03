@@ -32,11 +32,9 @@ export type ChainScan = {
   txs(from: bigint, to: bigint): Promise<Hex[]>;
 };
 
-/** Every contract whose events count: fills from both swap contracts, creations from V2 for the Clubs. */
+/** Every contract whose events count: fills, and creations for the Clubs. */
 const WATCHED: Address[] = [...new Set([...FILL_CONTRACTS, ...ACTIVITY_CONTRACTS])];
 
-// v1 emits the same `TradeFilled` as V2. Its `TradeCreated` has another signature, so it doesn't
-// match, which is right: only V2 deals feed the Clubs.
 const EVENTS = [getAbiItem({ abi: onDealV2Abi, name: "TradeFilled" }), getAbiItem({ abi: onDealV2Abi, name: "TradeCreated" })];
 
 /** The public RPC answers `eth_getLogs` for at most 100 blocks (ADR 0004). */

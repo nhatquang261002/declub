@@ -1,9 +1,8 @@
 import { zeroAddress, type Address } from "viem";
 import { toAsset, type Asset, type RawAsset } from "./assets";
-import { CHOG_ADDRESS } from "./config";
-import type { Deal, DealStatus } from "./deals";
+import type { DealStatus } from "./deals";
 
-/** A OnDealV2 deal: two lists of assets instead of v1's Chog ids + one MON amount. */
+/** A OnDealV2 deal: what each side gives, as two lists of assets. */
 export type DealV2 = {
   id: bigint;
   maker: Address;
@@ -59,37 +58,5 @@ export function toDealV2(id: bigint, raw: RawDealV2): DealV2 | null {
     fee: raw.fee,
     offered: offered as Asset[],
     requested: requested as Asset[],
-  };
-}
-
-/**
- * Lets the existing deal UI (cards, filters, notifications) show a V2 deal unchanged, when it
- * only uses what that UI already understands: Chogs and MON. Deals with any other token return
- * null and need the generic asset UI instead.
- */
-export function toLegacyDeal(deal: DealV2, chogAddress: Address = CHOG_ADDRESS): Deal | null {
-  const side = (assets: readonly Asset[]) => {
-    const ids: bigint[] = [];
-    let mon = 0n;
-    for (const a of assets) {
-      if (a.kind === "erc721" && a.token.toLowerCase() === chogAddress.toLowerCase()) ids.push(a.id);
-      else if (a.kind === "native") mon += a.amount;
-      else return null;
-    }
-    return { ids, mon };
-  };
-  const offered = side(deal.offered);
-  const requested = side(deal.requested);
-  if (!offered || !requested) return null;
-  return {
-    id: deal.id,
-    maker: deal.maker,
-    taker: deal.taker,
-    expiry: deal.expiry,
-    status: deal.status,
-    offeredIds: offered.ids,
-    offeredMon: offered.mon,
-    requestedIds: requested.ids,
-    requestedMon: requested.mon,
   };
 }

@@ -6,18 +6,15 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { LoadError } from "@/components/ErrorPanel";
 import { EmptyState, PageHeader } from "@/components/Page";
 import { ListingGrid } from "@/components/IntentParts";
-import { DealGrid } from "@/components/DealParts";
 import { Tabs } from "@/components/Tabs";
-import { VersionSwitch, type DealVersion } from "@/components/VersionSwitch";
 import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
-import { useDeals } from "@/hooks/useDeals";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { useIntents } from "@/hooks/usePool";
-import { ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS, SHOW_INTENTS, SHOW_V2 } from "@/lib/config";
+import { ON_DEAL_V2_ADDRESS, SHOW_INTENTS } from "@/lib/config";
 import { intentAsListing } from "@/lib/intents";
-import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
+import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
@@ -34,22 +31,15 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const [version, setVersion] = useState<DealVersion>(SHOW_V2 && SHOW_INTENTS ? "v2" : "v1");
-  const isV2 = version === "v2";
-  const v1 = useDeals({ limit: 200, enabled: !isV2 });
-  const v2 = useDealsV2({ limit: 200, enabled: isV2 });
-  // Signed swaps (ADR 0008) sit beside locked deals in the multi-asset view, every status.
-  const signed = useIntents({ status: "all", maker: address, enabled: isV2 && SHOW_INTENTS && !!address });
+  const v2 = useDealsV2({ limit: 200 });
+  // Signed swaps (ADR 0008) sit beside locked deals, every status.
+  const signed = useIntents({ status: "all", maker: address, enabled: SHOW_INTENTS && !!address });
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
-  const v2Deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
-  const { info } = useDealsTokenInfo(v2Deals);
-  // Fills are kept per contract, so each version reads its own record.
-  const v1Fills = useFills(address, ON_DEAL_ADDRESS);
-  const v2Fills = useFills(address, ON_DEAL_V2_ADDRESS ?? ON_DEAL_ADDRESS);
-  const { error } = isV2 ? v2 : v1;
-  const isLoading = (isV2 ? v2.isLoading || signed.isLoading : v1.isLoading) && !error;
-  const deals: Array<Deal | DealV2> = isV2 ? v2Deals : v1.deals;
-  const fillIds = isV2 ? v2Fills.ids : v1Fills.ids;
+  const deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
+  const { info } = useDealsTokenInfo(deals);
+  const { ids: fillIds } = useFills(address, ON_DEAL_V2_ADDRESS);
+  const { error } = v2;
+  const isLoading = (v2.isLoading || signed.isLoading) && !error;
 
   const walletDeals = useMemo(
     () => deals.filter((deal) => isWalletDeal(deal, address, fillIds)),
@@ -108,7 +98,6 @@ export default function HistoryPage() {
 
       <PageHeader title="Recent activity">
         <div className="flex flex-wrap items-center gap-2">
-          <VersionSwitch value={version} onChange={setVersion} />
           <CreateDealButton />
         </div>
       </PageHeader>
@@ -140,17 +129,13 @@ export default function HistoryPage() {
           <CreateDealButton className="mt-5" />
         </EmptyState>
       ) : (
-        isV2 ? (
-          <ListingGrid listings={visibleDeals as DealV2[]} now={now} me={address} info={info} />
-        ) : (
-          <DealGrid deals={visibleDeals as Deal[]} now={now} />
-        )
+        <ListingGrid listings={visibleDeals} now={now} me={address} info={info} />
       )}
     </div>
   );
 }
 
-function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
+function isWalletDeal(deal: Pick<DealV2, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
   return !!address
     && (sameAddress(deal.maker, address)
       || sameAddress(deal.taker, address)

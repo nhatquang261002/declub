@@ -54,10 +54,3 @@ export function formatDate(unixSec: bigint): string {
 
 /** "#1, #2, #3" */
 export const formatIds = (ids: readonly bigint[]) => ids.map((id) => `#${id}`).join(", ");
-
-/** "1, 2, #3 4" → [1n, 2n, 3n, 4n]. null if any piece isn't a positive integer. */
-export function parseIds(input: string): bigint[] | null {
-  const parts = input.split(/[\s,]+/).map((p) => p.replace(/^#/, "")).filter(Boolean);
-  if (!parts.every((p) => /^\d+$/.test(p))) return null;
-  return parts.map((p) => BigInt(p)).filter((id) => id > 0n);
-}

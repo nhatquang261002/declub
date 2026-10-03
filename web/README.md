@@ -40,10 +40,10 @@ Outside production, mock deals (`lib/demoDeals.ts`) replace the live ones so eve
 ## Layout
 
 ```text
-app/         routes: / · /my-chogs · /create · /deal/[id] · /history · /clubs · /guide
+app/         routes: / · /deals · /create · /v2/deal/[id] · /intents · /history · /clubs · /guide, and api/
 components/  Providers, Header, ConnectButton, Chog*, Deal*, Tx*, Page helpers, artwork
-hooks/       useDeals, useDeal, useChogs, useChogApproval, useTxFlow, useLocalFills, useNow
-lib/         abi (generated), config, wagmi, contracts, deals, errors, metadata, format
+hooks/       useDealBook, useDealsV2, useDealV2, useChogs, useTxFlow, useFills, useNow, …
+lib/         abi (generated), config, wagmi, contracts, dealsV2, dealBook, errors, metadata, format, server/
 ```
 
 ## Notes

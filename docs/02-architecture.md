@@ -54,7 +54,7 @@ The full spec is in [03 · Contract Design](03-contract-design.md) and the inter
 
 ### Frontend (`web/`)
 
-Next.js + wagmi + viem + Tailwind. It talks to the chain directly and has no backend in v1. See [05 · Frontend](05-frontend.md).
+Next.js + wagmi + viem + Tailwind. It sends every transaction from the browser and reads most things straight from the chain. Its server routes keep saves, profiles and Clubs, and hold the deal book so it can be searched and filtered whole ([ADR 0020](adr/0020-server-side-deal-book.md)). See [05 · Frontend](05-frontend.md).
 
 ### Intent pool and matcher (`matcher/`)
 
@@ -62,7 +62,7 @@ A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), 
 
 ### Indexer (deferred)
 
-Not in v1. The frontend reads trades straight from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks. Add an indexer when loading gets slow, when search and filters are needed, or to show who filled public trades. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
+Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
 
 ## Key flows
 

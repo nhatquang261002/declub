@@ -1,5 +1,6 @@
 import { expiryLabel, formatIds, formatMon } from "./format";
-import { displayStatus, sameAddress, type Deal } from "./deals";
+import { displayStatus, sameAddress } from "./deals";
+import type { DealV2 } from "./dealsV2";
 import { reasonText, type PoolIntent } from "./intents";
 
 export type NotificationKind =
@@ -30,10 +31,15 @@ export type AppNotification = {
 /** A maker's open deal is "expiring" inside this window. */
 export const EXPIRING_WINDOW_SEC = 3_600;
 
-const offerSummary = (deal: Deal) => {
+/** "#12, #40 + 2 tokens + 1.5 MON". Token amounts need their decimals, so ERC-20s are only counted. */
+const offerSummary = (deal: DealV2) => {
+  const ids = deal.offered.flatMap((a) => (a.kind === "erc721" ? [a.id] : []));
+  const tokens = deal.offered.filter((a) => a.kind === "erc20").length;
+  const mon = deal.offered.reduce((sum, a) => (a.kind === "native" ? sum + a.amount : sum), 0n);
   const parts = [
-    deal.offeredIds.length ? formatIds(deal.offeredIds) : null,
-    deal.offeredMon > 0n ? formatMon(deal.offeredMon) : null,
+    ids.length ? formatIds(ids) : null,
+    tokens ? `${tokens} token${tokens === 1 ? "" : "s"}` : null,
+    mon > 0n ? formatMon(mon) : null,
   ].filter(Boolean);
   return parts.join(" + ") || "assets";
 };
@@ -49,7 +55,7 @@ const offerSummary = (deal: Deal) => {
  * - expired:  my open deal ran out; the escrow is still locked until someone reclaims it
  */
 export function deriveNotifications(
-  deals: readonly Deal[],
+  deals: readonly DealV2[],
   account: string | undefined,
   nowSec: number,
 ): AppNotification[] {
@@ -58,7 +64,7 @@ export function deriveNotifications(
 
   for (const deal of deals) {
     const status = displayStatus(deal, nowSec);
-    const href = `/deal/${deal.id}`;
+    const href = `/v2/deal/${deal.id}`;
     const mine = sameAddress(deal.maker, account);
 
     if (!mine && sameAddress(deal.taker, account) && status === "open") {

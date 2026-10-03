@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getAddress } from "viem";
-import { ON_DEAL_ADDRESS } from "../lib/config";
+import { ON_DEAL_V2_ADDRESS } from "../lib/config";
 import {
-  demoDeals,
   demoDealsV2,
   demoDealV2,
   demoIntents,
@@ -18,8 +17,8 @@ import { ringLegs } from "../lib/intents";
 const ME = getAddress("0x00000000000000000000000000000000000000a1");
 
 describe("mock deals", () => {
-  it("never shares an id between v1 and V2, so one detail page can't show the other's deal", () => {
-    const ids = [...demoDeals().map((d) => d.id), ...demoDealsV2().map((d) => d.id)];
+  it("gives every deal its own id, clear of real ones", () => {
+    const ids = demoDealsV2().map((d) => d.id);
     assert.equal(new Set(ids).size, ids.length);
     assert.ok(ids.every((id) => id >= 9000n), "mock ids stay clear of real testnet ids");
     assert.ok(ids.every(isDemoDealId));
@@ -27,19 +26,16 @@ describe("mock deals", () => {
   });
 
   it("casts the connected wallet as maker and taker, so both views can be seen", () => {
-    const v1 = demoDeals(ME);
     const v2 = demoDealsV2(ME);
-    assert.ok(v1.some((d) => d.maker === ME) && v1.some((d) => d.taker === ME));
     assert.ok(v2.some((d) => d.maker === ME && d.status === "open") && v2.some((d) => d.taker === ME));
   });
 
   it("covers every status, including one past its expiry", () => {
     const now = Math.floor(Date.now() / 1000);
-    for (const deals of [demoDeals(), demoDealsV2()]) {
-      const statuses = new Set<string>(deals.map((d) => d.status));
-      for (const status of ["open", "filled", "cancelled"]) assert.ok(statuses.has(status), status);
-      assert.ok(deals.some((d) => d.status === "open" && d.expiry !== 0n && d.expiry < BigInt(now)), "an expired deal");
-    }
+    const deals = demoDealsV2();
+    const statuses = new Set<string>(deals.map((d) => d.status));
+    for (const status of ["open", "filled", "cancelled"]) assert.ok(statuses.has(status), status);
+    assert.ok(deals.some((d) => d.status === "open" && d.expiry !== 0n && d.expiry < BigInt(now)), "an expired deal");
   });
 
   it("gives open offers a note and offers in every state", () => {
@@ -66,8 +62,8 @@ describe("mock deals", () => {
   });
 
   it("refuses writes for mock deals and lets real ones through", () => {
-    assert.equal(isDemoWrite({ address: ON_DEAL_ADDRESS, args: [9012n] }), true);
-    assert.equal(isDemoWrite({ address: ON_DEAL_ADDRESS, args: [3n] }), false);
+    assert.equal(isDemoWrite({ address: ON_DEAL_V2_ADDRESS, args: [9112n] }), true);
+    assert.equal(isDemoWrite({ address: ON_DEAL_V2_ADDRESS, args: [3n] }), false);
     // An unset contract (V2 mocked without a deployment) has nowhere to send to.
     assert.equal(isDemoWrite({ address: undefined, args: [3n] }), true);
   });

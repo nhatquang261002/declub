@@ -4,11 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { formatMon } from "@/lib/format";
-import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
-import type { TraitFilter } from "@/lib/traitRequests";
-import { ChogThumb } from "./Chog";
+import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
+import type { DealV2 } from "@/lib/dealsV2";
 import { ClockIcon, LockIcon, SwapIcon } from "./Icons";
-import { TraitRequestSummary } from "./TraitRequest";
 import { Who } from "./Who";
 
 const BADGE: Record<DisplayStatus, string> = {
@@ -95,19 +93,6 @@ export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: 
   );
 }
 
-/** One side of a deal: Chog thumbnails plus a MON pill. `xl` is the deal page's stage. */
-export function DealSide({ ids, mon, xl = false }: { ids: readonly bigint[]; mon: bigint; xl?: boolean }) {
-  if (ids.length === 0 && mon === 0n) return <span className="text-sm text-muted">Nothing</span>;
-  return (
-    <div className={`flex min-h-20 flex-wrap items-start justify-center ${xl ? "gap-4" : "gap-2"}`}>
-      {ids.map((id) => (
-        <ChogThumb key={id.toString()} id={id} large={!xl} xl={xl} />
-      ))}
-      {mon > 0n && <MonPill wei={mon} />}
-    </div>
-  );
-}
-
 /** The gives / wants pair every deal-like card shows. */
 export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
   return (
@@ -131,7 +116,7 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
   );
 }
 
-/** The card chrome shared by v1 and V2 deals: header row, gives / wants panels, maker line. */
+/** The card chrome shared by deals and signed swaps: header row, gives / wants panels, maker line. */
 export function DealCardFrame({
   href,
   deal,
@@ -142,7 +127,7 @@ export function DealCardFrame({
   tag,
 }: {
   href: string;
-  deal: Pick<Deal, "id" | "maker" | "taker" | "expiry" | "status">;
+  deal: Pick<DealV2, "id" | "maker" | "taker" | "expiry" | "status">;
   now: number;
   me?: string;
   gives: ReactNode;
@@ -184,59 +169,5 @@ export function DealCardFrame({
         )}
       </div>
     </Link>
-  );
-}
-
-export function DealCard({
-  deal,
-  now,
-  me,
-  traitLabels,
-}: {
-  deal: Deal;
-  now: number;
-  me?: string;
-  /** Merkle root (lowercase) → trait, so trait requests can be named. */
-  traitLabels?: Map<string, TraitFilter>;
-}) {
-  return (
-    <DealCardFrame
-      href={`/deal/${deal.id}`}
-      deal={deal}
-      now={now}
-      me={me}
-      gives={<DealSide ids={deal.offeredIds} mon={deal.offeredMon} />}
-      wants={
-        deal.requestedRoot && deal.requestedCount && deal.requestedCount > 0n ? (
-          <TraitRequestSummary
-            filter={traitLabels?.get(deal.requestedRoot.toLowerCase())}
-            count={deal.requestedCount}
-            root={deal.requestedRoot}
-          />
-        ) : (
-          <DealSide ids={deal.requestedIds} mon={deal.requestedMon} />
-        )
-      }
-    />
-  );
-}
-
-export function DealGrid({
-  deals,
-  now,
-  me,
-  traitLabels,
-}: {
-  deals: Deal[];
-  now: number;
-  me?: string;
-  traitLabels?: Map<string, TraitFilter>;
-}) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {deals.map((t) => (
-        <DealCard key={t.id.toString()} deal={t} now={now} me={me} traitLabels={traitLabels} />
-      ))}
-    </div>
   );
 }

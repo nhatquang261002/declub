@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChogsFlow } from "@/components/create/ChogsFlow";
 import { KindPicker, type KindAvailability } from "@/components/create/KindPicker";
 import { MultiFlow } from "@/components/create/MultiFlow";
 import { SettlementPicker } from "@/components/create/SettlementPicker";
@@ -13,15 +12,15 @@ import { DEMO_CREATE } from "@/lib/config";
 import { swapIntents, swapV2 } from "@/lib/contracts";
 import { DEFAULT_TERMS, type Step, type Terms, type DealKind, type Settlement } from "@/lib/createFlow";
 
-// Open offers, exact requests and trait requests live on OnDealV2 (ADR 0005–0007). Without V2
-// configured, exact and trait requests fall back to the original Chog contract.
-const AVAILABILITY: KindAvailability = {
-  open: swapV2
-    ? { scope: "Any tokens, NFTs and MON" }
-    : { scope: "", unavailable: "Not available on this deployment yet" },
-  exact: { scope: swapV2 ? "Any tokens, NFTs and MON" : "Chogs and MON" },
-  trait: { scope: swapV2 ? "Any collection with readable traits" : "Chogs and MON" },
-};
+// Open offers, exact requests and trait requests all live on OnDealV2 (ADR 0005–0007).
+const UNAVAILABLE = { scope: "", unavailable: "Not available on this deployment yet" };
+const AVAILABILITY: KindAvailability = swapV2
+  ? {
+      open: { scope: "Any tokens, NFTs and MON" },
+      exact: { scope: "Any tokens, NFTs and MON" },
+      trait: { scope: "Any collection with readable traits" },
+    }
+  : { open: UNAVAILABLE, exact: UNAVAILABLE, trait: UNAVAILABLE };
 
 export default function CreatePage() {
   return (
@@ -73,7 +72,6 @@ function CreateWizard({ preview = false }: { preview?: boolean }) {
 
       {/* Same key across kinds that share a contract, so switching between them keeps what you typed. */}
       {!signed && swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
-      {!signed && !swapV2 && (kind === "trait" || kind === "exact") && <ChogsFlow key="chogs" kind={kind} {...flow} />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { ExternalIcon, SwapIcon } from "@/components/Icons";
 import { ListingGrid } from "@/components/IntentParts";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
-import { MARKET_SCAN, type useClubMarket } from "@/hooks/useClubMarket";
+import { MARKET_SIZE, type useClubMarket } from "@/hooks/useClubMarket";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { erc20Tokens } from "@/lib/assets";
 import type { ActivityEvent } from "@/lib/clubs";
@@ -117,7 +117,7 @@ export function ClubMarket({ market, symbol, recent, now }: { market: Market; sy
 
       {view !== "completed" && (market.truncated || market.poolError) && (
         <p className="mt-4 text-xs text-muted">
-          {market.truncated && `Looked through the newest ${MARKET_SCAN} deals; older ones aren't searched. `}
+          {market.truncated && `Showing the newest ${MARKET_SIZE} deals; browse Deals and search for ${symbol} to see the rest. `}
           {market.poolError ? "The signed-swap pool isn't answering, so signed swaps are missing." : null}
         </p>
       )}

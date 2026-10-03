@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
-import { CHAIN_ID, ON_DEAL_ADDRESS } from "@/lib/config";
+import { CHAIN_ID } from "@/lib/config";
 import { useLocalFills } from "./useLocalFills";
 
 type FillsResponse = { enabled: false } | { enabled: true; ids: string[] };
@@ -12,13 +12,14 @@ type FillsResponse = { enabled: false } | { enabled: true; ids: string[] };
  * The deals a wallet has filled, for History (ADR 0012). With the server store on, this is the
  * server's record: every fill the app reported after checking its receipt, the same on every
  * device (`reportTx`, called from useTxFlow). Without it, it is this browser's own record, as
- * before (hooks/useLocalFills.ts), and `record` is how a page adds to it.
+ * before (hooks/useLocalFills.ts), and `record` is how a page adds to it. Empty while the contract
+ * isn't configured.
  */
-export function useFills(account: Address | undefined, contract: Address = ON_DEAL_ADDRESS) {
+export function useFills(account: Address | undefined, contract: Address | undefined) {
   const local = useLocalFills(account, contract);
   const query = useQuery({
-    queryKey: ["fills", CHAIN_ID, contract.toLowerCase(), account?.toLowerCase()],
-    enabled: !!account,
+    queryKey: ["fills", CHAIN_ID, contract?.toLowerCase(), account?.toLowerCase()],
+    enabled: !!account && !!contract,
     staleTime: 15_000,
     retry: false,
     queryFn: async (): Promise<FillsResponse> => {

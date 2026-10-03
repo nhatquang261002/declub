@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { encodeAbiParameters, encodeEventTopics, getAddress, zeroAddress, type Address, type Hex } from "viem";
 import { onDealV2Abi } from "../lib/abi";
-import { ON_DEAL_ADDRESS } from "../lib/config";
 import { activityKey, ingestTx, readActivity, recordActivity, type ReceiptLike, type Reader } from "../lib/server/activity";
 import { fillsKey, listFills, recordFills } from "../lib/server/fills";
 import { memoryStore, type Store } from "../lib/server/store";
@@ -198,15 +197,15 @@ describe("ingestTx", () => {
 describe("recordFills (shared with History)", () => {
   it("still records a fill under the taker", async () => {
     const store = memoryStore();
-    const fill = log(ON_DEAL_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(V2, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill])), 1);
-    assert.deepEqual(await listFills(store, ON_DEAL_ADDRESS, taker), ["7"]);
-    assert.equal(fillsKey(ON_DEAL_ADDRESS, taker), fillsKey(ON_DEAL_ADDRESS, taker.toLowerCase()));
+    assert.deepEqual(await listFills(store, V2, taker), ["7"]);
+    assert.equal(fillsKey(V2, taker), fillsKey(V2, taker.toLowerCase()));
   });
 
   it("records nothing for a reverted transaction or another contract", async () => {
     const store = memoryStore();
-    const fill = log(ON_DEAL_ADDRESS, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(V2, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill], "reverted")), 0);
     assert.equal(await recordFills(store, receipt([log(OTHER, "TradeFilled", { tradeId: 7n, maker, taker })])), 0);
   });

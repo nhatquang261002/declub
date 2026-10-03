@@ -94,7 +94,7 @@ Rules:
 - **Wanted:** open deals and signed swaps that ask for it, trait requests for the collection included.
 - **Completed:** the Club's latest completed swaps, with who traded and a link to the deal (or, for a signed swap, its transaction).
 - Only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCardV2`.
-- Says when the scan limit was hit ("looked through the newest 200 deals; older ones aren't searched") and when the signed-swap pool isn't answering.
+- Says when more than 50 locked deals name the asset ("showing the newest 50 deals; browse Deals and search to see the rest") and when the signed-swap pool isn't answering.
 
 **Board tab**: member posts, newest first, pinned ones on top.
 
@@ -135,7 +135,7 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 - **OnDeal (v1)** isn't logged: it is Chog-only and superseded by V2.
 - **A Club added later has no past:** only events recorded while its asset was on the list count, until the fill watcher backfills it ([ADR 0019](adr/0019-fill-watcher.md), `FILL_WATCHER_START_BLOCK`).
 - **Matcher:** `GET /intents` and `/settlements` take `?token=`: any intent naming that address on either side, whatever the id (it matches the address inside the `intent_assets` key, so there is no schema change). `/settlements` also takes `?after=` (milliseconds; later cycles only, oldest first) for a reader that pages forward. `web/lib/pool.ts` passes `token`.
-- **Deals feed** stays client-side in v1: `useDealsV2` loads the newest 200 and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` filter them (`useClubMarket`).
+- **Deals feed** comes from the server's deal book ([ADR 0020](adr/0020-server-side-deal-book.md)): `useClubMarket` asks `/api/deals` for the open locked deals that name the Club's assets, across every deal, and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` split them into For trade and Wanted.
 - **Deals made outside the app** come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)): a cron that follows the finalized head from a cursor and passes each transaction through `recordActivity`, so they count within a run's interval.
 
 ## Membership and the Holder badge
