@@ -1,66 +1,147 @@
 # Privy in On Deal
 
-On Deal is OTC trading between strangers, so the hard problem is trust, not login. Privy is the app's **identity layer**: it says which wallets and which X / Discord account belong to the same person, and the app turns that into things other traders can see and the server can enforce. Sign-in is the smallest part of it.
+Privy is optional identity and account infrastructure for On Deal. The trading contracts do
+not depend on Privy: without `NEXT_PUBLIC_PRIVY_APP_ID`, the app uses the injected-wallet
+wagmi flow. When Privy is configured, it adds sign-in, linked accounts, wallet switching,
+verified profiles, handle-based counterparties, and the identity boundary for server-side
+state and Clubs.
 
-## What Privy powers
+## Current implementation
 
-| Feature | Privy feature used | Where |
+| Capability | Current behavior | Frontend / server surface |
 |---|---|---|
-| **Verified trader profiles.** A maker's `@handle` shows beside their wallet on every deal, so a counterparty knows who they trade with. Opt-in, revocable. | Linked accounts (X, Discord, wallets), read server-side with `@privy-io/node` | `app/api/profile`, `lib/server/profileSync.ts`, `components/Who.tsx` ([ADR 0011](adr/0011-verified-profiles.md)) |
-| **Make a deal for @handle.** Type the X or Discord handle of the person you agreed a trade with, pick one of the wallets they show under it, and the deal is locked on-chain to that wallet. No pasting addresses from DMs. | User lookup by social username: `getByTwitterUsername`, `getByDiscordUsername` | `app/api/profiles/lookup`, `lib/server/handleLookup.ts`, `components/create/parts.tsx` ([ADR 0017](adr/0017-deal-by-handle.md)) |
-| **Profiles kept honest.** An unlinked, transferred or deleted account stops showing, without the owner opening the app. | Webhooks: `user.linked_account`, `user.unlinked_account`, `user.transferred_account`, `user.deleted` (Svix-signed) | `app/api/webhooks/privy`, `lib/server/privyWebhook.ts` ([ADR 0013](adr/0013-privy-webhooks.md)) |
-| **One person, many wallets.** Collectors keep a vault and a hot wallet. Link both; switch which one trades on `/account`. | Wallet linking, `useSetActiveWallet` from `@privy-io/wagmi` | `app/account/page.tsx` ([ADR 0010](adr/0010-privy-sign-in.md)) |
-| **Clubs: Holder badge across all your wallets.** A Club membership belongs to the Privy user; the Holder check sums `balanceOf` over every linked wallet, and wallets follow the account (via webhook) as they're linked or unlinked. | Linked wallets as the source of truth for membership | `lib/server/members.ts`, `lib/server/memberRoutes.ts` ([ADR 0016](adr/0016-clubs-and-momentum.md)) |
-| **Club roles and moderation by person, not wallet.** Roles, bans and app admins are keyed by Privy user id, so swapping wallets doesn't dodge a ban. | Privy user id | `lib/server/boardRoutes.ts`, `CLUB_ADMIN_USER_IDS` ([09-clubs.md](09-clubs.md)) |
-| **Per-user server state.** Fill history, notification read markers and recent collections follow the person across devices. | Access token verified server-side | `lib/server/gate.ts`, `app/api/state` ([ADR 0012](adr/0012-server-side-saves.md)) |
-| **Wallet connection.** Privy supplies wagmi's connectors; every contract read, write and EIP-712 signature is unchanged. | `@privy-io/wagmi` | `components/Providers.tsx`, `lib/wagmi.ts` |
+| Sign-in | Privy can sign in with a wallet, Google, X, or Discord. Wallet login is shown first. Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
+| Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/account`, `components/ConnectButton.tsx` |
+| Multiple wallets | Linked wallets are shown on `/account`; a connected wallet can be made active without changing the account. | `/account`, `useSetActiveWallet` |
+| Embedded wallets | Disabled by default. Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one for users who have no wallet. | `components/Providers.tsx`, `lib/config.ts` |
+| Shared trader profiles | A user explicitly shares an X or Discord profile. Google and email can be linked for sign-in/recovery but are never shown as trader profiles. | `/account`, `/api/profile`, `lib/server/profileSync.ts` |
+| Handle-based deals | A maker can find a shared X or Discord handle, choose one of that user's shared wallets, and lock the taker address in the deal flow. | `/create`, `/api/profiles/lookup`, `lib/server/handleLookup.ts` |
+| Server authorization | Per-user routes accept a Privy access token, verify it server-side, then fetch the user from Privy. The browser cannot choose the user id, handle, or wallet to authorize. | `lib/server/privy.ts`, `lib/server/gate.ts` |
+| Clubs | Membership, roles, moderation, and Holder checks are keyed to the Privy user. Linked Ethereum wallets are synchronized so a wallet unlink stops counting for Holder status. | `/clubs`, `/clubs/[address]`, `lib/server/members.ts` |
+| Webhook synchronization | Signed Privy user events refresh existing shared profiles and Club wallet membership. Webhooks never publish a profile or create a membership. | `POST /api/webhooks/privy`, `lib/server/privyWebhook.ts` |
 
-**The server never trusts the browser about identity.** Every per-user route takes only the access token, verifies it against the app's keys, then reads the user's linked accounts from Privy by id. A request can't name a handle or a wallet.
+The implementation is deliberately fail-closed at the integration boundary:
 
-## Why no embedded wallets
+- Public Privy features are off when `NEXT_PUBLIC_PRIVY_APP_ID` is absent.
+- Server identity features are off unless both `NEXT_PUBLIC_PRIVY_APP_ID` and
+  `PRIVY_APP_SECRET` are present.
+- Webhook processing is off unless the server secret and
+  `PRIVY_WEBHOOK_SIGNING_SECRET` are present.
+- Invalid or missing Privy access tokens do not identify a user.
+- Webhook signatures are verified against the raw request body before the event is read.
 
-They are off on purpose (`NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS`). On Deal users trade collections they already hold, and those assets live in the wallet they already own. A fresh embedded wallet would be empty, so it couldn't list or fill anything until assets were moved in. It would also weaken the trust signal: "this X account owns this wallet" means something for a wallet with history, and little for a new, empty one, which is exactly what a scammer would use. Privy's job here is to vouch for wallets people bring, not to make new ones.
+## Account and sign-in behavior
 
-## Demo script (about 4 minutes)
+The header's **Connect** control renders one of two modes, selected at build time:
 
-Two browsers: **A** (the maker, your main wallet) and **B** (the counterparty, a private window with a second wallet and a second X or Discord account).
+1. **Privy mode** when `NEXT_PUBLIC_PRIVY_APP_ID` is set. A user can sign in, connect a
+   linked wallet, switch the active wallet, open `/account`, or sign out.
+2. **Injected-wallet mode** when the app id is absent. wagmi exposes installed EIP-6963
+   wallets and there is no Privy account or linked-account screen.
 
-1. **Wallet-first sign-in.** In A, sign in with the wallet. On `/account`, link X. Link a second wallet too, to show one person with two wallets.
-2. **Verified profiles.** Still on `/account`, turn on *Show my profile to other traders*. Do the same in B with its own wallet and X or Discord account.
-3. **Make a deal for @handle.** In A, create a deal. In *Only this wallet can accept*, type B's handle and press **Find**: B's wallet comes back from Privy's user lookup. Pick it. The review shows B's handle next to the address. Create the deal. Point out that A never pasted an address.
-4. **What the counterparty sees.** In B, the deal is under *For you*, with A shown as `@handle` beside the address, and only B's wallet can accept it. The handles came from Privy on the server, not from anything either side typed.
-5. **Clubs.** In A, join a Club. The Holder badge reflects tokens held in *either* linked wallet. Post on the Board.
-6. **Webhook.** In the Privy dashboard, open *Users*, find B's user (a throwaway), and **Delete User**. Privy sends `user.deleted`, and the server removes B's shared profile and Club memberships. In A, press **Find** for B's handle again: *Nobody shows a profile as …*. Reload the deal: B's handle is gone and the address shows plain. (Deletion can't be undone, so use a throwaway account for B.)
+In Privy mode, a social or email login can return to an account that has no wallet connected
+in the current browser. The header offers **Connect wallet** or **Link a wallet**. This is
+different from silently creating an embedded wallet: embedded creation only happens when the
+explicit environment flag and dashboard setting enable it.
 
-For step 6, don't unlink X from `/account` to show the webhook: the Account page re-syncs itself when it sees a stale share, so the change can't be credited to the webhook. A dashboard deletion happens outside the app, so only the webhook can explain it. Keep the dashboard's *Webhooks* delivery log open to show the `200`.
+The `/account` page has three relevant states:
 
-Viewers see a changed profile on reload, not live. `useProfile` caches for five minutes in a tab, and `/api/profiles` is cached for 30 s (plus stale-while-revalidate) behind a CDN, so on a deployed host reload a second time if the first still shows the handle.
+- Privy is not configured: explains that the app is using an installed wallet.
+- Privy is configured but the user is signed out: offers **Sign in**.
+- The user is signed in: shows linked social/email accounts, linked wallets, active-wallet
+  switching, optional embedded-wallet export, and the shared-profile controls.
 
-## Setup for the demo
+Unlinking a wallet removes it from Privy sign-in and from the app's linked-wallet identity
+set; it does not destroy the wallet or move its assets.
 
-In `web/.env.local` (server secrets aren't read from the root `.env`):
+## Verified profiles and handle lookup
 
-```bash
-NEXT_PUBLIC_PRIVY_APP_ID=...          # Privy dashboard
-PRIVY_APP_SECRET=...                  # Privy dashboard, beside the app id
-UPSTASH_REDIS_REST_URL=...            # Upstash console > database > REST API
-UPSTASH_REDIS_REST_TOKEN=...
-PRIVY_WEBHOOK_SIGNING_SECRET=whsec_...  # shown once the webhook endpoint is added
+Sharing a profile is opt-in. The browser sends only its access token and an instruction to
+share, stop sharing, or refresh. The server obtains the user's current linked accounts from
+Privy, validates the available profile, and stores the mapping by wallet. A user who has
+not enabled sharing is not returned by handle lookup even if Privy knows the social account.
+
+In `/create`, **Only this wallet can accept** accepts an X or Discord handle when Privy is
+available. **Find** calls `/api/profiles/lookup`; the maker selects one of the wallets that
+the shared profile exposes. An unresolved handle cannot pass the review step. The selected
+wallet address, not the typed handle, is the on-chain restriction.
+
+The profile displayed beside a wallet is therefore server-derived. It is not accepted from
+deal form input and it is not proof that the wallet itself cryptographically belongs to a
+social account.
+
+## Webhooks
+
+The route is:
+
+```text
+POST /api/webhooks/privy
 ```
 
-In the Privy dashboard:
+Subscribe the Privy endpoint to:
 
-- Login methods: wallet, Google, X, Discord. Embedded wallets off.
-- *Configuration > Webhooks*: add `https://<host>/api/webhooks/privy`, subscribe to `user.linked_account`, `user.unlinked_account`, `user.transferred_account` and `user.deleted`, then send *Test webhook* (`privy.test` answers `200`).
-- Webhooks are free in development and need the Enterprise plan in production, so run the demo against the development app. Locally, expose the dev server with `ngrok http 3000` or `cloudflared tunnel --url http://localhost:3000` and register the tunnel URL.
+- `user.linked_account`
+- `user.unlinked_account`
+- `user.transferred_account`
+- `user.deleted`
 
-## Rehearse first
+For each affected user, the handler reads the current linked accounts from Privy, refreshes
+an existing shared profile, and synchronizes Club wallets. This current-state read makes
+retries, duplicate deliveries, and out-of-order deliveries harmless. A deleted user is
+treated as having no linked accounts.
 
-Per the [roadmap](06-roadmap.md), the Privy pieces are typechecked, built and unit-tested (the webhook with signed requests), but have **not yet run against a real Privy app**. Go through the whole script once with real keys before recording, and check:
+Events unrelated to these user changes are acknowledged without changing application state.
+If the signature is invalid, the route returns `401`. If synchronization fails, it returns
+`500` so Privy can retry. When the route is disabled or the store is unavailable, it returns
+`503`.
 
-- [ ] Wallet sign-in, linking X and a second wallet, switching wallets on `/account`
-- [ ] Sharing a profile and seeing `@handle` from browser B
-- [ ] Finding B by handle on Create, picking the wallet, and seeing the deal under *For you* in B
-- [ ] *Test webhook* answers `200`
-- [ ] Deleting a throwaway user removes the handle (the dashboard shows a `200` delivery)
-- [ ] Joining a Club, the Holder badge with tokens in the second wallet, posting on the Board
+## Configuration
+
+Client configuration is build-time configuration:
+
+```dotenv
+NEXT_PUBLIC_PRIVY_APP_ID=...
+NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=false
+```
+
+Server configuration belongs in `web/.env.local` or the hosting provider's environment, not
+in a committed root `.env`:
+
+```dotenv
+PRIVY_APP_SECRET=...
+PRIVY_WEBHOOK_SIGNING_SECRET=whsec_...
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+`UPSTASH_*` is required for persistent profiles, server-side state, and Clubs. In development,
+the app can use its configured local/in-memory store, but that is not a production persistence
+strategy.
+
+The Privy dashboard must allow the deployed origin and enable the login methods the app is
+expected to expose: wallet, Google, X, Discord, and optionally email. Enable embedded wallets
+only when the product decision and `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` agree.
+
+For a local webhook test, expose the dev server with a tunnel and register the tunnel URL in
+Privy. Production webhook availability and billing depend on the Privy plan in use.
+
+## What remains to validate
+
+The code paths and signed-request tests exist, but live validation is an operational task.
+Before calling the Privy integration production-ready, run this checklist against the actual
+deployed app and Privy project:
+
+- [ ] Sign in with a wallet; link X, Discord, email, and a second wallet as applicable.
+- [ ] Return using Google, X, or Discord and connect or switch to the intended wallet.
+- [ ] Enable a shared profile and verify that another browser sees the profile beside the wallet.
+- [ ] Find that user by X or Discord handle in `/create`, select the wallet, and complete a
+      deal visibility check.
+- [ ] Send Privy's dashboard test webhook and confirm a `200` response.
+- [ ] Unlink or transfer a throwaway account and confirm the profile and Club wallet state
+      refresh after reload.
+- [ ] If embedded wallets are enabled, create one, connect it, and verify the export warning.
+- [ ] Join a Club, verify Holder status across linked wallets, post, and exercise the relevant
+      moderation path with real receipts.
+
+These checks should be marked complete only after the deployed host, real Privy app, real
+secrets, and the configured persistence store have all been exercised.

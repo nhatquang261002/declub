@@ -3,7 +3,8 @@
 Stack: **Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · wagmi 3 · viem 2 · Tailwind 4 · @tanstack/react-query 5**. Package manager: npm.
 Writes and most reads go straight to Monad over RPC. The server answers what the chain can't: saves, profiles and Clubs, and the deal book, which searches and filters every deal ([ADR 0020](adr/0020-server-side-deal-book.md)). The app uses `OnDealV2` only; OnDeal (v1) stays in `contracts/` but isn't in the app.
 
-Status: Phase 2, in progress. `✓` = built, `…` = still to do.
+Status: Current frontend reference. Implementation status and remaining live verification are
+tracked in [06 · Roadmap](06-roadmap.md).
 
 ## Layout (`web/`)
 
@@ -14,8 +15,10 @@ web/
 │   ├── globals.css             ✓ Tailwind theme tokens + card/btn/input utilities
 │   ├── page.tsx                ✓ Home: hero, how it works, links to Deals / Create / Guide
 │   ├── deals/page.tsx         ✓ Open Deals → DealsV2: tabs, search + filters, one page at a time from /api/deals
-│   ├── my-chogs/page.tsx       ✓ wallet's Chogs → "Deal this", MockChog mint panel
 │   ├── create/page.tsx         ✓ Create a deal: three-step wizard (deal type → assets → confirm). /v2/create redirects here
+│   ├── account/page.tsx        ✓ Privy sign-in, linked accounts, wallet switching and shared profile
+│   ├── intents/page.tsx        ✓ signed-intent list and matcher status
+│   ├── intent/[hash]/page.tsx  ✓ signed intent status, pool removal, on-chain cancel and settlement cycle
 │   ├── v2/deal/[id]/page.tsx  ✓ Deal Detail + actions
 │   ├── api/deals/route.ts      ✓ the deal book: a searched, filtered page of every deal and signed swap
 │   ├── history/page.tsx        ✓ my deals + withdraw
@@ -25,7 +28,7 @@ web/
 ├── components/
 │   ├── Providers.tsx           ✓ WagmiProvider + QueryClientProvider
 │   ├── Header.tsx              ✓ nav + ConnectButton
-│   ├── ConnectButton.tsx       ✓ Privy sign-in, or injected wallets (EIP-6963 list); wrong-network switch
+│   ├── ConnectButton.tsx       ✓ Privy sign-in or injected wallets (EIP-6963 list); wallet menu and network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb
 │   ├── DealParts.tsx          ✓ StatusBadge · MonPill · SwapPanels · DealCardFrame
 │   ├── Tabs.tsx                ✓ the one tab bar (`tabbar` / `tab` styles; Pagination reuses them)
@@ -52,7 +55,11 @@ web/
 │   ├── useDealBook.ts          ✓ one page of /api/deals, polled
 │   ├── useChogs.ts             ✓ useChogMetadata
 │   ├── useTxFlow.ts            ✓ switch chain → simulate → estimate → sign → receipt → refetch
-│   ├── useLocalFills.ts        ✓ deals this browser filled (localStorage), for History
+│   ├── useFills.ts             ✓ server-verified fill ids with browser fallback
+│   ├── useLocalFills.ts        ✓ browser-only fill fallback for History
+│   ├── useAccessToken.ts       ✓ optional Privy access-token adapter
+│   ├── useProfiles.ts          ✓ wallet profile lookup
+│   ├── useNotifications.ts     ✓ deal and intent notifications with server/local read state
 │   └── useNow.ts               ✓ ticking clock for expiry labels
 └── wagmi.config.ts             ✓ `npm run abi` config (Foundry plugin)
 ```
@@ -62,7 +69,7 @@ web/
 - `next.config.ts` loads the **repo-root `.env`**, so the web app and the Foundry scripts share one file. `web/.env*` still overrides it.
 - Most values default to the testnet deployment, so `npm run dev` works with no `.env` at all (with the mock deals below). `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` and `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` have no default: without them there are no live deals or signed swaps.
 - `NEXT_PUBLIC_CHOG_MINTABLE=false` hides the mint panel; set it for the real collection.
-- With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (email, Google, X, Discord or a wallet), embedded wallets are created for people without one, and `/account` links and unlinks accounts ([ADR 0010](adr/0010-privy-sign-in.md)). Without it, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963). WalletConnect in wagmi 3 needs `@walletconnect/ethereum-provider` and a project id, so it was left out of v1.
+- With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (Google, X, Discord or a wallet), and `/account` manages linked accounts and active wallets ([ADR 0010](adr/0010-privy-sign-in.md)). Email is linkable from `/account` for recovery but is not currently a login method. Embedded wallets are **off by default**; set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` only after enabling them in the Privy dashboard. Without the app id, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963) are available. WalletConnect is not configured.
 
 ### Design tokens
 
@@ -81,9 +88,9 @@ scattering hex values through JSX or utility definitions.
 | Screen | Reads | Writes | Status |
 |---|---|---|---|
 | **Open Deals** `/deals` | `/api/deals` (the server reads `tradeCount` + multicall `getTrade`, and the pool) | — | ✓ |
-| **My Chogs** `/my-chogs` | `balanceOf`, `tokenOfOwnerByIndex`, `tokenURI`, `isApprovedForAll` | `mint` (MockChog only) | ✓ |
+| **Account** `/account` | Privy user, linked accounts, linked wallets and shared-profile state | link/unlink accounts, connect/switch wallet, share/stop sharing profile | ✓ when Privy is configured |
 | **Create** `/create` | one wizard, OnDealV2 or a signed intent (see *Create wizard*) | approvals, `createTrade` / `createTraitTrade` / `createOpenOffer` | ✓ |
-| **History** `/history` | the newest 200 deals from `useDealsV2` filtered by `maker = me` / `taker = me`, plus fills (`useFills`), and my signed swaps | — | ✓ |
+| **History** `/history` | the newest 200 V2 deals, server-verified fills (or browser fallback), and the connected wallet's signed swaps | — | ✓ |
 
 ### Copy vocabulary
 
@@ -110,7 +117,7 @@ A bell in the header (connected wallets only). There is no event stream to subsc
 | Ending soon | my open deal expires within 1h |
 | Expired | my open deal ran out and its escrow is still locked |
 
-Read state is a set of `kind:dealId` keys in localStorage, per wallet. On the first visit of a wallet, existing Accepted items are marked read so old deals don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It can't reach a closed tab; that needs a server-side trigger.
+Read state is kept in localStorage per wallet as a resilient browser copy and, when Privy plus a store are configured, is merged with the user's server-side state through `/api/state`. Recent collections use the same per-user server state. On the first visit for a wallet, existing Accepted items are marked read so old deals don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It cannot reach a closed tab; that needs a server-side trigger.
 
 ### OnDealV2 in the frontend (Phase 4)
 
@@ -132,7 +139,7 @@ V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is the deal contract. Until `NE
 | `/create` (V2 half) | `components/create/MultiFlow.tsx`: exact request = two `AssetEditor`s (request / offer); open offer = a note (byte counter, limit 280) plus one editor. Both take an optional taker and an expiry, and redirect to the new deal. `/v2/create` redirects to `/create` |
 | `/v2/deal/[id]` | Both sides as `AssetList`, then cancel / reclaim / accept, and a "collect" panel for held payouts. An open offer shows the note and the offers instead of an ask (see below) |
 | `lib/assetDraft.ts` | Typed rows → `Asset[]`, mirroring the contract's rules (size, duplicates, MON on both sides) |
-| `hooks/useAssetApprovals.ts` | The approvals still missing, one step at a time |
+| `hooks/useAssetApprovals.ts` | Reads and sequences the exact ERC-20 / NFT approvals still needed, one step at a time |
 | `hooks/useDealV2.ts` | One deal by id, plus its note (`getTrade` + `offerNote` in one multicall) |
 | `hooks/useProposalsV2.ts` | The newest offers on an open offer: `proposalCount` then one `getProposals` page, newest first, with `loadMore` |
 | `lib/proposals.ts` | `ProposalV2`, `toProposal` |
@@ -185,14 +192,14 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 | `/history` (Multi-asset) | The wallet's signed swaps in every status beside its locked deals, with the same Active / Completed / Expired filters |
 | `/guide#settlement` | *Locked deals vs signed swaps*: a comparison table and one anchored entry per chip (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
 | `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain** |
-| `/intents`, `/intents/new` | Redirect to `/deals` and `/create`, for old links |
+| `/intents`, `/intents/new` | Compatibility redirects to `/deals` and `/create`; the signed-intent UI is now embedded in those screens |
 
 | File | Purpose |
 |---|---|
 | `lib/intents.ts` | The EIP-712 types and domain, the struct hash (the intent's id), the pool's JSON shapes and their parsers, status copy, deadline presets, `nonceBit`, and `intentAsListing` (a signed swap shaped like a V2 deal, so the list and filters treat both alike) |
 | `lib/pool.ts` | The HTTP client. Pool rejections become readable copy; rows whose recomputed hash doesn't match are dropped |
 | `hooks/usePool.ts` | `usePoolInfo` (also flags a pool for another chain or contract), `useIntents`, `useIntent`, `useSettlements` |
-| `hooks/useIntentReadiness.ts` | What stands between a wallet and an intent that can settle: balance and ownership problems, and the approvals still missing |
+| `hooks/useIntentReadiness.ts` | What stands between a wallet and an intent that can settle: balance, ownership, and required approval checks |
 | `hooks/useSignFlow.ts` | Sign and post an intent, or sign a cancel. Free, no gas; reuses `TxState` with an added `posting` stage so `TxButton` works unchanged |
 | `components/create/SettlementPicker.tsx` | The *Lock assets now* / *Sign only* choice: two cards, each with three chips (plus or minus) that open a tooltip |
 | `components/Tooltip.tsx` | The one tooltip: opens on hover, focus or tap; closes on Escape, outside tap or blur; an optional "Learn more" link; shifts to the right edge near the screen edge. Its trigger is a button, so it can't sit inside another button or link |
@@ -319,9 +326,9 @@ Where errors show up:
 | `WrongNativeAmount` (V2) | The MON sent doesn't match the deal plus the protocol fee. |
 | `WrongFee` (signed swaps) | The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token. |
 | `NotMaker` | Only the creator can cancel this deal. |
-| `EmptySide` | Add at least one Chog or some MON to each side. |
+| `EmptySide` | Add at least one asset to each side. |
 | `MonOnBothSides` | Put MON on one side only. |
-| `TooManyTokens` | Up to 10 Chogs per side. |
+| `TooManyTokens` | Up to 10 assets per side. |
 | `ExpiryInPast` | Pick an expiry in the future. |
 | `NothingToWithdraw` | There's nothing to withdraw. |
 | `WithdrawFailed` | Your wallet couldn't receive the MON. |
@@ -367,10 +374,10 @@ On the deal page (`app/v2/deal/[id]`), `hooks/useTraitFill.ts` rebuilds each set
 
 Files: `app/create/page.tsx` (stepper, kind picker, shared `Terms`), `components/create/` (`Stepper`, `KindPicker`, `MultiFlow`, `SignedFlow`, `TraitRequests`, `parts`), `lib/createFlow.ts` (kinds, expiries, taker check). Each flow owns its own drafts and renders all three steps.
 
-Rules on the Chog-contract side (client-side):
+Rules enforced by the V2 asset editor (client-side):
 
-- At least one Chog or some MON on each side, and MON on only one side.
-- Up to 10 Chogs per side, no duplicates, and nothing on both sides.
+- At least one asset on each side, and MON on only one side.
+- Up to 10 assets per side, no duplicate assets, and no asset on both sides.
 - Offered Chogs are picked from the wallet. Requested Chogs are added by id; `ownerOf` blocks ids that don't exist.
 - A private taker must currently own every requested Chog.
 - "Who can accept" also takes an X or Discord handle when Privy is on: **Find** calls `/api/profiles/lookup` and lists the wallets that trader shares under it; picking one fills in the address. A handle left unresolved blocks the step. The review shows the taker with `<Who>` ([ADR 0017](adr/0017-deal-by-handle.md)).
