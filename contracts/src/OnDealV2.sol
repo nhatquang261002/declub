@@ -79,6 +79,9 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
     }
 
     /// @inheritdoc IOnDealV2
+    // The only external calls before the events are `_validateSide`'s ERC-165 staticcalls,
+    // which can't change state or re-enter.
+    // forge-lint: disable-next-item(reentrancy-events)
     function createOpenOffer(
         Asset[] calldata offered,
         address taker,
@@ -104,6 +107,9 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
     }
 
     /// @inheritdoc IOnDealV2
+    // The only external calls before the events are `_validateSide`'s ERC-165 staticcalls,
+    // which can't change state or re-enter.
+    // forge-lint: disable-next-item(reentrancy-events)
     function propose(uint256 tradeId, Asset[] calldata assets)
         external
         payable
@@ -381,6 +387,9 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
 
     // ─────────────────────────────────────────────────────────────── Internals
 
+    // The only external calls before the events are `_validateSide`'s ERC-165 staticcalls,
+    // which can't change state or re-enter.
+    // forge-lint: disable-next-item(reentrancy-events)
     function _create(
         Asset[] calldata offered,
         Asset[] calldata requested,
@@ -570,7 +579,9 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
     /// @dev Move an NFT and verify it changed hands. Checking `ownerOf` only afterwards isn't
     ///      enough: with a token whose `transferFrom` silently does nothing, an id the receiver
     ///      already holds (one escrowed for another trade, or one the maker owns) would pass.
-    // forge-lint: disable-next-item(calls-loop)
+    // Called once per NFT in a side, so its reverts sit in a loop on purpose: one NFT that
+    // doesn't move must revert the whole deal.
+    // forge-lint: disable-next-item(calls-loop, require-revert-in-loop)
     function _moveNft(address token, address from, address to, uint256 id) private {
         IERC721 nft = IERC721(token);
         if (nft.ownerOf(id) != from) revert NftNotReceived(token, id);

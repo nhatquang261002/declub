@@ -183,7 +183,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 Every admin-only call reverts with `NotFeeAdmin(caller)` for anyone else. Views: `fee`, `pendingFee`, `pendingFeeAt`, `feeAdmin`, `pendingFeeAdmin`, `MAX_FEE`, `MAX_FEE_LIMIT`, `FEE_RAISE_DELAY`, `FEE_RECIPIENT`.
 
-The contract accepts any ceiling up to 500 MON (or 500 WMON for intents). The deploy scripts default `PROTOCOL_FEE_MAX_WEI` to 4 × the launch fee; that's a script default, not a contract rule.
+The contract accepts any ceiling up to 500 MON (or 500 WMON for intents). The deploy scripts require `PROTOCOL_FEE_MAX_WEI` whenever there is a fee, and a `FEE_ADMIN` whenever the ceiling isn't 0 unless `FEE_FIXED=true` (see [script/README.md](../contracts/script/README.md)); neither is a contract rule.
 
 ## Phase 3: trait-based requests
 
@@ -240,14 +240,14 @@ Three scripts in [`contracts/script/`](../contracts/script/). Each `run()` parse
 
 ### `DeployV2.s.sol`
 
-1. Deploy `OnDealV2(fee, maxFee, feeRecipient, feeAdmin)` from `PROTOCOL_FEE_WEI` (default 0), `PROTOCOL_FEE_MAX_WEI` (default 4 × the fee), `FEE_RECIPIENT` and `FEE_ADMIN` (default none, a fixed fee).
+1. Deploy `OnDealV2(fee, maxFee, feeRecipient, feeAdmin)` from `PROTOCOL_FEE_WEI` (default 0), `PROTOCOL_FEE_MAX_WEI` (required with a fee), `FEE_RECIPIENT` and `FEE_ADMIN` (required with a non-zero ceiling unless `FEE_FIXED=true`, which deploys a fee nobody can change).
 2. With `DEPLOY_MOCK_ERC20=true`, deploy `MockERC20("Mock USD", "mUSD")` and mint `DEMO_MINT_AMOUNT` whole tokens (default 1000) to each address in `DEMO_WALLETS`.
 3. Print `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_V2_DEPLOY_BLOCK`, the fee settings read back from the contract, and `NEXT_PUBLIC_MOCK_ERC20_ADDRESS` when the mock was deployed.
 
 ### `DeployIntents.s.sol`
 
 1. With `DEPLOY_MOCK_WMON=true` and no `FEE_TOKEN`, deploy `MockWMON` and use it as the fee token.
-2. Deploy `OnDealIntents(feeToken, fee, maxFee, feeRecipient, feeAdmin)` from `FEE_TOKEN`, `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI` (default 4 × the fee), `FEE_RECIPIENT` and `FEE_ADMIN`.
+2. Deploy `OnDealIntents(feeToken, fee, maxFee, feeRecipient, feeAdmin)` from `FEE_TOKEN`, `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT` and `FEE_ADMIN`, with the same rules as above. A given `FEE_TOKEN` must first wrap and unwrap 1 wei in the script's local simulation, with 18 decimals, or the script stops before broadcasting.
 3. Print `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_INTENTS_DEPLOY_BLOCK`, `MOCK_WMON_ADDRESS` when the mock was deployed, and the fee settings read back from the contract.
 
 ### `Deploy.s.sol` (v1, legacy)

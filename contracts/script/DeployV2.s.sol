@@ -4,16 +4,19 @@ pragma solidity 0.8.28;
 import {Script, console} from "forge-std/Script.sol";
 import {OnDealV2} from "../src/OnDealV2.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
+import {FeeConfig} from "./FeeConfig.sol";
 
 /// @notice Deploys the generic OnDealV2 (any token) with its protocol fee, and optionally a
 ///         mock ERC-20 so the multi-asset flow can be demoed on testnet.
 /// @dev Env (all optional):
 ///        PROTOCOL_FEE_WEI      per-side fee in wei (default 0 = no fee)
-///        PROTOCOL_FEE_MAX_WEI  ceiling the fee admin can never exceed (default 4 × the fee);
-///                              at most `MAX_FEE_LIMIT`
+///        PROTOCOL_FEE_MAX_WEI  ceiling the fee admin can never exceed, at most `MAX_FEE_LIMIT`;
+///                              required when PROTOCOL_FEE_WEI is set (it is immutable)
 ///        FEE_RECIPIENT         address that receives the fees; required when the ceiling is
 ///                              not 0
-///        FEE_ADMIN             may change the fee within the ceiling (default none = fixed)
+///        FEE_ADMIN             may change the fee within the ceiling; required when the
+///                              ceiling is not 0, unless FEE_FIXED is set
+///        FEE_FIXED             true → deploy with no fee admin, so the fee never changes
 ///        DEPLOY_MOCK_ERC20  true → also deploy "Mock USD" (mUSD) with an open mint
 ///        DEMO_WALLETS       comma-separated addresses to mint mUSD to
 ///        DEMO_MINT_AMOUNT   mUSD (whole tokens) per demo wallet (default 1000)
@@ -24,6 +27,7 @@ contract DeployV2 is Script {
         uint256 maxFee;
         address feeRecipient;
         address feeAdmin;
+        bool fixedFee;
         bool deployMockErc20;
         address[] demoWallets;
         uint256 mintAmount; // whole tokens
@@ -51,9 +55,10 @@ contract DeployV2 is Script {
 
     function configFromEnv() public view returns (Config memory c) {
         c.fee = vm.envOr("PROTOCOL_FEE_WEI", uint256(0));
-        c.maxFee = vm.envOr("PROTOCOL_FEE_MAX_WEI", 4 * c.fee);
+        c.maxFee = FeeConfig.maxFeeFromEnv(vm, c.fee);
         c.feeRecipient = vm.envOr("FEE_RECIPIENT", address(0));
         c.feeAdmin = vm.envOr("FEE_ADMIN", address(0));
+        c.fixedFee = vm.envOr("FEE_FIXED", false);
         c.deployMockErc20 = vm.envOr("DEPLOY_MOCK_ERC20", false);
         c.mintAmount = vm.envOr("DEMO_MINT_AMOUNT", uint256(1000));
         string memory wallets = vm.trim(vm.envOr("DEMO_WALLETS", string("")));
@@ -68,6 +73,7 @@ contract DeployV2 is Script {
 
     function deploy(Config memory c) public returns (Result memory r) {
         require(block.chainid == 10143 || block.chainid == 31337, "testnet deployment only");
+        FeeConfig.checkAdmin(c.maxFee, c.feeAdmin, c.fixedFee);
         r.deployBlock = block.number;
         vm.startBroadcast();
 

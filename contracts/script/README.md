@@ -17,9 +17,10 @@ Deploys `OnDealV2` ([ADR 0005](../../docs/adr/0005-generic-asset-model.md)) with
 | Variable | |
 |---|---|
 | `PROTOCOL_FEE_WEI` | what each side pays per completed deal, in MON wei, until the fee admin changes it (default 0) |
-| `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above; defaults to 4 × `PROTOCOL_FEE_WEI`, at most 500 MON |
+| `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above, at most 500 MON; required when `PROTOCOL_FEE_WEI` is set |
 | `FEE_RECIPIENT` | who receives it (a Safe); required when the ceiling is not 0 |
-| `FEE_ADMIN` | who may change the fee (a different Safe); unset means the fee is fixed for good |
+| `FEE_ADMIN` | who may change the fee (a different Safe); required when the ceiling is not 0, unless `FEE_FIXED` is set |
+| `FEE_FIXED` | `true` deploys with no fee admin, so the fee never changes |
 | `DEPLOY_MOCK_ERC20` | `true` also deploys `MockERC20("Mock USD", "mUSD")` with an open mint |
 | `DEMO_WALLETS` | comma-separated addresses to mint mUSD to |
 | `DEMO_MINT_AMOUNT` | mUSD per demo wallet, in whole tokens (default 1000) |
@@ -43,13 +44,16 @@ Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset 
 | Variable | |
 |---|---|
 | `PROTOCOL_FEE_WEI` | what each maker pays when a cycle settles, in `FEE_TOKEN` units (18 decimals), until the fee admin changes it |
-| `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above; defaults to 4 × `PROTOCOL_FEE_WEI`, at most 500 tokens |
+| `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above, at most 500 tokens; required when `PROTOCOL_FEE_WEI` is set |
 | `FEE_RECIPIENT` | who receives it (a Safe); required when the ceiling is not 0 |
-| `FEE_ADMIN` | who may change the fee (a different Safe); unset means the fee is fixed for good |
-| `FEE_TOKEN` | the chain's wrapped MON; required when the ceiling is not 0, unless the next one is set |
+| `FEE_ADMIN` | who may change the fee (a different Safe); required when the ceiling is not 0, unless `FEE_FIXED` is set |
+| `FEE_FIXED` | `true` deploys with no fee admin, so the fee never changes |
+| `FEE_TOKEN` | the chain's wrapped MON; required when the ceiling is not 0, unless the next one is set. Before broadcasting, the script wraps and unwraps 1 wei of it in its local simulation and checks 18 decimals, and refuses anything that doesn't behave like WMON |
 | `DEPLOY_MOCK_WMON` | `true` deploys a `MockWMON` and uses it as the fee token. Testnet has no canonical WMON. Ignored when `FEE_TOKEN` is set |
 
-The same `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT` and `FEE_ADMIN` go to `DeployV2.s.sol` (there the fee is plain MON), so both contracts charge the same amount. Both print the fee settings they deployed with. The recipient, token and ceiling are immutable. The amount isn't: the fee admin calls `setFee` on each contract (a cut applies at once, a raise needs `applyFee` 7 days later), so keep the two in step. The 4 × default is the scripts' choice; the contracts accept any ceiling up to 500.
+The same `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT`, `FEE_ADMIN` and `FEE_FIXED` go to `DeployV2.s.sol` (there the fee is plain MON), so both contracts charge the same amount. Both print the fee settings they deployed with. The recipient, token and ceiling are immutable. The amount isn't: the fee admin calls `setFee` on each contract (a cut applies at once, a raise needs `applyFee` 7 days later), so keep the two in step.
+
+The recipient, token and ceiling can't be changed after deploy, so the scripts don't guess them (both share `script/FeeConfig.sol`): a fee without `PROTOCOL_FEE_MAX_WEI` is refused rather than given a default ceiling, and a non-zero ceiling without `FEE_ADMIN` is refused unless `FEE_FIXED=true` says a fee nobody can change is what you want. The contracts accept any ceiling up to 500; the roadmap's plan is about 4 × the launch fee.
 
 ```bash
 cd contracts

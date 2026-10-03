@@ -18,7 +18,7 @@ A locked deal can ask for exact assets, for any NFT with given traits ("any Chog
 
 ## Status
 
-- **Protocol: built.** `OnDealV2`, `OnDealIntents`, the shared `FeeAdmin`, legacy `OnDeal` and the mocks, with 440 Foundry tests passing in 39 suites (unit, fuzz, invariant) and Slither triaged ([04 · Security](docs/04-security.md)). The matcher has 79 tests and the web app 260 unit tests.
+- **Protocol: built.** `OnDealV2`, `OnDealIntents`, the shared `FeeAdmin`, legacy `OnDeal` and the mocks, with 461 Foundry tests passing in 41 suites (unit, fuzz, invariant, including invariants against hostile NFT collections), a Halmos proof that every pair and 3-ring pays every maker's `want`, and Slither triaged ([04 · Security](docs/04-security.md)). The matcher has 79 tests and the web app 260 unit tests.
 - **App: built.** The Next.js app in [`web/`](web/) has the deal list (searched and filtered on the server), Create (lock or sign), the deal and signed-swap pages, History, Clubs, Account, the Guide, notifications and Privy sign-in. Left: a click-through on testnet with real wallets.
 - **Testnet: needs a redeploy.** The deployed contracts predate the protocol fee and the current intents domain (see below).
 
@@ -91,7 +91,7 @@ curl -L https://foundry.paradigm.xyz | bash && foundryup
 cd contracts
 git submodule update --init --recursive   # forge-std, openzeppelin-contracts
 forge build
-forge test                                # 440 tests incl. fuzz + invariants
+forge test                                # 461 tests incl. fuzz + invariants
 forge coverage --report summary --no-match-coverage "(test|script)"
 ```
 

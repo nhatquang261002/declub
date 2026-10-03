@@ -58,6 +58,7 @@ contract DeployV2Test is Test {
         DeployV2.Config memory c;
         c.fee = 1 ether;
         c.maxFee = 4 ether;
+        c.feeAdmin = makeAddr("feeAdmin");
         vm.expectRevert(IFeeAdmin.NoFeeRecipient.selector);
         script.deploy(c);
     }
@@ -77,16 +78,38 @@ contract DeployV2Test is Test {
         );
         vm.setEnv("DEMO_MINT_AMOUNT", "5");
         vm.setEnv("PROTOCOL_FEE_WEI", "2000000000000000000");
+        vm.setEnv("PROTOCOL_FEE_MAX_WEI", "8000000000000000000");
         vm.setEnv("FEE_RECIPIENT", "0x0000000000000000000000000000000000000fee");
         vm.setEnv("FEE_ADMIN", "0x0000000000000000000000000000000000000ad1");
         DeployV2.Config memory c = script.configFromEnv();
         assertEq(c.fee, 2 ether);
-        assertEq(c.maxFee, 8 ether, "ceiling defaults to 4x the fee");
+        assertEq(c.maxFee, 8 ether);
         assertEq(c.feeRecipient, address(0xfee));
         assertEq(c.feeAdmin, address(0xad1));
         assertTrue(c.deployMockErc20);
         assertEq(c.demoWallets.length, 2);
         assertEq(c.demoWallets[1], address(0xdef));
         assertEq(c.mintAmount, 5);
+    }
+
+    function test_refusesAFeeWithoutACeiling() public {
+        vm.setEnv("PROTOCOL_FEE_WEI", "1");
+        vm.setEnv("PROTOCOL_FEE_MAX_WEI", ""); // empty counts as unset
+        vm.expectRevert("PROTOCOL_FEE_MAX_WEI is required when PROTOCOL_FEE_WEI is set");
+        script.configFromEnv();
+    }
+
+    function test_refusesAFeeWithNoAdminUnlessFixed() public {
+        DeployV2.Config memory c;
+        c.fee = 1 ether;
+        c.maxFee = 4 ether;
+        c.feeRecipient = makeAddr("treasury");
+        vm.expectRevert("FEE_ADMIN unset: set it, or FEE_FIXED=true to lock the fee for good");
+        script.deploy(c);
+
+        c.fixedFee = true;
+        DeployV2.Result memory r = script.deploy(c);
+        assertEq(OnDealV2(r.swap).feeAdmin(), address(0));
+        assertEq(OnDealV2(r.swap).fee(), 1 ether);
     }
 }

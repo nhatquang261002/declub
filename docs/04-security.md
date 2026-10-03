@@ -89,7 +89,7 @@ contracts/test/
 
 **Exit criteria, all met:**
 
-- `forge test`: all 440 tests pass, in 39 suites, across `OnDeal`, `OnDealV2`, `OnDealIntents`, `FeeAdmin`, the mocks and the deploy scripts. The top level of `contracts/test/` (the files above) has 145 of them plus the invariant suite.
+- `forge test`: all 461 tests pass, in 41 suites, across `OnDeal`, `OnDealV2`, `OnDealIntents`, `FeeAdmin`, the mocks and the deploy scripts (each invariant suite counts as one). The top level of `contracts/test/` (the files above) has 150 of them plus the invariant suite.
 - `forge coverage`: 100% of lines, statements, branches and functions on `MockChog.sol` and on `OnDeal.sol`'s exact-id paths. The trait overloads only have the four tests in `OnDeal.traits.t.sol`; their other reverts, and the plain fill of a trait trade, are untested.
 - Invariants hold at 256 runs × depth 64 (16,384 handler calls per run).
 
@@ -106,7 +106,22 @@ contracts/test/
 
 `forge lint` is clean. Intentional patterns are suppressed inline with a reason, so any new finding stands out.
 
-Before any mainnet deploy with real Chogs: an external review, a re-run of Slither (triaged as above), and a public testnet period.
+**Slither 0.11.4 on everything** (`slither . --filter-paths "lib/|test/|script/|src/mocks/"`, run 2026-10-03 over `OnDeal`, `OnDealV2`, `OnDealIntents` and `FeeAdmin`) returned 102 results, none of them a bug:
+
+| Detector | Impact | Where | Verdict |
+|---|---|---|---|
+| `arbitrary-send-erc20` ×3 | High | `OnDealIntents._send`, `_chargeFees` | **False positive.** `from` is always a maker in the cycle whose signature `settle` checked, and whose nonce it used up, before any asset moves. The signature covers every `give` and the fee token and `maxFee`. |
+| `arbitrary-send-eth` | High | `OnDealV2._transferOut` | **False positive.** `to` is the maker, taker, proposer or fee recipient that the trade names; a failed send becomes a credit. |
+| `reentrancy-eth` ×10 | High | `OnDealV2` fill, accept, reject, withdraw, cancel, reclaim; `OnDeal.fillTrade` ×2 | **False positive**, as for v1 above: every entry point is `nonReentrant`, and the only state written after a call is a credit for a send that *failed*. Covered by the re-entry tests in `OnDealV2.tokens.t.sol` and `OnDealV2.offers.t.sol`. |
+| `uninitialized-state` | High | `OnDealV2._proposals` | **False positive.** A mapping; entries are written in `propose`. |
+| `missing-zero-check` | Low | `FeeAdmin.transferFeeAdmin` | Intended: a zero `next` cancels a pending handover. |
+| `shadowing-local` ×2, `reentrancy-benign` | Low | `IOnDeal` parameter names; v1 `_sendMon` | Cosmetic, and v1 is legacy. |
+| `calls-loop` ×53, `timestamp` ×8 | Low | loops over a capped side; expiries and deadlines | Intended, as for v1: sides are capped at 10 assets, one failing transfer must revert the whole deal, and deadlines are hours long. |
+| `naming-convention` ×16, `low-level-calls` ×3, `cyclomatic-complexity` ×3 | Info | | `UPPER_CASE` immutables and constants, the deliberate `call`s in payouts, `_validateSide`. |
+
+**Halmos** proves the core settlement property symbolically (`test/intents/symbolic/`, see [OnDealIntents](#ondealintents)).
+
+Before any mainnet deploy with real Chogs: an external review, a re-run of Slither and Halmos (triaged as above), and a public testnet period.
 
 ## `OnDealV2` (Phase 4)
 
@@ -140,6 +155,8 @@ Recomputed from the trades themselves in `test/v2/invariant/`, over native, two 
 
 Mutation checks: removing the credit on a failed payout, redirecting reclaimed assets to the caller, and allowing fills after expiry each make the invariant suite fail.
 
+**Hostile collections** (`OnDealV2.hostile.invariant.t.sol`). A second invariant suite runs V3 against collections built to cheat: a `SoftNft` whose `transferFrom` does nothing, instead of reverting, when the move isn't allowed (so only the contract's own `ownerOf` checks stop it), a `LyingNft` that never moves anything, and type confusion (USDC sent as an ERC-721, an NFT sent as an ERC-20). Honest trades, open offers, proposals, fills, accepts, withdrawals and cancels run alongside attempts to deposit another actor's id, deposit an id already in escrow, deposit a `LyingNft`, fill a trade with an id the taker doesn't hold, or fill an ask that includes a `LyingNft`. Each call knows whether it's honest: an honest one must succeed and land where the terms say, a hostile one must revert. Invariants: the escrow owns a `SoftNft` id exactly when one open trade or `Active` proposal holds it (never two), never holds a `LyingNft` or a type-confused asset, and holds exactly the USDC and fee shares it accounts for. Removing either the `ownerOf == from` check in `_moveNft` or the "an ERC-20 must not be an NFT" check makes it fail within one run (the second lets "1 unit" of an NFT collection pull NFT #1 into escrow).
+
 ### Threats (additions to the table above)
 
 | Threat | Mitigation | Test |
@@ -161,7 +178,7 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 - **A permanently blocked recipient** (the token itself blacklists them) keeps the credit in the escrow forever. The escrow can't do more than offer the claim.
 - **Gas-burning token or receiver.** As with v1's MON receiver, one that burns all forwarded gas can make fills of *its own* trades fail. Takers lose gas, nobody loses assets.
 - **Approvals.** The app approves each ERC-20 to `OnDealV2` for the exact amount of the deal, not unlimited, and each NFT collection with `setApprovalForAll` (the only way to cover several ids in one transaction; `web/hooks/useAssetApprovals.ts`). For signed swaps it approves `OnDealIntents` for the exact ERC-20 amount (plus the fee), and each NFT on its own with `approve(id)` unless the maker chooses to approve the whole collection (`web/hooks/useIntentReadiness.ts`). The app has no revoke button.
-- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON); 4× the launch fee is only the deploy scripts' default for `PROTOCOL_FEE_MAX_WEI`, so check `MAX_FEE()` on the deployed contract. It can't touch a deal already listed, charge an intent more than its `maxFee`, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
+- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON), and the deploy scripts take whatever `PROTOCOL_FEE_MAX_WEI` says (they refuse to guess one), so check `MAX_FEE()` on the deployed contract. It can't touch a deal already listed, charge an intent more than its `maxFee`, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
 - No external review yet.
 
 ### Test suite
@@ -178,12 +195,13 @@ contracts/test/v2/
 ├── OnDealV2.fee.t.sol          the protocol fee (ADR 0015), fixed per deal across changes (ADR 0018)
 ├── OnDealV2.offers.t.sol       open offers: notes, propose / withdraw / reject / accept rules, paging, re-entry
 ├── OnDealV2.traits.t.sol       trait requests: field and spec rules, proofs (one built by the web app), fills, refunds
-├── invariant/                    handler + invariants V1–V9, proposal statuses and liveness
+├── invariant/                    handler + invariants V1–V9, proposal statuses and liveness;
+│                                 HostileHandler + V3 and accounting against hostile collections
 ├── DeployV2.t.sol, MockERC20.t.sol
-contracts/test/utils/WeirdTokens.sol   fee, lying, no-return, blocklist and hook tokens
+contracts/test/utils/WeirdTokens.sol   fee, lying, soft, no-return, blocklist and hook tokens
 ```
 
-`test/v2/` holds 193 tests plus the invariant suite (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealV2.sol` is 100% of lines, statements, branches and functions.
+`test/v2/` holds 202 tests plus the two invariant suites (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealV2.sol` is 100% of lines, statements, branches and functions.
 
 ## OnDealIntents
 
@@ -200,11 +218,17 @@ contracts/test/intents/
 ├── OnDealIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
 ├── OnDealIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
 ├── OnDealIntents.fee.t.sol        the protocol fee (ADR 0015), signed as a maximum (ADR 0018)
-├── DeployIntents.t.sol            deploy script: fee from config and env, MockWMON vs a given fee token, refusals, other chains
-└── invariant/                       handler + invariants N1, N2, N5, N6 and conservation
+├── DeployIntents.t.sol            deploy script: fee from config and env, MockWMON vs a given fee token, WMON check, refusals, other chains
+├── invariant/                       handler + invariants N1, N2, N5, N6 and conservation;
+│                                    HostileHandler + N1, conservation and settlement against hostile collections
+└── symbolic/                        Halmos: every pair and 3-ring pays every want (run with halmos, not forge)
 ```
 
-`test/intents/` holds 99 tests plus the invariant suite (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealIntents.sol` is 100% of lines, statements, branches and functions. Slither has not been run on it yet.
+`test/intents/` holds 104 tests plus the two invariant suites (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `OnDealIntents.sol` is 100% of lines, statements, branches and functions. Slither is triaged [above](#static-analysis).
+
+**Hostile collections** (`OnDealIntents.hostile.invariant.t.sol`). Signed pairs and 3-rings where each give is either honest or hostile: a `SoftNft` id the receiver already owns, one a third actor owns, one whose maker revoked approval (so `SoftNft` silently refuses), a `LyingNft`, USDC given as an ERC-721 or an NFT given as an ERC-20. Every maker signs, so the signature never stops a bad cycle; the contract's checks have to. Honest cycles must settle and leave every NFT with the next maker and every USDC balance exact; hostile ones must revert. Invariants: the contract holds nothing, `LyingNft` ids never move, and USDC is conserved. Removing the `ownerOf == from` check in `_send` makes it fail within one run.
+
+**Symbolic check** (`test/intents/symbolic/OnDealIntents.halmos.t.sol`, `FOUNDRY_DYNAMIC_TEST_LINKING=false halmos --match-contract OnDealIntentsSymbolic --loop 4`). For every pair and every 3-ring of single-asset ERC-20 intents, with every amount and every token choice symbolic (so every rotation, mismatch and short give), Halmos 0.3.3 proves that `settle` either reverts or leaves each maker with at least its `want` and exactly its `give` paid, and the contract with nothing: 445 paths for the pair, 4,082 for the ring, about 100 s. Makers are ERC-1271 wallets that accept any signature, so the solver doesn't model `ecrecover`; signatures have their own suite. Changing `>=` to let a give 1 wei short through gives a counterexample (`g1 = w0 − 1`).
 
 Protocol fee: every maker in a settled cycle pays the current `fee()` of `FEE_TOKEN` straight to the recipient, so the contract still holds nothing. `FEE_TOKEN` is trusted to be a plain wrapped-MON token (no issuer, no pause, no blocklist, so it can't be used to block settlements, and no transfer fee: unlike a `give`, the fee transfer has no balance-delta check); the deployer picks it once and it can't change. Each intent signs `maxFee`, so a signature carries consent to at most that amount, whatever the fee admin does later ([ADR 0018](adr/0018-adjustable-protocol-fee.md)). `OnDealIntents.fee.t.sol` (27 tests) covers every maker charged once, rings of 3 and 4, a maker who also gives WMON, a `maxFee` above the fee paying only the fee, one below it or another token refused, a cut settling old intents at the new fee, a queued raise changing nothing until applied, an applied raise making old intents stale, a maker without balance or allowance reverting the whole cycle with nothing moved or charged, replays, the zero fee and the constructor guards.
 
