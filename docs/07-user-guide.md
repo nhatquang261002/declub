@@ -70,6 +70,8 @@ When signed swaps are on, step 1 of Create asks how the deal settles. Both kinds
 - **Cancel on-chain** costs gas and makes the signature useless for good.
 - **Paused** means your wallet can't honour the swap right now (the asset moved, or an approval was revoked). Fix it and the swap comes back.
 
+Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives.
+
 ## Fees
 
 - Every completed deal charges a small flat protocol fee per side, so both people pay the same. Nobody pays it if a deal is cancelled, expires, or an offer is rejected or withdrawn. The screens show the exact amount before you confirm.
@@ -117,7 +119,7 @@ A **Club** is the community for one verified NFT collection or memecoin, such as
 | Role | Who | Can |
 |---|---|---|
 | **Owner** | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page. Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders |
-| **Moderator** | Appointed by the Owner | Hide, restore and delete posts, ban and unban members of this Club. Can't act on the Owner or other moderators |
+| **Moderator** | Appointed by the Owner | Hide, restore and delete posts, ban and unban members of this Club (but not lift a ban the Owner made). Can't act on the Owner or other moderators |
 | **Member** | Anyone who joined | Post, report, appear on the leaderboard |
 | **Visitor** | Not signed in or not joined | Read only |
 

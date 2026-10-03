@@ -181,6 +181,7 @@ const MODES = [
 const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
   ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post."],
   ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
+  ["Can I sign several swaps with the same NFT?", "No. Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool also takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives."],
   ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. A short deadline is the best protection."],
 ];
 

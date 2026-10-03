@@ -56,7 +56,7 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
     icon: <ShieldIcon className="size-4" />,
     role: "Moderator",
     who: "Appointed by the Owner.",
-    can: "Hides, restores and deletes posts, and bans or unbans members of this Club. Can't act on the Owner or other moderators.",
+    can: "Hides, restores and deletes posts, and bans or unbans members of this Club, but can't lift a ban the Owner made. Can't act on the Owner or other moderators.",
   },
   {
     icon: <UsersIcon className="size-4" />,
