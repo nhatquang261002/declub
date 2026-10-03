@@ -159,6 +159,33 @@ abstract contract FeeAdminTest is Test {
         target.applyFee();
     }
 
+    function test_aRaiseCanBeAppliedUntilTheWindowCloses() public {
+        vm.prank(admin);
+        target.setFee(5 ether);
+        vm.warp(block.timestamp + DELAY + 7 days);
+
+        vm.prank(admin);
+        target.applyFee();
+        assertEq(target.fee(), 5 ether);
+    }
+
+    function test_aStaleRaiseCannotBeApplied() public {
+        vm.prank(admin);
+        target.setFee(5 ether);
+        uint256 at = block.timestamp + DELAY;
+
+        vm.warp(at + 7 days + 1);
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IFeeAdmin.FeeRaiseExpired.selector, at));
+        target.applyFee();
+        assertEq(target.fee(), FEE);
+
+        // Queued again, it waits the full delay from now.
+        vm.prank(admin);
+        target.setFee(5 ether);
+        assertEq(target.pendingFeeAt(), block.timestamp + DELAY);
+    }
+
     function test_applyWithNothingQueuedReverts() public {
         vm.prank(admin);
         vm.expectRevert(IFeeAdmin.NoPendingFee.selector);

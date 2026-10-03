@@ -5,7 +5,14 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IOnDealV2} from "../../src/interfaces/IOnDealV2.sol";
 import {OnDealV2Base} from "./OnDealV2Base.sol";
 import {ReentrantReceiver} from "../utils/Actors.sol";
-import {FeeToken, LyingToken, LyingNft, NoReturnToken, HookToken} from "../utils/WeirdTokens.sol";
+import {
+    FeeToken,
+    LyingToken,
+    LyingNft,
+    SoftNft,
+    NoReturnToken,
+    HookToken
+} from "../utils/WeirdTokens.sol";
 
 /// @dev Non-standard tokens and re-entry through token / MON callbacks.
 contract OnDealV2TokensTest is OnDealV2Base {
@@ -37,9 +44,7 @@ contract OnDealV2TokensTest is OnDealV2Base {
         LyingNft liar = new LyingNft();
         liar.mint(alice, 1);
         vm.prank(alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(IOnDealV2.NftNotReceived.selector, address(liar), 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.NftNotReceived.selector, address(liar), 1));
         swap.createTrade(_list(_nft(address(liar), 1)), _list(_chog(B1)), address(0), 0);
     }
 
@@ -202,5 +207,88 @@ contract OnDealV2TokensTest is OnDealV2Base {
         vm.expectRevert(); // ERC721InvalidReceiver: no onERC721Received
         chog.safeTransferFrom(alice, address(swap), A1);
         _assertOwner(A1, alice);
+    }
+
+    // ───────────────────────────────────────────── the taker's NFTs are verified too
+
+    function _softNft() internal returns (SoftNft soft) {
+        soft = new SoftNft();
+        soft.mint(alice, 1);
+        soft.mint(carol, 2);
+        vm.prank(alice);
+        soft.setApprovalForAll(address(swap), true);
+        vm.prank(bob);
+        soft.setApprovalForAll(address(swap), true);
+    }
+
+    /// A collection that ignores an unauthorised transfer can't hand a taker the escrow for an
+    /// NFT they don't own.
+    function test_fillWithAnNftTheTakerDoesNotOwnReverts() public {
+        SoftNft soft = _softNft();
+        uint256 id = _create(alice, _list(_native(10 ether)), _list(_nft(address(soft), 2)));
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.NftNotReceived.selector, address(soft), 2));
+        swap.fillTrade(id);
+        assertEq(soft.ownerOf(2), carol);
+        assertEq(uint8(_status(id)), uint8(IOnDealV2.Status.Open));
+    }
+
+    function test_fillWithAnNftThatNeverMovesReverts() public {
+        LyingNft liar = new LyingNft();
+        liar.mint(bob, 2);
+        uint256 id = _create(alice, _list(_chog(A1)), _list(_nft(address(liar), 2)));
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.NftNotReceived.selector, address(liar), 2));
+        swap.fillTrade(id);
+        _assertOwner(A1, address(swap));
+    }
+
+    /// An id already held in escrow for one trade can't be listed again in another, so the
+    /// second maker can't cancel their way to the first maker's NFT.
+    function test_anEscrowedNftCannotBeListedTwice() public {
+        SoftNft soft = _softNft();
+        uint256 first = _create(alice, _list(_nft(address(soft), 1)), _list(_chog(B1)));
+        assertEq(soft.ownerOf(1), address(swap));
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.NftNotReceived.selector, address(soft), 1));
+        swap.createTrade(_list(_nft(address(soft), 1)), _list(_chog(A2)), address(0), 0);
+
+        vm.prank(alice);
+        swap.cancelTrade(first);
+        assertEq(soft.ownerOf(1), alice);
+    }
+
+    // ───────────────────────────────────────────── asset types match the contract
+
+    /// ERC-20 and ERC-721 `transferFrom` share a selector: "6 units of an ERC-20" at the Chog
+    /// collection would pull Chog #6 from a taker who approved the collection.
+    function test_anNftCollectionCannotBeAskedForAsAnErc20() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.InvalidAsset.selector, 0));
+        swap.createTrade(_list(_chog(A1)), _list(_erc20(address(chog), B1)), address(0), 0);
+    }
+
+    function test_anNftCollectionCannotBeOfferedAsAnErc20() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.InvalidAsset.selector, 0));
+        swap.createTrade(_list(_erc20(address(chog), A1)), _list(_chog(B1)), address(0), 0);
+    }
+
+    function test_anErc20CannotBeAskedForAsAnNft() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.InvalidAsset.selector, 0));
+        swap.createTrade(_list(_chog(A1)), _list(_nft(address(usdc), 100 ether)), address(0), 0);
+    }
+
+    function test_anErc20CannotBeATraitSet() public {
+        IOnDealV2.Asset memory set = IOnDealV2.Asset(
+            IOnDealV2.AssetType.ERC721Trait, address(usdc), uint256(keccak256("root")), 1
+        );
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IOnDealV2.InvalidAsset.selector, 0));
+        swap.createTraitTrade(_list(_chog(A1)), _list(set), address(0), 0, "{}");
     }
 }

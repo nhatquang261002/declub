@@ -33,6 +33,9 @@ interface IFeeAdmin {
     error NoPendingFee();
     /// @notice The queued raise can't be applied before `effectiveAt`.
     error FeeRaiseNotReady(uint256 effectiveAt);
+    /// @notice The queued raise wasn't applied within `FEE_APPLY_WINDOW` of `effectiveAt`; queue
+    ///         it again so users get fresh notice.
+    error FeeRaiseExpired(uint256 effectiveAt);
 
     // ─────────────────────────────────────────────────────────────── Admin
 
@@ -41,7 +44,8 @@ interface IFeeAdmin {
     ///         `setFee(fee())` cancels a queued raise.
     function setFee(uint256 newFee) external;
 
-    /// @notice Make the queued raise the fee in force, once its time has come.
+    /// @notice Make the queued raise the fee in force, once its time has come and within
+    ///         `FEE_APPLY_WINDOW` after it.
     function applyFee() external;
 
     /// @notice First step of handing the role to `next`, who must call `acceptFeeAdmin`. A zero

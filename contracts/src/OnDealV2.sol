@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IOnDealV2} from "./interfaces/IOnDealV2.sol";
@@ -322,14 +323,18 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
                 if (a.token != address(0) || a.id != 0 || a.amount == 0) revert InvalidAsset(i);
                 native = a.amount;
             } else if (a.assetType == AssetType.ERC20) {
-                if (a.token.code.length == 0 || a.id != 0 || a.amount == 0) revert InvalidAsset(i);
+                if (a.token.code.length == 0 || a.id != 0 || a.amount == 0 || _isNft(a.token)) {
+                    revert InvalidAsset(i);
+                }
             } else if (a.assetType == AssetType.ERC721) {
-                if (a.token.code.length == 0 || a.amount != 1) revert InvalidAsset(i);
+                if (a.token.code.length == 0 || a.amount != 1 || !_isNft(a.token)) {
+                    revert InvalidAsset(i);
+                }
             } else {
                 // A trait set is only ever something a taker can hand over.
                 if (
                     !allowTrait || a.token.code.length == 0 || a.id == 0 || a.amount == 0
-                        || a.amount > MAX_ASSETS_PER_SIDE
+                        || a.amount > MAX_ASSETS_PER_SIDE || !_isNft(a.token)
                 ) revert InvalidAsset(i);
             }
             for (uint256 j; j < i; ++j) {
@@ -365,6 +370,13 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
 
     function _same(Asset calldata a, Asset calldata b) private pure returns (bool) {
         return a.assetType == b.assetType && a.token == b.token && a.id == b.id;
+    }
+
+    /// @dev ERC-20 and ERC-721 `transferFrom` share a selector, so an asset's declared type has to
+    ///      match the contract behind it. Otherwise an ask for "6 units of an ERC-20" at an NFT
+    ///      collection would pull NFT #6 from a taker who approved the collection.
+    function _isNft(address token) private view returns (bool) {
+        return ERC165Checker.supportsInterface(token, type(IERC721).interfaceId);
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
@@ -432,13 +444,11 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
                 // forge-lint: disable-next-line(calls-loop)
                 IERC20(a.token).safeTransferFrom(msg.sender, maker, a.amount);
             } else if (a.assetType == AssetType.ERC721) {
-                // forge-lint: disable-next-line(calls-loop)
-                IERC721(a.token).transferFrom(msg.sender, maker, a.id);
+                _moveNft(a.token, msg.sender, maker, a.id);
             } else {
                 uint256[] memory ids = fills[traitIndex++].tokenIds;
                 for (uint256 k; k < ids.length; ++k) {
-                    // forge-lint: disable-next-line(calls-loop)
-                    IERC721(a.token).transferFrom(msg.sender, maker, ids[k]);
+                    _moveNft(a.token, msg.sender, maker, ids[k]);
                 }
             }
         }
@@ -553,13 +563,19 @@ contract OnDealV2 is IOnDealV2, FeeAdmin, ReentrancyGuard {
                 revert UnsupportedToken(a.token);
             }
         } else if (a.assetType == AssetType.ERC721) {
-            IERC721 nft = IERC721(a.token);
-            // Reverts if the maker doesn't own the id or hasn't approved us.
-            // forge-lint: disable-next-line(calls-loop)
-            nft.transferFrom(msg.sender, address(this), a.id);
-            // forge-lint: disable-next-line(calls-loop)
-            if (nft.ownerOf(a.id) != address(this)) revert NftNotReceived(a.token, a.id);
+            _moveNft(a.token, msg.sender, address(this), a.id);
         }
+    }
+
+    /// @dev Move an NFT and verify it changed hands. Checking `ownerOf` only afterwards isn't
+    ///      enough: with a token whose `transferFrom` silently does nothing, an id the receiver
+    ///      already holds (one escrowed for another trade, or one the maker owns) would pass.
+    // forge-lint: disable-next-item(calls-loop)
+    function _moveNft(address token, address from, address to, uint256 id) private {
+        IERC721 nft = IERC721(token);
+        if (nft.ownerOf(id) != from) revert NftNotReceived(token, id);
+        nft.transferFrom(from, to, id);
+        if (nft.ownerOf(id) != to) revert NftNotReceived(token, id);
     }
 
     function _payoutAll(Asset[] storage assets, address to) private {

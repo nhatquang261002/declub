@@ -325,6 +325,13 @@ export const onDealIntentsAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'FEE_APPLY_WINDOW',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'FEE_RAISE_DELAY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -810,6 +817,11 @@ export const onDealIntentsAbi = [
   {
     type: 'error',
     inputs: [{ name: 'effectiveAt', internalType: 'uint256', type: 'uint256' }],
+    name: 'FeeRaiseExpired',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'effectiveAt', internalType: 'uint256', type: 'uint256' }],
     name: 'FeeRaiseNotReady',
   },
   {
@@ -949,6 +961,13 @@ export const onDealV2Abi = [
       { name: 'admin', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_APPLY_WINDOW',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -1900,6 +1919,11 @@ export const onDealV2Abi = [
     type: 'error',
     inputs: [{ name: 'expiry', internalType: 'uint64', type: 'uint64' }],
     name: 'ExpiryInPast',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'effectiveAt', internalType: 'uint256', type: 'uint256' }],
+    name: 'FeeRaiseExpired',
   },
   {
     type: 'error',

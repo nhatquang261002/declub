@@ -46,6 +46,22 @@ contract LyingNft is ERC721 {
     function transferFrom(address, address, uint256) public pure override {}
 }
 
+/// An ERC-721 whose transferFrom does nothing, instead of reverting, when the move isn't allowed.
+/// Allowed moves go through.
+contract SoftNft is ERC721 {
+    constructor() ERC721("SoftNft", "SNFT") {}
+
+    function mint(address to, uint256 id) external {
+        _mint(to, id);
+    }
+
+    function transferFrom(address from, address to, uint256 id) public override {
+        address owner = _ownerOf(id);
+        if (owner != from || !_isAuthorized(owner, msg.sender, id)) return;
+        _transfer(from, to, id);
+    }
+}
+
 /// USDT-style: transfer / transferFrom return nothing.
 contract NoReturnToken {
     mapping(address => uint256) public balanceOf;

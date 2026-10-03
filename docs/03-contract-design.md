@@ -61,16 +61,16 @@ On an open offer, takers escrow proposals and the maker accepts one. Proposal id
 |---|---|
 | a side is empty (the offered side; and `requested` for `createTrade` / `createTraitTrade`) | `EmptySide` |
 | more than 10 assets on a side | `TooManyAssets(count, max)` |
-| field rules per type (see the ADR): native has no token/id, ERC-20 has a contract and no id, ERC-721 has a contract and amount 1, amounts > 0 | `InvalidAsset(index)` |
+| field rules per type (see the ADR): native has no token/id, ERC-20 has a contract that doesn't report `IERC721` over ERC-165 and no id, ERC-721 has a contract that does and amount 1, amounts > 0 | `InvalidAsset(index)` |
 | same `(type, token, id)` twice on a side | `DuplicateAsset(index)` |
 | same `(type, token, id)` on both sides | `SameAssetBothSides(i, j)` |
-| trait asset on the offered side, in a proposal, or via `createTrade`; zero root, zero or > 10 `amount`, or non-contract token | `InvalidAsset(index)` |
+| trait asset on the offered side, in a proposal, or via `createTrade`; zero root, zero or > 10 `amount`, or a token that isn't an ERC-165 `IERC721` | `InvalidAsset(index)` |
 | `createTraitTrade` without a trait asset / with an empty or oversized spec | `NoTraitAsset` / `BadTraitSpec(length, max)` |
 | `createOpenOffer` note over 280 bytes | `NoteTooLong(length, max)` |
 | `msg.value` ≠ native amount offered + `fee()` | `WrongNativeAmount(expected, sent)` (`expected` includes the fee) |
 | `expiry` in the past | `ExpiryInPast` |
 | ERC-20 deposit delivered a different amount | `UnsupportedToken(token)` |
-| NFT not owned by the escrow after the transfer | `NftNotReceived(token, id)` |
+| NFT not owned by the sender before the transfer, or by the receiver after it (the maker's deposit and the taker's side of a fill) | `NftNotReceived(token, id)` |
 
 ### Fill, proposal and claim checks
 
@@ -150,7 +150,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
   | `deadline` is not zero, and not passed (`block.timestamp > deadline`) | `InvalidDeadline(intent)` / `IntentExpired(intent)` |
   | `feeToken == FEE_TOKEN` and `maxFee >= fee()` | `WrongFee(intent, feeToken, maxFee)` |
   | each side has 1 to `MAX_ASSETS_PER_SIDE = 10` assets | `EmptySide(intent, give)` / `TooManyAssets(intent, give, count)` |
-  | only `ERC20` (contract, id 0, amount > 0) and `ERC721` (contract, amount 1); `Native` is refused | `InvalidAsset(intent, give, index)` |
+  | only `ERC20` (contract that isn't an ERC-165 `IERC721`, id 0, amount > 0) and `ERC721` (`IERC721` contract, amount 1); `Native` is refused | `InvalidAsset(intent, give, index)` |
   | no asset twice on a side, none on both sides | `DuplicateAsset(intent, give, index)` / `SameAssetBothSides(intent)` |
   | valid signature, unused nonce, makers distinct within the cycle | `BadSignature(intent)` / `NonceUsed(maker, nonce)` / `DuplicateMaker(intent)` |
   | the previous maker's `give` covers this `want` | `WantNotMet(intent, wantIndex)` |
@@ -158,7 +158,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 - `want` is a floor: ERC-20 amounts are minimums, NFTs are exact ids. Each `give` is paid in full, so anything beyond the next maker's `want` (a larger amount, extra assets) goes to that maker.
 - The contract puts no upper bound on `deadline`. The pool only accepts deadlines 60 s to 7 days out; that's pool policy.
 - Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `OnDealV2`. Each intent signs `feeToken` and `maxFee`, the most its maker pays. After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
-- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`, as in V2); NFTs are checked with `ownerOf` (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
+- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`, as in V2); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
 - Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
 - The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`) and has no `receive()`. Its only admin is the fee admin, over the fee amount.
 - Events: `IntentFilled(intentHash, maker, recipient, nonce)` once per intent in a settled cycle, `FeeCharged(recipient, token, amount)`, `NoncesInvalidated(maker, word, mask)`, plus the `FeeAdmin` events.
@@ -176,7 +176,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 |---|---|---|
 | `constructor(initialFee, maxFee, feeRecipient, admin)` | deployer | Reverts with `FeeTooHigh(maxFee, MAX_FEE_LIMIT)`, `FeeTooHigh(initialFee, maxFee)` or `NoFeeRecipient` (a non-zero ceiling with no recipient). Emits `FeeAdminTransferred(0, admin)` when `admin` isn't zero. A zero admin fixes the fee for good. |
 | `setFee(newFee)` | admin | Above `MAX_FEE`: `FeeTooHigh`. At or below the current fee: applies at once (`FeeChanged`) and drops any queued raise, so `setFee(fee())` cancels one. Above it: queues the raise for 7 days from now (`FeeChangeQueued(newFee, effectiveAt)`), replacing any queued raise and restarting the clock. |
-| `applyFee()` | admin | Makes the queued raise the fee in force (`FeeChanged`). `NoPendingFee` if none, `FeeRaiseNotReady(effectiveAt)` before its time. A raise never applies by itself. |
+| `applyFee()` | admin | Makes the queued raise the fee in force (`FeeChanged`). `NoPendingFee` if none, `FeeRaiseNotReady(effectiveAt)` before its time, `FeeRaiseExpired(effectiveAt)` more than `FEE_APPLY_WINDOW` (7 days) after it. A raise never applies by itself. |
 | `transferFeeAdmin(next)` | admin | First step of a handover (`FeeAdminTransferStarted(current, next)`). A zero `next` cancels one. |
 | `acceptFeeAdmin()` | pending admin | Takes the role (`FeeAdminTransferred(previous, next)`). Anyone else: `NotPendingFeeAdmin(caller)`. |
 | `renounceFeeAdmin()` | admin | Clears the admin, any pending admin and any queued raise, and emits `FeeAdminTransferred(admin, 0)`. The fee never changes again. |

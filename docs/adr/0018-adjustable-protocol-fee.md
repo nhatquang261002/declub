@@ -29,7 +29,7 @@ A launch at **$5 per side** was also chosen, so the fee needs to be able to come
 - **`setFee(newFee)`**, at most `MAX_FEE`:
   - **Equal or lower:** applies at once and drops any queued raise. `setFee(fee())` is how a queued raise is cancelled.
   - **Higher:** is queued as `pendingFee`, usable from `pendingFeeAt = now + 7 days`. A new call replaces the queued one and restarts the clock.
-- **`applyFee()`**: makes a queued raise live once its time has come. Admin only.
+- **`applyFee()`**: makes a queued raise live once its time has come, and only within `FEE_APPLY_WINDOW` (7 days) after that; a stale raise reverts with `FeeRaiseExpired` and has to be queued again, so users always get a fresh notice. Admin only.
 - **`transferFeeAdmin(next)`** then **`acceptFeeAdmin()`** from `next`: a two-step handover, so a typo can't hand the role to nobody.
 - **`renounceFeeAdmin()`**: sets the admin to zero and drops any queued raise or handover. After that the fee never changes.
 - **Nothing else.** The admin can't touch escrow, credits, nonces, the recipient, the token or the ceiling, and can't pause anything.

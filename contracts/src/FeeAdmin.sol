@@ -11,6 +11,8 @@ import {IFeeAdmin} from "./interfaces/IFeeAdmin.sol";
 abstract contract FeeAdmin is IFeeAdmin {
     uint256 public constant MAX_FEE_LIMIT = 500 ether;
     uint256 public constant FEE_RAISE_DELAY = 7 days;
+    /// @dev How long a raise stays appliable once ready, so an old notice can't be used months on.
+    uint256 public constant FEE_APPLY_WINDOW = 7 days;
 
     uint256 public immutable MAX_FEE;
     address public immutable FEE_RECIPIENT;
@@ -73,6 +75,8 @@ abstract contract FeeAdmin is IFeeAdmin {
         // Seconds of validator skew are irrelevant against a 7-day delay.
         // forge-lint: disable-next-line(block-timestamp)
         if (block.timestamp < effectiveAt) revert FeeRaiseNotReady(effectiveAt);
+        // forge-lint: disable-next-line(block-timestamp)
+        if (block.timestamp > effectiveAt + FEE_APPLY_WINDOW) revert FeeRaiseExpired(effectiveAt);
         uint256 newFee = _pendingFee;
         _clearPendingFee();
         _setFee(_fee, newFee);

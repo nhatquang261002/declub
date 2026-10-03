@@ -7,6 +7,7 @@ import {
     FeeToken,
     LyingToken,
     LyingNft,
+    SoftNft,
     NoReturnToken,
     BlocklistToken,
     BlocklistNft,
@@ -213,5 +214,50 @@ contract OnDealIntentsTokensTest is OnDealIntentsBase {
         _assertBlocked(hook);
         _assertOwner(C1, carol); // the nested swap did not happen
         assertFalse(swap.isNonceUsed(carol, 0));
+    }
+
+    /// With a collection that ignores an unauthorised transfer, an id the receiver already owns
+    /// would pass a check made only after the transfer.
+    function test_anNftTheReceiverAlreadyOwnsIsRefused() public {
+        SoftNft soft = new SoftNft();
+        soft.mint(bob, 1);
+        vm.prank(alice);
+        soft.setApprovalForAll(address(swap), true);
+
+        IOnDealIntents.Intent memory a = _intent(
+            alice, _list(_nft(address(soft), 1)), _list(_erc20(address(usdc), 10 ether)), 0
+        );
+        IOnDealIntents.Intent memory b =
+            _intent(bob, _list(_erc20(address(usdc), 10 ether)), _list(_nft(address(soft), 1)), 0);
+
+        _expectSettle(
+            abi.encodeWithSelector(IOnDealIntents.NftNotReceived.selector, address(soft), 1), a, b
+        );
+        assertEq(usdc.balanceOf(alice), START_TOKEN);
+    }
+
+    /// "1 unit of an ERC-20" at the Chog collection would move Chog #1, and the receiver's
+    /// balance would rise by exactly one.
+    function test_anNftCollectionCannotBeAnErc20() public {
+        IOnDealIntents.Intent memory a = _intent(
+            alice, _list(_erc20(address(usdc), 10 ether)), _list(_erc20(address(chog), 6)), 0
+        );
+        IOnDealIntents.Intent memory b =
+            _intent(bob, _list(_chog(6)), _list(_erc20(address(usdc), 10 ether)), 0);
+
+        _expectSettle(
+            abi.encodeWithSelector(IOnDealIntents.InvalidAsset.selector, 0, false, 0), a, b
+        );
+    }
+
+    function test_anErc20CannotBeAnNft() public {
+        IOnDealIntents.Intent memory a =
+            _intent(alice, _list(_chog(1)), _list(_nft(address(usdc), 10 ether)), 0);
+        IOnDealIntents.Intent memory b =
+            _intent(bob, _list(_erc20(address(usdc), 10 ether)), _list(_chog(1)), 0);
+
+        _expectSettle(
+            abi.encodeWithSelector(IOnDealIntents.InvalidAsset.selector, 0, false, 0), a, b
+        );
     }
 }

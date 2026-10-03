@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -203,11 +204,11 @@ contract OnDealIntents is IOnDealIntents, FeeAdmin, EIP712, ReentrancyGuard {
         for (uint256 i; i < n; ++i) {
             Asset calldata a = assets[i];
             if (a.assetType == AssetType.ERC20) {
-                if (a.token.code.length == 0 || a.id != 0 || a.amount == 0) {
+                if (a.token.code.length == 0 || a.id != 0 || a.amount == 0 || _isNft(a.token)) {
                     revert InvalidAsset(intent, give, i);
                 }
             } else if (a.assetType == AssetType.ERC721) {
-                if (a.token.code.length == 0 || a.amount != 1) {
+                if (a.token.code.length == 0 || a.amount != 1 || !_isNft(a.token)) {
                     revert InvalidAsset(intent, give, i);
                 }
             } else {
@@ -241,6 +242,13 @@ contract OnDealIntents is IOnDealIntents, FeeAdmin, EIP712, ReentrancyGuard {
 
     function _same(Asset calldata a, Asset calldata b) private pure returns (bool) {
         return a.assetType == b.assetType && a.token == b.token && a.id == b.id;
+    }
+
+    /// @dev ERC-20 and ERC-721 `transferFrom` share a selector, so an asset's declared type has to
+    ///      match the contract behind it. Otherwise "1 unit of an ERC-20" at an NFT collection
+    ///      would move NFT #1 (and pass the balance check, which rises by one).
+    function _isNft(address token) private view returns (bool) {
+        return ERC165Checker.supportsInterface(token, type(IERC721).interfaceId);
     }
 
     // ─────────────────────────────────────────────────────────────── Internals
@@ -288,7 +296,10 @@ contract OnDealIntents is IOnDealIntents, FeeAdmin, EIP712, ReentrancyGuard {
             if (token.balanceOf(to) - before != a.amount) revert UnsupportedToken(a.token);
         } else {
             IERC721 nft = IERC721(a.token);
-            // Reverts if `from` doesn't own the id or hasn't approved us.
+            // Checked before as well as after: with a token whose `transferFrom` silently does
+            // nothing, an id `to` already owns would pass the check below.
+            // forge-lint: disable-next-line(calls-loop)
+            if (nft.ownerOf(a.id) != from) revert NftNotReceived(a.token, a.id);
             // forge-lint: disable-next-line(calls-loop)
             nft.transferFrom(from, to, a.id);
             // forge-lint: disable-next-line(calls-loop)

@@ -43,6 +43,19 @@ contract OnDealTraitsTest is OnDealBase {
         swap.fillTrade(id, _ids(B1), proofs);
     }
 
+    /// A trait trade stores no requested ids, so the exact-id fill would hand over the escrow
+    /// for the requested MON alone.
+    function test_traitRequest_cannotBeFilledWithoutProofs() public {
+        bytes32 root = _root(swap.traitLeaf(B1), swap.traitLeaf(B2));
+        vm.prank(alice);
+        uint256 id = swap.createTrade{value: 1 ether}(_ids(A1), root, 1, 0, address(0), 0);
+
+        vm.prank(carol);
+        vm.expectRevert(IOnDeal.InvalidTraitRequest.selector);
+        swap.fillTrade(id);
+        _assertOwner(A1, address(swap));
+    }
+
     function test_traitRequest_preservesExactIdFill() public {
         uint256 id = _create(alice, _ids(A1), 0, _ids(B1), 0);
         _fill(bob, id);

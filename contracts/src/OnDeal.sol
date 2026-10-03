@@ -125,6 +125,9 @@ contract OnDeal is IOnDeal, ReentrancyGuard {
         Trade storage t = _trades[tradeId];
         if (t.status != Status.Open) revert TradeNotOpen(tradeId);
         if (_isExpired(t)) revert TradeIsExpired(tradeId);
+        // A trait trade stores no requested ids, so without this the caller would take the
+        // escrow for `requestedMon` alone. It must go through the proof-taking overload.
+        if (requestedRoot[tradeId] != bytes32(0)) revert InvalidTraitRequest();
         address maker = t.maker;
         address taker = t.taker;
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
