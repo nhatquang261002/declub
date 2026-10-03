@@ -6,7 +6,8 @@
  ┌─────────────────────────────── Browser ────────────────────────────────┐
  │  Next.js (App Router, TypeScript, Tailwind)                            │
  │    ├─ pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash]     │
- │    │         /history · /clubs · /clubs/[address] · /account · /guide  │
+ │    │         /history · /clubs · /clubs/[address] · /account           │
+ │    │         /guide · /guide/clubs                                     │
  │    └─ hooks: useDealBook · useDealsV2 · useDealV2 · usePool            │
  │              useFills · useNotifications · useTxFlow · useSignFlow     │
  │  wagmi + viem, Privy sign-in (injected-wallet fallback)                │

@@ -62,7 +62,7 @@ Without Upstash credentials, the server store is off in production; outside prod
 
 ```text
 app/         pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash] · /history · /clubs ·
-             /clubs/[address] · /account · /guide
+             /clubs/[address] · /account · /guide · /guide/clubs
              redirects: /v2/create → /create · /intents → /deals · /intents/new → /create
 app/api/     25 routes: deals, cron/fills, fills, activity, state, profile(s), profiles/lookup,
              collection-traits, clubs/…, me/clubs, webhooks/privy

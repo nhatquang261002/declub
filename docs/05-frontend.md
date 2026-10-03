@@ -25,7 +25,9 @@ web/
 │   ├── clubs/page.tsx          ✓ Clubs directory: totals, Your Clubs, Most active + Rising + Most traded, All Clubs (search, filter, sort, list/cards)
 │   ├── clubs/parts.tsx         ✓ ClubRow · ClubListHeader · Leaderboard · CardSkeleton
 │   ├── clubs/[address]/        ✓ one Club: page.tsx + ClubMarket · ClubBoard · ClubMembers · ClubManage · ClubSidebar · parts
-│   └── guide/page.tsx          ✓ deal guide + FAQ
+│   └── guide/                  ✓ the Guide: two bases sharing parts.tsx (hero + Deals/Clubs switch, contents, sections)
+│       ├── page.tsx            ✓ Deals: start, make, take, locked vs signed, after, fees, safety, FAQ
+│       └── clubs/page.tsx      ✓ Clubs: tabs, joining, badges + Momentum, posts, roles, safety, FAQ
 ├── components/
 │   ├── Providers.tsx           ✓ PrivyProvider + @privy-io/wagmi's WagmiProvider when Privy is on, else wagmi's; QueryClientProvider; ToastProvider
 │   ├── Header.tsx              ✓ nav (Deals, Clubs, History, Guide), Create button, NotificationBell, ConnectButton
@@ -206,7 +208,7 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 | `/create` | Step 1 opens with **How should it settle?**: *Lock assets now* (the three deal kinds, as before) or *Sign only*. Sign only runs `SignedFlow`: want (no MON), give plus a deadline (default 1 hour), then review, the consent notice, **approve** and **Sign and post**. Both steps link back to *Lock assets* for a deal that needs MON or a trait request |
 | `/deals` | Locked deals and signed swaps in one grid, each tagged **Locked** or **Signed**. A *Type* filter (All types / Locked / Signed) sits beside the MON and sort filters. Search, MON and sort apply to both |
 | `/history` | The wallet's signed swaps in every status beside its locked deals, with the same All / Active / Completed / Expired filter |
-| `/guide#settlement` | *Locked deals vs signed swaps*: a comparison table and one anchored entry per chip (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
+| `/guide#settlement` | *Locked deals vs signed swaps*: two cards with one anchored entry per chip, a folded side-by-side table (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
 | `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain** |
 | `/intents`, `/intents/new` | Compatibility redirects to `/deals` and `/create`; the signed-intent UI is now embedded in those screens |
 

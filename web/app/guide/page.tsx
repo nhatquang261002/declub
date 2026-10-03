@@ -6,25 +6,21 @@ import { CheckIcon, ShieldIcon, SwapIcon, WalletIcon } from "@/components/Icons"
 import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { termsFor } from "@/lib/settlementTerms";
+import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "./parts";
 
-// The guide reads like a short manual: one idea per section, short lines, the button names in
-// bold so they match the screens. docs/07-user-guide.md is the longer version of the same text.
+// The Deals guide. The Clubs guide sits beside it at /guide/clubs. The create screen's settlement chips
+// link here by anchor (/guide#cant-fail and the rest), so Deals stays at /guide.
 
-const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf] shadow-[0.3rem_0.3rem_0_rgb(0_0_0/0.16)]";
-const MUTED = "text-[#4e5968]";
-
-const SECTIONS = [
-  { id: "start", label: "Get started", show: true },
-  { id: "make", label: "Make a deal", show: true },
-  { id: "take", label: "Take a deal", show: true },
-  { id: "settlement", label: "Locked or signed", show: !!swapIntents },
-  { id: "after", label: "After a deal", show: true },
-  { id: "fees", label: "Fees", show: true },
-  { id: "safety", label: "Stay safe", show: true },
-  { id: "faq", label: "FAQ", show: true },
-].filter((section) => section.show);
-
-const sectionNumber = (id: string) => SECTIONS.findIndex((section) => section.id === id) + 1;
+const SECTIONS: GuideSection[] = [
+  { id: "start", label: "Get started" },
+  { id: "make", label: "Make a deal" },
+  { id: "take", label: "Take a deal" },
+  ...(swapIntents ? [{ id: "settlement", label: "Locked or signed" }] : []),
+  { id: "after", label: "After a deal" },
+  { id: "fees", label: "Fees" },
+  { id: "safety", label: "Stay safe" },
+  { id: "faq", label: "FAQ" },
+];
 
 const START = [
   {
@@ -163,7 +159,7 @@ const SAFETY = [
   "Check who can accept and when the deal expires.",
   "Compare a handle and its wallet with your conversation. Lookalikes exist.",
   "Never approve a contract address someone sent you in a message.",
-  "Notes, posts and badges are written by people, not checked by On Deal.",
+  "An open offer's note is written by its maker, not checked by On Deal.",
 ];
 
 /** Locked deals against signed swaps, row by row. The one-line reasons live in lib/settlementTerms.ts. */
@@ -211,312 +207,191 @@ const FAQ_ITEMS = [
   ...FAQ.slice(5),
 ];
 
-function SectionHeading({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
-  const label = SECTIONS.find((section) => section.id === id)?.label;
-  return (
-    <header className="mb-6">
-      <p className="flex items-center gap-2 text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">
-        <span className="grid size-6 place-items-center rounded-full border-2 border-[#111318] bg-accent text-[11px] tracking-normal text-white">
-          {sectionNumber(id)}
-        </span>
-        {label}
-      </p>
-      <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{title}</h2>
-      {children && <p className="mt-2 max-w-2xl leading-7 text-muted">{children}</p>}
-    </header>
-  );
-}
-
-function Section({ id, title, intro, children }: { id: string; title: string; intro?: ReactNode; children: ReactNode }) {
-  return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24">
-      <SectionHeading id={id} title={title}>{intro}</SectionHeading>
-      {children}
-    </section>
-  );
-}
-
 export default function GuidePage() {
   return (
     <div className="space-y-10 pb-10">
-      <section className="hero-panel overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div>
-            <div className="eyebrow">Field guide</div>
-            <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
-              How On Deal works,
-              <span className="block text-accent">in five minutes.</span>
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Make a deal, take one, and get your assets back if it doesn&apos;t happen. Every step, in plain words.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <CreateDealButton />
-              <Link href="/deals" className="btn-secondary">
-                Browse deals <span aria-hidden>↗</span>
-              </Link>
-            </div>
-          </div>
-          <ul className={`${CARD} space-y-3 p-5 text-sm lg:w-72`}>
-            <li className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">The short version</li>
-            {[
-              "Both sides move together, or nothing moves.",
-              "You only pay the fee when a deal completes.",
-              "Testnet only: use test assets.",
-            ].map((line) => (
-              <li key={line} className="flex gap-2.5 leading-6">
-                <CheckIcon className="mt-1 size-4 shrink-0 text-[#1f7a55]" />
-                {line}
+      <GuideHero
+        base="deals"
+        title="How deals work,"
+        accent="in five minutes."
+        lead="Make a deal, take one, and get your assets back if it doesn't happen. Every step, in plain words."
+        actions={
+          <>
+            <CreateDealButton />
+            <Link href="/deals" className="btn-secondary">
+              Browse deals <span aria-hidden>↗</span>
+            </Link>
+          </>
+        }
+        summary={["Both sides move together, or nothing moves.", "You only pay the fee when a deal completes.", "Testnet only: use test assets."]}
+        sections={SECTIONS}
+      />
+
+      <GuideBody sections={SECTIONS}>
+        <Section sections={SECTIONS} id="start" title="Before your first deal">
+          <CardGrid items={START} />
+        </Section>
+
+        <Section sections={SECTIONS} id="make" title="Make a deal in three steps" intro={<>Press <b>Create deal</b> and follow the steps.</>}>
+          <ol className={`${CARD} divide-y divide-[#111318]/10`}>
+            {MAKE_STEPS.map((step, i) => (
+              <li key={step.title} className="flex gap-4 p-5 sm:p-6">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">
+                  {i + 1}
+                </span>
+                <div>
+                  <h3 className="font-black">{step.title}</h3>
+                  <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
+                </div>
               </li>
             ))}
-          </ul>
-        </div>
-        <nav aria-label="Guide sections" className="flex gap-2 overflow-x-auto border-t border-black/10 px-6 py-4 sm:px-10 lg:hidden">
-          {SECTIONS.map((section) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
-              className="shrink-0 rounded-full border-2 border-[#111318] bg-white/60 px-3 py-1 text-sm font-bold hover:bg-white"
-            >
-              {section.label}
-            </a>
-          ))}
-        </nav>
-      </section>
+          </ol>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-14">
-        <aside className="hidden lg:block">
-          <nav aria-label="On this page" className="sticky top-24">
-            <p className="text-xs font-black tracking-[0.16em] text-muted uppercase">On this page</p>
-            <ol className="mt-4 space-y-1 border-l-2 border-[#111318]/15 text-sm">
-              {SECTIONS.map((section, i) => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
-                    className="-ml-0.5 flex gap-2 border-l-2 border-transparent py-1.5 pl-4 font-semibold text-muted hover:border-accent hover:text-[#111318]"
-                  >
-                    <span className="w-4 font-mono text-xs leading-5 text-[#a9282f]">{i + 1}</span>
-                    {section.label}
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </nav>
-        </aside>
+          <h3 className="mt-10 mb-4 text-lg font-black">Three kinds of deal</h3>
+          <CardGrid items={KINDS} />
+          <p className="mt-4 text-sm leading-6 text-muted">
+            Each side holds up to 10 assets: any mix of NFTs, tokens and MON. To make a deal for one person, put their
+            wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b>.
+          </p>
+        </Section>
 
-        <div className="min-w-0 space-y-16">
-          <Section id="start" title="Before your first deal">
-            <ul className="grid gap-4 sm:grid-cols-3">
-              {START.map(({ icon, title, body }) => (
-                <li key={title} className={`${CARD} p-5`}>
-                  <span className="grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">
-                    {icon}
-                  </span>
-                  <h3 className="mt-4 font-black">{title}</h3>
-                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{body}</p>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          <Section id="make" title="Make a deal in three steps" intro={<>Press <b>Create deal</b> and follow the steps.</>}>
-            <ol className={`${CARD} divide-y divide-[#111318]/10`}>
-              {MAKE_STEPS.map((step, i) => (
-                <li key={step.title} className="flex gap-4 p-5 sm:p-6">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">
-                    {i + 1}
-                  </span>
-                  <div>
-                    <h3 className="font-black">{step.title}</h3>
-                    <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-
-            <h3 className="mt-10 text-lg font-black">Three kinds of deal</h3>
-            <ul className="mt-4 grid gap-4 sm:grid-cols-3">
-              {KINDS.map((kind) => (
-                <li key={kind.title} className={`${CARD} p-5`}>
-                  <h4 className="font-black">{kind.title}</h4>
-                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{kind.body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Each side holds up to 10 assets: any mix of NFTs, tokens and MON. To make a deal for one person, put their
-              wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b>.
-            </p>
-          </Section>
-
-          <Section
-            id="take"
-            title="Take a deal"
-            intro={<>Open a deal from <b>Deals</b>. The page shows what you get, what you give, and your next move.</>}
-          >
-            <dl className={`${CARD} divide-y divide-[#111318]/10`}>
-              {TAKE.map((row) => (
-                <div key={row.kind} className="grid gap-2 p-5 sm:grid-cols-[9rem_1fr] sm:gap-6 sm:p-6">
-                  <dt className="font-black">{row.kind}</dt>
-                  <dd className={`text-sm leading-6 ${MUTED}`}>{row.body}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
-              <ShieldIcon className="mt-0.5 size-5 shrink-0 text-[#1f7a55]" />
-              <span>
-                <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is
-                undone and everyone keeps what they had.
-              </span>
-            </p>
-          </Section>
-
-          {swapIntents && (
-            <Section
-              id="settlement"
-              title="Lock your assets, or just sign"
-              intro={
-                <>
-                  Every deal settles one of two ways, and you choose when you create it. Both show up in the same list,
-                  tagged Locked or Signed.
-                </>
-              }
-            >
-              <div className="grid gap-4 md:grid-cols-2">
-                {MODES.map(({ mode, title, bestFor }) => (
-                  <div key={mode} className={`${CARD} p-5 sm:p-6`}>
-                    <h3 className="text-lg font-black">{title}</h3>
-                    <p className={`mt-1 text-sm leading-6 ${MUTED}`}>
-                      <b className="text-[#111318]">Best for:</b> {bestFor}
-                    </p>
-                    <dl className="mt-5 space-y-4 border-t border-[#111318]/10 pt-5">
-                      {termsFor(mode).map((term) => (
-                        <div
-                          key={term.id}
-                          id={term.id}
-                          className="scroll-mt-24 rounded-lg target:-m-2 target:bg-white target:p-2 target:outline-2 target:outline-accent"
-                        >
-                          <dt className="flex items-center gap-2 text-sm font-black">
-                            <span
-                              aria-hidden
-                              className={`grid size-5 place-items-center rounded-full border-2 border-[#111318] text-xs leading-none ${
-                                term.good ? "bg-mint" : "bg-peach"
-                              }`}
-                            >
-                              {term.good ? "+" : "−"}
-                            </span>
-                            {term.label}
-                          </dt>
-                          <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{term.detail}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                ))}
+        <Section
+          sections={SECTIONS}
+          id="take"
+          title="Take a deal"
+          intro={<>Open a deal from <b>Deals</b>. The page shows what you get, what you give, and your next move.</>}
+        >
+          <dl className={`${CARD} divide-y divide-[#111318]/10`}>
+            {TAKE.map((row) => (
+              <div key={row.kind} className="grid gap-2 p-5 sm:grid-cols-[9rem_1fr] sm:gap-6 sm:p-6">
+                <dt className="font-black">{row.kind}</dt>
+                <dd className={`text-sm leading-6 ${MUTED}`}>{row.body}</dd>
               </div>
+            ))}
+          </dl>
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
+            <ShieldIcon className="mt-0.5 size-5 shrink-0 text-[#1f7a55]" />
+            <span>
+              <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is
+              undone and everyone keeps what they had.
+            </span>
+          </p>
+        </Section>
 
-              <details className={`${CARD} group mt-4`}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-black">
-                  Compare them side by side
-                  <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
-                </summary>
-                <div className="overflow-x-auto border-t border-[#111318]/10">
-                  <table className="w-full min-w-[34rem] text-left text-sm">
-                    <thead>
-                      <tr className="text-xs tracking-wider text-[#4e5968] uppercase">
-                        <th className="px-5 py-3" />
-                        <th className="px-5 py-3 font-black">Lock assets now</th>
-                        <th className="px-5 py-3 font-black">Sign only</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#111318]/10">
-                      {COMPARE.map(([row, locked, signed]) => (
-                        <tr key={row} className="align-top">
-                          <th scope="row" className="px-5 py-3.5 font-black whitespace-nowrap">{row}</th>
-                          <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{locked}</td>
-                          <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{signed}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {swapIntents && (
+          <Section
+            sections={SECTIONS}
+            id="settlement"
+            title="Lock your assets, or just sign"
+            intro={
+              <>
+                Every deal settles one of two ways, and you choose when you create it. Both show up in the same list,
+                tagged Locked or Signed.
+              </>
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              {MODES.map(({ mode, title, bestFor }) => (
+                <div key={mode} className={`${CARD} p-5 sm:p-6`}>
+                  <h3 className="text-lg font-black">{title}</h3>
+                  <p className={`mt-1 text-sm leading-6 ${MUTED}`}>
+                    <b className="text-[#111318]">Best for:</b> {bestFor}
+                  </p>
+                  <dl className="mt-5 space-y-4 border-t border-[#111318]/10 pt-5">
+                    {termsFor(mode).map((term) => (
+                      <div
+                        key={term.id}
+                        id={term.id}
+                        className="scroll-mt-24 rounded-lg target:-m-2 target:bg-white target:p-2 target:outline-2 target:outline-accent"
+                      >
+                        <dt className="flex items-center gap-2 text-sm font-black">
+                          <span
+                            aria-hidden
+                            className={`grid size-5 place-items-center rounded-full border-2 border-[#111318] text-xs leading-none ${
+                              term.good ? "bg-mint" : "bg-peach"
+                            }`}
+                          >
+                            {term.good ? "+" : "−"}
+                          </span>
+                          {term.label}
+                        </dt>
+                        <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{term.detail}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
-              </details>
-            </Section>
-          )}
-
-          <Section id="after" title="When a deal doesn't happen">
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {AFTER.filter((item) => !item.signed || swapIntents).map((item) => (
-                <li key={item.title} className={`${CARD} p-5`}>
-                  <h3 className="font-black">{item.title}</h3>
-                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{item.body}</p>
-                </li>
               ))}
-            </ul>
-          </Section>
-
-          <Section id="fees" title="What it costs">
-            <div className={`${CARD} p-5 sm:p-6`}>
-              <ul className="space-y-2.5 text-sm leading-6">
-                {FEES.map((line) => (
-                  <li key={line} className="flex gap-2.5">
-                    <CheckIcon className="mt-1 size-4 shrink-0 text-[#1f7a55]" />
-                    {line}
-                  </li>
-                ))}
-              </ul>
-              <dl className="mt-5 grid gap-4 border-t border-[#111318]/10 pt-5 sm:grid-cols-2">
-                {FEE_MODES.filter(([mode]) => mode !== "Signed swaps" || swapIntents).map(([mode, text]) => (
-                  <div key={mode}>
-                    <dt className="text-sm font-black">{mode}</dt>
-                    <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{text}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className={`mt-5 border-t border-[#111318]/10 pt-4 text-sm ${MUTED}`}>
-                You also pay Monad&apos;s network gas for each transaction.
-              </p>
             </div>
-          </Section>
 
-          <Section id="safety" title="Before you confirm">
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {SAFETY.map((line) => (
-                <li key={line} className={`${CARD} flex gap-3 p-4 text-sm leading-6`}>
-                  <span className="grid size-5 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-mint">
-                    <CheckIcon className="size-3" />
-                  </span>
+            <details className={`${CARD} group mt-4`}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-black">
+                Compare them side by side
+                <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
+              </summary>
+              <div className="overflow-x-auto border-t border-[#111318]/10">
+                <table className="w-full min-w-[34rem] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs tracking-wider text-[#4e5968] uppercase">
+                      <th className="px-5 py-3" />
+                      <th className="px-5 py-3 font-black">Lock assets now</th>
+                      <th className="px-5 py-3 font-black">Sign only</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#111318]/10">
+                    {COMPARE.map(([row, locked, signed]) => (
+                      <tr key={row} className="align-top">
+                        <th scope="row" className="px-5 py-3.5 font-black whitespace-nowrap">{row}</th>
+                        <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{locked}</td>
+                        <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{signed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </Section>
+        )}
+
+        <Section sections={SECTIONS} id="after" title="When a deal doesn't happen">
+          <CardGrid cols={2} items={AFTER.filter((item) => !item.signed || swapIntents)} />
+        </Section>
+
+        <Section sections={SECTIONS} id="fees" title="What it costs">
+          <div className={`${CARD} p-5 sm:p-6`}>
+            <ul className="space-y-2.5 text-sm leading-6">
+              {FEES.map((line) => (
+                <li key={line} className="flex gap-2.5">
+                  <CheckIcon className="mt-1 size-4 shrink-0 text-[#1f7a55]" />
                   {line}
                 </li>
               ))}
             </ul>
-          </Section>
-
-          <Section id="faq" title="Questions, answered">
-            <div className={`${CARD} divide-y divide-[#111318]/10`}>
-              {FAQ_ITEMS.map(([question, answer]) => (
-                <details key={question} className="group px-5 sm:px-6">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-bold">
-                    {question}
-                    <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
-                  </summary>
-                  <p className={`pb-5 pr-8 text-sm leading-6 ${MUTED}`}>{answer}</p>
-                </details>
+            <dl className="mt-5 grid gap-4 border-t border-[#111318]/10 pt-5 sm:grid-cols-2">
+              {FEE_MODES.filter(([mode]) => mode !== "Signed swaps" || swapIntents).map(([mode, text]) => (
+                <div key={mode}>
+                  <dt className="text-sm font-black">{mode}</dt>
+                  <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{text}</dd>
+                </div>
               ))}
-            </div>
-          </Section>
-
-          <div className="page-section flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
-            <div>
-              <p className="font-black">Still stuck?</p>
-              <p className="mt-1 text-sm text-muted">Tell us what happened and the deal&apos;s link, and we&apos;ll take a look.</p>
-            </div>
-            <a href="mailto:support@on-deal.app" className="btn-secondary shrink-0">
-              Contact support
-            </a>
+            </dl>
+            <p className={`mt-5 border-t border-[#111318]/10 pt-4 text-sm ${MUTED}`}>
+              You also pay Monad&apos;s network gas for each transaction.
+            </p>
           </div>
-        </div>
-      </div>
+        </Section>
+
+        <Section sections={SECTIONS} id="safety" title="Before you confirm">
+          <Checklist items={SAFETY} />
+        </Section>
+
+        <Section sections={SECTIONS} id="faq" title="Questions, answered">
+          <Faq items={FAQ_ITEMS} />
+        </Section>
+
+        <GuideFooter
+          other={{ href: "/guide/clubs", title: "Clubs guide", body: "Join a community, earn a Holder badge, and post what you're after." }}
+        />
+      </GuideBody>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 On Deal is a peer-to-peer, non-custodial way to swap digital assets on Monad: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
 
-The in-app version of this guide is the [Guide page](../web/app/guide/page.tsx) (`/guide`).
+The in-app version of this guide has two bases, side by side: **Deals** at `/guide` ([page](../web/app/guide/page.tsx)) and **Clubs** at `/guide/clubs` ([page](../web/app/guide/clubs/page.tsx)).
 
 ## Sign in
 
