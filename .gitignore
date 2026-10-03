@@ -6,6 +6,7 @@
 # Foundry
 contracts/out/
 contracts/cache/
+cache/
 contracts/broadcast/*/31337/
 contracts/broadcast/**/dry-run/
 
