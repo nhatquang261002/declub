@@ -152,15 +152,49 @@ body {
 
 .deal-card {
   border: 2px solid #111318;
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   background: #fdf6cd;
   color: #111318;
   box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 
 .deal-card:hover {
   border-color: #315ea8;
   background: #fff8dc;
+  box-shadow: 0.45rem 0.5rem 0 #315ea8;
+  transform: translateY(-3px);
+}
+
+.deal-card:focus-visible {
+  outline: 3px solid var(--action-primary);
+  outline-offset: 3px;
+}
+
+/* The ⇄ between a card's two sides, as a small version of the deal page's seal. */
+.deal-card-seal {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  align-self: center;
+  border: 2px solid #111318;
+  border-radius: 9999px;
+  background: #111318;
+  color: #f0b735;
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.deal-card-seal svg { width: 1rem; height: 1rem; }
+.deal-card:hover .deal-card-seal { transform: rotate(180deg); }
+
+.deal-card .text-mint { color: #1f7a55; }
+.deal-card .text-warn { color: #8a5a00; }
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-card, .deal-card-seal { transition: none; }
+  .deal-card:hover { transform: none; }
+  .deal-card:hover .deal-card-seal { transform: none; }
 }
 
 .deal-card .text-muted {
@@ -1304,7 +1338,8 @@ body {
 
 /* Cards and panels: the cream sticker of page-section, without its tape (a page of tape is noise). */
 .club-card,
-.club-panel {
+.club-panel,
+.deal-panel {
   border: 2px solid #111318;
   border-radius: 1rem;
   background: var(--chog-cream-500);
@@ -1339,16 +1374,16 @@ body {
   box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
 }
 
-:is(.club-card, .club-panel, .club-hero) .text-muted { color: #4e5968; }
-:is(.club-card, .club-panel, .club-hero) .text-danger { color: #a9282f; }
-:is(.club-card, .club-panel, .club-hero) .text-mint { color: #1f7a55; }
-:is(.club-card, .club-panel, .club-hero) .text-warn { color: #8a5a00; }
+:is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-muted { color: #4e5968; }
+:is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-danger { color: #a9282f; }
+:is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-mint { color: #1f7a55; }
+:is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-warn { color: #8a5a00; }
 
-:is(.club-panel, .club-hero) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip) {
+:is(.club-panel, .club-hero, .deal-panel, .deal-sheet) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip) {
   color: #a9282f;
 }
 
-:is(.club-panel, .club-hero) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover {
+:is(.club-panel, .club-hero, .deal-panel, .deal-sheet) a:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover {
   color: #315ea8;
 }
 
@@ -1640,4 +1675,404 @@ a.chip:hover { border-color: #111318; background: white; }
 .pill[aria-pressed="true"] { border-color: #111318; background: #111318; color: var(--chog-cream-500); }
 .pill:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 2px; }
 .pill-count { font-variant-numeric: tabular-nums; opacity: 0.7; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Deals. A deal's page is a contract sheet: a header with a rubber-stamp status,
+ * the two sides of the swap on a stage with a seal between them, the terms as a
+ * row of facts, and one "Your move" dock that says what this wallet can do next.
+ * Cards, offers, intents and the create flow's review reuse the same pieces.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.deal-sheet {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 1px 1px, rgb(17 19 24 / 0.07) 1px, transparent 0) 0 0 / 14px 14px,
+    linear-gradient(160deg, #fff8dc 0%, #fff4cf 45%, #fbe7b4 100%);
+  color: #111318;
+  box-shadow: 0.5rem 0.5rem 0 rgb(0 0 0 / 0.2);
+}
+
+.deal-sheet-head {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 1.5rem 1.5rem 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .deal-sheet-head { padding: 2rem 2.25rem 0.75rem; }
+}
+
+.deal-title {
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.deal-title-hash {
+  color: #d83b45;
+  margin-right: 0.05em;
+}
+
+/* The status as a rubber stamp: double-ruled, inked, a little crooked. */
+.deal-stamp {
+  --stamp: #1f7a55;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  border: 3px solid var(--stamp);
+  border-radius: 0.6rem;
+  padding: 0.35rem 0.9rem 0.4rem;
+  color: var(--stamp);
+  box-shadow: inset 0 0 0 2px #fff4cf, inset 0 0 0 3.5px var(--stamp);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+  mix-blend-mode: multiply;
+  animation: stamp-in 420ms cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.deal-stamp small {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  opacity: 0.85;
+}
+
+.deal-stamp[data-status="expired"] { --stamp: #b27500; }
+.deal-stamp[data-status="filled"] { --stamp: #315ea8; }
+.deal-stamp[data-status="cancelled"] { --stamp: #6b7280; }
+.deal-stamp[data-status="rejected"] { --stamp: #a9282f; }
+
+@keyframes stamp-in {
+  from { opacity: 0; transform: rotate(-14deg) scale(1.6); }
+  to { opacity: 1; transform: rotate(-6deg) scale(1); }
+}
+
+/* The two sides of the swap, with a seal between them. Stacks on narrow screens. */
+.deal-stage {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .deal-stage { padding: 1.25rem 2.25rem 2.25rem; }
+}
+
+@media (min-width: 768px) {
+  .deal-stage {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 1rem;
+  }
+}
+
+.deal-side {
+  --side: #f0b735;
+  --side-ink: #111318;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: 0.3rem 0.3rem 0 var(--side);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.deal-side[data-side="want"] { --side: #d83b45; --side-ink: #fff; }
+.deal-side[data-you] { box-shadow: 0.3rem 0.3rem 0 var(--side), 0 0 0 4px rgb(49 94 168 / 0.18); }
+
+.deal-side-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  border-bottom: 2px solid #111318;
+  background: var(--side);
+  padding: 0.55rem 0.9rem;
+  color: var(--side-ink);
+}
+
+.deal-side-title {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.deal-side-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 9999px;
+  background: rgb(17 19 24 / 0.12);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.deal-side[data-side="want"] .deal-side-note { background: rgb(255 255 255 / 0.2); }
+.deal-side-note svg { width: 0.8rem; height: 0.8rem; }
+
+.deal-side-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.deal-seal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  align-self: center;
+}
+
+.deal-seal-disc {
+  display: grid;
+  width: 3.6rem;
+  height: 3.6rem;
+  place-items: center;
+  border: 2px solid #111318;
+  border-radius: 9999px;
+  background: #111318;
+  color: #f0b735;
+  box-shadow: 0.2rem 0.2rem 0 #d83b45;
+}
+
+.deal-seal-disc svg { width: 1.6rem; height: 1.6rem; transform: rotate(90deg); }
+
+@media (min-width: 768px) {
+  .deal-seal-disc svg { transform: none; }
+}
+
+/* The seal's dashed ring turns while the deal can still be taken. */
+.deal-seal::before {
+  position: absolute;
+  inset: -0.45rem;
+  border: 2px dashed rgb(17 19 24 / 0.3);
+  border-radius: 9999px;
+  content: "";
+}
+
+.deal-seal[data-live]::before { animation: seal-spin 14s linear infinite; }
+.deal-seal[data-status="filled"] .deal-seal-disc { background: #315ea8; color: #fff; box-shadow: 0.2rem 0.2rem 0 #111318; }
+.deal-seal[data-status="cancelled"] .deal-seal-disc,
+.deal-seal[data-status="expired"] .deal-seal-disc { background: #dfe3ea; color: #4e5968; box-shadow: 0.2rem 0.2rem 0 #9aa3b2; }
+
+@keyframes seal-spin { to { transform: rotate(360deg); } }
+
+/* A settled or dead deal reads as an archive: the sides go quiet. */
+.deal-stage[data-status="cancelled"] .deal-side,
+.deal-stage[data-status="expired"] .deal-side-body { filter: saturate(0.4); }
+.deal-stage[data-status="cancelled"] .deal-side { opacity: 0.75; }
+
+/* The terms along the bottom of the sheet. */
+.deal-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  border-top: 2px solid #111318;
+  background: rgb(255 255 255 / 0.45);
+}
+
+.deal-fact {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.9rem 1.5rem;
+  box-shadow: inset -1px -1px 0 rgb(17 19 24 / 0.12);
+}
+
+.deal-fact dt {
+  color: #4e5968;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.deal-fact dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.deal-fact dd small {
+  display: block;
+  color: #4e5968;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* "Your move": one panel with this wallet's role, its steps, and the buttons. */
+.deal-dock {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 1.25rem;
+  background: #fff;
+  color: #111318;
+  box-shadow: 0.4rem 0.4rem 0 #111318;
+}
+
+.deal-dock::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.55rem;
+  background: var(--dock, #f0b735);
+  content: "";
+}
+
+.deal-dock[data-tone="maker"] { --dock: #315ea8; }
+.deal-dock[data-tone="done"] { --dock: #315ea8; }
+.deal-dock[data-tone="blocked"] { --dock: #9aa3b2; }
+.deal-dock[data-tone="warn"] { --dock: #b27500; }
+.deal-dock .text-muted { color: #4e5968; }
+.deal-dock .text-mint { color: #1f7a55; }
+.deal-dock .text-warn { color: #8a5a00; }
+.deal-dock .text-danger { color: #a9282f; }
+
+.deal-dock-inner {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1.25rem 1.85rem;
+}
+
+@media (min-width: 640px) {
+  .deal-dock-inner { padding: 1.5rem 1.75rem 1.5rem 2.35rem; }
+}
+
+.deal-dock-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.deal-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.deal-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1.5px solid rgb(17 19 24 / 0.2);
+  border-radius: 9999px;
+  background: #fff;
+  padding: 0.25rem 0.75rem 0.25rem 0.3rem;
+  color: #4e5968;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.deal-step-dot {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.deal-step-dot svg { width: 0.8rem; height: 0.8rem; }
+.deal-step[data-state="done"] { border-color: #1f7a55; background: #e3f5ec; color: #1f7a55; }
+.deal-step[data-state="done"] .deal-step-dot { border-color: #1f7a55; background: #1f7a55; color: #fff; }
+.deal-step[data-state="current"] { border-color: #111318; background: #f0b735; color: #111318; box-shadow: 0.12rem 0.12rem 0 #d83b45; }
+.deal-step[data-state="current"] .deal-step-dot { border-color: #111318; background: #111318; color: #f0b735; }
+.deal-step-join { width: 1rem; height: 2px; background: rgb(17 19 24 / 0.2); }
+
+/* A row in a deal's list of assets: art or a kind badge, the amount, the contract. */
+.asset-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1.5px solid rgb(17 19 24 / 0.16);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 0.85);
+  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
+  color: #111318;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+
+.asset-row:hover { border-color: #111318; }
+
+.asset-badge {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid #111318;
+  border-radius: 0.6rem;
+  background: #fff4cf;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.asset-badge[data-kind="native"] { border-color: #836ef9; background: #eeeaff; }
+.asset-badge[data-kind="erc20"] { background: #e8eefb; color: #24467f; }
+.asset-badge[data-kind="trait"] { background: #fde8ea; color: #a9282f; }
+
+/* The protocol fee as a receipt line. */
+.fee-note {
+  border: 1.5px dashed rgb(17 19 24 / 0.3);
+  border-radius: 0.8rem;
+  background: rgb(255 255 255 / 0.55);
+  padding: 0.6rem 0.85rem;
+  color: #111318;
+  font-size: 0.875rem;
+}
+
+.fee-note .text-muted { color: #4e5968; }
+
+/* An offer on an open offer. */
+.offer-card {
+  border: 2px solid #111318;
+  border-radius: 1rem;
+  background: var(--chog-cream-500);
+  color: #111318;
+  box-shadow: 0.3rem 0.3rem 0 rgb(0 0 0 / 0.16);
+}
+
+.offer-card[data-status="active"] { background: #fff; }
+.offer-card[data-status="accepted"] { border-color: #315ea8; box-shadow: 0.3rem 0.3rem 0 #315ea8; }
+.offer-card[data-status="withdrawn"],
+.offer-card[data-status="rejected"] { opacity: 0.7; box-shadow: none; }
+.offer-card .text-muted { color: #4e5968; }
+
+@media (prefers-reduced-motion: reduce) {
+  .deal-stamp { animation: none; }
+  .deal-seal[data-live]::before { animation: none; }
+}
 }

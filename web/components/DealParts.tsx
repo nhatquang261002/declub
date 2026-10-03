@@ -7,24 +7,30 @@ import { formatMon } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { TraitFilter } from "@/lib/traitRequests";
 import { ChogThumb } from "./Chog";
+import { ClockIcon, LockIcon, SwapIcon } from "./Icons";
 import { TraitRequestSummary } from "./TraitRequest";
 import { Who } from "./Who";
 
 const BADGE: Record<DisplayStatus, string> = {
-  open: "bg-mint/15 text-mint",
-  expired: "bg-warn/15 text-warn",
-  filled: "bg-accent/20 text-accent",
-  cancelled: "bg-zinc-500/20 text-zinc-300",
+  open: "chip-mint",
+  expired: "chip-warn",
+  filled: "chip-blue",
+  cancelled: "",
+};
+
+/** What a status is called wherever people read it. "filled" is the contract's word, not theirs. */
+export const STATUS_TEXT: Record<DisplayStatus, string> = {
+  open: "Open",
+  expired: "Expired",
+  filled: "Swapped",
+  cancelled: "Cancelled",
 };
 
 export function StatusBadge({ status }: { status: DisplayStatus }) {
   return (
-    <span
-      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase ${BADGE[status]} ${
-        status === "open" ? "rotate-[-2deg]" : ""
-      }`}
-    >
-      {status}
+    <span className={`chip ${BADGE[status]} uppercase tracking-wide ${status === "open" ? "rotate-[-2deg]" : ""}`}>
+      {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
+      {STATUS_TEXT[status]}
     </span>
   );
 }
@@ -33,13 +39,14 @@ export function StatusBadge({ status }: { status: DisplayStatus }) {
 export function SettlementTag({ signed }: { signed: boolean }) {
   return (
     <span
-      className="rounded-full border border-line px-2 py-0.5 text-xs text-muted"
+      className="chip"
       title={
         signed
           ? "Signed, not locked. A matcher settles it when something fits, and it can fail if the assets move."
           : "The maker's side is locked in the contract, so accepting it can't fail."
       }
     >
+      {signed ? <SwapIcon /> : <LockIcon />}
       {signed ? "Signed" : "Locked"}
     </span>
   );
@@ -57,7 +64,7 @@ export function MonPill({ wei }: { wei: bigint }) {
   );
 }
 
-function countdown(expiry: bigint, now: number): string {
+export function countdown(expiry: bigint, now: number): string {
   const seconds = Number(expiry) - now;
   if (seconds <= 0) return "Expired";
   const days = Math.floor(seconds / 86_400);
@@ -72,31 +79,29 @@ function countdown(expiry: bigint, now: number): string {
 export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: number; status: DisplayStatus }) {
   if (status !== "open" && status !== "expired") return null;
   if (expiry === 0n) {
-    return <span className="text-xs text-muted">∞ no expiry</span>;
+    return <span className="chip">∞ No expiry</span>;
   }
   const remaining = Number(expiry) - now;
   const urgent = remaining > 0 && remaining < 3_600;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-      status === "expired"
-        ? "border-warn/30 text-warn"
-        : urgent
-          ? "border-line text-white"
-          : "border-line text-muted"
-    }`}>
-      <span aria-hidden>{status === "expired" ? "!" : "◷"}</span>
+    <span
+      className={`chip tabular-nums ${status === "expired" ? "chip-warn" : urgent ? "chip-danger" : ""}`}
+      title={urgent ? "Less than an hour left" : undefined}
+    >
+      <ClockIcon />
       {countdown(expiry, now)}
+      {remaining > 0 && <span className="font-semibold opacity-70">left</span>}
     </span>
   );
 }
 
-/** One side of a deal: Chog thumbnails plus a MON pill. */
-export function DealSide({ ids, mon }: { ids: readonly bigint[]; mon: bigint }) {
+/** One side of a deal: Chog thumbnails plus a MON pill. `xl` is the deal page's stage. */
+export function DealSide({ ids, mon, xl = false }: { ids: readonly bigint[]; mon: bigint; xl?: boolean }) {
   if (ids.length === 0 && mon === 0n) return <span className="text-sm text-muted">Nothing</span>;
   return (
-    <div className="flex min-h-20 flex-wrap items-start justify-center gap-2">
+    <div className={`flex min-h-20 flex-wrap items-start justify-center ${xl ? "gap-4" : "gap-2"}`}>
       {ids.map((id) => (
-        <ChogThumb key={id.toString()} id={id} large />
+        <ChogThumb key={id.toString()} id={id} large={!xl} xl={xl} />
       ))}
       {mon > 0n && <MonPill wei={mon} />}
     </div>
@@ -113,7 +118,9 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
         </span>
         {gives}
       </div>
-      <div className="flex items-center text-lg text-muted">↔</div>
+      <span className="deal-card-seal" aria-hidden>
+        <SwapIcon />
+      </span>
       <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
         <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
           wants
@@ -153,17 +160,15 @@ export function DealCardFrame({
       className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200"
     >
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold tracking-tight">Deal #{deal.id.toString()}</span>
+        <span className="font-black tracking-tight">
+          <span className="text-accent">#</span>
+          {deal.id.toString()}
+        </span>
         <StatusBadge status={status} />
         {tag}
-        {forMe && (
-          <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold">For you</span>
-        )}
-        {deal.taker && !forMe && (
-          <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
-            Private
-          </span>
-        )}
+        {forMe && <span className="chip chip-peach">★ For you</span>}
+        {mine && <span className="chip chip-dark">Yours</span>}
+        {deal.taker && !forMe && <span className="chip">Private</span>}
         <span className="ml-auto"><ExpiryCountdown expiry={deal.expiry} now={now} status={status} /></span>
       </div>
 

@@ -17,7 +17,9 @@ import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from
 import { formatMon, parseIds, parseMon } from "@/lib/format";
 import { buildMerkleSet } from "@/lib/merkle";
 import { idsWithTrait, traitOptions } from "@/lib/traitRequests";
-import { ConfirmCard, NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { ConfirmCard, NextButton, ReviewStage, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { DealStageSide } from "@/components/DealSheet";
+import { LockIcon } from "@/components/Icons";
 import { PREVIEW_CATALOG, PREVIEW_IDS } from "./previewData";
 import { TraitPicker } from "./TraitPicker";
 
@@ -192,21 +194,26 @@ export function ChogsFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   return (
     <div className="space-y-6">
       <StepHeading title="Review and confirm" blurb="Check both sides. Once it's on-chain you can cancel, but not edit." />
-      <div className="grid gap-6 md:grid-cols-2">
-        <ReviewCard title="You give" note="Locked in escrow until you accept or cancel.">
-          <ChogAssets ids={offered} mon={offeredMon ?? 0n} />
-        </ReviewCard>
-        <ReviewCard title="You get" note="Sent straight to you when someone accepts.">
-          {isTrait ? (
-            <div className="space-y-2">
-              <TraitRequestSummary filter={filter} count={traitSet.count} root={traitSet.root} />
-              {(requestedMon ?? 0n) > 0n && <ChogAssets ids={NO_IDS} mon={requestedMon ?? 0n} />}
-            </div>
-          ) : (
-            <ChogAssets ids={requested} mon={requestedMon ?? 0n} />
-          )}
-        </ReviewCard>
-      </div>
+      <ReviewStage
+        give={
+          <DealStageSide side="give" title="You give" note={<><LockIcon /> Locked on create</>}>
+            <ChogAssets ids={offered} mon={offeredMon ?? 0n} />
+            <p className="text-xs text-muted">Held in escrow until someone accepts or you cancel.</p>
+          </DealStageSide>
+        }
+        want={
+          <DealStageSide side="want" title="You get" note="Sent to you on accept">
+            {isTrait ? (
+              <div className="space-y-2">
+                <TraitRequestSummary filter={filter} count={traitSet.count} root={traitSet.root} />
+                {(requestedMon ?? 0n) > 0n && <ChogAssets ids={NO_IDS} mon={requestedMon ?? 0n} />}
+              </div>
+            ) : (
+              <ChogAssets ids={requested} mon={requestedMon ?? 0n} />
+            )}
+          </DealStageSide>
+        }
+      />
       <ReviewTerms kindLabel={isTrait ? "Request by trait" : "Exact Chogs"} terms={terms} whoLabel="Who can accept" />
       <ConfirmCard
         onBack={() => onStep(2)}

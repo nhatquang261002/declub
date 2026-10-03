@@ -15,8 +15,7 @@ import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useDeals } from "@/hooks/useDeals";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { useIntents } from "@/hooks/usePool";
-import { ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS } from "@/lib/config";
-import { swapIntents, swapV2 } from "@/lib/contracts";
+import { ON_DEAL_ADDRESS, ON_DEAL_V2_ADDRESS, SHOW_INTENTS, SHOW_V2 } from "@/lib/config";
 import { intentAsListing } from "@/lib/intents";
 import { displayStatus, sameAddress, type DisplayStatus, type Deal } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
@@ -35,12 +34,12 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const [version, setVersion] = useState<DealVersion>(swapV2 && swapIntents ? "v2" : "v1");
+  const [version, setVersion] = useState<DealVersion>(SHOW_V2 && SHOW_INTENTS ? "v2" : "v1");
   const isV2 = version === "v2";
   const v1 = useDeals({ limit: 200, enabled: !isV2 });
   const v2 = useDealsV2({ limit: 200, enabled: isV2 });
   // Signed swaps (ADR 0008) sit beside locked deals in the multi-asset view, every status.
-  const signed = useIntents({ status: "all", maker: address, enabled: isV2 && !!swapIntents && !!address });
+  const signed = useIntents({ status: "all", maker: address, enabled: isV2 && SHOW_INTENTS && !!address });
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
   const v2Deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
   const { info } = useDealsTokenInfo(v2Deals);

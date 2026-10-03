@@ -22,7 +22,9 @@ import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from
 import { noteBytes } from "@/lib/dealsV2";
 import { draftClause, newTraitDraft, resolveDrafts, type TraitDraft } from "@/lib/traitDraft";
 import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
-import { ConfirmCard, NextButton, ReviewCard, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { ConfirmCard, NextButton, ReviewStage, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { DealStageSide } from "@/components/DealSheet";
+import { LockIcon } from "@/components/Icons";
 import { PREVIEW_TRAIT_CATALOG } from "./previewData";
 import { TraitRequests } from "./TraitRequests";
 
@@ -228,26 +230,30 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
   return (
     <div className="space-y-6">
       <StepHeading title="Review and confirm" blurb="Check both sides. Once it's on-chain you can cancel, but not edit." />
-      <div className="grid gap-6 md:grid-cols-2">
-        <ReviewCard title="You give" note="Locked in escrow until you accept or cancel.">
-          <AssetList assets={offered.assets} info={info} />
-        </ReviewCard>
-        {isOpen ? (
-          <ReviewCard title="You're looking for" note="Not enforced. You can accept any offer.">
-            <p className="whitespace-pre-wrap break-words text-sm">
-              {note.trim() || "Nothing specified. Anyone can send you an offer."}
-            </p>
-          </ReviewCard>
-        ) : (
-          <ReviewCard title="You get" note="Sent straight to you when someone accepts.">
-            <div className="space-y-2">
+      <ReviewStage
+        give={
+          <DealStageSide side="give" title="You give" note={<><LockIcon /> Locked on create</>}>
+            <AssetList assets={offered.assets} info={info} />
+            <p className="text-xs text-muted">Held in escrow until someone accepts or you cancel.</p>
+          </DealStageSide>
+        }
+        want={
+          isOpen ? (
+            <DealStageSide side="want" title="You're looking for" note="Not enforced">
+              <p className="whitespace-pre-wrap break-words text-sm">
+                {note.trim() || "Nothing specified. Anyone can send you an offer."}
+              </p>
+              <p className="text-xs text-muted">You can accept any offer you like.</p>
+            </DealStageSide>
+          ) : (
+            <DealStageSide side="want" title="You get" note="Sent to you on accept">
               {isTrait &&
                 resolved.map((r) => r && <TraitClauseSummary key={r.clause.token + r.set.root} clause={r.clause} matches={r.ids.length} />)}
               {plain.assets.length > 0 && <AssetList assets={plain.assets} info={info} />}
-            </div>
-          </ReviewCard>
-        )}
-      </div>
+            </DealStageSide>
+          )
+        }
+      />
       <ReviewTerms
         kindLabel={isOpen ? "Open offer" : isTrait ? "Request by trait" : "Exact assets"}
         terms={terms}

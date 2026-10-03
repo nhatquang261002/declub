@@ -34,12 +34,17 @@ export function ChogImage({ id, className = "", preferLocal = false }: { id: big
   );
 }
 
-/** Small tile used inside deal summaries. */
-export function ChogThumb({ id, large = false }: { id: bigint; large?: boolean }) {
+/** Small tile used inside deal summaries. `xl` is the deal page's stage. */
+export function ChogThumb({ id, large = false, xl = false }: { id: bigint; large?: boolean; xl?: boolean }) {
   return (
-    <div className={`${large ? "w-20" : "w-14"} shrink-0 text-center`}>
-      <ChogImage id={id} className={`rounded-lg border border-white/10 ${large ? "rotate-[-2deg]" : ""}`} />
-      <div className="mt-1 font-mono text-[11px] text-muted">#{id.toString()}</div>
+    <div className={`${xl ? "w-24 sm:w-28" : large ? "w-20" : "w-14"} group/chog shrink-0 text-center`}>
+      <ChogImage
+        id={id}
+        className={`rounded-lg border-2 border-[#111318] shadow-[0.18rem_0.18rem_0_#111318] transition-transform duration-200 ${
+          large || xl ? "rotate-[-2deg] group-hover/chog:rotate-0 group-hover/chog:scale-105" : ""
+        }`}
+      />
+      <div className={`mt-1.5 font-mono font-semibold text-muted ${xl ? "text-xs" : "text-[11px]"}`}>#{id.toString()}</div>
     </div>
   );
 }

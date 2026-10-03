@@ -48,7 +48,7 @@ export function TraitRequests({ drafts, onChange, statuses, resolved, room }: Pr
 
       <ul className="space-y-4">
         {drafts.map((draft, i) => (
-          <li key={draft.key} className="space-y-3 rounded-lg bg-white/5 p-3">
+          <li key={draft.key} className="space-y-3 rounded-xl border-2 border-[#111318] bg-white p-3 shadow-[0.2rem_0.2rem_0_#f0b735]">
             <TraitRequestRow
               index={i}
               draft={draft}
@@ -143,7 +143,7 @@ function TraitRequestRow({
             {traitOptions(status.catalog).map(({ traitType, values }) => {
               const chosen = draft.picks.filter((p) => p.traitType === traitType).length;
               return (
-                <details key={traitType} className="rounded-lg border border-white/10 px-3 py-2">
+                <details key={traitType} className="rounded-lg border-[1.5px] border-[#111318]/15 bg-[#fff4cf]/60 px-3 py-2 open:bg-white">
                   <summary className="cursor-pointer text-sm font-semibold">
                     {traitType}
                     {chosen > 0 && <span className="ml-2 text-xs text-muted">{chosen} chosen</span>}

@@ -14,7 +14,7 @@ import { useIntents } from "@/hooks/usePool";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { erc20Tokens } from "@/lib/assets";
-import { swapIntents } from "@/lib/contracts";
+import { SHOW_INTENTS } from "@/lib/config";
 import { describeError } from "@/lib/errors";
 import { intentAsListing } from "@/lib/intents";
 import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
@@ -47,7 +47,7 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
   const filtering = isFiltering(filters) || kind !== "any";
   const limit = filtering ? SEARCH_LIMIT : page * PAGE;
   const showLocked = kind !== "signed";
-  const showSigned = !!swapIntents && kind !== "locked";
+  const showSigned = SHOW_INTENTS && kind !== "locked";
   const { deals, total, hasMore, isLoading: dealsLoading, error } = useDealsV2({ limit, enabled: showLocked });
 
   // The pool being down only costs the signed swaps: locked deals read straight from the chain.
@@ -123,7 +123,7 @@ export function DealsV2({ switcher }: { switcher: ReactNode }) {
         onChange={updateFilters}
         placeholder="Search NFT ID, token symbol or address, or maker 0x…"
         extra={
-          swapIntents && (
+          SHOW_INTENTS && (
             <Select
               className="w-auto"
               aria-label="Filter by deal type"

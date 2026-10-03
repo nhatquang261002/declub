@@ -11,6 +11,7 @@ import { sameAddress } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
 import { SETTLEMENT_GUIDE } from "@/lib/settlementTerms";
 import { Who } from "@/components/Who";
+import type { StampStatus } from "@/components/DealSheet";
 import {
   isLive,
   isSignedListing,
@@ -25,18 +26,30 @@ import {
 type Info = ReadonlyMap<string, TokenInfo>;
 
 const BADGE: Record<IntentStatus, string> = {
-  open: "bg-mint/15 text-mint",
-  stale: "bg-warn/15 text-warn",
-  settled: "bg-accent/20 text-accent",
-  cancelled: "bg-zinc-500/20 text-zinc-300",
-  expired: "bg-zinc-500/20 text-zinc-300",
-  consumed: "bg-zinc-500/20 text-zinc-300",
-  rejected: "bg-danger/15 text-danger",
+  open: "chip-mint",
+  stale: "chip-warn",
+  settled: "chip-blue",
+  cancelled: "",
+  expired: "chip-warn",
+  consumed: "",
+  rejected: "chip-danger",
+};
+
+/** The deal page's stamp for an intent status (components/DealSheet.tsx). */
+export const INTENT_STAMP: Record<IntentStatus, StampStatus> = {
+  open: "open",
+  stale: "expired",
+  settled: "filled",
+  cancelled: "cancelled",
+  expired: "expired",
+  consumed: "cancelled",
+  rejected: "rejected",
 };
 
 export function IntentStatusBadge({ status }: { status: IntentStatus }) {
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase ${BADGE[status]}`}>
+    <span className={`chip uppercase tracking-wide ${BADGE[status]}`}>
+      {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
       {STATUS_LABEL[status]}
     </span>
   );
@@ -64,8 +77,8 @@ export function IntentCard({ row, now, me, info }: { row: PoolIntent; now: numbe
   return (
     <Link href={`/intent/${row.hash}`} className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold tracking-tight">
-          Swap <span className="font-mono">{row.hash.slice(0, 8)}…</span>
+        <span className="font-black tracking-tight">
+          Swap <span className="font-mono text-accent">{row.hash.slice(0, 8)}…</span>
         </span>
         <IntentStatusBadge status={status} />
         <SettlementTag signed />
@@ -101,9 +114,9 @@ export function IntentGrid({ rows, now, me, info }: { rows: readonly PoolIntent[
  */
 export function ConsentNotice({ className = "" }: { className?: string }) {
   return (
-    <div className={`space-y-2 rounded-xl border border-warn/40 bg-warn/10 p-4 text-sm ${className}`.trim()}>
-      <p className="font-semibold text-warn">Signing lets anyone settle this, with anyone</p>
-      <ul className="list-disc space-y-1 pl-5 text-muted">
+    <div className={`space-y-2 rounded-xl border-2 border-[#b27500] bg-[#fff3d1] p-4 text-sm text-[#4a3200] ${className}`.trim()}>
+      <p className="font-black text-[#6b4600]">Signing lets anyone settle this, with anyone</p>
+      <ul className="list-disc space-y-1 pl-5">
         <li>
           Any counterparty that meets what you want can settle it. In a ring you may never have heard of the other
           wallets.
@@ -129,7 +142,7 @@ export function ConsentNotice({ className = "" }: { className?: string }) {
 
 function Maker({ address, me }: { address: string; me?: string }) {
   return sameAddress(address, me) ? (
-    <span className="font-semibold text-white">you</span>
+    <span className="font-black">you</span>
   ) : (
     <Who address={address} />
   );
@@ -143,12 +156,10 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
   const legs = ringLegs(settlement.cycle);
   const ring = legs.length > 2;
   return (
-    <section className="page-section space-y-4 p-4">
+    <section className="deal-panel space-y-4 p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent uppercase">
-          {ring ? `Ring of ${legs.length}` : "Swap"}
-        </span>
-        <h3 className="text-sm font-semibold">
+        <span className="chip chip-blue uppercase tracking-wide">{ring ? `Ring of ${legs.length}` : "Swap"}</span>
+        <h3 className="font-black">
           {ring ? `Matched across ${legs.length} wallets` : "Matched and swapped"}
         </h3>
         {settlement.at > 0 && (
@@ -158,7 +169,7 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
 
       <ol className="space-y-3">
         {legs.map(({ row, to }) => (
-          <li key={row.hash} className="space-y-2 rounded-xl bg-white/5 p-3">
+          <li key={row.hash} className="space-y-2 rounded-xl border-2 border-[#111318] bg-white p-3 shadow-[0.2rem_0.2rem_0_#f0b735]">
             <p className="text-xs text-muted">
               <Maker address={row.intent.maker} me={me} /> gave to <Maker address={to} me={me} />
             </p>
@@ -171,7 +182,7 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
       </ol>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-        <a href={explorerTx(settlement.txHash)} target="_blank" rel="noreferrer" className="underline hover:text-white">
+        <a href={explorerTx(settlement.txHash)} target="_blank" rel="noreferrer" className="font-semibold underline">
           View settlement ↗
         </a>
         {footer}

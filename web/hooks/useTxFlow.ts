@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import type {
   Abi,
+  Address,
   ContractFunctionArgs,
   ContractFunctionName,
   Hash,
@@ -18,7 +19,8 @@ import {
   writeContract,
 } from "wagmi/actions";
 import { useQueryClient } from "@tanstack/react-query";
-import { describeError, type AppError } from "@/lib/errors";
+import { describeError, MockWriteError, type AppError } from "@/lib/errors";
+import { isDemoWrite } from "@/lib/demoDeals";
 import { useToast } from "@/components/Toast";
 import { mayFill, mayReport, reportTx } from "@/lib/fillReport";
 import { chain } from "@/lib/wagmi";
@@ -72,6 +74,7 @@ export function useTxFlow() {
     ): Promise<TransactionReceipt | null> => {
       let hash: Hash | undefined;
       try {
+        if (isDemoWrite(call as { address?: Address; args?: readonly unknown[] })) throw new MockWriteError();
         const connection = getConnection(config);
         if (!connection.address) throw new Error("Connect a wallet first.");
         const account = connection.address;

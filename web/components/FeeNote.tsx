@@ -27,10 +27,10 @@ export function FeeNote({
   const raise = pending && pending.amount > amount ? pending : undefined;
   if (amount === 0n && !raise) return null;
   return (
-    <div className="space-y-1 rounded-xl bg-white/5 px-3 py-2 text-sm">
+    <div className="fee-note space-y-1">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-        <span className="text-muted">Protocol fee</span>
-        <span className="font-semibold">{formatFee(amount, unit)}</span>
+        <span className="text-xs font-extrabold tracking-[0.1em] text-muted uppercase">Protocol fee</span>
+        <span className="font-black tabular-nums">{formatFee(amount, unit)}</span>
       </div>
       <p className="text-xs text-muted">{children}</p>
       {raise && (

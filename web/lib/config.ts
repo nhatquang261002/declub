@@ -68,8 +68,12 @@ export const KNOWN_COLLECTIONS: Address[] = (env.knownCollections ?? "")
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";
+/** Mock deals stand in for the live ones (lib/demoDeals.ts). On outside production unless `=false`. */
 export const DEMO_DEALS =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_DEALS !== "false";
+/** Whether multi-asset deals and signed swaps are shown: configured, or mocked. Writes still need the contract. */
+export const SHOW_V2 = !!ON_DEAL_V2_ADDRESS || DEMO_DEALS;
+export const SHOW_INTENTS = !!ON_DEAL_INTENTS_ADDRESS || DEMO_DEALS;
 export const DEMO_CREATE =
   process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_CREATE === "true";
 

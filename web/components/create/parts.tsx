@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { isAddress } from "viem";
 import { XLogoIcon } from "@/components/Icons";
 import { Select } from "@/components/Select";
+import { DealSheet, DealStage } from "@/components/DealSheet";
 import { Who } from "@/components/Who";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call } from "@/hooks/useClubMembership";
@@ -166,6 +167,22 @@ function HandleMatches({ matches, onPick }: { matches: HandleMatch[]; onPick: (w
         )}
       </ul>
     </div>
+  );
+}
+
+/**
+ * Both sides of the deal in review, on the same stage the deal's own page uses, so the maker
+ * sees what takers will see. Pass a `DealStageSide` for each.
+ */
+export function ReviewStage({ give, want }: { give: ReactNode; want: ReactNode }) {
+  return (
+    <DealSheet>
+      <div className="flex flex-wrap items-center gap-2 px-6 pt-5 sm:px-9">
+        <span className="chip chip-peach">Preview</span>
+        <span className="text-xs text-muted">How your deal will look to everyone else</span>
+      </div>
+      <DealStage status="open" live gives={give} wants={want} />
+    </DealSheet>
   );
 }
 

@@ -81,10 +81,20 @@ function rawMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A write for a mock deal (lib/demoDeals.ts): refused before anything reaches a wallet. */
+export class MockWriteError extends Error {
+  constructor() {
+    super("This is mock data for previewing the app, so nothing was sent. Set NEXT_PUBLIC_DEMO_DEALS=false to use live deals.");
+    this.name = "MockWriteError";
+  }
+}
+
 /** Turns anything thrown by wagmi/viem/the pool into a title, one readable sentence and optional details. */
 export function describeError(error: unknown): AppError {
   const raw = rawMessage(error);
   const details = (message: string) => (raw && raw !== message ? clip(raw) : undefined);
+
+  if (error instanceof MockWriteError) return { kind: "unknown", title: "Mock deal", message: error.message };
 
   if (error instanceof PoolError) {
     return { kind: "pool", title: "Intent pool refused this", message: error.message, details: `Pool code: ${error.code}` };

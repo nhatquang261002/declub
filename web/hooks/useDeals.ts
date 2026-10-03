@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContract, useReadContracts } from "wagmi";
+import { useConnection, useReadContract, useReadContracts } from "wagmi";
 import { swap } from "@/lib/contracts";
 import { DEMO_DEALS } from "@/lib/config";
-import { demoDeals, toDeal, type Deal } from "@/lib/deals";
+import { demoDeals } from "@/lib/demoDeals";
+import { toDeal, type Deal } from "@/lib/deals";
 
 /**
  * The newest `limit` deals, newest first.
@@ -21,6 +22,7 @@ export function useDeals({ limit = 200, enabled = true }: { limit?: number; enab
   });
   const total = count.data ?? 0n;
   const showDemoDeals = DEMO_DEALS;
+  const { address } = useConnection();
 
   const ids = useMemo(() => {
     const out: bigint[] = [];
@@ -46,7 +48,7 @@ export function useDeals({ limit = 200, enabled = true }: { limit?: number; enab
   });
 
   const deals = useMemo(() => {
-    if (showDemoDeals) return demoDeals();
+    if (showDemoDeals) return demoDeals(address).slice(0, limit);
     const out: Deal[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
@@ -60,7 +62,7 @@ export function useDeals({ limit = 200, enabled = true }: { limit?: number; enab
       if (deal) out.push(deal);
     });
     return out;
-  }, [results.data, traitResults.data, ids, showDemoDeals]);
+  }, [results.data, traitResults.data, ids, showDemoDeals, address, limit]);
 
   return {
     deals,

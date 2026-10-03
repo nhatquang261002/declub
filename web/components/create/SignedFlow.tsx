@@ -21,7 +21,8 @@ import { draftToAssets, draftTokens, newRow, type DraftRow } from "@/lib/assetDr
 import { MOCK_ERC20_ADDRESS, POOL_URL } from "@/lib/config";
 import type { Step } from "@/lib/createFlow";
 import { DEADLINES, DEFAULT_DEADLINE, deadlineSeconds, intentProblem, type DeadlineKey } from "@/lib/intents";
-import { ConfirmCard, NextButton, ReviewCard, StepHeading, StepNav } from "./parts";
+import { ConfirmCard, NextButton, ReviewCard, ReviewStage, StepHeading, StepNav } from "./parts";
+import { DealStageSide } from "@/components/DealSheet";
 
 type Props = {
   step: Step;
@@ -79,7 +80,7 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const escrowHint = (
     <p className="text-xs text-muted">
       Signed swaps can&apos;t include MON or a trait request.{" "}
-      <button type="button" className="underline hover:text-white" onClick={onUseEscrow}>
+      <button type="button" className="font-semibold underline hover:text-accent" onClick={onUseEscrow}>
         Lock assets instead
       </button>{" "}
       if you need either.
@@ -166,14 +167,19 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
             : `Nothing answered at ${POOL_URL}. Start the matcher, then reload.`}
         </Alert>
       )}
-      <div className="grid gap-6 md:grid-cols-2">
-        <ReviewCard title="You give" note="Stays in your wallet until a match settles.">
-          <AssetList assets={give.assets} info={info} />
-        </ReviewCard>
-        <ReviewCard title="You get, at least" note="Sent straight to you when it settles.">
-          <AssetList assets={want.assets} info={info} />
-        </ReviewCard>
-      </div>
+      <ReviewStage
+        give={
+          <DealStageSide side="give" title="You give" note="Stays in your wallet">
+            <AssetList assets={give.assets} info={info} />
+            <p className="text-xs text-muted">Nothing is locked. It moves only when a match settles.</p>
+          </DealStageSide>
+        }
+        want={
+          <DealStageSide side="want" title="You get, at least" note="Sent to you on settle">
+            <AssetList assets={want.assets} info={info} />
+          </DealStageSide>
+        }
+      />
       <ReviewCard title="Terms">
         <dl className="space-y-1.5">
           {(

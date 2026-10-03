@@ -22,7 +22,7 @@ No setup is needed. Addresses default to the Phase 1 testnet deployment. To poin
 
 You need an injected wallet (MetaMask, Rabby, …) on Monad testnet (chain 10143) with some test MON. The **My Chogs** page mints MockChogs for demo wallets.
 
-For a wallet-free UI review, set `NEXT_PUBLIC_DEMO_DEALS=true`. Sample deals replace the live deal list while enabled; leave it disabled for normal testnet use. The History page currently uses this preview data without requiring a connected wallet.
+Outside production, mock deals (`lib/demoDeals.ts`) replace the live ones so every deal screen can be reviewed without a wallet or testnet state: Chog deals, multi-asset deals, open offers with offers on them, and signed swaps, in every status. Connect a wallet to see the maker's and taker's views. Writes for a mock deal are refused before reaching the wallet. Set `NEXT_PUBLIC_DEMO_DEALS=false` for normal testnet use.
 
 ## Scripts
 

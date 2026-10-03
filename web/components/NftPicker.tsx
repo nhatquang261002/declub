@@ -174,7 +174,7 @@ function CollectionRow({ address, info, tag, onSelect }: { address: Address; inf
       <button
         type="button"
         onClick={onSelect}
-        className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-line px-3 py-2.5 text-left hover:bg-white/10"
+        className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border-[1.5px] border-[#111318]/20 bg-white/70 px-3 py-2.5 text-left transition-colors hover:border-[#111318] hover:bg-white"
       >
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Unnamed collection")}</span>
@@ -234,7 +234,7 @@ function TokenStep({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-[1.5px] border-[#111318]/15 bg-white/70 px-3 py-2">
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Collection")}</span>
           <span className="block font-mono text-xs text-muted">{shortAddress(collection)}</span>

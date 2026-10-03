@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReadContracts } from "wagmi";
+import { useConnection, useReadContracts } from "wagmi";
 import { swapV2 } from "@/lib/contracts";
+import { demoDealV2, isDemoDealId } from "@/lib/demoDeals";
 import { toDealV2 } from "@/lib/dealsV2";
 import { parseSpec } from "@/lib/traitSpec";
 
@@ -12,13 +13,17 @@ import { parseSpec } from "@/lib/traitSpec";
  * `deal` is null for an id that doesn't exist.
  */
 export function useDealV2(id: bigint) {
+  // A mock deal (lib/demoDeals.ts) is never read from the chain.
+  const demo = isDemoDealId(id);
+  const { address } = useConnection();
+  const mock = useMemo(() => (demo ? demoDealV2(id, address) : undefined), [demo, id, address]);
   const result = useReadContracts({
     contracts: [
       { ...swapV2!, functionName: "getTrade", args: [id] },
       { ...swapV2!, functionName: "offerNote", args: [id] },
       { ...swapV2!, functionName: "traitSpec", args: [id] },
     ],
-    query: { enabled: !!swapV2, refetchInterval: 6_000 },
+    query: { enabled: !!swapV2 && !demo, refetchInterval: 6_000 },
   });
   const [dealRead, noteRead, specRead] = result.data ?? [];
   const deal = useMemo(
@@ -30,6 +35,7 @@ export function useDealV2(id: bigint) {
   // null when there is none, or it isn't something this app wrote (the deal then can't be filled here).
   const specText = specRead?.status === "success" ? specRead.result : "";
   const traitClauses = useMemo(() => (specText ? parseSpec(specText) : null), [specText]);
+  if (mock) return { deal: mock.deal, note: mock.note, traitClauses: null, isLoading: false, error: null };
   return {
     deal,
     note,

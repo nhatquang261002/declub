@@ -78,7 +78,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
           return (
             <li key={row.key} className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-16 shrink-0 rounded-full bg-white/10 px-2 py-1 text-center text-xs font-semibold">
+                <span className="chip chip-dark w-16 shrink-0 justify-center">
                   {KIND_LABEL[row.kind]}
                 </span>
                 {row.kind === "erc721" ? (

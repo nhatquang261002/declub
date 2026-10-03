@@ -1,17 +1,35 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
+import { Alert } from "@/components/Alert";
 import { AssetList } from "@/components/AssetList";
+import { ConnectButton } from "@/components/ConnectButton";
 import { FeeNote } from "@/components/FeeNote";
 import { LoadError } from "@/components/ErrorPanel";
-import { EmptyState, PageHeader } from "@/components/Page";
+import { EmptyState } from "@/components/Page";
 import { describeError } from "@/lib/errors";
 import { TraitSlotView } from "@/components/TraitFillPanel";
 import { OfferNote, ProposalForm, ProposalList } from "@/components/Proposals";
-import { StatusBadge } from "@/components/DealParts";
+import { SettlementTag, STATUS_TEXT } from "@/components/DealParts";
+import {
+  BackToDeals,
+  DealByline,
+  DealDock,
+  DealFacts,
+  DealSheet,
+  DealSheetHead,
+  DealStage,
+  DealStageSide,
+  DealStamp,
+  DealSteps,
+  DealTitle,
+  sideTitles,
+  stepsOf,
+  type Party,
+} from "@/components/DealSheet";
+import { LockIcon } from "@/components/Icons";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useFills } from "@/hooks/useFills";
@@ -23,16 +41,17 @@ import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
+import { ON_DEAL_ADDRESS, SHOW_V2 } from "@/lib/config";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
-import { isOpenOffer } from "@/lib/dealsV2";
-import { displayStatus, sameAddress } from "@/lib/deals";
+import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
+import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 
 const NO_ASSETS: readonly Asset[] = [];
 
 export default function DealV2Page() {
   const params = useParams<{ id: string }>();
-  if (!swapV2) return <EmptyState>Multi-asset deals aren&apos;t enabled on this deployment yet.</EmptyState>;
+  if (!SHOW_V2) return <EmptyState>Multi-asset deals aren&apos;t enabled on this deployment yet.</EmptyState>;
   if (!/^\d+$/.test(params.id)) return <EmptyState>Invalid deal id.</EmptyState>;
   return <DealDetailV2 id={BigInt(params.id)} />;
 }
@@ -46,7 +65,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   // Both sides pay the fee this deal was listed with, not the contract's current one (ADR 0018).
   const fee = deal?.fee;
   // History needs to know which public deals this wallet filled (hooks/useFills.ts).
-  const { record } = useFills(address, swapV2!.address);
+  const { record } = useFills(address, swapV2?.address ?? ON_DEAL_ADDRESS);
 
   // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
   const openOffer = !!deal && isOpenOffer(deal);
@@ -103,130 +122,170 @@ function DealDetailV2({ id }: { id: bigint }) {
   const requestedNative = deal.requested.find((a) => a.kind === "native")?.amount ?? 0n;
   const plainRequested = deal.requested.filter((a) => a.kind !== "trait");
   const traitFillBlocked = traitFill.hasTraits && !traitFill.complete;
+  const forMe = !!deal.taker && sameAddress(deal.taker, address);
+  // What each side is to the viewer, when they're a party to it.
+  const party: Party = isMaker ? "maker" : status === "open" && allowed && !!address ? "taker" : undefined;
+  const titles = sideTitles(party);
+  const kind = openOffer ? "Open offer" : traitFill.hasTraits ? "Request by trait" : null;
+  const settled = status === "filled" || status === "cancelled";
+
+  async function accept() {
+    if (fee === undefined) return;
+    // What the maker asked for in MON, plus this wallet's share of the protocol fee.
+    const value = requestedNative + fee;
+    const receipt = traitFill.hasTraits
+      ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
+      : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value });
+    if (receipt) record(id);
+  }
 
   return (
     <>
-      <PageHeader title={`Deal #${id.toString()}`}>
-        <StatusBadge status={status} />
-      </PageHeader>
-      <div className="space-y-6">
-        <div className="card grid gap-6 p-5 md:grid-cols-2">
-          <div>
-            <div className="label">Maker gives</div>
-            <AssetList assets={deal.offered} info={info} />
-          </div>
-          {openOffer ? (
-            <div className="space-y-2">
-              <div className="label">Open to offers</div>
-              <OfferNote note={note} />
-            </div>
-          ) : (
-            <div>
-              <div className="label">Taker gives</div>
-              <div className="space-y-2">
-                {traitFill.hasTraits && !traitFill.aligned && (
-                  <p className="rounded-lg bg-white/5 px-3 py-2 text-sm text-warn">
-                    This deal asks for NFTs by trait, but its description can&apos;t be read here, so it can&apos;t be accepted from this app.
-                  </p>
-                )}
-                {traitFill.slots.map((slot, i) => (
-                  <TraitSlotView
-                    key={slot.asset.id.toString()}
-                    slot={slot}
-                    account={address}
-                    onToggle={canFill ? (tokenId) => traitFill.toggle(i, tokenId) : undefined}
-                  />
-                ))}
-                {plainRequested.length > 0 && <AssetList assets={plainRequested} info={info} />}
-              </div>
-            </div>
-          )}
-          <div className="text-sm text-muted">Created by <Who address={deal.maker} full /></div>
-          <div className="text-sm text-muted">
-            {deal.expiry === 0n ? "No expiry" : `Expires ${formatDate(deal.expiry)}`}
-            {deal.taker && <> · private offer for <Who address={deal.taker} full /></>}
-          </div>
-        </div>
-
-        {fee !== undefined && status === "open" && canFill && (
-          <FeeNote amount={fee}>
-            Sent with your payment, together with the maker&apos;s matching share that is already held with this deal. Both
-            go to the protocol only because this deal completes.
-          </FeeNote>
-        )}
-        {fee !== undefined && status === "open" && isMaker && (
-          <FeeNote amount={fee}>
-            Your share is held with this deal. It&apos;s only charged if someone completes it, and it comes back to you if you
-            cancel or it expires.
-          </FeeNote>
-        )}
-
-        <div className="flex flex-wrap items-center gap-3">
-          {status === "open" && isMaker && (
-            <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapV2!, functionName: "cancelTrade", args: [id] })}>
-              Cancel deal
-            </TxButton>
-          )}
-          {status === "expired" && (
-            <TxButton state={action.state} onClick={() => action.run({ ...swapV2!, functionName: "reclaimExpired", args: [id] })}>
-              Reclaim to maker
-            </TxButton>
-          )}
-          {canFill && steps[0] && (
-            <TxButton state={action.state} onClick={() => action.run(steps[0].call)}>
-              {steps[0].label}
-              {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
-            </TxButton>
-          )}
-          {canFill && !steps[0] && (
-            <TxButton
-              state={action.state}
-              disabled={traitFillBlocked || fee === undefined}
-              onClick={async () => {
-                if (fee === undefined) return;
-                // What the maker asked for in MON, plus this wallet's share of the protocol fee.
-                const value = requestedNative + fee;
-                const receipt = traitFill.hasTraits
-                  ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
-                  : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value });
-                if (receipt) record(id);
-              }}
-            >
-              Accept &amp; swap
-            </TxButton>
-          )}
-          {status === "open" && !isMaker && !allowed && (
-            <p className="text-sm text-muted">This is a private offer for another wallet.</p>
-          )}
-          {status === "open" && !address && (
-            <p className="text-sm text-muted">Connect a wallet to {openOffer ? "send an offer" : "accept this deal"}.</p>
-          )}
-          {(status === "filled" || status === "cancelled") && (
-            <p className="text-sm text-muted">
-              This deal is settled and read-only.
-              {openOffer && " Offers that weren't accepted can still be withdrawn by whoever made them."}
-            </p>
-          )}
-          <Link href="/deals" className="btn-secondary">Back to deals</Link>
-        </div>
-        <TxStatus state={action.state} />
-
-        {openOffer && (
-          <ProposalList
-            proposals={proposals}
-            total={total}
-            hasMore={hasMore}
-            onLoadMore={loadMore}
-            info={info}
-            dealId={id}
-            canDecide={isMaker && status === "open"}
+      <BackToDeals />
+      <div className="space-y-8">
+        <DealSheet>
+          <DealSheetHead
+            chips={
+              <>
+                <SettlementTag signed={false} />
+                {forMe && <span className="chip chip-peach">★ For you</span>}
+                {isMaker && <span className="chip chip-dark">Your deal</span>}
+                {kind && <span className="chip">{kind}</span>}
+              </>
+            }
+            title={<DealTitle id={id.toString()} />}
+            byline={<DealByline maker={deal.maker} mine={isMaker} expiry={deal.expiry} now={now} live={status === "open"} />}
+            stamp={<DealStamp status={status} label={STATUS_TEXT[status]} note={status === "open" && openOffer ? "taking offers" : undefined} />}
           />
-        )}
-        {canPropose && <ProposalForm dealId={id} offered={deal.offered} fee={deal.fee} />}
+
+          <DealStage
+            status={status}
+            live={status === "open"}
+            gives={
+              <DealStageSide
+                side="give"
+                title={titles.give}
+                note={
+                  settled ? undefined : (
+                    <>
+                      <LockIcon /> In escrow
+                    </>
+                  )
+                }
+                mine={party === "taker"}
+              >
+                <AssetList assets={deal.offered} info={info} />
+              </DealStageSide>
+            }
+            wants={
+              openOffer ? (
+                <DealStageSide side="want" title={isMaker ? "You're looking for" : "Maker is looking for"}>
+                  <OfferNote note={note} />
+                </DealStageSide>
+              ) : (
+                <DealStageSide side="want" title={titles.want} mine={party === "maker"}>
+                  {traitFill.hasTraits && !traitFill.aligned && (
+                    <Alert tone="warn" title="Can’t be accepted here">
+                      This deal asks for NFTs by trait, but its description can&apos;t be read here.
+                    </Alert>
+                  )}
+                  {traitFill.slots.map((slot, i) => (
+                    <TraitSlotView
+                      key={slot.asset.id.toString()}
+                      slot={slot}
+                      account={address}
+                      onToggle={canFill ? (tokenId) => traitFill.toggle(i, tokenId) : undefined}
+                    />
+                  ))}
+                  {plainRequested.length > 0 && <AssetList assets={plainRequested} info={info} />}
+                </DealStageSide>
+              )
+            }
+          />
+
+          <DealFacts
+            facts={[
+              {
+                label: openOffer ? "Who can send offers" : "Who can accept",
+                value: deal.taker ? <Who address={deal.taker} mine={forMe} /> : "Anyone",
+              },
+              { label: "Expires", value: deal.expiry === 0n ? "Never" : formatDate(deal.expiry) },
+              // The whole address, where people are meant to check it against their counterparty.
+              { label: "Maker's wallet", value: <span className="font-mono text-xs font-semibold">{deal.maker}</span> },
+            ]}
+          />
+        </DealSheet>
+
+        <Dock
+          deal={deal}
+          status={status}
+          isMaker={isMaker}
+          allowed={allowed}
+          openOffer={openOffer}
+          canPropose={canPropose}
+          connected={!!address}
+        >
+          {canFill && (
+            <>
+              <DealSteps
+                steps={stepsOf([
+                  ["Wallet connected", true],
+                  ...(traitFill.hasTraits ? [["Choose your NFTs", traitFill.complete] as const] : []),
+                  [steps.length > 1 ? `Approve ${steps.length} assets` : "Approve", steps.length === 0],
+                  ["Accept & swap", false],
+                ])}
+              />
+              {fee !== undefined && (
+                <FeeNote amount={fee}>Sent with your payment. The maker pays the same, and neither is charged unless the swap completes.</FeeNote>
+              )}
+            </>
+          )}
+          {fee !== undefined && status === "open" && isMaker && (
+            <FeeNote amount={fee}>Held with your deal. Charged only if it completes; returned if you cancel or it expires.</FeeNote>
+          )}
+
+          {(status === "open" && isMaker) || status === "expired" || canFill || canPropose ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {status === "open" && isMaker && (
+                <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapV2!, functionName: "cancelTrade", args: [id] })}>
+                  Cancel deal
+                </TxButton>
+              )}
+              {status === "expired" && (
+                <TxButton state={action.state} onClick={() => action.run({ ...swapV2!, functionName: "reclaimExpired", args: [id] })}>
+                  {isMaker ? "Reclaim my assets" : "Return assets to maker"}
+                </TxButton>
+              )}
+              {canFill && steps[0] && (
+                <TxButton state={action.state} onClick={() => action.run(steps[0].call)}>
+                  {steps[0].label}
+                  {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
+                </TxButton>
+              )}
+              {canFill && !steps[0] && (
+                <TxButton state={action.state} disabled={traitFillBlocked || fee === undefined} onClick={accept}>
+                  Accept &amp; swap
+                </TxButton>
+              )}
+              {canPropose && (
+                <a href="#make-offer" className="btn-primary">
+                  Build your offer <span aria-hidden>↓</span>
+                </a>
+              )}
+              {canFill && traitFillBlocked && !steps[0] && (
+                <p className="text-sm text-muted">Pick the NFTs you&apos;ll send, above.</p>
+              )}
+            </div>
+          ) : null}
+          <TxStatus state={action.state} success={status === "filled" ? "Swapped. The assets are in your wallet." : undefined} />
+        </Dock>
 
         {credits.length > 0 && (
-          <div className="card space-y-3 p-5">
-            <div className="label">Waiting for you to collect</div>
+          <section className="deal-panel space-y-3 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="chip chip-mint">Held for you</span>
+              <h2 className="font-black">Waiting for you to collect</h2>
+            </div>
             <p className="text-sm text-muted">
               A payout to you was rejected (for example by a token or a contract wallet). It is held safely until you claim it.
             </p>
@@ -244,10 +303,110 @@ function DealDetailV2({ id }: { id: bigint }) {
               </div>
             ))}
             <TxStatus state={claim.state} success="Claimed." />
+          </section>
+        )}
+
+        {openOffer && (
+          <ProposalList
+            proposals={proposals}
+            total={total}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            info={info}
+            dealId={id}
+            canDecide={isMaker && status === "open"}
+          />
+        )}
+        {canPropose && (
+          <div id="make-offer" className="scroll-mt-24">
+            <ProposalForm dealId={id} offered={deal.offered} fee={deal.fee} />
           </div>
         )}
       </div>
     </>
+  );
+}
+
+/** The dock's headline and line of context: who this wallet is to the deal, and what's next. */
+function Dock({
+  deal,
+  status,
+  isMaker,
+  allowed,
+  openOffer,
+  canPropose,
+  connected,
+  children,
+}: {
+  deal: DealV2;
+  status: DisplayStatus;
+  isMaker: boolean;
+  allowed: boolean;
+  openOffer: boolean;
+  canPropose: boolean;
+  connected: boolean;
+  children: ReactNode;
+}) {
+  if (status === "filled" || status === "cancelled") {
+    return (
+      <DealDock tone="done" eyebrow="Settled" title={status === "filled" ? "This deal is done" : "This deal was cancelled"}>
+        <p className="text-sm text-muted">
+          {status === "filled" ? "Both sides swapped in one transaction." : "The maker called it off and took their assets back."}
+          {openOffer && " Offers that weren't accepted can still be withdrawn by whoever made them."}
+        </p>
+        {children}
+      </DealDock>
+    );
+  }
+  if (status === "expired") {
+    return (
+      <DealDock tone="warn" title="This deal ran out of time">
+        <p className="text-sm text-muted">
+          Nobody can accept it now. Anyone can send the locked assets back to the maker.
+        </p>
+        {children}
+      </DealDock>
+    );
+  }
+  if (isMaker) {
+    return (
+      <DealDock tone="maker" eyebrow="Your deal" title={openOffer ? "Your open offer is live" : "Your deal is live"}>
+        <p className="text-sm text-muted">
+          {openOffer
+            ? "Your side is in escrow. Accept an offer below, or cancel to take it back."
+            : "Your side is in escrow until someone accepts. Cancel any time to take it back."}
+        </p>
+        {children}
+      </DealDock>
+    );
+  }
+  if (!connected) {
+    return (
+      <DealDock title={openOffer ? "Want this? Make an offer" : "Want this? Take the deal"}>
+        <p className="text-sm text-muted">Connect a wallet to {openOffer ? "send an offer" : "accept this deal"}.</p>
+        <div>
+          <ConnectButton />
+        </div>
+      </DealDock>
+    );
+  }
+  if (!allowed) {
+    return (
+      <DealDock tone="blocked" title="This offer is for someone else">
+        <p className="text-sm text-muted">
+          Only <Who address={deal.taker!} /> can accept it.
+        </p>
+        {children}
+      </DealDock>
+    );
+  }
+  return (
+    <DealDock title={canPropose ? "Send the maker an offer" : "Take the deal"}>
+      {canPropose && (
+        <p className="text-sm text-muted">Your offer is held in escrow while they decide. Take it back any time before they accept.</p>
+      )}
+      {children}
+    </DealDock>
   );
 }
 

@@ -75,7 +75,7 @@ export function TxStatus({ state, success }: { state: TxState; success?: ReactNo
 
 function TxLink({ hash }: { hash: string }) {
   return (
-    <a href={explorerTx(hash)} target="_blank" rel="noreferrer" className="underline hover:text-white">
+    <a href={explorerTx(hash)} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2 hover:text-accent">
       View transaction ↗
     </a>
   );

@@ -65,3 +65,5 @@ export const XLogoIcon = ({ className = "size-3" }: P) => (
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" />
   </svg>
 );
+export const LockIcon = (p: P) => (<Icon {...p}><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></Icon>);
+export const SendIcon = (p: P) => (<Icon {...p}><path d="M4 12 20 4l-4 16-4-6.5L4 12Z" /><path d="m12 13.5 8-9.5" /></Icon>);

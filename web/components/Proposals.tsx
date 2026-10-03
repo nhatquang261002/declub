@@ -21,10 +21,10 @@ import { Who } from "@/components/Who";
 type Info = ReadonlyMap<string, TokenInfo>;
 
 const BADGE: Record<ProposalStatus, string> = {
-  active: "bg-mint/15 text-mint",
-  accepted: "bg-accent/20 text-accent",
-  withdrawn: "bg-zinc-500/20 text-zinc-300",
-  rejected: "bg-zinc-500/20 text-zinc-300",
+  active: "chip-mint",
+  accepted: "chip-blue",
+  withdrawn: "",
+  rejected: "chip-danger",
 };
 
 /** The maker's note, as plain text. It is not verified and binds nobody. */
@@ -66,15 +66,24 @@ export function ProposalList({
   const closed = proposals.filter((p) => p.status !== "active");
 
   return (
-    <section className="space-y-3">
-      <h2 className="label !mb-0">Offers ({total.toString()})</h2>
-      {proposals.length === 0 && <p className="text-sm text-muted">No offers yet.</p>}
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h2 className="text-2xl font-black tracking-tight">Offers</h2>
+        <span className="chip chip-dark tabular-nums">{total.toString()}</span>
+        {active.length > 0 && <span className="text-sm text-muted">{active.length} waiting for the maker</span>}
+      </div>
+      {proposals.length === 0 && (
+        <div className="deal-panel px-6 py-10 text-center">
+          <p className="font-bold">No offers yet</p>
+          <p className="mt-1 text-sm text-muted">The first one could be yours.</p>
+        </div>
+      )}
       {active.map((p) => (
         <ProposalRow key={p.id.toString()} proposal={p} info={info} dealId={dealId} canDecide={canDecide} />
       ))}
       {closed.length > 0 && (
         <details className="space-y-3">
-          <summary className="cursor-pointer text-sm text-muted">Closed offers ({closed.length})</summary>
+          <summary className="cursor-pointer text-sm font-bold text-muted hover:text-[#111318]">Closed offers ({closed.length})</summary>
           <div className="mt-3 space-y-3">
             {closed.map((p) => (
               <ProposalRow key={p.id.toString()} proposal={p} info={info} dealId={dealId} canDecide={false} />
@@ -110,12 +119,14 @@ function ProposalRow({
     decide.run({ ...swapV2!, functionName, args: [dealId, proposal.id] });
 
   return (
-    <div className="card space-y-3 p-4">
+    <div className="offer-card space-y-3 p-4" data-status={proposal.status}>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold">Offer #{proposal.id.toString()}</span>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase ${BADGE[proposal.status]}`}>
-          {proposal.status}
+        <span className="font-black">
+          Offer <span className="text-accent">#</span>
+          {proposal.id.toString()}
         </span>
+        <span className={`chip uppercase tracking-wide ${BADGE[proposal.status]}`}>{proposal.status}</span>
+        {mine && <span className="chip chip-dark">Yours</span>}
         <span className="ml-auto text-xs text-muted">
           from <Who address={proposal.proposer} mine={mine} />
         </span>
@@ -188,7 +199,7 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
         info={info}
         owner={address}
       />
-      <div className="card space-y-3 p-4">
+      <div className="deal-panel space-y-3 p-4">
         {(validation ?? overlap) && (
           <Alert tone="warn" title="Check your offer">
             {validation ?? overlap}
