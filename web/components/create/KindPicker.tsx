@@ -14,7 +14,7 @@ const KINDS: ReadonlyArray<{ key: DealKind; title: string; blurb: string }> = [
   {
     key: "trait",
     title: "Request by trait",
-    blurb: "Ask for any Chog with a trait, like a Crown hat. Anyone with a match can accept.",
+    blurb: "Ask for NFTs with a trait, like any Chog with a Crown hat. Anyone with a match can accept.",
   },
 ];
 

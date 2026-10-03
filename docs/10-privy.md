@@ -10,10 +10,10 @@ state and Clubs.
 
 | Capability | Current behavior | Frontend / server surface |
 |---|---|---|
-| Sign-in | Privy can sign in with a wallet, Google, X, or Discord. Wallet login is shown first. Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
+| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on Monad testnet only. Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
 | Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/account`, `components/ConnectButton.tsx` |
 | Multiple wallets | Linked wallets are shown on `/account`; a connected wallet can be made active without changing the account. | `/account`, `useSetActiveWallet` |
-| Embedded wallets | Disabled by default. Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one for users who have no wallet. | `components/Providers.tsx`, `lib/config.ts` |
+| Embedded wallets | Disabled by default (`createOnLogin: "off"`). Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one at login for users who have no wallet (`"users-without-wallets"`). | `components/Providers.tsx`, `lib/config.ts` |
 | Shared trader profiles | A user explicitly shares an X or Discord profile. Google and email can be linked for sign-in/recovery but are never shown as trader profiles. | `/account`, `/api/profile`, `lib/server/profileSync.ts` |
 | Handle-based deals | A maker can find a shared X or Discord handle, choose one of that user's shared wallets, and lock the taker address in the deal flow. | `/create`, `/api/profiles/lookup`, `lib/server/handleLookup.ts` |
 | Server authorization | Per-user routes accept a Privy access token, verify it server-side, then fetch the user from Privy. The browser cannot choose the user id, handle, or wallet to authorize. | `lib/server/privy.ts`, `lib/server/gate.ts` |
@@ -32,12 +32,16 @@ The implementation is deliberately fail-closed at the integration boundary:
 
 ## Account and sign-in behavior
 
-The header's **Connect** control renders one of two modes, selected at build time:
+The header's wallet control renders one of two modes, selected at build time:
 
-1. **Privy mode** when `NEXT_PUBLIC_PRIVY_APP_ID` is set. A user can sign in, connect a
-   linked wallet, switch the active wallet, open `/account`, or sign out.
-2. **Injected-wallet mode** when the app id is absent. wagmi exposes installed EIP-6963
-   wallets and there is no Privy account or linked-account screen.
+1. **Privy mode** when `NEXT_PUBLIC_PRIVY_APP_ID` is set. The button reads **Sign in**. A user
+   can sign in, connect a linked wallet, switch the active wallet, open `/account`, or sign out.
+2. **Injected-wallet mode** when the app id is absent. The button reads **Connect wallet**; wagmi
+   exposes installed EIP-6963 wallets and there is no Privy account or linked-account screen.
+
+In both modes a wallet on another chain sees **Switch to Monad Testnet**. `components/Providers.tsx`
+wraps the app in `PrivyProvider` and `@privy-io/wagmi`'s `WagmiProvider` in Privy mode, and in
+wagmi's own `WagmiProvider` otherwise.
 
 In Privy mode, a social or email login can return to an account that has no wallet connected
 in the current browser. The header offers **Connect wallet** or **Link a wallet**. This is
@@ -61,8 +65,8 @@ share, stop sharing, or refresh. The server obtains the user's current linked ac
 Privy, validates the available profile, and stores the mapping by wallet. A user who has
 not enabled sharing is not returned by handle lookup even if Privy knows the social account.
 
-In `/create`, **Only this wallet can accept** accepts an X or Discord handle when Privy is
-available. **Find** calls `/api/profiles/lookup`; the maker selects one of the wallets that
+In `/create`, **Only this wallet can accept** (on an open offer, **Only this wallet can send
+offers**) accepts an X or Discord handle when Privy is available. **Find** calls `/api/profiles/lookup`; the maker selects one of the wallets that
 the shared profile exposes. An unresolved handle cannot pass the review step. The selected
 wallet address, not the typed handle, is the on-chain restriction.
 
@@ -104,8 +108,9 @@ NEXT_PUBLIC_PRIVY_APP_ID=...
 NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=false
 ```
 
-Server configuration belongs in `web/.env.local` or the hosting provider's environment, not
-in a committed root `.env`:
+Server configuration belongs in `web/.env.local` or the hosting provider's environment. The
+repo-root `.env` won't do: `next.config.ts` copies only its `NEXT_PUBLIC_*` values into the web
+app, so a secret put there is silently ignored.
 
 ```dotenv
 PRIVY_APP_SECRET=...
@@ -114,12 +119,15 @@ UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-`UPSTASH_*` is required for persistent profiles, server-side state, and Clubs. In development,
-the app can use its configured local/in-memory store, but that is not a production persistence
-strategy.
+`UPSTASH_*` is required for persistent profiles, server-side state, and Clubs. The Vercel KV
+names `KV_REST_API_URL` and `KV_REST_API_TOKEN` work too, as fallbacks (`lib/server/store.ts`).
+Without them, production has no store and those features switch off; development uses an
+in-memory store (seeded with mock Clubs), which is lost on restart and is not a production
+persistence strategy.
 
 The Privy dashboard must allow the deployed origin and enable the login methods the app is
-expected to expose: wallet, Google, X, Discord, and optionally email. Enable embedded wallets
+expected to expose: wallet, Google, X, Discord, and email if users should be able to link it
+for recovery (the app's own config doesn't offer email as a login method). Enable embedded wallets
 only when the product decision and `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` agree.
 
 For a local webhook test, expose the dev server with a tunnel and register the tunnel URL in

@@ -3,62 +3,85 @@
 ## System overview
 
 ```text
- ┌──────────────────────────── Browser ────────────────────────────┐
- │                                                                  │
- │  Next.js (App Router, TypeScript, Tailwind)                      │
- │    ├─ pages: Open Trades · My Chogs · Create · Trade #id · History│
- │    └─ hooks: useTrades · useTrade · useOwnedChogs · useTxFlow     │
- │                         │                                         │
- │                 wagmi  +  viem  (+ injected wallet)               │
- └─────────────────────────┬────────────────────────────────────────┘
-                           │  JSON-RPC (eth_call/multicall reads, sendTx)
-                           ▼
- ┌─────────────────────── Monad testnet (10143) ───────────────────┐
- │                                                                  │
- │   ┌──────────────┐   setApprovalForAll    ┌──────────────────┐   │
- │   │  Chog NFT    │◄───────────────────────│    OnDeal      │   │
- │   │  (ERC-721)   │   transferFrom (pull/  │  escrow + settle │   │
- │   │  MockChog on │   push on fill/refund) │                  │   │
- │   │  testnet     │───────────────────────►│  trades[id]      │   │
- │   └──────────────┘                        │  pendingWithdraw │   │
- │                                           └────────┬─────────┘   │
- │                                                    │ events       │
- └────────────────────────────────────────────────────┼─────────────┘
-                                                      ▼
-                            TradeCreated · TradeFilled · TradeCancelled
-                            TradeReclaimed · WithdrawalCredited · Withdrawn
-                                                      │
-                                   (Phase 3+) ────────▼─────────
-                                   Indexer → DB → /api  (ADR 0003)
+ ┌─────────────────────────────── Browser ────────────────────────────────┐
+ │  Next.js (App Router, TypeScript, Tailwind)                            │
+ │    ├─ pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash]     │
+ │    │         /history · /clubs · /clubs/[address] · /account · /guide  │
+ │    └─ hooks: useDealBook · useDealsV2 · useDealV2 · usePool            │
+ │              useFills · useNotifications · useTxFlow · useSignFlow     │
+ │  wagmi + viem, Privy sign-in (injected-wallet fallback)                │
+ └────┬───────────────────┬─────────────────────────────────┬─────────────┘
+      │ RPC reads, txs    │ /api/*                          │ intents (HTTP)
+      │ EIP-712 sigs      ▼                                 ▼
+      │   ┌── Next.js server (web/app/api) ───┐   ┌────── matcher/ ──────┐
+      │   │ /api/deals: book of V2 + pool     │   │ pool: HTTP + sqlite  │
+      │   │ /api/cron/fills: fill watcher     │   │ matcher: pairs and   │
+      │   │ /api/webhooks/privy (svix)        │   │ rings of up to 4,    │
+      │   │ profiles, saves, Clubs, activity  │   │ simulate → settle    │
+      │   │   └─► Upstash Redis               │   └─────────┬────────────┘
+      │   │                                   │             │
+      │   └───────────────┬───────────────────┘             │ settle(cycle, sigs)
+      │                   │ storage reads, receipts,        │
+      │                   │ 100-block log scans             │
+      ▼                   ▼                                 ▼
+ ┌──────────────────────── Monad testnet (10143) ─────────────────────────┐
+ │  ┌─────────────────────────┐         ┌─────────────────────────────┐   │
+ │  │ OnDealV2                │         │ OnDealIntents               │   │
+ │  │ locked deals: exact,    │         │ signed swaps: pairs and     │   │
+ │  │ trait, open offers;     │         │ rings, wallet to wallet;    │   │
+ │  │ fee in MON per side     │         │ fee in WMON per maker       │   │
+ │  └────────────┬────────────┘         └──────────────┬──────────────┘   │
+ │               └─────── both inherit FeeAdmin ───────┘                  │
+ │                                  │ transfers                           │
+ │                                  ▼                                     │
+ │                      any ERC-721 · any ERC-20 · MON                    │
+ │                                                                        │
+ │  OnDeal (v1, legacy: one Chog collection + MON; not used by the app)   │
+ └────────────────────────────────────────────────────────────────────────┘
 ```
+
+No indexer: deals are read from storage ([ADR 0003](adr/0003-no-indexer-in-v1.md), [0004](adr/0004-read-deals-from-storage.md)).
 
 ## Components
 
-### OnDeal contract (`contracts/src/OnDeal.sol`)
+### OnDealV2 (`contracts/src/OnDealV2.sol`)
 
-A single contract with no upgrade proxy and no admin. It does four things:
+The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No upgrade proxy. A trade is two `Asset[]` (ERC-721, ERC-20, MON, or an `ERC721Trait` request), up to 10 per side.
 
 | Responsibility | How |
 |---|---|
 | Trade state | `mapping(uint256 => Trade)` plus a sequential `tradeCount` |
-| Escrow | Holds the maker's Chogs (as ERC-721 owner) and MON (as its own balance) |
-| Settlement | `fillTrade` does all four transfers in one call |
-| Refunds | `cancelTrade` (maker), `reclaimExpired` (anyone, after expiry), `withdraw` (MON pull fallback) |
+| Escrow | Holds the maker's offered assets, and each proposal's assets on an open offer |
+| Settlement | `fillTrade` / `fillTraitTrade` / `acceptProposal` pay both sides in one call |
+| Refunds | `cancelTrade` (maker), `reclaimExpired` (anyone, after expiry), `rejectProposal` / `withdrawProposal`, and `claim` (pull fallback when a push fails) |
+| Fee | A flat MON fee per side of a completed deal, recorded on the trade at creation ([ADR 0015](adr/0015-protocol-fee.md)) |
 
-The full spec is in [03 · Contract Design](03-contract-design.md) and the interface is [`IOnDeal.sol`](../contracts/src/interfaces/IOnDeal.sol).
+### OnDealIntents (`contracts/src/OnDealIntents.sol`)
+
+Settles signed EIP-712 intents wallet to wallet, nothing escrowed ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). `settle(cycle, signatures)` takes a pair or a ring of up to 4 and re-checks every signature, nonce, deadline and transfer. Each maker pays the fee in WMON, capped by the `maxFee` they signed. Domain `("OnDealIntents", "3")`.
+
+### FeeAdmin (`contracts/src/FeeAdmin.sol`)
+
+Shared by both contracts ([ADR 0018](adr/0018-adjustable-protocol-fee.md)). The fee admin can cut the fee at once, or raise it after a 7-day delay (`setFee`, then `applyFee`), never above a ceiling fixed at deploy (at most 500 MON). Admin transfer is two-step, and `renounceFeeAdmin` fixes the fee for good. The admin can't touch escrow or deals.
+
+### OnDeal v1 (`contracts/src/OnDeal.sol`), legacy
+
+The original contract: one Chog collection plus MON, no admin, no fee. Still in the repo and on testnet, but the app no longer reads or writes it ([ADR 0020](adr/0020-server-side-deal-book.md)).
+
+The full specs are in [03 · Contract Design](03-contract-design.md); the interfaces are in [`contracts/src/interfaces/`](../contracts/src/interfaces/).
 
 ### Chog collection
 
-- **Testnet:** `MockChog`, an `ERC721Enumerable` with open minting and on-chain SVG metadata including traits. It is deployed first, and its address is passed to the `OnDeal` constructor.
-- **Production:** the real Chog contract, set through `CHOG_ADDRESS`. Before switching, check whether it supports `ERC721Enumerable` (this affects how the frontend lists Chogs; see [05 · Frontend](05-frontend.md#listing-a-wallets-chogs)).
+- **Testnet:** `MockChog` (open mint, on-chain SVG and traits) or the `ChogGenesisMirror` of the real collection's metadata. Set through `CHOG_ADDRESS` / `NEXT_PUBLIC_CHOG_ADDRESS`; the app gives Chog tokens its own artwork.
+- **Production:** the real Chog contract. The app trades any ERC-721, so Chog is only one collection among others.
 
 ### Frontend (`web/`)
 
-Next.js + wagmi + viem + Tailwind. It sends every transaction from the browser and reads most things straight from the chain. Its server routes keep saves, profiles and Clubs, and hold the deal book so it can be searched and filtered whole ([ADR 0020](adr/0020-server-side-deal-book.md)). See [05 · Frontend](05-frontend.md).
+Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([ADR 0010](adr/0010-privy-sign-in.md)). It sends every transaction from the browser and reads most things straight from the chain. Its server routes (`web/app/api`) keep profiles, saves and Clubs in Upstash Redis ([ADR 0011](adr/0011-verified-profiles.md), [0012](adr/0012-server-side-saves.md), [0016](adr/0016-clubs-and-momentum.md)), hold the deal book so it can be searched and filtered whole (`/api/deals`, [ADR 0020](adr/0020-server-side-deal-book.md)), follow the chain for fills from a cron (`/api/cron/fills`, [ADR 0019](adr/0019-fill-watcher.md)), and take Privy's webhook (`/api/webhooks/privy`, [ADR 0013](adr/0013-privy-webhooks.md)). See [05 · Frontend](05-frontend.md).
 
 ### Intent pool and matcher (`matcher/`)
 
-A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)), and the first backend in the project. The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `OnDealIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key, and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
+A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `OnDealIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key, and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
 
 ### Indexer (deferred)
 
@@ -66,40 +89,56 @@ Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`
 
 ## Key flows
 
-### Create
+### Create (locked deal)
 
 ```text
-Maker                 Chog NFT                 OnDeal
-  │ setApprovalForAll(OnDeal) ─►│                     │   (once per wallet)
-  │ createTrade(offered, requested, reqMon, taker, expiry) {value: offeredMon}
-  │ ─────────────────────────────────────────────────────►│
-  │                               │◄─ transferFrom(maker→swap) × offered
-  │                               │                     │── emit TradeCreated
-  │◄──────────────────────────── tradeId ───────────────│
+Maker                          Token contracts                 OnDealV2
+  │ approve / setApprovalForAll(OnDealV2) ──►│                      │  (once per token)
+  │ createTrade(offered, requested, taker, expiry)                  │
+  │   {value: offered MON + fee}  (or createTraitTrade / createOpenOffer)
+  │ ───────────────────────────────────────────────────────────────►│
+  │                                          │◄── transferFrom(maker → escrow) × offered
+  │                                          │                      │── emit TradeCreated
+  │◄──────────────────────────── tradeId ───────────────────────────│
 ```
 
 ### Fill (atomic)
 
 ```text
-Taker                 Chog NFT                 OnDeal                 Maker
-  │ setApprovalForAll(OnDeal) ─►│                     │                    │
-  │ fillTrade(id) {value: requestedMon} ────────────────►│                    │
-  │                               │  status = Filled   (effects first)      │
-  │                               │◄─ transferFrom(taker→maker) × requested │
-  │                               │◄─ transferFrom(swap→taker)  × offered   │
-  │                               │                     │── requestedMon ──►│
-  │◄──────────────────────────────── offeredMon ────────│                    │
-  │                               │                     │── emit TradeFilled │
+Taker                          Token contracts                 OnDealV2              Maker
+  │ approve requested tokens ───────────────►│                      │                   │
+  │ fillTrade(id) {value: requested MON + fee}  (fillTraitTrade with proofs)            │
+  │ ───────────────────────────────────────────────────────────────►│                   │
+  │                                          │   status = Filled (effects first)        │
+  │                                          │◄── taker → maker  × requested ──────────►│
+  │◄─────────────────────────────────────────│◄── escrow → taker × offered              │
+  │                                          │                      │── both fees → fee recipient
+  │                                          │                      │── emit TradeFilled
 ```
 
-If any step reverts (the taker no longer owns a requested Chog, approval is missing, the MON amount is wrong, or the trade has expired), the whole transaction reverts and nothing moves.
+If any step reverts (the taker no longer owns a requested NFT, approval is missing, the MON is wrong, or the deal has expired), the whole transaction reverts and nothing moves. A payout that can't be pushed is credited and taken later with `claim`.
 
-### Cancel / reclaim
+### Cancel / reclaim / proposals
 
 ```text
-Maker ── cancelTrade(id) ──► OnDeal ── transferFrom(swap→maker) × offered
-                                      └─ offeredMon → maker (or credit)
+Maker ── cancelTrade(id) ──► OnDealV2 ── escrow + maker's fee → maker
 Anyone ─ reclaimExpired(id) ─► same refund path, only if expired
+Taker ── propose(id, assets) ─► proposal escrowed (open offers)
+Maker ── acceptProposal ─► atomic swap · rejectProposal ─► refund to proposer
+Proposer ─ withdrawProposal ─► refund
+```
+
+### Signed swap (intent settle)
+
+```text
+Maker A, B (, C, D)        Pool + matcher                 OnDealIntents
+  │ approve give tokens + WMON fee (once)                       │
+  │ sign Intent{give, want, feeToken, maxFee, nonce, deadline}  │
+  │ ── POST /intents ─────►│ verify, store                      │
+  │                        │ find a cycle (2–4) → eth_call      │
+  │                        │ settle(cycle, signatures) ────────►│
+  │                        │        each give → next maker, fee → recipient
+  │◄──────────────── assets arrive wallet to wallet ────────────│
 ```
 
 ## Repo layout
@@ -108,8 +147,8 @@ Anyone ─ reclaimExpired(id) ─► same refund path, only if expired
 on-deal/
 ├── docs/          ← you are here
 ├── contracts/     Foundry: src/, test/, script/, lib/ (forge install)
-├── matcher/       Node: intent pool (HTTP + sqlite) and local matcher (Phase 4)
-└── web/           Next.js app: app/ (routes), components/, hooks/, lib/ (Phase 2)
+├── matcher/       Node: intent pool (HTTP + sqlite) and local matcher
+└── web/           Next.js app: app/ (pages and api/), components/, hooks/, lib/ (lib/server/ for the API)
 ```
 
 ## Network
@@ -121,16 +160,20 @@ on-deal/
 | Explorers | [MonadVision](https://testnet.monadvision.com/), [Monadscan](https://testnet.monadscan.com/) | |
 | Verification | Sourcify: `https://sourcify-api-monad.blockvision.org/` | |
 
-Both contracts' creation bytecode (solc 0.8.28, `evm_version = prague`) was gas-estimated against the Monad testnet node, so Monad's own EVM accepts it, not only Foundry's local EVM.
+The first deployment's creation bytecode (OnDeal and MockChog; solc 0.8.28, `evm_version = prague`) was gas-estimated against the Monad testnet node before it was sent, so Monad's own EVM accepts it, not only Foundry's local EVM. The later contracts use the same compiler settings and were deployed the same way.
 
 ### Deployed (testnet)
 
+The app is configured with:
+
 | Contract | Address | Block |
 |---|---|---|
-| OnDeal | [`0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298`](https://testnet.monadvision.com/address/0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298) | 66352698 |
-| MockChog | [`0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4`](https://testnet.monadvision.com/address/0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4) | 66352681 |
+| OnDealV2 | [`0x73591F76d7deE66F683A979cEffb4356982EE1bB`](https://testnet.monadvision.com/address/0x73591F76d7deE66F683A979cEffb4356982EE1bB) | 67163690 |
+| OnDealIntents | [`0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2`](https://testnet.monadvision.com/address/0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2) | 67194397 |
+| MockERC20 (mUSD) | [`0xd300f095f456D59AAc122B0100833fE195136F6c`](https://testnet.monadvision.com/address/0xd300f095f456D59AAc122B0100833fE195136F6c) | 66874652 |
+| Chog collection (ChogGenesisMirror) | [`0x32a325b0640594377d0708ca9081c93da95e1908`](https://testnet.monadvision.com/address/0x32a325b0640594377d0708ca9081c93da95e1908) | 66576933 |
 
-Both are source-verified on Sourcify (full match). Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. Transaction record: [`contracts/broadcast/Deploy.s.sol/10143/run-latest.json`](../contracts/broadcast/Deploy.s.sol/10143/run-latest.json).
+Neither deal contract matches the current source: both predate the fee and `FeeAdmin`, and the intents contract uses the old EIP-712 domain `("ChogSwapIntents", "1")`. Redeploy V2 and Intents before the fee and signed swaps work. Broadcast records, the legacy v1 deployments and the other V2s are listed in the [README](../README.md#deployments-monad-testnet-chain-10143).
 
 A few Monad specifics that affect the design:
 

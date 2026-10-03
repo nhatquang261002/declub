@@ -1,10 +1,10 @@
 # 09 · Clubs and Momentum
 
-A **Club** is the community for one verified NFT collection or ERC-20 token. Signed-in users join it, and it shows the deals that use the asset, a board of short posts, its members, and **Momentum**, an activity score. The decision and its reasoning are in [ADR 0016](adr/0016-clubs-and-momentum.md). This page is the spec.
+A **Club** is the community for one verified NFT collection or memecoin (a memecoin can share its collection's Club; other ERC-20s, like stablecoins and wrapped MON, get none). Signed-in users join it, and it shows the deals that use the asset, a board of short posts, its members, and **Momentum**, an activity score. The decision and its reasoning are in [ADR 0016](adr/0016-clubs-and-momentum.md). This page is the spec.
 
 ## What a Club gives you
 
-- **Market:** the open deals and signed swaps that offer or want the asset, and a strip of recently completed ones.
+- **Market:** the open deals and signed swaps that offer or want the asset, and its recent swaps.
 - **Board:** short posts from members: notes, and "Looking for" posts that can link a deal.
 - **Members:** a leaderboard ranked by member Momentum, with verified X or Discord handles ([ADR 0011](adr/0011-verified-profiles.md)) and a Holder badge.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
@@ -15,8 +15,8 @@ Clubs change nothing on chain. No contract, matcher rule or pool rule depends on
 
 | Route | What |
 |---|---|
-| `/clubs` | Index: "Your clubs", then every Club sorted by Club Momentum |
-| `/clubs/[address]` | One Club, with the tabs Market, Board and Members |
+| `/clubs` | The directory: totals, "Your Clubs", the Most active / Rising / Most traded boards, then All Clubs (see *Screens*) |
+| `/clubs/[address]` | One Club, with the tabs Market, Board, Members, and Manage for staff |
 
 "Clubs" is added to the header's nav.
 
@@ -54,7 +54,7 @@ Kept per Club, by Privy user id, in `club-roles:{chain}:{token}`. The app admin 
 | Role | How you get it | Can |
 |---|---|---|
 | **App admin** | `CLUB_ADMIN_USER_IDS` environment variable | Everything below, in every Club. Assign or remove Owners. Ban someone from every Club. Purge a hidden Club. |
-| **Owner** (at most one) | **Claim:** a member whose linked wallet is the contract's `owner()`, read on chain by the server. **Or** an admin assigns one after checking the project another way. | Edit the Club profile: description (500 characters), up to 3 links, banner (a token image). Pin up to 3 posts. Appoint and remove Moderators (at most 10). Hand ownership to another member. Set "holders only can post". |
+| **Owner** (at most one) | **Claim:** a member whose linked wallet is the contract's `owner()`, read on chain by the server. **Or** an admin assigns one after checking the project another way. | Edit the Club profile: description (500 characters), up to 3 links (a banner image is not built yet). Pin up to 3 posts. Appoint and remove Moderators (at most 10). Hand ownership to another member. Set "holders only can post". |
 | **Moderator** | Appointed by the Owner or an admin | Hide, restore and delete posts. Work through the report queue. Ban and unban members from this Club. Can't act on the Owner or on other Moderators. |
 | **Member** | Joins | Post (needs a shared verified profile), report posts, appear on the leaderboard. |
 | **Visitor** | Not joined, or not signed in | Read only. |
@@ -90,10 +90,12 @@ Rules:
 
 **Market tab**
 
-- **Have:** open deals and signed swaps that offer the asset, open offers included.
+Three views, switched with pills:
+
+- **For trade:** open deals and signed swaps that offer the asset, open offers included.
 - **Wanted:** open deals and signed swaps that ask for it, trait requests for the collection included.
-- **Completed:** the Club's latest completed swaps, with who traded and a link to the deal (or, for a signed swap, its transaction).
-- Only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCardV2`.
+- **Recent swaps:** the Club's latest completed swaps, with who traded and a link to the deal (or, for a signed swap, its transaction).
+- For trade and Wanted show only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCardV2`.
 - Says when more than 50 locked deals name the asset ("showing the newest 50 deals; browse Deals and search to see the rest") and when the signed-swap pool isn't answering.
 
 **Board tab**: member posts, newest first, pinned ones on top.
@@ -103,7 +105,7 @@ Rules:
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
 
-**Deep links**: an asset row on a deal page links to its Club when it has one.
+**Deep links**: not built yet. An asset row on a deal page doesn't link to its Club.
 
 ## Momentum
 
@@ -136,7 +138,7 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 - **A Club added later has no past:** only events recorded while its asset was on the list count, until the fill watcher backfills it ([ADR 0019](adr/0019-fill-watcher.md), `FILL_WATCHER_START_BLOCK`).
 - **Matcher:** `GET /intents` and `/settlements` take `?token=`: any intent naming that address on either side, whatever the id (it matches the address inside the `intent_assets` key, so there is no schema change). `/settlements` also takes `?after=` (milliseconds; later cycles only, oldest first) for a reader that pages forward. `web/lib/pool.ts` passes `token`.
 - **Deals feed** comes from the server's deal book ([ADR 0020](adr/0020-server-side-deal-book.md)): `useClubMarket` asks `/api/deals` for the open locked deals that name the Club's assets, across every deal, and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` split them into For trade and Wanted.
-- **Deals made outside the app** come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)): a cron that follows the finalized head from a cursor and passes each transaction through `recordActivity`, so they count within a run's interval.
+- **Deals made outside the app** come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)): a cron (`GET /api/cron/fills`) that follows the finalized head from a cursor and passes each transaction through `recordActivity`, so they count within a run's interval. It runs only with a store and `CRON_SECRET` set; without it, Momentum counts only what the app itself reported.
 
 ## Membership and the Holder badge
 
@@ -215,9 +217,9 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - **Data:** `web/data/assets.json`, `web/lib/verifiedAssets.ts` (`clubFor(token)`).
 - **Server:** `web/lib/server/activity.ts` (the log), `clubs.ts` (a Club's events from the log and the pool, its summary and detail), `clubRoutes.ts` (the read handlers, built over a registry so tests can use their own list), `members.ts` (membership, Holder checks, sync, the list) and `memberRoutes.ts` (its handlers, with the caller's gate injectable for tests), `board.ts` (posts, reports, bans, roles, the claim, the profile, the purge), `boardRoutes.ts` (its handlers), `clubState.ts` (roles, profile, bans and log documents; the admin list), the store ops (`addMember`, `removeMember`, `countMembers`), and the routes under `web/app/api/clubs/` and `web/app/api/activity/`.
 - **Shared:** `web/lib/momentum.ts` (the score), `web/lib/clubs.ts` (event and stats types, `summarize`, `settlementEvents`, `mergeEvents`) and `web/lib/members.ts` (`isHolder`, display wallet, stale-row picking, ranking), `clubRoles.ts` (the permission matrix, role changes) and `clubPosts.ts` (text cleaning, links, what each viewer sees, profile checks).
-- **Pages:** `web/app/clubs/page.tsx` and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx` and `ClubManage.tsx` (the staff tab).
+- **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubSidebar.tsx` and `parts.tsx`.
 - **Hooks:** `useClubs`, `useClub`, `useClubMarket`, `useClubMembership` (with `useMyClubs`, `useClubMembers`), `useSignIn`, `useClubBoard` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`), on React Query and `useAccessToken`. Writes report errors through `useToast`; loads use `LoadError`.
-- **Components:** `ClubCard` (with `ClubTile`), `MomentumBadge`, `HolderBadge`, `JoinClubButton`, `PostItem`.
+- **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's side column is `ClubSidebar.tsx`.
 - **Reused:** `featuredCollections` and `useCollectionInfos` for names, `useTokenInfo` for ERC-20s, `loadMetadata` for art.
 
 ## Build order
@@ -241,8 +243,8 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 
 By hand, with two wallets on Monad testnet:
 
-1. Sign in, join the MockChog Club, and see the Holder badge after a mint.
+1. Mint a Mock Chog to the first wallet from the command line (`MockChog.mint(to, quantity)`; the app has no mint screen), sign in, join the Mock Chog Club, and see the Holder badge.
 2. Create a deal and fill it from the second wallet.
-3. Check "Recently completed", Club Momentum going up, and both members on the leaderboard.
+3. Check "Recent swaps", Club Momentum going up, and both members on the leaderboard.
 4. Post a "Looking for" linked to a deal, report it from 3 accounts and see it hidden, then delete it as admin.
 5. Turn Privy off and see the not-configured state.

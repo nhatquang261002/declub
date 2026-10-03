@@ -17,7 +17,7 @@ import type { Store } from "./store";
  * Mock Club data for development: members with verified handles, a busy board, roles, swaps and a
  * moderation log, so the Clubs screens can be seen full without anyone signing in or trading.
  * Seeded once into the in-memory store a dev server uses (lib/server/store.ts), never into Upstash
- * or a production build, and switched off with ONDEAL_DEMO_CLUBS=false.
+ * or a production build, and switched off with NEXT_PUBLIC_DEMO_CLUBS=false.
  *
  * Everything goes in under the same keys and shapes the real writes use, so the screens read it
  * through the real routes. The deals and transactions it names don't exist on chain.

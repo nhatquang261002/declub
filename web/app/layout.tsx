@@ -38,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 ·{" "}
               </>
             )}
-            no admin, assets only move in your transactions, any fee is flat and only charged when a deal completes
+            assets only move in your transactions, and the fee is flat, capped and only charged when a deal completes
           </footer>
         </Providers>
       </body>

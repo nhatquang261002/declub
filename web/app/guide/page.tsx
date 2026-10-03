@@ -1,28 +1,169 @@
+import type { ReactNode } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { CreateDealButton } from "@/components/CreateDealButton";
+import { CheckIcon, ShieldIcon, SwapIcon, WalletIcon } from "@/components/Icons";
+import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { termsFor } from "@/lib/settlementTerms";
 
-const STEPS = [
+// The guide reads like a short manual: one idea per section, short lines, the button names in
+// bold so they match the screens. docs/07-user-guide.md is the longer version of the same text.
+
+const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf] shadow-[0.3rem_0.3rem_0_rgb(0_0_0/0.16)]";
+const MUTED = "text-[#4e5968]";
+
+const SECTIONS = [
+  { id: "start", label: "Get started", show: true },
+  { id: "make", label: "Make a deal", show: true },
+  { id: "take", label: "Take a deal", show: true },
+  { id: "settlement", label: "Locked or signed", show: !!swapIntents },
+  { id: "after", label: "After a deal", show: true },
+  { id: "fees", label: "Fees", show: true },
+  { id: "safety", label: "Stay safe", show: true },
+  { id: "faq", label: "FAQ", show: true },
+].filter((section) => section.show);
+
+const sectionNumber = (id: string) => SECTIONS.findIndex((section) => section.id === id) + 1;
+
+const START = [
   {
-    number: "01",
-    title: "Connect your wallet",
-    body: "Use an injected wallet such as MetaMask or Rabby, and switch to Monad testnet. You will need test MON for gas and any MON you include in a deal.",
+    icon: <WalletIcon className="size-4" />,
+    title: PRIVY_APP_ID ? "Sign in" : "Connect a wallet",
+    body: PRIVY_APP_ID ? (
+      <>Press <b>Sign in</b> and use Google, X, Discord or a wallet. Then link the wallet that holds your assets.</>
+    ) : (
+      <>Press <b>Connect wallet</b> and pick the wallet installed in your browser.</>
+    ),
   },
   {
-    number: "02",
-    title: "Create an offer",
-    body: "Choose the assets you want to give, then enter the asset IDs or MON you want in return. You can make the offer public or address it to one wallet.",
+    icon: <SwapIcon className="size-4" />,
+    title: "Use Monad testnet",
+    body: <>If the button says <b>Switch to Monad Testnet</b>, press it. Every deal here runs on testnet.</>,
   },
   {
-    number: "03",
-    title: "Approve and lock",
-    body: "Approve On Deal once so it can escrow your offered assets. Creating the deal then locks your side in the contract immediately.",
+    icon: <Image src="/brand/mon.svg" alt="" width={20} height={20} className="size-5" />,
+    title: "Get test MON",
+    body: <>You need a little test MON for gas, plus any MON you want to put in a deal.</>,
+  },
+];
+
+const MAKE_STEPS = [
+  {
+    title: "Deal type",
+    body: swapIntents ? (
+      <>Choose how it settles (lock or sign, explained below), what kind of deal it is, and what you want back.</>
+    ) : (
+      <>Choose what kind of deal it is, and what you want back.</>
+    ),
   },
   {
-    number: "04",
-    title: "Accept a deal",
-    body: "Open a deal where you own every requested asset. Approve the collection if needed, then Accept & Swap. The contract settles both sides atomically.",
+    title: "Your assets",
+    body: (
+      <>
+        Add what you give with <b>+ MON</b>, <b>+ Token</b> or <b>+ NFT</b>. Choose who can take it (anyone, or one
+        wallet) and when it expires: 1 hour, 24 hours, 7 days or never.
+      </>
+    ),
   },
+  {
+    title: "Confirm",
+    body: (
+      <>
+        Check the summary, <b>Approve</b> each asset you offer, then <b>Create deal</b>. Your side and your share of
+        the fee are now held by the contract.
+      </>
+    ),
+  },
+];
+
+const KINDS = [
+  { title: "Open offer", body: "Show what you're giving and let people send you offers. You pick the one you like." },
+  { title: "Request exact assets", body: "Name exactly what you want back. Whoever holds it can accept in one step." },
+  { title: "Request by trait", body: "Ask for NFTs with a trait, like any Chog with a Crown hat. Any match can accept." },
+];
+
+const TAKE = [
+  {
+    kind: "Exact assets",
+    body: (
+      <>
+        Approve what you send if asked, then press <b>Accept &amp; swap</b>. Any MON asked for, plus your share of the
+        fee, goes in the same transaction.
+      </>
+    ),
+  },
+  {
+    kind: "By trait",
+    body: <>Choose which of your NFTs to send. Each one is checked against the request before you can accept.</>,
+  },
+  {
+    kind: "Open offer",
+    body: (
+      <>
+        Build an offer from your own assets and press <b>Send offer</b>. It&apos;s held until the maker accepts or
+        rejects it. <b>Withdraw my offer</b> works at any time.
+      </>
+    ),
+  },
+];
+
+const AFTER: ReadonlyArray<{ title: string; body: ReactNode; signed?: boolean }> = [
+  {
+    title: "Changed your mind?",
+    body: (
+      <>
+        <b>Cancel deal</b> returns everything you locked, fee included, while the deal is open.
+      </>
+    ),
+  },
+  {
+    title: "It expired",
+    body: (
+      <>
+        Press <b>Reclaim my assets</b>. Anyone can press <b>Return assets to maker</b>, and it always goes back to you.
+      </>
+    ),
+  },
+  {
+    title: "Held for you",
+    body: (
+      <>
+        If a payout to you was refused (some contract wallets do this), the deal page shows it as waiting. Press{" "}
+        <b>Claim</b> to collect it.
+      </>
+    ),
+  },
+  {
+    title: "Taking back a signed swap",
+    signed: true,
+    body: (
+      <>
+        <b>Remove from pool</b> is free. <b>Cancel on-chain</b> costs gas but makes your signature useless for good.
+      </>
+    ),
+  },
+];
+
+const FEES = [
+  "A small flat fee per side, so both people pay the same.",
+  "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
+  "The exact amount is on screen before you confirm.",
+  "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
+];
+
+const FEE_MODES: ReadonlyArray<[string, string]> = [
+  ["Locked deals", "Paid in MON with your side, held with it, and refunded if the deal doesn't complete. The fee a deal was listed with is the fee both sides pay."],
+  ["Signed swaps", "Paid in WMON (wrapped MON) when the swap settles. You sign the most you'll pay; if the fee drops first, you pay less."],
+];
+
+const SAFETY = [
+  "Check you're on Monad testnet, with the wallet you expect.",
+  "Read every asset, token id and amount on both sides.",
+  "Check who can accept and when the deal expires.",
+  "Compare a handle and its wallet with your conversation. Lookalikes exist.",
+  "Never approve a contract address someone sent you in a message.",
+  "Notes, posts and badges are written by people, not checked by On Deal.",
 ];
 
 /** Locked deals against signed swaps, row by row. The one-line reasons live in lib/settlementTerms.ts. */
@@ -30,188 +171,350 @@ const COMPARE: ReadonlyArray<[string, string, string]> = [
   ["Can it fail?", "No. Once someone accepts, both sides move together.", "Yes, if you move the asset or revoke the approval before a match."],
   ["What it costs", "Gas to create, and again to cancel. Approvals cost gas too.", "Nothing to post or remove. You only pay for approvals."],
   ["Your assets", "Held by the contract until it's accepted, cancelled or expires.", "Stay in your wallet the whole time."],
-  ["What you can use", "MON, NFTs, tokens and trait requests.", "NFTs and tokens. MON must be wrapped as WMON. No trait requests."],
+  ["What you can use", "MON, NFTs, tokens, trait requests and open offers.", "NFTs and tokens. MON must be wrapped as WMON. No trait requests."],
   ["Who can take it", "Anyone, one named wallet, or you pick from the offers you receive.", "Anyone that meets your terms. A matcher finds pairs and rings of up to 4 wallets."],
-  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, removed from the pool, or its deadline passes (10 minutes to 7 days, required)."],
+  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, removed from the pool, or its deadline passes (10 minutes to 7 days)."],
 ];
+
+const MODES = [
+  { mode: "escrow", title: "Lock assets now", bestFor: "A specific buyer, a big trade, or anything with MON or a trait." },
+  { mode: "signed", title: "Sign only", bestFor: "Quick NFT and token swaps, without locking anything or paying to post." },
+] as const;
 
 /** Only shown where signed swaps exist. */
 const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
-  ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post. See Locked deals vs signed swaps above."],
+  ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post."],
   ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
   ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. A short deadline is the best protection."],
 ];
 
-const FAQ: ReadonlyArray<[string, string]> = [
-  ["What is On Deal?", "On Deal is a peer-to-peer, non-custodial way to swap digital assets. The smart contract holds the maker's side and settles the exchange only when the taker provides the requested side."],
-  ["Do I have to trust the other party?", "No. The swap is atomic: either every NFT and MON transfer succeeds, or the transaction reverts. The other party never receives your escrowed assets without sending their side."],
-  ["What does escrow mean here?", "When you create an open deal, the assets you offer move into the On Deal contract. They remain there until the deal is filled, cancelled by you, or reclaimed after expiry."],
-  ["Can I cancel my deal?", "Yes. The maker can cancel any open deal before it is filled. Your escrowed assets and offered MON are returned to your wallet."],
-  ["What happens when a deal expires?", "An expired deal cannot be filled. The maker, or another wallet on the maker's behalf, can call Reclaim to return the escrowed assets."],
-  ["Who can accept a deal?", "Public deals can be accepted by any wallet that owns all requested assets. A direct deal can only be accepted by the wallet named by the maker."],
-  ["Are there platform fees?", "Multi-asset and signed deals charge a small flat protocol fee per side, so both people pay the same. It is only charged when the deal completes: if you cancel, it expires, or an offer is rejected or withdrawn, nobody pays it. The screens show the exact amount before you confirm. In a locked deal it is sent in MON with your side and held with it, and refunded if the deal doesn't complete. In a signed swap it is taken in WMON (wrapped MON) from your wallet when the swap settles, and the first step wraps the MON you need. The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. A locked deal keeps the fee it was listed with, for both sides. A signed swap is signed with the most you'll pay, and if the fee is cut before it settles you pay less. You also pay the Monad transaction cost. Deals on the original single-collection contract (testnet only) have no fee."],
-  ["Why do I need to approve On Deal?", "ERC-721 collections require your permission before a contract can transfer your NFTs. Approval is a one-time collection-wide permission for this swap contract."],
-  ["Is this mainnet?", "The current demo runs on Monad testnet with test assets. Treat them as disposable and never send valuable assets to an unfamiliar contract."],
+/** Only shown with Privy sign-in, which the handle lookup needs. */
+const HANDLE_FAQ: [string, string] = [
+  "Can I make a deal for one person by their handle?",
+  "Yes. In Only this wallet can accept, type their X or Discord handle, like @bob, and press Find. It finds people who chose to show their profile, and you pick the wallet they'll accept from. A handle shows the account and the wallet belong together, not that the person is honest.",
 ];
+
+const FAQ: ReadonlyArray<[string, string]> = [
+  ["What is On Deal?", "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets."],
+  ["Do I have to trust the other person?", "No. The swap is atomic: every transfer in it succeeds, or the whole transaction is undone. The other side can never take your assets without sending theirs."],
+  ["Where are my assets while a deal is open?", "In a locked deal, inside the On Deal contract, until the deal is accepted, you cancel it, or it expires and you reclaim it. In a signed swap, they never leave your wallet."],
+  ["Why do I need to approve On Deal?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
+  ["What is an open offer?", "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders."],
+  ["Is this mainnet?", "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract."],
+];
+
+const FAQ_ITEMS = [
+  ...FAQ.slice(0, 3),
+  ...(swapIntents ? SIGNED_FAQ : []),
+  ...FAQ.slice(3, 5),
+  ...(PRIVY_APP_ID ? [HANDLE_FAQ] : []),
+  ...FAQ.slice(5),
+];
+
+function SectionHeading({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
+  const label = SECTIONS.find((section) => section.id === id)?.label;
+  return (
+    <header className="mb-6">
+      <p className="flex items-center gap-2 text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">
+        <span className="grid size-6 place-items-center rounded-full border-2 border-[#111318] bg-accent text-[11px] tracking-normal text-white">
+          {sectionNumber(id)}
+        </span>
+        {label}
+      </p>
+      <h2 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{title}</h2>
+      {children && <p className="mt-2 max-w-2xl leading-7 text-muted">{children}</p>}
+    </header>
+  );
+}
+
+function Section({ id, title, intro, children }: { id: string; title: string; intro?: ReactNode; children: ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24">
+      <SectionHeading id={id} title={title}>{intro}</SectionHeading>
+      {children}
+    </section>
+  );
+}
 
 export default function GuidePage() {
   return (
-    <div className="pb-10">
-      <section className="border-b border-black/10 pb-10 pt-4 sm:pb-12">
-        <p className="text-sm font-semibold text-accent">Documentation / Guide</p>
-        <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+    <div className="space-y-10 pb-10">
+      <section className="hero-panel overflow-hidden">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <h1 className="max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">How to use On Deal</h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-muted sm:text-lg">
-              Everything you need to make a safe deal, from connecting your wallet to receiving your assets.
+            <div className="eyebrow">Field guide</div>
+            <h1 className="mt-5 max-w-2xl text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
+              How On Deal works,
+              <span className="block text-accent">in five minutes.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
+              Make a deal, take one, and get your assets back if it doesn&apos;t happen. Every step, in plain words.
             </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <CreateDealButton />
+              <Link href="/deals" className="btn-secondary">
+                Browse deals <span aria-hidden>↗</span>
+              </Link>
+            </div>
           </div>
-          <CreateDealButton className="shrink-0" />
+          <ul className={`${CARD} space-y-3 p-5 text-sm lg:w-72`}>
+            <li className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">The short version</li>
+            {[
+              "Both sides move together, or nothing moves.",
+              "You only pay the fee when a deal completes.",
+              "Testnet only: use test assets.",
+            ].map((line) => (
+              <li key={line} className="flex gap-2.5 leading-6">
+                <CheckIcon className="mt-1 size-4 shrink-0 text-[#1f7a55]" />
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
-        <nav className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold">
-          <a href="#how-it-works" className="text-accent hover:underline">How it works</a>
-          {swapIntents && <a href="#settlement" className="text-accent hover:underline">Locked vs signed</a>}
-          <a href="#safety" className="text-accent hover:underline">Safety checklist</a>
-          <a href="#faq" className="text-accent hover:underline">FAQ</a>
+        <nav aria-label="Guide sections" className="flex gap-2 overflow-x-auto border-t border-black/10 px-6 py-4 sm:px-10 lg:hidden">
+          {SECTIONS.map((section) => (
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              className="shrink-0 rounded-full border-2 border-[#111318] bg-white/60 px-3 py-1 text-sm font-bold hover:bg-white"
+            >
+              {section.label}
+            </a>
+          ))}
         </nav>
       </section>
 
-      <div className="grid gap-12 pt-10 lg:grid-cols-[12rem_1fr] lg:gap-16">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-14">
         <aside className="hidden lg:block">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted">On this page</p>
-          <nav className="mt-4 space-y-3 border-l border-black/10 pl-4 text-sm">
-            <a href="#how-it-works" className="block text-muted hover:text-accent">How it works</a>
-            {swapIntents && <a href="#settlement" className="block text-muted hover:text-accent">Locked vs signed</a>}
-            <a href="#safety" className="block text-muted hover:text-accent">Safety checklist</a>
-            <a href="#faq" className="block text-muted hover:text-accent">FAQ</a>
+          <nav aria-label="On this page" className="sticky top-24">
+            <p className="text-xs font-black tracking-[0.16em] text-muted uppercase">On this page</p>
+            <ol className="mt-4 space-y-1 border-l-2 border-[#111318]/15 text-sm">
+              {SECTIONS.map((section, i) => (
+                <li key={section.id}>
+                  <a
+                    href={`#${section.id}`}
+                    className="-ml-0.5 flex gap-2 border-l-2 border-transparent py-1.5 pl-4 font-semibold text-muted hover:border-accent hover:text-[#111318]"
+                  >
+                    <span className="w-4 font-mono text-xs leading-5 text-[#a9282f]">{i + 1}</span>
+                    {section.label}
+                  </a>
+                </li>
+              ))}
+            </ol>
           </nav>
         </aside>
 
-        <div className="min-w-0 space-y-14">
-          <section id="how-it-works" className="scroll-mt-24">
-            <div className="flex items-start gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">1</span>
-              <div>
-                <p className="text-sm font-semibold text-accent">The short version</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Four steps to a swap</h2>
-              </div>
-            </div>
-            <div className="mt-7 divide-y divide-black/10 overflow-hidden rounded-xl border border-black/10 bg-white">
-              {STEPS.map((step) => (
-                <article key={step.number} className="grid gap-3 p-5 sm:grid-cols-[3rem_11rem_1fr] sm:items-start sm:gap-5 sm:p-6">
-                  <span className="font-mono text-sm font-bold text-accent">{step.number}</span>
-                  <h3 className="font-bold">{step.title}</h3>
-                  <p className="text-sm leading-6 text-muted">{step.body}</p>
-                </article>
+        <div className="min-w-0 space-y-16">
+          <Section id="start" title="Before your first deal">
+            <ul className="grid gap-4 sm:grid-cols-3">
+              {START.map(({ icon, title, body }) => (
+                <li key={title} className={`${CARD} p-5`}>
+                  <span className="grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">
+                    {icon}
+                  </span>
+                  <h3 className="mt-4 font-black">{title}</h3>
+                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{body}</p>
+                </li>
               ))}
-            </div>
-          </section>
+            </ul>
+          </Section>
+
+          <Section id="make" title="Make a deal in three steps" intro={<>Press <b>Create deal</b> and follow the steps.</>}>
+            <ol className={`${CARD} divide-y divide-[#111318]/10`}>
+              {MAKE_STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-4 p-5 sm:p-6">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h3 className="font-black">{step.title}</h3>
+                    <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <h3 className="mt-10 text-lg font-black">Three kinds of deal</h3>
+            <ul className="mt-4 grid gap-4 sm:grid-cols-3">
+              {KINDS.map((kind) => (
+                <li key={kind.title} className={`${CARD} p-5`}>
+                  <h4 className="font-black">{kind.title}</h4>
+                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{kind.body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Each side holds up to 10 assets: any mix of NFTs, tokens and MON. To make a deal for one person, put their
+              wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b>.
+            </p>
+          </Section>
+
+          <Section
+            id="take"
+            title="Take a deal"
+            intro={<>Open a deal from <b>Deals</b>. The page shows what you get, what you give, and your next move.</>}
+          >
+            <dl className={`${CARD} divide-y divide-[#111318]/10`}>
+              {TAKE.map((row) => (
+                <div key={row.kind} className="grid gap-2 p-5 sm:grid-cols-[9rem_1fr] sm:gap-6 sm:p-6">
+                  <dt className="font-black">{row.kind}</dt>
+                  <dd className={`text-sm leading-6 ${MUTED}`}>{row.body}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
+              <ShieldIcon className="mt-0.5 size-5 shrink-0 text-[#1f7a55]" />
+              <span>
+                <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is
+                undone and everyone keeps what they had.
+              </span>
+            </p>
+          </Section>
 
           {swapIntents && (
-            <section id="settlement" className="scroll-mt-24">
-              <div className="flex items-start gap-4">
-                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">2</span>
-                <div>
-                  <p className="text-sm font-semibold text-accent">Choosing how it settles</p>
-                  <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Locked deals vs signed swaps</h2>
-                </div>
-              </div>
-              <p className="mt-5 max-w-3xl text-sm leading-6 text-muted">
-                Every deal settles one of two ways, and you choose when you create it. A <strong>locked deal</strong> puts
-                your side in the contract, so it&apos;s certain but ties up your assets. A <strong>signed swap</strong> is a
-                message you sign: free and nothing is locked, but it&apos;s only as reliable as your wallet at the moment
-                it settles. Both appear in the same list, tagged Locked or Signed.
-              </p>
-
-              <div className="mt-6 overflow-x-auto rounded-xl border border-black/10 bg-white">
-                <table className="w-full min-w-[34rem] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-black/10 text-xs uppercase tracking-wider text-muted">
-                      <th className="px-5 py-3 font-bold" />
-                      <th className="px-5 py-3 font-bold">Lock assets now</th>
-                      <th className="px-5 py-3 font-bold">Sign only</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-black/10">
-                    {COMPARE.map(([row, locked, signed]) => (
-                      <tr key={row} className="align-top">
-                        <th scope="row" className="px-5 py-4 font-semibold whitespace-nowrap">{row}</th>
-                        <td className="px-5 py-4 leading-6 text-muted">{locked}</td>
-                        <td className="px-5 py-4 leading-6 text-muted">{signed}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {(["escrow", "signed"] as const).map((mode) => (
-                  <div key={mode} className="rounded-xl border border-black/10 bg-white p-5">
-                    <h3 className="font-bold">{mode === "escrow" ? "Lock assets now" : "Sign only"}</h3>
-                    <dl className="mt-4 space-y-4">
+            <Section
+              id="settlement"
+              title="Lock your assets, or just sign"
+              intro={
+                <>
+                  Every deal settles one of two ways, and you choose when you create it. Both show up in the same list,
+                  tagged Locked or Signed.
+                </>
+              }
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                {MODES.map(({ mode, title, bestFor }) => (
+                  <div key={mode} className={`${CARD} p-5 sm:p-6`}>
+                    <h3 className="text-lg font-black">{title}</h3>
+                    <p className={`mt-1 text-sm leading-6 ${MUTED}`}>
+                      <b className="text-[#111318]">Best for:</b> {bestFor}
+                    </p>
+                    <dl className="mt-5 space-y-4 border-t border-[#111318]/10 pt-5">
                       {termsFor(mode).map((term) => (
-                        <div key={term.id} id={term.id} className="scroll-mt-24 target:rounded-lg target:bg-[#fff4cf] target:p-2 target:-m-2">
-                          <dt className="flex items-center gap-1.5 text-sm font-semibold">
-                            <span className={`font-black ${term.good ? "text-mint" : "text-warn"}`} aria-hidden>{term.good ? "+" : "−"}</span>
+                        <div
+                          key={term.id}
+                          id={term.id}
+                          className="scroll-mt-24 rounded-lg target:-m-2 target:bg-white target:p-2 target:outline-2 target:outline-accent"
+                        >
+                          <dt className="flex items-center gap-2 text-sm font-black">
+                            <span
+                              aria-hidden
+                              className={`grid size-5 place-items-center rounded-full border-2 border-[#111318] text-xs leading-none ${
+                                term.good ? "bg-mint" : "bg-peach"
+                              }`}
+                            >
+                              {term.good ? "+" : "−"}
+                            </span>
                             {term.label}
                           </dt>
-                          <dd className="mt-1 text-sm leading-6 text-muted">{term.detail}</dd>
+                          <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{term.detail}</dd>
                         </div>
                       ))}
                     </dl>
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-sm text-muted">
-                The design and settlement rules are written up in the project docs: ADR 0008 (signed swaps) and ADR 0009
-                (rings).
-              </p>
-            </section>
+
+              <details className={`${CARD} group mt-4`}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-black">
+                  Compare them side by side
+                  <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
+                </summary>
+                <div className="overflow-x-auto border-t border-[#111318]/10">
+                  <table className="w-full min-w-[34rem] text-left text-sm">
+                    <thead>
+                      <tr className="text-xs tracking-wider text-[#4e5968] uppercase">
+                        <th className="px-5 py-3" />
+                        <th className="px-5 py-3 font-black">Lock assets now</th>
+                        <th className="px-5 py-3 font-black">Sign only</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#111318]/10">
+                      {COMPARE.map(([row, locked, signed]) => (
+                        <tr key={row} className="align-top">
+                          <th scope="row" className="px-5 py-3.5 font-black whitespace-nowrap">{row}</th>
+                          <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{locked}</td>
+                          <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{signed}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </Section>
           )}
 
-          <section id="safety" className="scroll-mt-24 rounded-xl border border-black/10 bg-white p-6 sm:p-8">
-            <div className="flex items-start gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">{swapIntents ? 3 : 2}</span>
-              <div>
-                <p className="text-sm font-semibold text-accent">Before you confirm</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Safety checklist</h2>
-              </div>
-            </div>
-            <ul className="mt-7 grid gap-4 border-t border-black/10 pt-6 text-sm leading-6 text-muted sm:grid-cols-2">
-              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Confirm Monad testnet and the expected wallet.</li>
-              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Check every offered and requested token id.</li>
-              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Direct offers are visible only to their named wallet.</li>
-              <li className="flex gap-3"><span className="font-bold text-mint">✓</span>Never trust a contract address copied from an untrusted source.</li>
+          <Section id="after" title="When a deal doesn't happen">
+            <ul className="grid gap-4 sm:grid-cols-2">
+              {AFTER.filter((item) => !item.signed || swapIntents).map((item) => (
+                <li key={item.title} className={`${CARD} p-5`}>
+                  <h3 className="font-black">{item.title}</h3>
+                  <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{item.body}</p>
+                </li>
+              ))}
             </ul>
-          </section>
+          </Section>
 
-          <section id="faq" className="scroll-mt-24">
-            <div className="flex items-start gap-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-white">{swapIntents ? 4 : 3}</span>
-              <div>
-                <p className="text-sm font-semibold text-accent">Questions, answered</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Frequently asked questions</h2>
-              </div>
+          <Section id="fees" title="What it costs">
+            <div className={`${CARD} p-5 sm:p-6`}>
+              <ul className="space-y-2.5 text-sm leading-6">
+                {FEES.map((line) => (
+                  <li key={line} className="flex gap-2.5">
+                    <CheckIcon className="mt-1 size-4 shrink-0 text-[#1f7a55]" />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <dl className="mt-5 grid gap-4 border-t border-[#111318]/10 pt-5 sm:grid-cols-2">
+                {FEE_MODES.filter(([mode]) => mode !== "Signed swaps" || swapIntents).map(([mode, text]) => (
+                  <div key={mode}>
+                    <dt className="text-sm font-black">{mode}</dt>
+                    <dd className={`mt-1 text-sm leading-6 ${MUTED}`}>{text}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className={`mt-5 border-t border-[#111318]/10 pt-4 text-sm ${MUTED}`}>
+                You also pay Monad&apos;s network gas for each transaction.
+              </p>
             </div>
-            <div className="mt-7 divide-y divide-black/10 rounded-xl border border-black/10 bg-white">
-              {[...FAQ.slice(0, 1), ...(swapIntents ? SIGNED_FAQ : []), ...FAQ.slice(1)].map(([question, answer]) => (
+          </Section>
+
+          <Section id="safety" title="Before you confirm">
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {SAFETY.map((line) => (
+                <li key={line} className={`${CARD} flex gap-3 p-4 text-sm leading-6`}>
+                  <span className="grid size-5 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-mint">
+                    <CheckIcon className="size-3" />
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section id="faq" title="Questions, answered">
+            <div className={`${CARD} divide-y divide-[#111318]/10`}>
+              {FAQ_ITEMS.map(([question, answer]) => (
                 <details key={question} className="group px-5 sm:px-6">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-semibold">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-bold">
                     {question}
                     <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
                   </summary>
-                  <p className="pb-5 pr-8 text-sm leading-6 text-muted">{answer}</p>
+                  <p className={`pb-5 pr-8 text-sm leading-6 ${MUTED}`}>{answer}</p>
                 </details>
               ))}
             </div>
-          </section>
-          <p className="border-t border-black/10 pt-6 text-sm text-muted">
-            Still need help?{" "}
-            <a href="mailto:support@on-deal.app" className="font-semibold text-accent underline">
+          </Section>
+
+          <div className="page-section flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
+            <div>
+              <p className="font-black">Still stuck?</p>
+              <p className="mt-1 text-sm text-muted">Tell us what happened and the deal&apos;s link, and we&apos;ll take a look.</p>
+            </div>
+            <a href="mailto:support@on-deal.app" className="btn-secondary shrink-0">
               Contact support
             </a>
-            .
-          </p>
+          </div>
         </div>
       </div>
     </div>

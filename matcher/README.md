@@ -46,7 +46,7 @@ Bigints are decimal strings. Errors are `{ "error": code, "message": … }`. COR
 | `DELETE /intents/:hash` | `{ signature }`: the maker's EIP-712 signature over `CancelIntent(bytes32 intentHash)` in the same domain |
 | `GET /settlements` | settled cycles with their intents, newest first. `?maker=`, `?token=` (cycles naming that token), `?after=` (milliseconds: later cycles only, oldest first), `?limit=` |
 
-`hash` is the EIP-712 struct hash, the same id the contract emits in `IntentFilled`. Posting is rejected (422) unless the intent is well formed, it signs exactly the contract's fee (`wrong_fee`), the deadline is 60 s to 7 days away, the signature is one the contract would accept (non-malleable ECDSA, or ERC-1271 for contract wallets), the nonce is unused and the maker holds and has approved everything in `give` plus the fee (`fee_balance`, `fee_allowance`; the fee counts on top of any give of the same token). Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
+`hash` is the EIP-712 struct hash, the same id the contract emits in `IntentFilled`. Posting is rejected (422) unless the intent is well formed, it names the contract's fee token (`feeToken`) and signs a `maxFee` of at least the current `fee()` (`wrong_fee`; more is fine, the maker pays only the fee), the deadline is 60 s to 7 days away, the signature is one the contract would accept (non-malleable ECDSA, or ERC-1271 for contract wallets), the nonce is unused and the maker holds and has approved everything in `give` plus the fee (`fee_balance`, `fee_allowance`; the fee counts on top of any give of the same token). Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
 
 ## How matching works
 
@@ -68,7 +68,7 @@ Bigints are decimal strings. Errors are `{ "error": code, "message": … }`. COR
 ## Tests
 
 ```bash
-npm test          # 66 tests, about a minute and a half
+npm test          # 79 tests, about a minute and a half
 npm run typecheck
 ```
 
