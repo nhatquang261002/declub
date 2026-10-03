@@ -23,7 +23,7 @@ Move each to the Upstash store, and keep the browser as the working copy and the
 
 ## What it does not do
 
-- **It is not an indexer.** Only fills the app reported are recorded: a fill sent straight to the contract, or made before this shipped, is missing, and existing local records aren't uploaded (the server can't verify them, as the filler isn't in storage). Complete history needs something that reads the chain, and `ingestFills` in `lib/server/fills.ts` is the function a watcher would call: a cron route that scans new blocks (chunked to the RPC's 100-block cap) and passes each transaction hash through it. The matcher's pool already records settled signed intents separately.
+- **It is not an indexer.** Only fills the app reported are recorded: a fill sent straight to the contract, or made before this shipped, is missing, and existing local records aren't uploaded (the server can't verify them, as the filler isn't in storage). Complete history needs something that reads the chain, and `ingestFills` in `lib/server/fills.ts` is the function a watcher would call: a cron route that scans new blocks (chunked to the RPC's 100-block cap) and passes each transaction hash through it. The matcher's pool already records settled signed intents separately. The watcher is built: [ADR 0019](0019-fill-watcher.md).
 - **It doesn't prove the reporter is the filler.** It doesn't need to: the record is what the chain says, whoever reports it.
 - **Read markers aren't private from the operator.** They sit in the store beside the user's Privy id, and `DELETE /api/state` removes them.
 

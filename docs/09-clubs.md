@@ -133,10 +133,10 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 - **Client:** `web/lib/fillReport.ts` has `mayFill` (a fill: awaited, History needs it before it refetches), `mayReport` (a fill, or a V2 `createTrade`, `createTraitTrade` or `createOpenOffer`: fire-and-forget) and `reportTx`. Accepting a proposal is a fill.
 - **Signed swaps** are not in `ingestTx`, and are not copied into the store. The Club routes read the matcher's `/settlements?token=` when asked (cached 30 s per Club in the server process) and merge it with the log by event id. A settled cycle is one swap with every maker in it as a party. A pool that is down only costs the signed swaps. This needs no cursor, and it relies on the matcher keeping its history.
 - **OnDeal (v1)** isn't logged: it is Chog-only and superseded by V2.
-- **A Club added later has no past:** only events recorded while its asset was on the list count, until the watcher backfills.
+- **A Club added later has no past:** only events recorded while its asset was on the list count, until the fill watcher backfills it ([ADR 0019](adr/0019-fill-watcher.md), `FILL_WATCHER_START_BLOCK`).
 - **Matcher:** `GET /intents` and `/settlements` take `?token=`: any intent naming that address on either side, whatever the id (it matches the address inside the `intent_assets` key, so there is no schema change). `/settlements` also takes `?after=` (milliseconds; later cycles only, oldest first) for a reader that pages forward. `web/lib/pool.ts` passes `token`.
 - **Deals feed** stays client-side in v1: `useDealsV2` loads the newest 200 and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` filter them (`useClubMarket`).
-- **Limit:** a deal made outside the app is missed until the fill watcher (a cron that follows the chain head from a cursor, already on the roadmap) feeds `ingestTx`. Until then Momentum counts what the app saw.
+- **Deals made outside the app** come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)): a cron that follows the finalized head from a cursor and passes each transaction through `recordActivity`, so they count within a run's interval.
 
 ## Membership and the Holder badge
 
@@ -228,7 +228,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 4. **Built:** the Board (posts, reports, auto-hide), roles (the `owner()` claim, Moderators, handing over), bans, pins, the Club page, the moderation log and the admin tools (global bans, purge). The banner image is left for later.
 5. **Built:** the user guide ([07](07-user-guide.md#clubs-and-momentum)), the frontend notes ([05](05-frontend.md#clubs)) and this page.
 
-**Not in v1:** the fill-watcher cron, bell notifications for a Club's posts and deals, the in-app request queue, moderators chosen by holders, cross-Club reputation on the profile, Clubs for unverified assets.
+**Not in v1:** bell notifications for a Club's posts and deals, the in-app request queue, moderators chosen by holders, cross-Club reputation on the profile, Clubs for unverified assets.
 
 ## Testing
 

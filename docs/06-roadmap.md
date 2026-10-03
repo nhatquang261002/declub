@@ -42,7 +42,7 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Trade Detail (escrow panel, fill / cancel / reclaim)
 - [x] History + withdraw (local fill record until an indexer exists; see the server-side record below)
 - [x] Server-side saves: fills (receipt-verified), notification read markers and recent collections move to Upstash for signed-in users, with the browser as fallback ([ADR 0012](adr/0012-server-side-saves.md))
-- [ ] Fill watcher: a cron that scans new blocks and feeds `ingestFills`, so History also has fills the app never saw ([ADR 0012](adr/0012-server-side-saves.md#what-it-does-not-do))
+- [x] Fill watcher: `GET /api/cron/fills` (behind `CRON_SECRET`) follows the finalized head from a cursor in 100-block chunks and feeds every fill and V2 creation through the same receipt checks as a report, so History and Momentum also have deals the app never saw ([ADR 0019](adr/0019-fill-watcher.md)). Tested with a fake chain, run end to end against a local anvil and scanned live on Monad testnet. Still to do: pick a scheduler (Vercel Hobby crons run only daily) and set `FILL_WATCHER_START_BLOCK` to backfill
 - [x] `npm run build` + lint clean (Next.js 16.3.6, 7 routes)
 - [ ] Manual pass on Monad testnet (create → fill → withdraw with two wallets)
 - [ ] Rehearse the demo script ([01 · Product Spec §9](01-product-spec.md#9-demo-script))

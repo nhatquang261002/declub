@@ -264,7 +264,7 @@ The **Escrow panel** keeps the spec's picture: `Maker ✓ deposited` (always tru
 
 **Rules the UI relies on:** posts are rendered as plain text (React escapes them, nothing is linked); the Club page's links are the only anchors users supply, and they carry `rel="noopener noreferrer nofollow"`; user ids never reach the browser, so staff name people by wallet.
 
-**Reporting activity.** `lib/fillReport.ts` (`mayReport`, `reportTx`) posts a transaction hash to `/api/activity` after a fill or a V2 create, so Momentum counts the deal. It is fire-and-forget, except a fill, which History waits for.
+**Reporting activity.** `lib/fillReport.ts` (`mayReport`, `reportTx`) posts a transaction hash to `/api/activity` after a fill or a V2 create, so Momentum counts the deal. It is fire-and-forget, except a fill, which History waits for. Deals the app never reported come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)).
 
 **Not built:** an uploaded banner image (the cover is generated, and the avatar art comes from the assets list), notifications for Club posts and deals, and in-app requests for new Clubs.
 
