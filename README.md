@@ -70,9 +70,12 @@ Contracts were deployed under their old names (`ChogSwap`, `ChogSwapV2`, `ChogSw
 | [`docs/08-art-direction.md`](docs/08-art-direction.md)     | Visual language, logo and artwork                                                   |
 | [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs and Momentum: a community per verified asset (spec, roles, data, API)         |
 | [`docs/10-privy.md`](docs/10-privy.md)                     | What Privy powers, why embedded wallets are off by default, demo script and setup   |
+| [`docs/11-test-plan.md`](docs/11-test-plan.md)           | Pre-mainnet test plan: automated suites, manual testnet cases, go/no-go and canary   |
 | [`docs/adr/`](docs/adr/README.md)                          | Architecture decision records ([index](docs/adr/README.md))                         |
 | [`contracts/`](contracts/)                                 | Foundry project: `src/OnDealV2.sol`, `src/OnDealIntents.sol`, `src/FeeAdmin.sol`, `src/OnDeal.sol` (legacy v1), `src/mocks/`, tests, three deploy scripts (`Deploy`, `DeployV2`, `DeployIntents`) |
 | [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |
+| [`e2e/`](e2e/README.md)                                     | End-to-end scenarios on anvil or testnet, read-only deployment checks, web smoke tests |
+| [`scripts/test-all.sh`](scripts/test-all.sh)               | Every automated check in one command (the pre-mainnet gate)                          |
 | [`web/`](web/)                                             | Next.js app: routes, components, hooks, generated ABIs ([README](web/README.md))    |
 
 ## Stack
@@ -100,6 +103,11 @@ To deploy to Monad testnet, see [`contracts/script/README.md`](contracts/script/
 ```bash
 # Intent pool and matcher (needs Node 24+; the tests also need anvil and `forge build`)
 cd matcher && npm install && npm test
+```
+
+```bash
+# Everything at once: contracts, matcher, web (incl. build) and the e2e scenarios on anvil
+scripts/test-all.sh            # --quick, --coverage --slither --halmos; see docs/11-test-plan.md
 ```
 
 ```bash
