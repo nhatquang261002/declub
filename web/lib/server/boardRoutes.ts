@@ -53,7 +53,7 @@ const REFUSALS: Record<string, [number, string]> = {
   archived: [409, "This Club is archived: it stays readable, but it isn’t taking changes."],
   not_member: [403, "Join the Club first."],
   banned: [403, "You can’t do that in this Club."],
-  no_profile: [403, "Share a verified X or Discord profile on your Account page first, so people can see who is posting."],
+  no_profile: [403, "Turn on “Show my profile to other traders” on your Account page first (with X or Discord linked), so people can see who is posting."],
   holders_only: [403, "The Owner has limited posting to holders."],
   bad_kind: [400, "A post is a note or a “looking for”."],
   empty: [400, "Write something first."],

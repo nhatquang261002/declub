@@ -47,7 +47,7 @@ const MOMENTUM_RULES = [
 ];
 
 const POST_RULES = [
-  "Be a member, and share a verified X or Discord profile on the Account page.",
+  "Be a member, link an X or Discord account, and turn on “Show my profile to other traders” on the Account page.",
   "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
   `Plain text, up to ${POST_MAX} characters. No formatting, and links in the text aren't clickable.`,
   "A note can share one X post, shown as a card. A “Looking for” post can attach a deal or a signed swap.",
@@ -95,7 +95,7 @@ const FAQ: ReadonlyArray<[string, string]> = [
   ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member holding the asset when the epoch is built. Your share waits under Rewards until you claim it."],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections and memecoins on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club."],
-  ["Why can't I post?", "You need to be a member and to have shared a verified X or Discord profile. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
+  ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
   ["How does someone become the Owner?", "The wallet that the token contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
 ];

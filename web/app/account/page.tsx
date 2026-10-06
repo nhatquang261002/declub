@@ -266,7 +266,7 @@ function ShareProfile() {
       ) : available ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm text-muted">
-            Would show <span className="font-semibold text-white">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
+            Would show <span className="font-semibold text-[#111318]">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
             every wallet linked to this sign-in.
           </span>
           <button className="btn-primary" disabled={busy} onClick={share}>

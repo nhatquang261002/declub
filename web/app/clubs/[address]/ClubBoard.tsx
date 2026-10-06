@@ -194,7 +194,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         <p className="text-xs text-muted">{active.description}</p>
         {me.member && !archived && (
           <p className="text-xs text-muted">
-            Posting needs a verified X or Discord profile on your{" "}
+            Posting needs a linked X or Discord account with “Show my profile” turned on in your{" "}
             <Link href="/account" className="font-bold underline">
               Account
             </Link>
