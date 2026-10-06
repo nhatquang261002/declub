@@ -190,6 +190,7 @@ const MODES = [
 
 /** Only shown where signed swaps exist. */
 const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
+  ["Where are my assets in a signed swap?", "They never leave your wallet. They only move at the moment a match settles, and only if they are still there."],
   ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post."],
   ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
   ["Can I sign several swaps with the same NFT?", "No. Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool also takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives."],
@@ -205,7 +206,7 @@ const HANDLE_FAQ: [string, string] = [
 const FAQ: ReadonlyArray<[string, string]> = [
   ["What is DeClub?", "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets."],
   ["Do I have to trust the other person?", "No. The swap is atomic: every transfer in it succeeds, or the whole transaction is undone. The other side can never take your assets without sending theirs."],
-  ["Where are my assets while a deal is open?", "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it. In a signed swap, they never leave your wallet."],
+  ["Where are my assets while a deal is open?", "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it."],
   ["Why do I need to approve DeClub?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
   ["What is an open offer?", "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders."],
   ["Is this mainnet?", NETWORK.mainnet

@@ -4,6 +4,7 @@ import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, Shi
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR, REPORTS_TO_HIDE } from "@/lib/clubPosts";
 import { PRIVY_APP_ID } from "@/lib/config";
+import { swapIntents } from "@/lib/contracts";
 import { LENSES } from "@/lib/lenses";
 import { MOMENTUM } from "@/lib/momentum";
 import { REWARDS, percent } from "@/lib/rewards";
@@ -24,7 +25,7 @@ const SECTIONS: GuideSection[] = [
 ];
 
 const TABS = [
-  { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals and signed swaps for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
+  { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals{swapIntents ? " and signed swaps" : ""} for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
   { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies and likes under them. Order them by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
   { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by Momentum. <b>Follow</b> the ones you trust.</> },
   { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim. <b>Share the week</b> posts the recap to X.</> },
@@ -50,7 +51,7 @@ const POST_RULES = [
   "Be a member, link an X or Discord account, and turn on “Show my profile to other traders” on the Account page.",
   "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
   `Plain text, up to ${POST_MAX} characters. No formatting, and links in the text aren't clickable.`,
-  "A note can share one X post, shown as a card. A “Looking for” post can attach a deal or a signed swap.",
+  `A note can share one X post, shown as a card. A “Looking for” post can attach a deal${swapIntents ? " or a signed swap" : ""}.`,
   `One post every ${POST_COOLDOWN_SEC} seconds, and ${POSTS_PER_HOUR} an hour in each Club.`,
   "Delete your own posts whenever you like.",
 ];
@@ -59,8 +60,8 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
   {
     icon: <CrownIcon className="size-4" />,
     role: "Owner",
-    who: "The wallet the token contract names as its owner, once it presses Claim. Or someone the app's admins picked.",
-    can: `Edits the description and up to ${MAX_LINKS} links, pins up to ${MAX_PINNED} posts, appoints up to ${MAX_MODERATORS} moderators, can limit posting to Holders, and can hand the Club to another member.`,
+    who: "The wallet the collection's contract names as its owner, once it presses Claim. Or someone the app's admins picked.",
+    can: `Edits the description and up to ${MAX_LINKS} links, links the project's X account, sets whether coin holders get the badge, pins up to ${MAX_PINNED} posts, appoints up to ${MAX_MODERATORS} moderators, can limit posting to Holders, collects the Club fund, and can hand the Club to another member.`,
   },
   {
     icon: <ShieldIcon className="size-4" />,
@@ -92,11 +93,11 @@ const SAFETY = [
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
   ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} members who hold the most of the collection when the epoch is built, one share per NFT (a tie goes to whoever joined first); ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it.`],
+  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
-  ["How does someone become the Owner?", "The wallet that the token contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
+  ["How does someone become the Owner?", "The wallet that the collection's contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
 ];
 
