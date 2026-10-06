@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pills } from "@/components/Pills";
-import { LinkIcon } from "@/components/Icons";
+import { LinkIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostItem } from "@/components/PostItem";
 import { WalletAvatar } from "@/components/WalletAvatar";
@@ -17,7 +17,7 @@ import { LENSES, type LensId } from "@/lib/lenses";
 import { Empty, Loading } from "./parts";
 
 const KINDS: { value: PostKind; label: string; hint: string }[] = [
-  { value: "note", label: "Note", hint: "Say something to the Club" },
+  { value: "note", label: "Note", hint: "Say something to the Club, or share an X post" },
   { value: "looking", label: "Looking for", hint: "What you want to buy or trade for" },
 ];
 
@@ -41,7 +41,7 @@ function CharRing({ length }: { length: number }) {
   );
 }
 
-function Composer({ token, wallet }: { token: string; wallet?: string }) {
+function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xHint?: string }) {
   const { post } = useClubActions(token);
   const [kind, setKind] = useState<PostKind>("note");
   const [text, setText] = useState("");
@@ -55,7 +55,7 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         post.mutate(
-          { kind, text, wallet, ...(kind === "looking" && link.trim() ? { link: link.trim() } : {}) },
+          { kind, text, wallet, ...(link.trim() ? { link: link.trim() } : {}) },
           { onSuccess: () => (setText(""), setLink("")) },
         );
       }}
@@ -72,7 +72,7 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
                 type="button"
                 aria-pressed={kind === k.value}
                 className={`chip px-3 py-1 text-xs ${kind === k.value ? "chip-peach" : "hover:bg-white"}`}
-                onClick={() => setKind(k.value)}
+                onClick={() => (setKind(k.value), setLink(""))}
               >
                 {k.label}
               </button>
@@ -89,6 +89,26 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
             placeholder={kind === "looking" ? "WTB any Chog with a crown, 2 MON over floor" : hint}
             onChange={(event) => setText(event.target.value)}
           />
+          {kind === "note" && (
+            <div className="flex flex-col gap-1.5">
+              <label className="relative">
+                <span className="sr-only">An X post to share (optional)</span>
+                <XLogoIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
+                <input
+                  className="input border-2 border-[#111318]/25 bg-white pl-9 focus:border-[#111318]"
+                  value={link}
+                  inputMode="url"
+                  placeholder="Share an X post: paste its link (optional)"
+                  onChange={(event) => setLink(event.target.value)}
+                />
+              </label>
+              {xHint && (
+                <p className="text-xs text-muted">
+                  Your own X post counts for the Club, if you hold its asset, when it {xHint}. One a day.
+                </p>
+              )}
+            </div>
+          )}
           {kind === "looking" && (
             <label className="relative">
               <span className="sr-only">Deal id or signed-swap hash (optional)</span>
@@ -160,7 +180,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         holdersOnly ? (
           <CantPost token={token} symbol={symbol} reason="holders" />
         ) : (
-          <Composer token={token} wallet={me.wallet} />
+          <Composer token={token} wallet={me.wallet} xHint={page?.x?.hint} />
         )
       ) : (
         <CantPost token={token} symbol={symbol} reason="join" />

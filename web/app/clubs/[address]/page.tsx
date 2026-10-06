@@ -7,7 +7,7 @@ import { isAddress } from "viem";
 import { Alert } from "@/components/Alert";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
-import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { formatMomentum, HeatMeter, MomentumChange, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { Tooltip } from "@/components/Tooltip";
@@ -163,8 +163,21 @@ function Club({ entry }: { entry: ClubEntry }) {
           </div>
 
           {page?.description && <p className="mt-5 max-w-3xl text-[0.95rem] leading-7 break-words whitespace-pre-wrap">{page.description}</p>}
-          {(page?.links.length ?? 0) > 0 && (
+          {((page?.links.length ?? 0) > 0 || (page?.x?.accounts.length ?? 0) > 0) && (
             <ul className="mt-3 flex flex-wrap gap-2">
+              {page?.x?.accounts.map((a) => (
+                <li key={a.handle}>
+                  <a
+                    href={`https://x.com/${a.handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="chip py-1"
+                    title={`The project’s own X account: the Owner linked it with a post from @${a.handle}.`}
+                  >
+                    <XLogoIcon className="size-3" />@{a.handle} ✓
+                  </a>
+                </li>
+              ))}
               {page!.links.map((href) => (
                 <li key={href}>
                   <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="chip py-1">
@@ -199,8 +212,18 @@ function Club({ entry }: { entry: ClubEntry }) {
           <Stat label="Members" hint={club ? `${holders.toLocaleString()} ${holders === 1 ? "holder" : "holders"}` : undefined}>
             {club ? club.members.toLocaleString() : "…"}
           </Stat>
-          <Stat label="Swaps · 7 days">{stats ? stats.completed7d.toLocaleString() : "…"}</Stat>
-          <Stat label="New deals · 7 days">{stats ? stats.created7d.toLocaleString() : "…"}</Stat>
+          <Stat label="Swaps · 7 days" hint={stats ? `${stats.created7d.toLocaleString()} new ${stats.created7d === 1 ? "deal" : "deals"}` : undefined}>
+            {stats ? stats.completed7d.toLocaleString() : "…"}
+          </Stat>
+          <Stat
+            label={
+              <Tooltip content="Holders’ own X posts about this Club, shared on its Board. They count toward Momentum and the Holder bonus.">
+                <span className="uppercase underline decoration-dotted underline-offset-2">X posts · 7 days</span>
+              </Tooltip>
+            }
+          >
+            {stats ? (stats.xShares7d ?? 0).toLocaleString() : "…"}
+          </Stat>
           <Stat label="Traders · 30 days">{stats ? stats.traders30d.toLocaleString() : "…"}</Stat>
           <Stat label="Heat">{stats ? <HeatMeter value={stats.momentum} /> : "…"}</Stat>
         </dl>

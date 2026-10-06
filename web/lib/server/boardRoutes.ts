@@ -22,6 +22,10 @@ import {
   type Deps as BoardDeps,
 } from "./board";
 import { adminIds, loadProfile, loadRoles, readLog } from "./clubState";
+import { signalsOf, startXLink, unlinkX, verifyXLink } from "./xPosts";
+import { signalsHint } from "../xPosts";
+import type { ClubProfile } from "../clubPosts";
+import type { ClubEntry } from "../verifiedAssets";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { getMember } from "./members";
 import { clubOf, type Ctx } from "./memberRoutes";
@@ -54,10 +58,18 @@ const REFUSALS: Record<string, [number, string]> = {
   bad_kind: [400, "A post is a note or a “looking for”."],
   empty: [400, "Write something first."],
   too_long: [400, "Posts are at most 280 characters."],
-  bad_link: [400, "Link a deal id or a signed-swap hash, and only on a “looking for” post."],
+  bad_link: [400, "A “looking for” post links a deal id or a signed-swap hash; a note links an X post."],
   link_not_found: [404, "That deal or signed swap wasn’t found."],
   link_mismatch: [422, "That deal or signed swap doesn’t involve this Club’s asset."],
   link_unavailable: [503, "Couldn’t check that link right now. Try again."],
+  x_not_found: [404, "That X post wasn’t found, or it isn’t public."],
+  x_unavailable: [503, "Couldn’t reach X to read that post. Try again."],
+  bad_handle: [400, "Give an X handle: up to 15 letters, digits or _."],
+  already_linked: [409, "That X account is already linked."],
+  too_many_accounts: [409, "A Club links at most 3 X accounts."],
+  xlink_expired: [409, "Start again: that code has expired, or none was asked for this account."],
+  xlink_mismatch: [422, "That post isn’t from that account, or it doesn’t have the code."],
+  xlink_unavailable: [503, "Couldn’t reach X to read that post. Try again."],
   cooldown: [429, "Wait a few seconds between posts."],
   rate_limited: [429, "You’ve reached the limit for now. Try again later."],
   unsigned: [400, "Sign the post with your wallet first."],
@@ -139,7 +151,8 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const body = await bodyOf(request);
       // Every post is signed by its author's Club wallet (ADR 0023), so it can be exported and checked.
       const result = await createSignedPost(f.store, f.entry, f.user.id, { message: parsePostMessage(body.message), signature: body.signature }, deps);
-      return result.ok ? json({ enabled: true, post: result.post }, 201) : refuse(result.reason);
+      // `xShare` tells the author whether their X post counted, and if not, why.
+      return result.ok ? json({ enabled: true, post: result.post, ...(result.xShare ? { xShare: result.xShare } : {}) }, 201) : refuse(result.reason);
     },
   };
 }
@@ -261,6 +274,17 @@ export function rolesHandler(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
+/** The profile as the API serves it: what the Owner set, and the Club's X signals (ADR 0024). */
+function publicProfile(entry: ClubEntry, profile: ClubProfile) {
+  const { description, links, holdersOnlyPosts } = profile;
+  const x = {
+    accounts: (profile.x?.accounts ?? []).map(({ handle, proof, linkedAt }) => ({ handle, proof, linkedAt })),
+    tags: profile.x?.tags ?? [],
+    hint: signalsHint(signalsOf(entry, profile)),
+  };
+  return { description, links, holdersOnlyPosts, x };
+}
+
 /** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */
 export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
@@ -270,10 +294,10 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
       const store = getStore();
       if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
       if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-      const { description, links, holdersOnlyPosts } = await loadProfile(store, entry.address);
+      const profile = await loadProfile(store, entry.address);
       const roles = await loadRoles(store, entry.address);
       return Response.json(
-        { enabled: true, description, links, holdersOnlyPosts, hasOwner: !!roles.owner },
+        { enabled: true, ...publicProfile(entry, profile), hasOwner: !!roles.owner },
         { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
       );
     },
@@ -281,11 +305,37 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-mod");
       if (f instanceof Response) return f;
       const result = await updateProfile(f.store, f.entry, f.actor, await bodyOf(request), deps);
-      if (result.ok) {
-        const { description, links, holdersOnlyPosts } = result.profile;
-        return json({ enabled: true, description, links, holdersOnlyPosts });
+      return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason, result.message);
+    },
+  };
+}
+
+/**
+ * POST /api/clubs/[token]/x  { action: "start", handle } → the code to post from that account;
+ *                            { action: "verify", handle, url } → links it, if the post has the code.
+ * DELETE /api/clubs/[token]/x  { handle } → unlinks it. The Owner or an app admin (ADR 0024).
+ */
+export function xLinkHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async POST(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      if (body.action === "start") {
+        const result = await startXLink(f.store, f.entry, f.actor, body.handle, deps);
+        return result.ok ? json({ enabled: true, handle: result.handle, code: result.code, text: result.text, until: result.until }) : refuse(result.reason);
       }
-      return refuse(result.reason, result.message);
+      if (body.action === "verify") {
+        const result = await verifyXLink(f.store, f.entry, f.actor, { handle: body.handle, url: body.url }, deps);
+        return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason);
+      }
+      return refuse("invalid", "Send { action: \"start\", handle } or { action: \"verify\", handle, url }.");
+    },
+    async DELETE(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await unlinkX(f.store, f.entry, f.actor, (await bodyOf(request)).handle, deps);
+      return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason);
     },
   };
 }

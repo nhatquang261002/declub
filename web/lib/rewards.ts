@@ -1,5 +1,8 @@
 import { encodeAbiParameters, getAddress, keccak256, type Address, type Hex } from "viem";
+import { toScored, type ActivityEvent } from "./clubs";
 import { REWARDS_EPOCH_SECONDS, REWARDS_GENESIS } from "./config";
+import { MOMENTUM, memberScore, score } from "./momentum";
+import { strengthFactor, type SignalStrength } from "./xPosts";
 
 /**
  * Club Rewards (ADR 0022, docs/09-clubs.md#rewards): each epoch, a share of the protocol fees a
@@ -15,6 +18,19 @@ export const REWARDS = {
   protocolBps: 4_000,
   /** Shares for an ERC-20 Club without `minHolding`: one per whole token (18 decimals). */
   defaultCoinUnit: 10n ** 18n,
+  /**
+   * The Holder bonus (ADR 0024): a Holder's shares count up to this much more (basis points) for
+   * their activity in the Club during the epoch. Holding stays the base: a quiet Holder keeps theirs.
+   */
+  maxBonusBps: 5_000,
+  /** Activity points that earn the whole bonus: about five swaps, or a week of well-received X posts. */
+  fullBonusPoints: 50,
+  /** Points per counted X share (halved when it's only weakly about the Club): Momentum's weight. */
+  xShareBase: MOMENTUM.xShareWeight,
+  /** Points per doubling of an X share's engagement (likes + reposts + quotes + replies). */
+  reachWeight: 2,
+  /** At most this many reach points per member per Club per epoch, so a viral post can't take it all. */
+  reachCapPerEpoch: 30,
 } as const;
 
 export const percent = (bps: number) => `${bps / 100}%`;
@@ -52,6 +68,64 @@ export function rewardLeaf(chainId: number, contract: Address, epoch: number, ac
 
 // ─────────────────────────────────────────────────────────────── the split
 
+// ─────────────────────────────────────────────────────────────── the Holder bonus
+
+/** One counted X share's reach, read from the X API before the epoch is built (lib/server/xReach.ts). */
+export type ReachEntry = {
+  club: string;
+  /** The member's Club wallet when they shared it. */
+  wallet: string;
+  /** Still their own post and still about the Club. A deleted post isn't. */
+  ok: boolean;
+  strength: SignalStrength | null;
+  /** Likes + reposts + quotes + replies. */
+  engagement: number;
+  reason?: "deleted" | "not_author" | "no_signal" | "no_account";
+};
+
+/** Every counted X share's reach for an epoch, by X post id. Published with the epoch. */
+export type ReachRecord = {
+  n: number;
+  /** Unix seconds. */
+  collectedAt: number;
+  /** False without X_BEARER_TOKEN: X shares then count their base points, with no reach. */
+  available: boolean;
+  posts: Record<string, ReachEntry>;
+};
+
+export type Activity = { trading: number; x: number; points: number; bonusBps: number };
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * A member's activity in a Club over an epoch (its events only, `end` exclusive), in full with no
+ * decay: trading as Momentum weighs it, plus their X shares, each worth `xShareBase` and its reach.
+ * The reach read has the last word on an X share: one that was deleted, or edited so it's no longer
+ * about the Club, counts for nothing.
+ */
+export function activityPoints(events: readonly ActivityEvent[], reach: ReachRecord | null, wallets: readonly string[], end: number): Activity {
+  const own = new Set(wallets.map((w) => w.toLowerCase()));
+  const trades = events.filter((e) => e.kind !== "xshare").map(toScored);
+  const trading = memberScore(score(trades, end, { decay: false, windowSec: Number.MAX_SAFE_INTEGER }), [...own]);
+
+  let base = 0;
+  let reached = 0;
+  for (const e of events) {
+    if (e.kind !== "xshare" || !own.has(e.parties[0] ?? "")) continue;
+    const read = reach?.available ? reach.posts[e.deal] : undefined;
+    const factor = read ? (read.ok ? strengthFactor(read.strength) : 0) : (e.weight ?? 1);
+    base += REWARDS.xShareBase * factor;
+    if (read?.ok) reached += REWARDS.reachWeight * Math.log2(1 + read.engagement) * factor;
+  }
+  const x = base + Math.min(REWARDS.reachCapPerEpoch, reached);
+  const points = trading + x;
+  return { trading: round2(trading), x: round2(x), points: round2(points), bonusBps: bonusBps(points) };
+}
+
+/** The bonus for `points`, in basis points: linear up to `fullBonusPoints`, then capped. */
+export const bonusBps = (points: number) =>
+  points <= 0 ? 0 : Math.floor(REWARDS.maxBonusBps * Math.min(1, points / REWARDS.fullBonusPoints));
+
 /** One Club's inputs to an epoch. Amounts are wei. */
 export type ClubInput = {
   /** The Club's own asset, lowercase. */
@@ -60,13 +134,14 @@ export type ClubInput = {
   fees: bigint;
   /** What earlier epochs couldn't pay out and roll in now. */
   carried: { holders: bigint; fund: bigint };
-  /** Each Holder member's display wallet and its shares. Zero-share members are left out. */
-  holders: { wallet: string; shares: bigint }[];
+  /** Each Holder member's display wallet, its shares and its bonus. Zero-share members are left out. */
+  holders: { wallet: string; shares: bigint; bonusBps?: number; points?: number }[];
   /** Where the Club fund goes, or null with no Owner. */
   owner: string | null;
 };
 
-export type Payout = { club: string; kind: "holder" | "fund"; amount: bigint };
+/** A holder payout also says how it was worked out: the shares held and the bonus they earned. */
+export type Payout = { club: string; kind: "holder" | "fund"; amount: bigint; shares?: bigint; bonusBps?: number; points?: number };
 
 export type ClubSplit = {
   club: string;
@@ -90,19 +165,33 @@ export function pools(fees: bigint, carried: { holders: bigint; fund: bigint }) 
   };
 }
 
-/** Splits one Club's pools between its Holders (by shares) and its Owner. Integer wei throughout. */
+/**
+ * Splits one Club's pools between its Holders and its Owner. A Holder's weight is their shares
+ * times (1 + bonus): holding is the base, activity adds up to `maxBonusBps`. Integer wei throughout;
+ * rounding dust rolls into the next epoch.
+ */
 export function splitClub(input: ClubInput): ClubSplit {
   const { holderPool, fundPool } = pools(input.fees, input.carried);
   const holders = input.holders.filter((h) => h.shares > 0n);
-  const totalShares = holders.reduce((sum, h) => sum + h.shares, 0n);
+  const bonus = (h: ClubInput["holders"][number]) => Math.min(REWARDS.maxBonusBps, Math.max(0, Math.floor(h.bonusBps ?? 0)));
+  const weightOf = (h: ClubInput["holders"][number]) => h.shares * BigInt(10_000 + bonus(h));
+  const totalWeight = holders.reduce((sum, h) => sum + weightOf(h), 0n);
   const payouts: ClubSplit["payouts"] = [];
 
   let paidHolders = 0n;
-  if (totalShares > 0n) {
+  if (totalWeight > 0n) {
     for (const h of holders) {
-      const amount = (holderPool * h.shares) / totalShares;
+      const amount = (holderPool * weightOf(h)) / totalWeight;
       if (amount === 0n) continue;
-      payouts.push({ club: input.club, kind: "holder", wallet: h.wallet.toLowerCase(), amount });
+      payouts.push({
+        club: input.club,
+        kind: "holder",
+        wallet: h.wallet.toLowerCase(),
+        amount,
+        shares: h.shares,
+        bonusBps: bonus(h),
+        ...(h.points !== undefined ? { points: h.points } : {}),
+      });
       paidHolders += amount;
     }
   }
@@ -132,7 +221,8 @@ export function leavesOf(splits: readonly ClubSplit[]): Leaf[] {
     for (const p of split.payouts) {
       const leaf = byWallet.get(p.wallet) ?? { account: getAddress(p.wallet), amount: 0n, breakdown: [] };
       leaf.amount += p.amount;
-      leaf.breakdown.push({ club: p.club, kind: p.kind, amount: p.amount });
+      const { club, kind, amount, shares, points } = p;
+      leaf.breakdown.push({ club, kind, amount, ...(shares !== undefined ? { shares, bonusBps: p.bonusBps } : {}), ...(points !== undefined ? { points } : {}) });
       byWallet.set(p.wallet, leaf);
     }
   }
@@ -162,8 +252,13 @@ export type EpochRecord = {
     carry: { holders: string; fund: string };
     holderCount: number;
   }[];
-  leaves: { account: Address; amount: string; proof: Hex[]; breakdown: { club: string; kind: Payout["kind"]; amount: string }[] }[];
+  leaves: { account: Address; amount: string; proof: Hex[]; breakdown: PublishedPayout[] }[];
+  /** The X reach the Holder bonus used (ADR 0024), or null when none was read. */
+  reach?: ReachRecord | null;
 };
+
+/** A payout as published: amounts as decimal strings. */
+export type PublishedPayout = { club: string; kind: Payout["kind"]; amount: string; shares?: string; bonusBps?: number; points?: number };
 
 /** A claimable leaf as `/api/rewards/me` serves it. */
 export type ClaimableLeaf = {
@@ -171,5 +266,5 @@ export type ClaimableLeaf = {
   account: Address;
   amount: string;
   proof: Hex[];
-  breakdown: { club: string; kind: Payout["kind"]; amount: string }[];
+  breakdown: PublishedPayout[];
 };

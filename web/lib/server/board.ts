@@ -12,7 +12,7 @@ import {
   REPORTS_TO_HIDE,
   checkProfileEdit,
   cleanText,
-  parseLink,
+  linkFor,
   pinnedFirst,
   viewPost,
   type ClubProfile,
@@ -52,6 +52,8 @@ import {
 } from "./clubState";
 import { allRows, getMember, leaveClub, memberKey, membersKey, sharedWallets, userClubsKey } from "./members";
 import { withinLimit, type Store } from "./store";
+import { oembedLookup, purgeXShares, recordXShare, removeXShare, setXShareHidden, type XDeps, type XShareVerdict } from "./xPosts";
+import type { XCard } from "../xPosts";
 
 /**
  * The Club's board and its staff (ADR 0016, docs/09-clubs.md): posts, reports, bans, roles, the
@@ -59,7 +61,7 @@ import { withinLimit, type Store } from "./store";
  * rules run against an in-memory store in tests. Each refusal is a reason code the routes map to
  * a status and a sentence.
  */
-export type Deps = {
+export type Deps = XDeps & {
   /** App admins' user ids; defaults to CLUB_ADMIN_USER_IDS. */
   admins?: ReadonlySet<string>;
   /** Epoch ms. */
@@ -98,13 +100,15 @@ const log = (store: Store, entry: AssetEntry, actor: Actor, action: string, targ
   appendLog(store, entry.address, { actor: actor.wallet, action, ...(target ? { target } : {}), ...(detail ? { detail } : {}) });
 
 // ---------------------------------------------------------------------------------------------
-// Links: a "Looking for" post may point at a deal or a signed swap, which must name the Club's token.
+// Links: a "Looking for" post may point at a deal or a signed swap, which must name the Club's token;
+// a note may share an X post (ADR 0024), which must exist and be public.
 
 const tokensOf = (assets: readonly { kind: string; token?: string }[]) =>
   assets.filter((a) => a.kind !== "native" && a.token).map((a) => a.token!.toLowerCase());
 
 /** The real lookup: V2's `getTrade`, or the pool's intent. */
 export async function resolveLink(link: PostLink): Promise<string[] | null> {
+  if (link.kind === "x") return null;
   if (link.kind === "intent") {
     const found = await getIntent(link.hash as `0x${string}`);
     return found ? tokensOf([...found.intent.give, ...found.intent.want]) : null;
@@ -126,7 +130,7 @@ export async function resolveLink(link: PostLink): Promise<string[] | null> {
 
 export type PostRefusal =
   | "archived" | "not_member" | "banned" | "no_profile" | "holders_only" | "bad_kind" | "empty" | "too_long"
-  | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "cooldown" | "rate_limited";
+  | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable" | "cooldown" | "rate_limited";
 
 export type PostInput = {
   kind: unknown;
@@ -142,7 +146,7 @@ export async function createPost(
   userId: string,
   input: PostInput,
   deps: Deps = {},
-): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: PostRefusal }> {
+): Promise<{ ok: true; post: PublicPost; xShare?: XShareVerdict } | { ok: false; reason: PostRefusal }> {
   const token = entry.address.toLowerCase();
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   const row = await getMember(store, token, userId);
@@ -161,18 +165,31 @@ export async function createPost(
   if (!text.ok) return { ok: false, reason: text.reason };
 
   let link: PostLink | undefined;
+  let card: XCard | undefined;
   if (input.link !== undefined && input.link !== null && input.link !== "") {
-    const parsed = kind === "looking" ? parseLink(input.link) : null;
+    const parsed = linkFor(kind, input.link);
     if (!parsed) return { ok: false, reason: "bad_link" };
-    let tokens: string[] | null;
-    try {
-      tokens = await (deps.resolveLink ?? resolveLink)(parsed);
-    } catch {
-      return { ok: false, reason: "link_unavailable" };
+    if (parsed.kind === "x") {
+      // Any public X post may be shared; whether it counts is decided below (`recordXShare`).
+      let found: XCard | null;
+      try {
+        found = await (deps.lookupX ?? oembedLookup)(parsed.id);
+      } catch {
+        return { ok: false, reason: "x_unavailable" };
+      }
+      if (!found) return { ok: false, reason: "x_not_found" };
+      card = found;
+    } else {
+      let tokens: string[] | null;
+      try {
+        tokens = await (deps.resolveLink ?? resolveLink)(parsed);
+      } catch {
+        return { ok: false, reason: "link_unavailable" };
+      }
+      if (!tokens) return { ok: false, reason: "link_not_found" };
+      // Either asset of a paired Club will do: a CHOG deal belongs on the Chogs' board.
+      if (!clubAssets(entry).some((asset) => tokens.includes(asset.address.toLowerCase()))) return { ok: false, reason: "link_mismatch" };
     }
-    if (!tokens) return { ok: false, reason: "link_not_found" };
-    // Either asset of a paired Club will do: a CHOG deal belongs on the Chogs' board.
-    if (!clubAssets(entry).some((asset) => tokens.includes(asset.address.toLowerCase()))) return { ok: false, reason: "link_mismatch" };
     link = parsed;
   }
 
@@ -180,8 +197,11 @@ export async function createPost(
   if (!(await withinLimit(store, `club-post-cd:${token}`, userId, 1, POST_COOLDOWN_SEC))) return { ok: false, reason: "cooldown" };
   if (!(await withinLimit(store, `club-post-hr:${token}`, userId, POSTS_PER_HOUR, 3600))) return { ok: false, reason: "rate_limited" };
 
+  const id = input.signed ? postId(input.signed.message) : randomUUID().replaceAll("-", "");
+  // A shared X post counts toward the Club's activity only if it passes every X-share rule.
+  const xShare = card ? await recordXShare(store, entry, { userId, row, postId: id, card }, deps) : undefined;
   const post: StoredPost = {
-    id: input.signed ? postId(input.signed.message) : randomUUID().replaceAll("-", ""),
+    id,
     userId,
     wallet: row.displayWallet,
     kind,
@@ -189,13 +209,14 @@ export async function createPost(
     ...(link ? { link } : {}),
     at: nowOf(deps),
     ...(input.signed ? { signed: { signature: input.signed.signature, at: input.signed.message.at } } : {}),
+    ...(card && xShare ? { x: { ...card, own: xShare.own, counted: xShare.counted } } : {}),
   };
   await store.set(postKey(token, post.id), post);
   await store.rank(postsKey(token), [{ member: post.id, score: post.at }], POSTS_KEPT);
   if (post.signed) {
     await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
   }
-  return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false) };
+  return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false), ...(xShare ? { xShare } : {}) };
 }
 
 export type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
@@ -225,7 +246,7 @@ export async function createSignedPost(
   userId: string,
   body: { message: PostMessage | null; signature: unknown },
   deps: Deps = {},
-): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: SignedPostRefusal }> {
+): Promise<{ ok: true; post: PublicPost; xShare?: XShareVerdict } | { ok: false; reason: SignedPostRefusal }> {
   const { message, signature } = body;
   if (!message || typeof signature !== "string" || !/^0x[0-9a-fA-F]+$/.test(signature)) return { ok: false, reason: "unsigned" };
   const token = entry.address.toLowerCase();
@@ -235,7 +256,7 @@ export async function createSignedPost(
   if (!text.ok) return { ok: false, reason: text.reason };
   if (text.text !== message.text) return { ok: false, reason: "not_clean" };
   if (message.link !== "") {
-    const parsed = message.kind === "looking" ? parseLink(message.link) : null;
+    const parsed = linkFor(message.kind, message.link);
     if (!parsed) return { ok: false, reason: "bad_link" };
     if (linkString(parsed) !== message.link) return { ok: false, reason: "not_clean" };
   }
@@ -370,6 +391,7 @@ export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, 
     if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
   }
   await store.del(postKey(token, id), reportsKey(token, id), countedReportsKey(token, id));
+  if (post.link?.kind === "x") await removeXShare(store, token, post.link.id, id);
   await unpin(store, token, id);
   if (!own) await log(store, entry, actor, "delete_post", id);
   return { ok: true };
@@ -409,6 +431,7 @@ export async function reportPost(
   const counted = await store.countMembers(countedReportsKey(token, id));
   if (counted >= REPORTS_TO_HIDE && !post.hidden && !authorStaff) {
     await store.set(postKey(token, id), { ...post, reported: true, hidden: "reports" } satisfies StoredPost);
+    if (post.link?.kind === "x") await setXShareHidden(store, token, post.link.id, id, true);
     await appendLog(store, token, { actor: "reports", action: "auto_hide", target: id, detail: `${counted} reports` }, nowOf(deps));
     return { ok: true, hidden: true };
   }
@@ -443,6 +466,7 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
     await store.set(postKey(token, id), visible);
     await store.del(reportsKey(token, id), countedReportsKey(token, id));
   }
+  if (post.link?.kind === "x") await setXShareHidden(store, token, post.link.id, id, hide);
   await log(store, entry, actor, hide ? "hide_post" : "restore_post", id);
   return { ok: true };
 }
@@ -626,7 +650,13 @@ export async function updateProfile(store: Store, entry: AssetEntry, actor: Acto
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   const checked = checkProfileEdit(input);
   if (!checked.ok) return { ok: false, reason: "invalid", message: checked.reason };
-  const profile = { ...(await loadProfile(store, token)), ...checked.edit };
+  const { xTags, ...edit } = checked.edit;
+  const current = await loadProfile(store, token);
+  const profile: ClubProfile = {
+    ...current,
+    ...edit,
+    ...(xTags ? { x: { accounts: current.x?.accounts ?? [], tags: xTags } } : {}),
+  };
   await saveProfile(store, token, profile);
   await log(store, entry, actor, "edit_profile", undefined, Object.keys(checked.edit).join(", "));
   return { ok: true, profile };
@@ -652,5 +682,6 @@ export async function purgeClub(store: Store, token: string): Promise<PurgeCount
   const postIds = await store.ranked(postsKey(lower), POSTS_KEPT);
   await store.del(...postIds.flatMap((id) => [postKey(lower, id), reportsKey(lower, id), countedReportsKey(lower, id)]), postsKey(lower));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
+  await purgeXShares(store, lower);
   return { members: ids.length, posts: postIds.length };
 }

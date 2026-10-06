@@ -53,7 +53,7 @@ function TopTraders({ token, onSeeAll }: { token: string; onSeeAll: () => void }
   const top = (view?.members ?? []).filter((m) => m.momentum > 0).slice(0, TOP);
   return (
     <Panel
-      title="Top traders"
+      title="Most active"
       action={
         (view?.total ?? 0) > 0 && (
           <button type="button" className="text-xs font-bold text-[#a9282f] hover:underline" onClick={onSeeAll}>

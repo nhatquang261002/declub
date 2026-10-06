@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR, REPORTS_TO_HIDE } from "@/lib/clubPosts";
 import { PRIVY_APP_ID } from "@/lib/config";
@@ -38,14 +38,19 @@ const JOIN_STEPS = [
 
 const MOMENTUM_RULES = [
   { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade.` },
-  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points each, at most ${MOMENTUM.createdPerDay} a day per wallet. Posts count for nothing.` },
+  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points each, at most ${MOMENTUM.createdPerDay} a day per wallet.` },
+  {
+    title: "Your X posts count too",
+    body: `${MOMENTUM.xShareWeight} points when a Holder shares their own X post about the Club on its Board, one a day. A post that only matches a tag counts half. Board notes count for nothing.`,
+  },
   { title: "Everything fades", body: `Points halve every ${MOMENTUM.halfLifeDays} days and are gone after ${MOMENTUM.windowDays}.` },
 ];
 
 const POST_RULES = [
   "Be a member, and share a verified X or Discord profile on the Account page.",
   "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
-  `Plain text, up to ${POST_MAX} characters. No formatting, and links aren't clickable.`,
+  `Plain text, up to ${POST_MAX} characters. No formatting, and links in the text aren't clickable.`,
+  "A note can share one X post, shown as a card. A “Looking for” post can attach a deal or a signed swap.",
   `One post every ${POST_COOLDOWN_SEC} seconds, and ${POSTS_PER_HOUR} an hour in each Club.`,
   "Delete your own posts whenever you like.",
 ];
@@ -197,7 +202,7 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small flat fee per side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s Holders, by how much they hold</li>
+                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s Holders, by how much they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
                 <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
                 <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
               </ul>
@@ -217,6 +222,34 @@ export default function ClubsGuidePage() {
                 Every epoch&apos;s numbers and proofs are public, so anyone can check who was paid what.
               </p>
             </div>
+          </div>
+          <div className={`${CARD} mt-4 p-5 sm:p-6`}>
+            <h3 className="flex items-center gap-2 font-black">
+              <XLogoIcon className="size-4" />
+              The activity bonus
+            </h3>
+            <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
+              Holding is the base: one share per NFT, or per set amount of the coin. A Holder&apos;s shares then count up to{" "}
+              <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for what they did in the Club that epoch: trading there, and sharing
+              their own X posts about the Club on its Board. Each counted post earns {REWARDS.xShareBase} points and a swap{" "}
+              {MOMENTUM.swapWeight}; {REWARDS.fullBonusPoints} points earn the full bonus. A Holder who does nothing still gets their base share.
+            </p>
+            <ul className={`mt-3 space-y-1.5 text-sm leading-6 ${MUTED}`}>
+              <li>
+                <b className="text-[#111318]">What counts as about the Club:</b> a link to the Club or its token, a mention, quote or reply of the
+                project&apos;s X account (the Owner links it), or one of the Club&apos;s tags (half).
+              </li>
+              <li>
+                <b className="text-[#111318]">Whose posts:</b> only your own, from the X account linked to your profile, made in the last 48 hours. One a
+                day counts per Club, and each X post counts once.
+              </li>
+              <li>
+                <b className="text-[#111318]">Engagement, where the app reads it:</b> when the app is connected to the X API, each post is read again
+                before an epoch is paid. Likes, reposts, quotes and replies then add up to {REWARDS.reachCapPerEpoch} more points (capped, so one viral
+                post can&apos;t take everything), and a post that was deleted, or edited so it&apos;s no longer about the Club, counts for nothing.
+                Without it, every counted post adds the same.
+              </li>
+            </ul>
           </div>
           <p className="mt-4 text-sm leading-6 text-muted">
             Faking volume to earn rewards loses money: each side of a swap pays the full fee, and only part of it comes back,

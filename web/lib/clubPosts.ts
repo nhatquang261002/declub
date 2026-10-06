@@ -1,6 +1,10 @@
+import { MAX_X_TAGS, normalizeTag, parseXStatus, type SignalStrength, type XAccount, type XCard } from "./xPosts";
+
 /**
  * Club posts (ADR 0016, docs/09-clubs.md): the first user-written text in the app, so the rules
- * are strict and live in one pure place. Posts are plain text: no HTML, markdown or links.
+ * are strict and live in one pure place. Posts are plain text: no HTML, markdown or links in the
+ * text. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
+ * for" post, or an X post on a note (ADR 0024).
  */
 export const POST_MAX = 280;
 export const POSTS_PER_HOUR = 5;
@@ -15,8 +19,8 @@ export const POSTS_KEPT = 500;
 export const POSTS_SHOWN = 100;
 
 export type PostKind = "note" | "looking";
-/** A deal or a signed swap a "Looking for" post points at. */
-export type PostLink = { kind: "deal"; id: string } | { kind: "intent"; hash: string };
+/** A deal or a signed swap a "Looking for" post points at, or an X post a note shares. */
+export type PostLink = { kind: "deal"; id: string } | { kind: "intent"; hash: string } | { kind: "x"; id: string };
 export type HiddenBy = "reports" | "moderator";
 
 /** What the server keeps. `userId` and the reports never leave the server. */
@@ -38,7 +42,15 @@ export type StoredPost = {
    * seconds). Every post made through the route is signed; the id is then the message's struct hash.
    */
   signed?: { signature: `0x${string}`; at: number };
+  /** A shared X post's card, read when it was posted. Not part of what was signed. */
+  x?: StoredXCard;
 };
+
+/**
+ * The card, plus whether the post is the author's own (their linked X account) and, if it counted
+ * toward the Club's activity, how strongly it was about the Club.
+ */
+export type StoredXCard = XCard & { own: boolean; counted: SignalStrength | null };
 
 /** A post as one viewer sees it. */
 export type PublicPost = {
@@ -56,6 +68,8 @@ export type PublicPost = {
   reports?: number;
   /** The author signed it with their wallet, so it can be checked anywhere (the Club's feed export). */
   signed: boolean;
+  /** A shared X post's card; hidden with the text. */
+  x?: StoredXCard;
 };
 
 // Control characters, line breaks, zero-width and bidirectional overrides: none belongs in a short
@@ -74,13 +88,26 @@ export function cleanText(input: unknown): CleanText {
   return { ok: true, text };
 }
 
-/** A deal id (digits) or an intent hash (0x and 64 hex digits), or `null` for anything else. */
+/**
+ * A deal id (digits), an intent hash (0x and 64 hex digits) or an X post link, or `null` for
+ * anything else.
+ */
 export function parseLink(input: unknown): PostLink | null {
   if (typeof input !== "string") return null;
   const value = input.trim();
   if (/^\d{1,18}$/.test(value)) return { kind: "deal", id: String(BigInt(value)) };
   if (/^0x[0-9a-fA-F]{64}$/.test(value)) return { kind: "intent", hash: value.toLowerCase() };
-  return null;
+  const x = parseXStatus(value);
+  return x ? { kind: "x", id: x } : null;
+}
+
+/** A note may share an X post; a "Looking for" post may point at a deal or a signed swap. */
+export const linkFits = (kind: PostKind, link: PostLink) => (kind === "note" ? link.kind === "x" : link.kind !== "x");
+
+/** The link `input` names, if it fits a post of `kind`; `null` otherwise. */
+export function linkFor(kind: PostKind, input: unknown): PostLink | null {
+  const link = parseLink(input);
+  return link && linkFits(kind, link) ? link : null;
 }
 
 export function viewPost(
@@ -98,6 +125,7 @@ export function viewPost(
     at: post.at,
     text: seeText ? post.text : null,
     ...(post.link && seeText ? { link: post.link } : {}),
+    ...(post.x && seeText ? { x: post.x } : {}),
     hidden: post.hidden ?? null,
     pinned,
     mine,
@@ -124,13 +152,18 @@ export type ClubProfile = {
   pinned: string[];
   /** Who claimed ownership through `owner()`, so an admin can see if it later changes. */
   ownerClaim?: { wallet: string; at: number };
+  /**
+   * What makes an X post about this Club (ADR 0024): the project's accounts, linked by a proof
+   * post (`lib/server/xPosts.ts`), and the Owner's tags.
+   */
+  x?: { accounts: XAccount[]; tags: string[] };
 };
 
 export const MAX_DESCRIPTION = 500;
 export const MAX_LINKS = 3;
 export const NO_PROFILE: ClubProfile = { description: "", links: [], holdersOnlyPosts: false, pinned: [] };
 
-export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">>;
+export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & { xTags?: string[] };
 export type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
 
 /** Checks an edit to the profile. Links must be plain `https://` addresses: they become anchors. */
@@ -164,6 +197,16 @@ export function checkProfileEdit(input: unknown): ProfileResult {
   if (body.holdersOnlyPosts !== undefined) {
     if (typeof body.holdersOnlyPosts !== "boolean") return { ok: false, reason: "holdersOnlyPosts is true or false." };
     edit.holdersOnlyPosts = body.holdersOnlyPosts;
+  }
+  if (body.xTags !== undefined) {
+    if (!Array.isArray(body.xTags) || body.xTags.length > MAX_X_TAGS) return { ok: false, reason: `Give at most ${MAX_X_TAGS} tags.` };
+    const tags: string[] = [];
+    for (const raw of body.xTags) {
+      const tag = normalizeTag(raw);
+      if (!tag) return { ok: false, reason: "A tag is a #hashtag, a $cashtag or a word: 2 to 30 letters, digits or _." };
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+    edit.xTags = tags;
   }
   return Object.keys(edit).length === 0 ? { ok: false, reason: "Nothing to change." } : { ok: true, edit };
 }

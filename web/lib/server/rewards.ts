@@ -6,6 +6,7 @@ import { CHAIN_ID, DECLUB_INTENTS_ADDRESS, DECLUB_REWARDS_ADDRESS, RPC_URL } fro
 import { buildMerkleTree } from "../merkle";
 import {
   REWARDS,
+  activityPoints,
   epochWindow,
   leavesOf,
   rewardLeaf,
@@ -13,6 +14,7 @@ import {
   type ClaimableLeaf,
   type ClubInput,
   type EpochRecord,
+  type ReachRecord,
 } from "../rewards";
 import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
 import { clubEvents } from "./clubs";
@@ -37,6 +39,8 @@ export const epochsKey = () => `${base}:epochs`;
 export const accountKey = (account: string) => `${base}:account:${account.toLowerCase()}`;
 export const carryKey = (club: string) => `${base}:carry:${club.toLowerCase()}`;
 export const lastKey = () => `${base}:last`;
+/** The X reach read for epoch `n` before it's built (lib/server/xReach.ts). */
+export const reachKey = (n: number) => `${base}:reach:${n}`;
 const lockKey = () => `${base}:lock`;
 
 /** Epochs and per-account indexes kept. A year of weekly epochs fits many times over. */
@@ -58,6 +62,8 @@ export type RewardsDeps = {
   contract?: Address;
   genesis?: number;
   length?: number;
+  /** The X reach for epoch `n`. Defaults to what `collectReach` saved; none means base points only. */
+  reach?: (n: number) => Promise<ReachRecord | null>;
 };
 
 export type BuildResult =
@@ -136,11 +142,15 @@ async function compute(
   const settlementFee = deps.settlementFee ?? viemSettlementFee;
   const intents = (deps.intents ?? DECLUB_INTENTS_ADDRESS ?? "").toLowerCase();
 
-  // Every completed swap in the window, with the Clubs it counts for.
+  // Every completed swap in the window, with the Clubs it counts for; and each Club's activity in
+  // the window, for the Holder bonus.
   const swaps = new Map<string, { event: ActivityEvent; clubs: Set<string> }>();
+  const activity = new Map<string, ActivityEvent[]>();
   for (const club of clubs) {
-    for (const event of await eventsOf(club)) {
-      if (event.kind !== "swapped" || event.at < window.start || event.at >= window.end) continue;
+    const inWindow = (await eventsOf(club)).filter((e) => e.at >= window.start && e.at < window.end);
+    activity.set(club.address.toLowerCase(), inWindow);
+    for (const event of inWindow) {
+      if (event.kind !== "swapped") continue;
       const seen = swaps.get(event.id) ?? { event, clubs: new Set<string>() };
       seen.clubs.add(club.address.toLowerCase());
       swaps.set(event.id, seen);
@@ -156,15 +166,20 @@ async function compute(
     for (const club of named) fees.set(club, (fees.get(club) ?? 0n) + each);
   }
 
+  const reach = await (deps.reach ?? ((k: number) => store.get<ReachRecord>(reachKey(k))))(n);
   const inputs: ClubInput[] = [];
   for (const club of clubs) {
     const key = club.address.toLowerCase();
     const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
+    const events = activity.get(key) ?? [];
     inputs.push({
       club: key,
       fees: fees.get(key) ?? 0n,
       carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
-      holders: await holderShares(store, club, holdings),
+      holders: (await holderShares(store, club, holdings)).map(({ wallet, wallets, shares }) => {
+        const { points, bonusBps } = activityPoints(events, reach, wallets, window.end);
+        return { wallet, shares, bonusBps, points };
+      }),
       owner: await ownerWallet(store, club),
     });
   }
@@ -197,8 +212,15 @@ async function compute(
       account: l.account,
       amount: str(l.amount),
       proof: tree.proofs[i]!,
-      breakdown: l.breakdown.map((b) => ({ club: b.club, kind: b.kind, amount: str(b.amount) })),
+      breakdown: l.breakdown.map((b) => ({
+        club: b.club,
+        kind: b.kind,
+        amount: str(b.amount),
+        ...(b.shares !== undefined ? { shares: str(b.shares), bonusBps: b.bonusBps ?? 0 } : {}),
+        ...(b.points !== undefined ? { points: b.points } : {}),
+      })),
     })),
+    reach,
   };
 }
 
@@ -207,7 +229,7 @@ async function compute(
  * collection, and one per `minHolding` (or whole token) of the memecoin. Throws when the chain
  * can't be read, so an epoch is never built on missing balances.
  */
-async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ wallet: string; shares: bigint }[]> {
+async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ wallet: string; wallets: string[]; shares: bigint }[]> {
   const rows = (await allRows(store, club.address)).filter((r) => r.displayWallet && r.wallets.length > 0);
   if (rows.length === 0) return [];
   const shares = rows.map(() => 0n);
@@ -223,7 +245,7 @@ async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): 
       shares[i] += held / unit;
     });
   }
-  return rows.map((row, i) => ({ wallet: row.displayWallet!, shares: shares[i]! })).filter((h) => h.shares > 0n);
+  return rows.map((row, i) => ({ wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]! })).filter((h) => h.shares > 0n);
 }
 
 /** The Owner's display wallet, from the roles and their member row (not the claim, which can go stale). */
@@ -261,8 +283,8 @@ export type ClubRewardsView = {
   epochs: { n: number; start: number; end: number; fees: string; holderPool: string; fundPool: string; paidHolders: string; paidFund: string; holderCount: number }[];
   /** What rolls into the next epoch. */
   carry: { holders: string; fund: string };
-  /** The latest epoch's payouts in this Club, largest first. */
-  earners: { account: Address; kind: "holder" | "fund"; amount: string }[];
+  /** The latest epoch's payouts in this Club, largest first, with each Holder's activity bonus. */
+  earners: { account: Address; kind: "holder" | "fund"; amount: string; bonusBps?: number }[];
 };
 
 export async function clubRewards(store: Store, club: string): Promise<ClubRewardsView> {
@@ -276,7 +298,11 @@ export async function clubRewards(store: Store, club: string): Promise<ClubRewar
   });
   const latest = records[0];
   const earners = (latest?.leaves ?? [])
-    .flatMap((l) => l.breakdown.filter((b) => b.club === key).map((b) => ({ account: l.account, kind: b.kind, amount: b.amount })))
+    .flatMap((l) =>
+      l.breakdown
+        .filter((b) => b.club === key)
+        .map((b) => ({ account: l.account, kind: b.kind, amount: b.amount, ...(b.bonusBps ? { bonusBps: b.bonusBps } : {}) })),
+    )
     .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : BigInt(b.amount) < BigInt(a.amount) ? -1 : 0))
     .slice(0, 10);
   const carry = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };

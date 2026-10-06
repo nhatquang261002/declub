@@ -20,6 +20,7 @@ type Web = {
   buildEpoch: (store: unknown, n: number, deps: unknown) => Promise<{ status: string; record?: EpochRecord }>;
   parseAssets: (list: unknown) => unknown[];
   REWARDS: { holderBps: number; fundBps: number };
+  activityPoints: (events: unknown[], reach: null, wallets: readonly string[], end: number) => { bonusBps: number };
   rewardLeaf: (chainId: number, contract: Address, epoch: number, account: Address, amount: bigint) => Hex;
   buildMerkleTree: (leaves: readonly Hex[]) => { root: Hex; proofs: Hex[][] };
 };
@@ -44,7 +45,18 @@ async function web(): Promise<Web> {
     import(at("lib/rewards.ts")),
     import(at("lib/merkle.ts")),
   ]);
-  return { ...store, ...activity, ...members, ...clubState, ...rewards, ...assets, REWARDS: shared.REWARDS, rewardLeaf: shared.rewardLeaf, buildMerkleTree: merkle.buildMerkleTree } as Web;
+  return {
+    ...store,
+    ...activity,
+    ...members,
+    ...clubState,
+    ...rewards,
+    ...assets,
+    REWARDS: shared.REWARDS,
+    activityPoints: shared.activityPoints,
+    rewardLeaf: shared.rewardLeaf,
+    buildMerkleTree: merkle.buildMerkleTree,
+  } as Web;
 }
 
 const localOnly = (w: World) => (w.target !== "local" ? "warps the chain and deploys its own DeClubRewards: local only" : !w.rewards ? "no DeClubRewards deployed" : null);
@@ -68,7 +80,7 @@ async function sameLeavesFor(w: World, record: EpochRecord, epoch: number): Prom
 export const rewardCases: Case<World>[] = [
   {
     id: "RW-01",
-    title: "A real swap's fee goes through the app's epoch builder: 40% to Holders by holdings, 20% to the Owner",
+    title: "A real swap's fee goes through the app's epoch builder: 40% to Holders by holdings and activity, 20% to the Owner",
     skip: localOnly,
     async run(w, note) {
       const app = await web();
@@ -124,13 +136,21 @@ export const rewardCases: Case<World>[] = [
       const holderPool = (fees * BigInt(app.REWARDS.holderBps)) / 10_000n;
       const fundPool = (fees * BigInt(app.REWARDS.fundBps)) / 10_000n;
       // Earlier scenarios may have left any of them holding NFTs: each holds what the chain says.
+      // Each Holder's shares count (1 + bonus): Alice and Bob traded in the epoch, Carol didn't (ADR 0024).
       const [a, b, c] = await holdings(w.nft, [w.alice.address, w.bob.address, w.carol.address]);
-      const shares = a! + b! + c!;
+      const bonus = (who: Address) => BigInt(app.activityPoints(events, null, [who.toLowerCase()], at + 50).bonusBps);
+      const weight = (held: bigint, who: Address) => held * (10_000n + bonus(who));
+      const [wa, wb, wc] = [weight(a!, w.alice.address), weight(b!, w.bob.address), weight(c!, w.carol.address)];
+      const total = wa + wb + wc;
+      assert.ok(bonus(w.alice.address) > 0n && bonus(w.carol.address) === 0n, "the traders earn an activity bonus");
       const amountOf = (who: Address) => BigInt(built!.leaves.find((l) => l.account === who)?.amount ?? "0");
-      assert.equal(amountOf(w.alice.address), (holderPool * a!) / shares, "Alice's Holder share");
-      assert.equal(amountOf(w.bob.address), (holderPool * b!) / shares, "Bob's Holder share");
-      assert.equal(amountOf(w.carol.address), fundPool + (holderPool * c!) / shares, "the Owner's Club fund (plus any Holder share)");
-      note(`fees ${w.fmt(fees)} MON; Holders ${w.fmt(holderPool)} over ${shares} NFTs (Alice ${a}, Bob ${b}, Carol ${c}); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`);
+      assert.equal(amountOf(w.alice.address), (holderPool * wa) / total, "Alice's Holder share");
+      assert.equal(amountOf(w.bob.address), (holderPool * wb) / total, "Bob's Holder share");
+      assert.equal(amountOf(w.carol.address), fundPool + (holderPool * wc) / total, "the Owner's Club fund (plus any Holder share)");
+      note(
+        `fees ${w.fmt(fees)} MON; Holders ${w.fmt(holderPool)} over ${a! + b! + c!} NFTs (Alice ${a}, Bob ${b}, Carol ${c}; ` +
+          `traders +${Number(bonus(w.alice.address)) / 100}%); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`,
+      );
     },
   },
   {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import type { UserGate } from "../lib/server/gate";
-import { claimHandler, bansHandlers, deletePostHandler, hideHandler, logHandler, pinHandler, postsHandlers, profileHandlers, purgeHandler, reportHandler, rolesHandler } from "../lib/server/boardRoutes";
+import { claimHandler, bansHandlers, deletePostHandler, hideHandler, logHandler, pinHandler, postsHandlers, profileHandlers, purgeHandler, reportHandler, rolesHandler, xLinkHandlers } from "../lib/server/boardRoutes";
 import { joinClub } from "../lib/server/members";
 import { membershipHandlers } from "../lib/server/memberRoutes";
 import { getStore } from "../lib/server/store";
@@ -251,5 +251,56 @@ describe("purge", () => {
     const res = await purge(req("DELETE"), ctx(BLOCKED));
     assert.equal(res.status, 200);
     assert.equal((await res.json()).purged.members, 1);
+  });
+});
+
+describe("X posts and the project's X account (ADR 0024)", () => {
+  const NOW_MS = 1_800_000_000_000;
+  /** An X post id made a minute before the test clock. */
+  const fresh = (((BigInt(NOW_MS - 60_000) - 1_288_834_974_657n) << 22n) + 7n).toString();
+  const x: Record<string, { author: string; text: string }> = { [fresh]: { author: "m2_on_x", text: `gm ${NFT}` } };
+  const xDeps = {
+    ...deps,
+    now: () => NOW_MS,
+    lookupX: async (id: string) => (x[id] ? { id, author: x[id].author, text: x[id].text, postedAt: NOW_MS - 60_000 } : null),
+    xAccountOf: async (userId: string) => (userId === "m2" ? { username: "m2_on_x", subject: "22" } : null),
+    xUserIdOf: async () => null,
+  };
+  const xPosts = postsHandlers(reg, xDeps);
+  const share = async (id: string) => {
+    await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:${current}`, `declub:rl:club-post-hr:${NFT.toLowerCase()}:${current}`);
+    const message = { club: NFT, kind: "note", text: "look", link: `https://x.com/i/status/${id}`, at: NOW_MS / 1000 };
+    return xPosts.POST(req("POST", { message, signature: `0x${"11".repeat(65)}` }), ctx());
+  };
+
+  it("tells the author whether their X post counted", async () => {
+    as("m2");
+    const res = await share(fresh);
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.deepEqual(body.xShare, { own: true, counted: "strong" });
+    assert.equal(body.post.x.author, "m2_on_x");
+    assert.equal((await share("12345")).status, 404, "a post X doesn't have");
+  });
+
+  it("links the project's account for the Owner only, by a post with the code", async () => {
+    const xl = xLinkHandlers(reg, xDeps);
+    as("m1");
+    assert.equal((await xl.POST(req("POST", { action: "start", handle: "ChogNFT" }), ctx())).status, 403);
+    as("own");
+    const started = await (await xl.POST(req("POST", { action: "start", handle: "ChogNFT" }), ctx())).json();
+    assert.ok(started.text.includes(started.code));
+    x["900"] = { author: "ChogNFT", text: started.text };
+    const linked = await xl.POST(req("POST", { action: "verify", handle: "ChogNFT", url: "https://x.com/ChogNFT/status/900" }), ctx());
+    assert.equal(linked.status, 200);
+
+    const page = await (await profileHandlers(reg, deps).GET(req("GET"), ctx())).json();
+    assert.deepEqual(page.x.accounts.map((a: { handle: string }) => a.handle), ["ChogNFT"]);
+    assert.match(page.x.hint, /@chognft/);
+    assert.equal(JSON.stringify(page).includes("xUserId"), false);
+
+    assert.equal((await xl.POST(req("POST", { action: "nope" }), ctx())).status, 400);
+    assert.equal((await xl.DELETE(req("DELETE", { handle: "ChogNFT" }), ctx())).status, 200);
+    assert.equal((await xl.DELETE(req("DELETE", { handle: "ChogNFT" }), ctx())).status, 404);
   });
 });

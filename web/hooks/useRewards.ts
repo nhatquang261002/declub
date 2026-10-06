@@ -28,7 +28,7 @@ async function getJson<T>(path: string): Promise<T> {
 export function useClubRewards(token: string) {
   const query = useQuery({
     queryKey: ["club-rewards", token.toLowerCase()],
-    queryFn: () => getJson<Base & ClubRewardsView>(`/api/clubs/${token}/rewards`),
+    queryFn: () => getJson<Base & ClubRewardsView & { xReach?: boolean }>(`/api/clubs/${token}/rewards`),
     refetchInterval: 60_000,
     retry: 1,
   });

@@ -19,17 +19,24 @@ export const MOMENTUM = {
   washDays: 7,
   /** Club score = sum × (1 + log2(wallets)) / this. Breadth counts. */
   breadthDivisor: 4,
+  /**
+   * A Holder's own X post about the Club, shared on its Board (ADR 0024): one a day per member, so
+   * it can't outweigh trading. A post that is only weakly about the Club counts half.
+   */
+  xShareWeight: 3,
 } as const;
 
-export type ActivityKind = "created" | "swapped";
+export type ActivityKind = "created" | "swapped" | "xshare";
 
 /** What the score needs from a logged event. The log keeps more (see lib/server/activity.ts). */
 export type ScoredEvent = {
   kind: ActivityKind;
   /** Unix seconds. */
   at: number;
-  /** Lowercase wallet addresses. A swap has the two sides; a creation has the maker. */
+  /** Lowercase wallet addresses. A swap has the two sides; a creation has the maker; an X share the member. */
   parties: string[];
+  /** An X share's strength factor (1 strong, 0.5 weak). Other kinds ignore it. */
+  weight?: number;
 };
 
 export type Scores = {
@@ -44,14 +51,18 @@ export type Scores = {
 const DAY = 86_400;
 const round = (n: number) => Math.round(n * 100) / 100;
 
-const decay = (ageSec: number) => 0.5 ** (ageSec / (MOMENTUM.halfLifeDays * DAY));
+const decayOf = (ageSec: number) => 0.5 ** (ageSec / (MOMENTUM.halfLifeDays * DAY));
 
 /** The unordered pair, as one key. */
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-/** Scores `events` as of `now` (unix seconds). Events after `now` are ignored. */
-export function score(events: ScoredEvent[], now: number): Scores {
-  const since = now - MOMENTUM.windowDays * DAY;
+/**
+ * Scores `events` as of `now` (unix seconds). Events after `now` are ignored. `decay: false` counts
+ * every event in full, as an epoch's activity does (lib/rewards.ts).
+ */
+export function score(events: ScoredEvent[], now: number, options: { decay?: boolean; windowSec?: number } = {}): Scores {
+  const since = now - (options.windowSec ?? MOMENTUM.windowDays * DAY);
+  const decay = options.decay === false ? () => 1 : decayOf;
   const live = events.filter((e) => e.at > since && e.at <= now).sort((a, b) => a.at - b.at);
 
   const wallets = new Map<string, number>();
@@ -64,6 +75,14 @@ export function score(events: ScoredEvent[], now: number): Scores {
   for (const e of live) {
     const parties = [...new Set(e.parties.map((p) => p.toLowerCase()))];
     const weight = decay(now - e.at);
+
+    // An X share is attention, not trading: it scores its member and leaves breadth (how many
+    // wallets traded) alone. The once-a-day rule is applied when it's recorded.
+    if (e.kind === "xshare") {
+      const wallet = parties[0];
+      if (wallet) add(wallet, MOMENTUM.xShareWeight * (e.weight ?? 1) * weight);
+      continue;
+    }
 
     if (e.kind === "created") {
       for (const wallet of parties) {

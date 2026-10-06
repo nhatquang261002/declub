@@ -5,7 +5,7 @@ import { heat } from "@/lib/clubs";
 export const formatMomentum = (value: number) => Math.round(value).toLocaleString();
 
 export const MOMENTUM_EXPLAINED =
-  "Momentum shows how busy this market has been. Completed swaps count most, new deals count a little, and anything older than a week counts for less. It doesn't say the asset is safe or valuable.";
+  "Momentum shows how busy this Club has been. Completed swaps count most; new deals and Holders' own X posts about the Club count a little; anything older than a week counts for less. It doesn't say the asset is safe or valuable.";
 
 /** Five rising bars, lit up to `level` (0, quiet, lights none). Decoration: say the level in words beside it. */
 export function HeatBars({ level }: { level: number }) {

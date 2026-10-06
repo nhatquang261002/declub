@@ -11,6 +11,9 @@
  * REWARDS_OPERATOR_KEY: the private key of the contract's operator. On mainnet the operator is a
  * Safe; there, build without --publish and send `publish(epoch, root)` with `total` from the Safe.
  *
+ * Before building, it reads the X reach of the epoch's X shares (ADR 0024) with X_BEARER_TOKEN
+ * (web/.env.local; pay per use, about $0.005 a post). Without it, X shares count with no reach.
+ *
  * Building is safe to repeat: an epoch is built once, and later runs print the stored one. What a
  * Club can't pay (no Holders, no Owner, rounding) rolls into the next epoch, so publish every epoch
  * you build, in order.
@@ -42,8 +45,9 @@ async function main() {
   const { chain } = await import("../lib/chain");
   const { DECLUB_REWARDS_ADDRESS, RPC_URL } = await import("../lib/config");
   const { deClubRewardsAbi } = await import("../lib/abi");
-  const { epochAt } = await import("../lib/rewards");
-  const { buildEpoch, lastKey } = await import("../lib/server/rewards");
+  const { epochAt, epochWindow } = await import("../lib/rewards");
+  const { buildEpoch, lastKey, readEpoch } = await import("../lib/server/rewards");
+  const { collectReach } = await import("../lib/server/xReach");
   const { getStore } = await import("../lib/server/store");
 
   if (!DECLUB_REWARDS_ADDRESS) throw new Error("Set NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS.");
@@ -52,6 +56,17 @@ async function main() {
   const now = Math.floor(Date.now() / 1000);
   const n = option("epoch") !== undefined ? Number(option("epoch")) : last !== null ? last + 1 : epochAt(now) - 1;
   if (!Number.isInteger(n) || n < 0) throw new Error(`No finished epoch to build (got ${n}).`);
+
+  // The reach is read once, before the epoch is built, and kept with it.
+  if (!(await readEpoch(store, n)) && now >= epochWindow(n).end) {
+    const reach = await collectReach(store, n);
+    const posts = Object.values(reach.posts);
+    console.log(
+      reach.available
+        ? `X reach: ${posts.length} X shares read, ${posts.filter((p) => p.ok).length} still count`
+        : "X reach: X_BEARER_TOKEN isn't set, so X shares count without reach",
+    );
+  }
 
   const result = await buildEpoch(store, n);
   if (result.status === "open") throw new Error(`Epoch ${n} is still running; it ends at ${new Date(result.endsAt * 1000).toISOString()}.`);
@@ -70,6 +85,9 @@ async function main() {
         `  fund ${formatEther(BigInt(club.paidFund))}  rolls over ${formatEther(BigInt(club.carry.holders) + BigInt(club.carry.fund))}`,
     );
   }
+
+  const bonused = record.leaves.flatMap((l) => l.breakdown).filter((b) => (b.bonusBps ?? 0) > 0);
+  if (bonused.length > 0) console.log(`  Holder bonus: ${bonused.length} Holder payouts got an activity bonus`);
 
   if (!flag("publish")) {
     console.log("\nNot published. Run again with --publish, or send publish(epoch, root) with `total` as value from the operator.");

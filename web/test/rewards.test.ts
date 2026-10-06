@@ -136,7 +136,10 @@ describe("leavesOf", () => {
     const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n }], owner: null });
     const leaves = leavesOf([a, b]);
     assert.deepEqual(leaves.map((l) => [l.account, l.amount]), [[getAddress(alice), 2n * ETH + 2n * ETH], [getAddress(bob), 4n * ETH]]);
-    assert.deepEqual(leaves[0]!.breakdown, [{ club: "0x1", kind: "fund", amount: 2n * ETH }, { club: "0x2", kind: "holder", amount: 2n * ETH }]);
+    assert.deepEqual(leaves[0]!.breakdown, [
+      { club: "0x1", kind: "fund", amount: 2n * ETH },
+      { club: "0x2", kind: "holder", amount: 2n * ETH, shares: 1n, bonusBps: 0 },
+    ]);
   });
 });
 

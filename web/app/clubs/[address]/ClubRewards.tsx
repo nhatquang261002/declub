@@ -35,6 +35,13 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
           <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as a member who holds {symbol}{" "}
           when the epoch closes: one share per NFT, or per set amount of the coin.
         </p>
+        <p className="mt-2 text-sm">
+          Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for what you did in the Club that
+          epoch: trading here, and sharing your own X posts about the Club on its Board (one a day counts).{" "}
+          {data?.xReach
+            ? "Posts that people liked, reposted, quoted or replied to count for more."
+            : "Each counted post adds the same, however it did on X."}
+        </p>
         {data && data.epoch >= 0 && (
           <p className="mt-3 text-xs text-muted">
             Epoch {data.epoch} closes {untilLabel(data.endsAt, now)}. Rewards are paid in MON.
@@ -77,6 +84,7 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
                     <span className="min-w-0 flex-1">
                       <Who address={e.account} />
                     </span>
+                    {e.kind === "holder" && e.bonusBps !== undefined && e.bonusBps > 0 && <span className="chip chip-peach">+{percent(e.bonusBps)} active</span>}
                     {e.kind === "fund" && (
                       <span className="chip chip-dark">
                         <CrownIcon />

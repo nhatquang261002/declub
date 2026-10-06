@@ -3,19 +3,58 @@
 import Link from "next/link";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, BanIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon } from "@/components/Icons";
+import { BadgeCheckIcon, BanIcon, ExternalIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon, XLogoIcon } from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
-import type { PostLink, PublicPost } from "@/lib/clubPosts";
+import type { PostLink, PublicPost, StoredXCard } from "@/lib/clubPosts";
 import { isOwnerOrAdmin, isStaff } from "@/lib/clubRoles";
 import { ago, shortAddress } from "@/lib/format";
 import type { ViewerRole } from "@/hooks/useClubMembership";
 import type { useFollows } from "@/hooks/useSocial";
 
+type AppLink = Exclude<PostLink, { kind: "x" }>;
+
 /** Where a linked deal or signed swap lives in the app. */
-const linkHref = (link: PostLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
-const linkLabel = (link: PostLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
+const linkHref = (link: AppLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
+const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
+
+/**
+ * A shared X post (ADR 0024), drawn from what the server read: no X script, and the text is plain
+ * text like a post's. It opens on X.
+ */
+function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: number }) {
+  const href = card ? `https://x.com/${card.author}/status/${card.id}` : `https://x.com/i/status/${id}`;
+  return (
+    <div className="x-card mt-1">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <XLogoIcon className="size-3.5" />
+        {card ? <span className="font-bold">@{card.author}</span> : <span className="font-bold">X post</span>}
+        {card?.postedAt && <span className="text-muted">· {ago(Math.floor(card.postedAt / 1000), now)}</span>}
+        {card?.own && (
+          <Tooltip content="Posted from the X account this member linked to their profile.">
+            <span className="chip">Their own post</span>
+          </Tooltip>
+        )}
+        {card?.counted && (
+          <Tooltip
+            content={
+              card.counted === "strong"
+                ? "A Holder’s own post about this Club: it counts toward their Momentum and Holder bonus."
+                : "A Holder’s own post that only matched one of the Club’s tags: it counts half."
+            }
+          >
+            <span className="chip chip-peach">Counts{card.counted === "weak" ? " · half" : ""}</span>
+          </Tooltip>
+        )}
+      </span>
+      {card && <p className="x-card-text">{card.text}</p>}
+      <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="x-card-open">
+        View on X <ExternalIcon className="size-3" />
+      </a>
+    </div>
+  );
+}
 
 export type PostActions = {
   report: (id: string) => void;
@@ -127,7 +166,8 @@ export function PostItem({
           </p>
         )}
         {post.text !== null && <p className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap">{post.text}</p>}
-        {post.link && (
+        {post.link?.kind === "x" && <XPostCard id={post.link.id} card={post.x} now={now} />}
+        {post.link && post.link.kind !== "x" && (
           <Link href={linkHref(post.link)} className="post-link mt-1">
             <SwapIcon className="size-4" />
             {linkLabel(post.link)}

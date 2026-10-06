@@ -3,6 +3,7 @@ import { DECLUB_REWARDS_ADDRESS } from "../config";
 import { epochAt, epochWindow } from "../rewards";
 import type { Registry } from "../verifiedAssets";
 import { claimableFor, clubRewards, readEpoch } from "./rewards";
+import { xApiConfigured } from "./xApi";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 
 /**
@@ -66,7 +67,8 @@ export function clubRewardsHandler(registry: Registry, deps: RouteDeps = {}) {
     const entry = registry.clubFor(token);
     if (!entry) return fail(404, "not_found", "No Club for this asset.");
     const store = storeOf(deps);
-    const base = { contract: DECLUB_REWARDS_ADDRESS ?? null, ...current(nowOf(deps)) };
+    // Whether X engagement counts in the Holder bonus (ADR 0024): only with the X API configured.
+    const base = { contract: DECLUB_REWARDS_ADDRESS ?? null, ...current(nowOf(deps)), xReach: xApiConfigured() };
     if (!store) return Response.json({ enabled: false, ...base, epochs: [], carry: { holders: "0", fund: "0" }, earners: [] }, { headers: NO_STORE });
     if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
     const view = await clubRewards(store, entry.address);

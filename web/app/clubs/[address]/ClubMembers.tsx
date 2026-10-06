@@ -19,7 +19,7 @@ import type { MemberSort, PublicMember } from "@/lib/members";
 import { Empty, Loading } from "./parts";
 
 const SORTS = [
-  { value: "momentum", label: "Top traders" },
+  { value: "momentum", label: "Most active" },
   { value: "new", label: "Newest" },
 ] as const;
 

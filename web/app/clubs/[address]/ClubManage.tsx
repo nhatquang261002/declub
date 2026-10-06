@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Alert } from "@/components/Alert";
-import { LinkIcon } from "@/components/Icons";
+import { ExternalIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions, useClubPage, useClubStaff } from "@/hooks/useClubBoard";
 import type { ViewerRole } from "@/hooks/useClubMembership";
 import { MAX_DESCRIPTION, MAX_LINKS } from "@/lib/clubPosts";
+import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
 import { Panel } from "./parts";
@@ -31,6 +32,8 @@ const ACTIONS: Record<string, string> = {
   remove_owner: "removed the Owner:",
   claim_owner: "claimed ownership through owner():",
   edit_profile: "edited the Club page",
+  link_x: "linked the X account",
+  unlink_x: "unlinked the X account",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
@@ -108,6 +111,124 @@ function PageEditor({ token }: { token: string }) {
   );
 }
 
+/**
+ * The Club on X (ADR 0024): the project's accounts, linked by a post only they could make, and the
+ * tags that make an X post about the Club. Members' own X posts that match count for the Club.
+ */
+function XEditor({ token }: { token: string }) {
+  const page = useClubPage(token);
+  const { xStart, xVerify, xUnlink, profile } = useClubActions(token);
+  const [handle, setHandle] = useState("");
+  const [proof, setProof] = useState<{ handle: string; text: string } | null>(null);
+  const [url, setUrl] = useState("");
+  const [tags, setTags] = useState<string | null>(null);
+  const accounts = page?.x?.accounts ?? [];
+  const currentTags = tags ?? (page?.x?.tags ?? []).join(" ");
+  const parsed = currentTags.split(/[\s,]+/).filter(Boolean);
+  const badTag = parsed.find((t) => !normalizeTag(t));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-bold">Project X accounts</p>
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted">None linked. Link the project’s own account so posts that mention or quote it count in full.</p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {accounts.map((a) => (
+              <li key={a.handle} className="flex flex-wrap items-center gap-2 text-sm">
+                <a className="inline-flex items-center gap-1.5 font-bold hover:underline" href={`https://x.com/${a.handle}`} target="_blank" rel="noopener noreferrer">
+                  <XLogoIcon className="size-3.5" />@{a.handle} ✓
+                </a>
+                <a className="text-xs text-muted hover:underline" href={`https://x.com/i/status/${a.proof}`} target="_blank" rel="noopener noreferrer">
+                  proof
+                </a>
+                <button type="button" className="ml-auto text-xs font-bold text-muted hover:text-danger" disabled={xUnlink.isPending} onClick={() => xUnlink.mutate(a.handle)}>
+                  Unlink
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {accounts.length < MAX_X_ACCOUNTS && !proof && (
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              xStart.mutate(handle, { onSuccess: (r) => (setProof({ handle: r.handle, text: r.text }), setUrl("")) });
+            }}
+          >
+            <label className="relative min-w-48 flex-1">
+              <span className="sr-only">The project’s X handle</span>
+              <XLogoIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
+              <input className={`${field} pl-9`} value={handle} placeholder="@ProjectHandle" onChange={(e) => setHandle(e.target.value)} />
+            </label>
+            <button type="submit" className="btn-secondary btn-sm" disabled={xStart.isPending || handle.trim().length === 0}>
+              {xStart.isPending ? "…" : "Link account"}
+            </button>
+          </form>
+        )}
+
+        {proof && (
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
+            <p>
+              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete
+              the post once it’s linked.
+            </p>
+            <p className="rounded-lg bg-white p-2 font-mono text-xs break-all">{proof.text}</p>
+            <a
+              className="btn-secondary btn-sm w-fit"
+              href={`https://x.com/intent/post?text=${encodeURIComponent(proof.text)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Post it on X <ExternalIcon className="size-3" />
+            </a>
+            <form
+              className="flex flex-wrap gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                xVerify.mutate({ handle: proof.handle, url }, { onSuccess: () => (setProof(null), setHandle("")) });
+              }}
+            >
+              <input className={`${field} min-w-48 flex-1`} value={url} inputMode="url" placeholder="https://x.com/…/status/…" onChange={(e) => setUrl(e.target.value)} />
+              <button type="submit" className="btn-primary btn-sm" disabled={xVerify.isPending || url.trim().length === 0}>
+                {xVerify.isPending ? "Checking…" : "Check and link"}
+              </button>
+              <button type="button" className="text-xs font-bold text-muted hover:text-[#111318]" onClick={() => setProof(null)}>
+                Cancel
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      <form
+        className="flex flex-col gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          profile.mutate({ xTags: parsed }, { onSuccess: () => setTags(null) });
+        }}
+      >
+        <label className="text-sm font-bold" htmlFor="club-x-tags">
+          Tags
+        </label>
+        <input id="club-x-tags" className={field} value={currentTags} placeholder="#chog $CHOG chogs" onChange={(e) => setTags(e.target.value)} />
+        <span className={`text-xs ${badTag || parsed.length > MAX_X_TAGS ? "text-danger" : "text-muted"}`}>
+          {badTag
+            ? `“${badTag}” isn’t a tag: use a #hashtag, a $cashtag or a word of 2 to 30 letters, digits or _.`
+            : `Up to ${MAX_X_TAGS}, separated by spaces. A post that only matches a tag counts half. The Club’s ticker is always one.`}
+        </span>
+        {page?.x?.hint && <span className="text-xs text-muted">Right now a member’s own X post counts when it {page.x.hint}.</span>}
+        <button type="submit" className="btn-secondary btn-sm mt-1 w-fit" disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}>
+          Save tags
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /** The staff view: the Club's page text, bans, the moderation log, and claiming ownership. */
 export function ClubManage({ token, role, now }: { token: string; role: ViewerRole; now: number }) {
   const { log, ownership, bans, isLoading } = useClubStaff(token, true);
@@ -127,6 +248,12 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
       {owner && (
         <Panel title="Club page">
           <PageEditor token={token} />
+        </Panel>
+      )}
+
+      {owner && (
+        <Panel title="The Club on X">
+          <XEditor token={token} />
         </Panel>
       )}
 

@@ -1,6 +1,7 @@
 import { getAddress, hashStruct, isAddress, isHex, type Address, type Hex } from "viem";
 import { CHAIN_ID } from "./config";
-import { cleanText, parseLink, type PostLink } from "./clubPosts";
+import { cleanText, linkFor, type PostLink } from "./clubPosts";
+import { xStatusUrl } from "./xPosts";
 
 /**
  * Portable social records (ADR 0023): Board posts and follows are EIP-712 messages signed by the
@@ -32,12 +33,13 @@ export const signingTime = () => Math.floor(Date.now() / 1000);
 /** How far a signed record's `at` may be from the server's clock when it's submitted. */
 export const SIGNED_SKEW_SEC = 300;
 
-/** A post as signed. `at` is unix seconds; `link` is "", a deal id, or an intent hash. */
+/** A post as signed. `at` is unix seconds; `link` is "", a deal id, an intent hash or an X post link. */
 export type PostMessage = { club: Address; kind: "note" | "looking"; text: string; link: string; at: number };
 export type FollowMessage = { follower: Address; target: Address; following: boolean; at: number };
 
 /** The link as a post signs it: the canonical form `parseLink` gives, or "" for none. */
-export const linkString = (link: PostLink | undefined) => (!link ? "" : link.kind === "deal" ? link.id : link.hash);
+export const linkString = (link: PostLink | undefined) =>
+  !link ? "" : link.kind === "deal" ? link.id : link.kind === "intent" ? link.hash : xStatusUrl(link.id);
 
 const wirePost = (m: PostMessage) => ({ ...m, at: BigInt(m.at) });
 const wireFollow = (m: FollowMessage) => ({ ...m, at: BigInt(m.at) });
@@ -63,7 +65,7 @@ export function draftPost(club: Address, kind: "note" | "looking", text: string,
   if (!clean.ok) return clean;
   let canonical = "";
   if (link.trim() !== "") {
-    const parsed = kind === "looking" ? parseLink(link) : null;
+    const parsed = linkFor(kind, link);
     if (!parsed) return { ok: false, reason: "bad_link" };
     canonical = linkString(parsed);
   }

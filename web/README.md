@@ -38,6 +38,7 @@ Without Upstash credentials, the server store is off in production; outside prod
 | `CRON_SECRET` | `web/.env.local` | Guards `GET /api/cron/fills`. Blank = the fill watcher is off |
 | `FILL_WATCHER_START_BLOCK` | `web/.env.local` | Where the watcher's first run starts. Blank = the current head |
 | `CLUB_ADMIN_USER_IDS` | `web/.env.local` | Clubs' app admins (Privy user ids, comma-separated) |
+| `X_BEARER_TOKEN` | `web/.env.local` | The X API, for the reach of members' X posts in the Holder bonus ([ADR 0024](../docs/adr/0024-x-posts-and-the-holder-bonus.md)); read by `npm run rewards:epoch`. Blank = no reach |
 | `TRUST_PROXY` | host environment | Self-hosting behind a proxy: how many proxies append to `X-Forwarded-For` (`true` = 1), so rate limits see the caller's IP. Not needed on Vercel. Blank = no forwarding header is trusted and all callers share one limit |
 
 `NEXT_PUBLIC_CHOG_MINTABLE` is still read in `lib/config.ts` but nothing uses it since the mint panel was removed.
@@ -50,9 +51,9 @@ Without Upstash credentials, the server store is off in production; outside prod
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run lint` | ESLint (flat config, `eslint-config-next`) |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Unit tests with `node --test` (Node 24+; no extra dependencies, see `test/register.mjs`). 305 tests, about three minutes |
+| `npm test` | Unit tests with `node --test` (Node 24+; no extra dependencies, see `test/register.mjs`). 340 tests, about three minutes |
 | `npm run abi` | Rebuild contracts with Foundry and regenerate `lib/abi.ts` (needs `forge` on PATH) |
-| `npm run rewards:epoch [-- --epoch n] [-- --publish]` | Build the next finished Club Rewards epoch from the store and print it; `--publish` funds it on `DeClubRewards` with `REWARDS_OPERATOR_KEY` (ADR 0022, [09 · Clubs](../docs/09-clubs.md#rewards)) |
+| `npm run rewards:epoch [-- --epoch n] [-- --publish]` | Read the epoch's X reach (with `X_BEARER_TOKEN`), build the next finished Club Rewards epoch from the store and print it; `--publish` funds it on `DeClubRewards` with `REWARDS_OPERATOR_KEY` (ADR 0022, [09 · Clubs](../docs/09-clubs.md#rewards)) |
 
 `lib/abi.ts` is committed, so the app builds without Foundry. Rerun `npm run abi` after any contract change.
 
@@ -62,13 +63,13 @@ Without Upstash credentials, the server store is off in production; outside prod
 app/         pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash] · /history · /clubs ·
              /clubs/[address] · /account · /guide · /guide/clubs
              redirects: /v2/create → /create · /intents → /deals · /intents/new → /create
-app/api/     32 routes: deals, cron/fills, fills, activity, state, profile(s), profiles/lookup,
-             collection-traits, clubs/… (with feed and rewards), me/clubs, rewards/…, wallets/…, follows,
+app/api/     33 routes: deals, cron/fills, fills, activity, state, profile(s), profiles/lookup,
+             collection-traits, clubs/… (with feed, rewards and x), me/clubs, rewards/…, wallets/…, follows,
              webhooks/privy
 components/  Providers, Header, ConnectButton, DealSheet, Deal*, Chog*, Tx*, create/, Page helpers, artwork
 hooks/       useDealBook, useDealsV2, useDealV2, usePool, useFills, useNotifications, useTxFlow, useSignFlow, …
 lib/         abi (generated), config, wagmi, contracts, dealsV2, dealBook, dealFiltersV2, intents, errors, metadata, format
-lib/server/  store (Upstash or in-memory), dealBook, fillWatcher, fills, activity, Clubs, rewards, follows, privy, privyWebhook, handleLookup
+lib/server/  store (Upstash or in-memory), dealBook, fillWatcher, fills, activity, Clubs, rewards, follows, xPosts, xApi, xReach, privy, privyWebhook, handleLookup
 ```
 
 ## Notes

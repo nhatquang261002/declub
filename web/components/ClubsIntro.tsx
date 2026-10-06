@@ -8,15 +8,16 @@ import { ClubsTeaser } from "./ClubsTeaser";
 
 const WHAT = [
   { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
-  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, signed by your wallet, and pick how the feed is ordered." },
+  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after or share your X posts, signed by your wallet, and pick how the feed is ordered." },
   { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges. Follow who you trust." },
-  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its Holders each week, ${percent(REWARDS.fundBps)} to the Club fund.` },
+  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its Holders each week, more to the active ones, and ${percent(REWARDS.fundBps)} to the Club fund.` },
 ];
 
 const HOW = [
   { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} for each side of a finished trade. Each side pays the fee, so faking it costs real money.` },
   { title: "New deals count a little", body: `${MOMENTUM.createdWeight} for each new deal or intent, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
-  { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by trading.` },
+  { title: "Attention counts a little", body: `${MOMENTUM.xShareWeight} when a Holder shares their own X post about the Club, one a day.` },
+  { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by staying busy.` },
 ];
 
 /** The home page's introduction to Clubs and Momentum. The Clubs themselves live at /clubs. */
@@ -53,7 +54,7 @@ export function ClubsIntro() {
 
       <h3 className="mt-12 text-xl font-black tracking-tight">How Momentum works</h3>
       <p className="mt-1 text-sm text-muted">Clubs are ranked by Momentum. It measures trading, not hype, and doesn’t say an asset is safe or valuable.</p>
-      <ol className="mt-5 grid gap-3 md:grid-cols-3">
+      <ol className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {HOW.map((step, i) => (
           <li key={step.title} className="page-section p-6">
             <span className="font-mono text-sm font-semibold text-accent">0{i + 1}</span>

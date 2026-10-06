@@ -45,8 +45,8 @@ export const LENSES: readonly Lens[] = [
   },
   {
     id: "momentum",
-    name: "Top traders",
-    description: "Posts from the members who trade most here rise; older posts sink.",
+    name: "Most active",
+    description: "Posts from the members most active here (trading, and their X posts about the Club) rise; older posts sink.",
     pins: true,
     rank(posts, ctx) {
       const weight = (p: LensPost) =>

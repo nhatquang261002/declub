@@ -1543,6 +1543,30 @@ a.chip:hover { border-color: #111318; background: white; }
 .club-panel a.post-link { color: #111318; }
 .club-panel a.post-link:hover { color: #111318; box-shadow: 0.25rem 0.25rem 0 #111318; transform: translate(-1px, -1px); }
 
+/* A shared X post (ADR 0024): the post as plain text, opening on X. */
+.x-card {
+  display: flex;
+  max-width: 34rem;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 2px solid #111318;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.65rem 0.8rem;
+  box-shadow: 0.15rem 0.15rem 0 #111318;
+}
+.x-card-text { font-size: 0.88rem; line-height: 1.35rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.club-panel a.x-card-open, a.x-card-open {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #4b5563;
+}
+.club-panel a.x-card-open:hover, a.x-card-open:hover { color: #111318; text-decoration: underline; }
+
 /* The characters left in a post, as a ring that fills. */
 .char-ring {
   --p: 0;

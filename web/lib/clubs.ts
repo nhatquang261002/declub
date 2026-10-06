@@ -30,9 +30,11 @@ export type ActivityEvent = {
    * (lib/server/rewards.ts). Absent when there was no fee or it isn't known yet.
    */
   fee?: string;
+  /** An X share's strength factor (lib/xPosts.ts `strengthFactor`). */
+  weight?: number;
 };
 
-export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties });
+export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties, ...(e.weight !== undefined ? { weight: e.weight } : {}) });
 
 export type ClubStats = {
   /** Club Momentum. */
@@ -45,6 +47,8 @@ export type ClubStats = {
   created7d: number;
   /** Distinct wallets in the last 30 days. */
   traders30d: number;
+  /** Members' own X posts about the Club shared on its Board in the last 7 days. */
+  xShares7d: number;
   /** Unix seconds of the latest event, or null. */
   lastActive: number | null;
 };
@@ -60,6 +64,7 @@ export function summarize(events: readonly ActivityEvent[], now: number): ClubSt
     change: t.change,
     completed7d: week.filter((e) => e.kind === "swapped").length,
     created7d: week.filter((e) => e.kind === "created").length,
+    xShares7d: week.filter((e) => e.kind === "xshare").length,
     traders30d: score(scored, now).uniqueWallets,
     lastActive: events.reduce<number | null>((latest, e) => (latest === null || e.at > latest ? e.at : latest), null),
   };
