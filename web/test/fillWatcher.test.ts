@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { encodeAbiParameters, encodeEventTopics, getAddress, zeroAddress, type Address, type Hex } from "viem";
-import { onDealV2Abi } from "../lib/abi";
+import { deClubEscrowAbi } from "../lib/abi";
 import { readActivity, type ReceiptLike, type Reader } from "../lib/server/activity";
 import { listFills } from "../lib/server/fills";
 import { cronAuthorized, cursorKey, startBlockFromEnv, watchFills, type ChainScan, type WatchOptions } from "../lib/server/fillWatcher";
@@ -14,9 +14,9 @@ const taker: Address = getAddress("0xbbbb000000000000000000000000000000000002");
 const hashOf = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 
 function log(address: Address, eventName: string, args: Record<string, unknown>, logIndex = 0) {
-  const item = onDealV2Abi.find((i) => i.type === "event" && i.name === eventName);
+  const item = deClubEscrowAbi.find((i) => i.type === "event" && i.name === eventName);
   if (!item || item.type !== "event") throw new Error(`no event ${eventName}`);
-  const topics = encodeEventTopics({ abi: onDealV2Abi, eventName, args } as never) as Hex[];
+  const topics = encodeEventTopics({ abi: deClubEscrowAbi, eventName, args } as never) as Hex[];
   const inputs = item.inputs.filter((i) => !i.indexed);
   const data = encodeAbiParameters(inputs, inputs.map((i) => args[i.name as string]) as never);
   return { address, data, topics, logIndex };

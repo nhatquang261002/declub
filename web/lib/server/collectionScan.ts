@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createPublicClient, getAddress, http, parseAbi, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { RPC_URL } from "../config";
+import { IPFS_GATEWAY, RPC_URL } from "../config";
 
 /**
  * Reads every token's traits from any ERC-721: `totalSupply` (and `tokenByIndex` when the
@@ -209,7 +209,6 @@ async function sequential(rpc: PublicClient, address: Address, total: number): P
 
 // ── Metadata ───────────────────────────────────────────────────────────────────────────────────
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
 /**
  * Addresses a metadata fetch must never reach: loopback, private (RFC 1918), CGNAT, link-local
@@ -319,7 +318,8 @@ export async function readCapped(res: Response, max: number): Promise<string | n
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function readJson(uri: string, budget?: AbortSignal): Promise<unknown> {
+/** A `tokenURI`'s JSON: inline, or fetched from a public https host (see `safeUrl`). `null` when it can't be fetched. */
+export async function readJson(uri: string, budget?: AbortSignal): Promise<unknown> {
   const base64 = "data:application/json;base64,";
   const utf8 = "data:application/json;utf8,";
   if (uri.startsWith(base64)) return JSON.parse(Buffer.from(uri.slice(base64.length), "base64").toString("utf8"));

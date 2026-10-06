@@ -14,8 +14,7 @@ import {
 } from "../lib/dealBook";
 import { DEFAULT_FILTERS } from "../lib/dealFilters";
 import type { DealV2 } from "../lib/dealsV2";
-import { demoIntents } from "../lib/demoDeals";
-import { intentAsListing, type PoolIntent } from "../lib/intents";
+import { intentAsListing, intentHash, type PoolIntent } from "../lib/intents";
 import { createBook, type BookReader } from "../lib/server/dealBook";
 import { dealsHandler } from "../lib/server/dealRoutes";
 
@@ -55,6 +54,20 @@ const source = (deals: DealV2[], signed: PoolIntent[] = [], info: Map<string, To
   allSigned: signed.map(intentAsListing),
   info,
 });
+
+/** A signed swap as the pool would return it, with the real hash of its terms. */
+const signedRow = (n: number, maker = ANA): PoolIntent => {
+  const intent = {
+    maker,
+    give: [nftAsset(NFT, BigInt(n))],
+    want: [erc20Asset(USD, 100n)],
+    feeToken: USD,
+    maxFee: 10n,
+    deadline: BigInt(NOW + 3_600),
+    nonce: BigInt(n),
+  };
+  return { hash: intentHash(intent), status: "open", reason: null, createdAt: NOW - n * 600, settlementTx: null, intent, signature: `0x${"ab".repeat(65)}` };
+};
 
 const ids = (items: readonly { id: bigint }[]) => items.map((t) => Number(t.id));
 
@@ -118,8 +131,7 @@ describe("pageBook", () => {
   });
 
   it("puts signed swaps first, and drops either kind on request", () => {
-    const rows = demoIntents(ME).filter((r) => r.status === "open");
-    assert.ok(rows.length > 0);
+    const rows = [signedRow(1), signedRow(2, ME), signedRow(3, BO)];
     const both = pageBook(source(book, rows), query(), NOW);
     assert.ok("signed" in both.items[0]);
     assert.equal(both.total, rows.length + 2);
@@ -143,14 +155,14 @@ describe("pageBook", () => {
 
 describe("the wire format", () => {
   it("round-trips deals and signed swaps through JSON", () => {
-    const row = demoIntents(ME)[0];
+    const row = signedRow(1, ME);
     const items = [deal(3, { taker: ME, expiry: 99n, fee: 7n, offered: [erc20Asset(USD, 123n), nativeAsset(5n)] }), intentAsListing(row)];
     const back = fromWireListings(JSON.parse(JSON.stringify(items.map(toWireListing))));
     assert.deepEqual(back, items);
   });
 
   it("leaves out what doesn't read back, including a signed swap whose hash doesn't match", () => {
-    const row = demoIntents(ME)[0];
+    const row = signedRow(1, ME);
     const forged = { signed: { ...JSON.parse(JSON.stringify(toWireListing(intentAsListing(row)))).signed, hash: `0x${"11".repeat(32)}` } };
     const broken = { deal: { ...JSON.parse(JSON.stringify(toWireListing(deal(1)))).deal, maker: "nobody" } };
     assert.deepEqual(fromWireListings([forged, broken, toWireListing(deal(2))]), [deal(2)]);
@@ -249,7 +261,7 @@ describe("GET /api/deals", () => {
   it("answers a page of the book, publicly cacheable", async () => {
     const { reader } = fakeReader([deal(1), deal(2, { status: "filled" }), deal(3)]);
     const book = createBook(reader, null);
-    const res = await dealsHandler({ book: () => book, demo: false, now: () => NOW * 1000 })(get("?size=1"));
+    const res = await dealsHandler({ book: () => book, now: () => NOW * 1000 })(get("?size=1"));
     assert.equal(res.status, 200);
     assert.match(res.headers.get("cache-control") ?? "", /s-maxage/);
     const body = (await res.json()) as BookResponse;
@@ -259,16 +271,9 @@ describe("GET /api/deals", () => {
   });
 
   it("refuses a bad query, and is off without a deal contract", async () => {
-    const off = dealsHandler({ book: () => null, demo: false });
+    const off = dealsHandler({ book: () => null });
     assert.equal((await off(get("?tab=nope"))).status, 400);
     assert.deepEqual(await (await off(get())).json(), { enabled: false });
-  });
-
-  it("serves the mock deals in development, cast for the viewer", async () => {
-    const res = await dealsHandler({ book: () => null, demo: true })(get(`?tab=for-you&viewer=${ME}&kind=locked`));
-    const body = (await res.json()) as BookResponse;
-    assert.ok(body.enabled && body.total > 0);
-    assert.ok(fromWireListings(body.items).every((t) => t.taker === ME));
   });
 });
 

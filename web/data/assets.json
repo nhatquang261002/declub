@@ -11,6 +11,16 @@
   },
   {
     "chainId": 10143,
+    "address": "0x32A325b0640594377D0708Ca9081c93da95e1908",
+    "kind": "erc721",
+    "name": "Chog Genesis",
+    "symbol": "CHOG",
+    "status": "verified",
+    "note": "The Chog Genesis collection on Monad testnet, the one this app's NEXT_PUBLIC_CHOG_ADDRESS points at (ERC-721, 1,969 minted).",
+    "image": "/art/chogs/chog-02.png"
+  },
+  {
+    "chainId": 10143,
     "address": "0xd300f095f456D59AAc122B0100833fE195136F6c",
     "kind": "erc20",
     "category": "stablecoin",
@@ -19,5 +29,35 @@
     "status": "verified",
     "note": "The project's own test token on Monad testnet, deployed from this repo (source-verified on Sourcify).",
     "minHolding": "1000000000000000000"
+  },
+  {
+    "chainId": 10143,
+    "address": "0xaDcA7bE2Cdf247a388A6Fb4b19fdF0b436Ad2584",
+    "kind": "erc721",
+    "name": "Chog Genesis",
+    "symbol": "CHOG",
+    "status": "verified",
+    "note": "Demo mirror of the mainnet collection on Monad testnet (CollectionMirror).",
+    "image": "/art/clubs/chog.png"
+  },
+  {
+    "chainId": 10143,
+    "address": "0xa2545c8c2907CFDACCfc43774A04fFA5C3D174C2",
+    "kind": "erc721",
+    "name": "skrumpeys",
+    "symbol": "SKRUMP",
+    "status": "verified",
+    "note": "Demo mirror of the mainnet collection on Monad testnet (CollectionMirror).",
+    "image": "/art/clubs/skrumpeys.png"
+  },
+  {
+    "chainId": 10143,
+    "address": "0x816F53AC5F57F7A69e0A9467D945e5778A864DA8",
+    "kind": "erc721",
+    "name": "r3tards",
+    "symbol": "R3TARDS",
+    "status": "verified",
+    "note": "Demo mirror of the mainnet collection on Monad testnet (CollectionMirror).",
+    "image": "/art/clubs/r3tards.png"
   }
 ]

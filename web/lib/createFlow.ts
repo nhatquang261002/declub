@@ -4,13 +4,13 @@ import { looksLikeHandle } from "./profiles";
 
 /**
  * The three ways to start a deal. "open" (makers list assets, takers send offers) and, when
- * OnDealV2 is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
+ * DeClubEscrow is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
  * and "trait" fall back to the Chog contract.
  */
 export type DealKind = "open" | "exact" | "trait";
 /**
- * How a deal settles. "escrow" locks the maker's side on-chain (OnDeal / OnDealV2); "signed"
- * locks nothing and is settled by a matcher (OnDealIntents, ADR 0008).
+ * How a deal settles. "escrow" locks the maker's side on-chain (DeClubEscrow); "signed"
+ * locks nothing and is settled by a matcher (DeClubIntents, ADR 0008).
  */
 export type Settlement = "escrow" | "signed";
 export type Step = 1 | 2 | 3;

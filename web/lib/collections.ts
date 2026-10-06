@@ -48,9 +48,9 @@ export const isFeatured = (address: string) =>
 
 // ─────────────────────────────────────────────────────────────── Recently used
 
-export const RECENT_KEY = "ondeal:recent-collections";
+export const RECENT_KEY = "declub:recent-collections";
 /** Fired on this tab after the list changes; other tabs get the browser's own `storage` event. */
-export const RECENT_EVENT = "ondeal:recents";
+export const RECENT_EVENT = "declub:recents";
 const RECENT_MAX = 8;
 
 /** The saved list as stored. Storage can be blocked or full; the picker works without it. */

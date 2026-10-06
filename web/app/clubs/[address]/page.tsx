@@ -7,7 +7,7 @@ import { isAddress } from "viem";
 import { Alert } from "@/components/Alert";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
-import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { formatMomentum, HeatMeter, MomentumChange, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { Tooltip } from "@/components/Tooltip";
@@ -15,21 +15,23 @@ import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard"
 import { useClubMarket } from "@/hooks/useClubMarket";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useClub } from "@/hooks/useClubs";
+import { useMyRewards } from "@/hooks/useRewards";
 import { useNow } from "@/hooks/useNow";
 import { toClubInfo } from "@/lib/clubs";
-import { ago } from "@/lib/format";
+import { ago, formatMon } from "@/lib/format";
 import { registry, type ClubEntry } from "@/lib/verifiedAssets";
 import { ClubBoard } from "./ClubBoard";
 import { ClubManage } from "./ClubManage";
 import { ClubMarket } from "./ClubMarket";
 import { ClubMembers } from "./ClubMembers";
+import { ClubRewards } from "./ClubRewards";
 import { ClubSidebar } from "./ClubSidebar";
 
 export default function ClubPage() {
   const params = useParams<{ address: string }>();
   const router = useRouter();
   const entry = isAddress(params.address, { strict: false }) ? registry.clubFor(params.address) : null;
-  // A memecoin that shares a collection's Club opens it at the Club's own address, and the other way round.
+  // A memecoin opens its collection's Club, at the collection's address.
   const home = entry && entry.address.toLowerCase() !== params.address.toLowerCase() ? entry.address.toLowerCase() : null;
   useEffect(() => {
     if (home) router.replace(`/clubs/${home}${window.location.search}`);
@@ -38,7 +40,7 @@ export default function ClubPage() {
     return (
       <div className="club-panel mx-auto max-w-md px-6 py-12 text-center">
         <p className="text-lg font-black">No Club here</p>
-        <p className="mt-1 text-sm text-muted">There is no Club for this address. Clubs are for verified NFT collections and memecoins: a stablecoin or wrapped MON has none.</p>
+        <p className="mt-1 text-sm text-muted">There is no Club for this address. Clubs are for verified NFT collections, and a memecoin made for one opens its Club. Other tokens have none.</p>
         <Link href="/clubs" className="btn-primary mt-5">
           See all Clubs
         </Link>
@@ -53,8 +55,8 @@ export default function ClubPage() {
   );
 }
 
-type Tab = "market" | "board" | "members" | "manage";
-const TABS: readonly Tab[] = ["market", "board", "members", "manage"];
+type Tab = "market" | "board" | "members" | "rewards" | "manage";
+const TABS: readonly Tab[] = ["market", "board", "members", "rewards", "manage"];
 
 function Stat({ label, children, hint }: { label: ReactNode; children: ReactNode; hint?: ReactNode }) {
   return (
@@ -87,6 +89,12 @@ function Club({ entry }: { entry: ClubEntry }) {
   const board = useClubPosts(entry.address);
   const { claim } = useClubActions(entry.address);
   const staff = me.role !== undefined && me.role !== "member";
+  // The Club fund this Owner can claim now (ADR 0022), as opposed to claiming the Club itself.
+  const rewards = useMyRewards(me.role === "owner" ? (me.wallet as `0x${string}` | undefined) : undefined);
+  const fundReady = rewards.claimable
+    .flatMap((leaf) => leaf.breakdown)
+    .filter((b) => b.kind === "fund" && b.club === entry.address.toLowerCase())
+    .reduce((sum, b) => sum + BigInt(b.amount), 0n);
 
   const asked = search.get("tab") as Tab | null;
   const tab: Tab = asked && TABS.includes(asked) && (asked !== "manage" || staff) ? asked : "market";
@@ -102,6 +110,7 @@ function Club({ entry }: { entry: ClubEntry }) {
     { value: "market", label: "Market", icon: <TagIcon />, count: market.isLoading ? undefined : market.have.length + market.wanted.length },
     { value: "board", label: "Board", icon: <ChatIcon />, count: board.enabled && !board.isLoading ? board.posts.length : undefined },
     { value: "members", label: "Members", icon: <UsersIcon />, count: club?.members },
+    { value: "rewards", label: "Rewards", icon: <CoinIcon /> },
     ...(staff ? [{ value: "manage" as const, label: "Manage", icon: <ShieldIcon /> }] : []),
   ];
 
@@ -134,7 +143,7 @@ function Club({ entry }: { entry: ClubEntry }) {
               </h1>
               <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted">
                 <span className="font-semibold">{clubLabel(info)}</span>
-                <Tooltip content={`On On Deal’s verified list: ${info.note}`}>
+                <Tooltip content={`On DeClub’s verified list: ${info.note}`}>
                   <span className="chip chip-blue">
                     <BadgeCheckIcon />
                     Verified
@@ -154,8 +163,21 @@ function Club({ entry }: { entry: ClubEntry }) {
           </div>
 
           {page?.description && <p className="mt-5 max-w-3xl text-[0.95rem] leading-7 break-words whitespace-pre-wrap">{page.description}</p>}
-          {(page?.links.length ?? 0) > 0 && (
+          {((page?.links.length ?? 0) > 0 || (page?.x?.accounts.length ?? 0) > 0) && (
             <ul className="mt-3 flex flex-wrap gap-2">
+              {page?.x?.accounts.map((a) => (
+                <li key={a.handle}>
+                  <a
+                    href={`https://x.com/${a.handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="chip py-1"
+                    title={`The project’s own X account: the Owner linked it with a post from @${a.handle}.`}
+                  >
+                    <XLogoIcon className="size-3" />@{a.handle} ✓
+                  </a>
+                </li>
+              ))}
               {page!.links.map((href) => (
                 <li key={href}>
                   <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="chip py-1">
@@ -190,8 +212,18 @@ function Club({ entry }: { entry: ClubEntry }) {
           <Stat label="Members" hint={club ? `${holders.toLocaleString()} ${holders === 1 ? "holder" : "holders"}` : undefined}>
             {club ? club.members.toLocaleString() : "…"}
           </Stat>
-          <Stat label="Swaps · 7 days">{stats ? stats.completed7d.toLocaleString() : "…"}</Stat>
-          <Stat label="New deals · 7 days">{stats ? stats.created7d.toLocaleString() : "…"}</Stat>
+          <Stat label="Swaps · 7 days" hint={stats ? `${stats.created7d.toLocaleString()} new ${stats.created7d === 1 ? "deal" : "deals"}` : undefined}>
+            {stats ? stats.completed7d.toLocaleString() : "…"}
+          </Stat>
+          <Stat
+            label={
+              <Tooltip content="Holders’ own X posts about this Club, shared on its Board. They count toward Momentum and the Holder bonus.">
+                <span className="uppercase underline decoration-dotted underline-offset-2">X posts · 7 days</span>
+              </Tooltip>
+            }
+          >
+            {stats ? (stats.xShares7d ?? 0).toLocaleString() : "…"}
+          </Stat>
           <Stat label="Traders · 30 days">{stats ? stats.traders30d.toLocaleString() : "…"}</Stat>
           <Stat label="Heat">{stats ? <HeatMeter value={stats.momentum} /> : "…"}</Stat>
         </dl>
@@ -209,6 +241,19 @@ function Club({ entry }: { entry: ClubEntry }) {
             }
           >
             If you own the {info.symbol} contract, claim the Club with the wallet that is its owner().
+          </Alert>
+        )}
+        {fundReady > 0n && tab !== "rewards" && (
+          <Alert
+            tone="info"
+            title={`${formatMon(fundReady)} in the Club fund is ready`}
+            actions={
+              <button type="button" className="alert-link" onClick={() => setTab("rewards")}>
+                Collect the fund
+              </button>
+            }
+          >
+            As the Owner, you collect the Club’s share of its swap fees. It’s on the Rewards tab.
           </Alert>
         )}
         {info.archived && (
@@ -244,6 +289,9 @@ function Club({ entry }: { entry: ClubEntry }) {
           {tab === "market" && <ClubMarket market={market} symbol={held} recent={recent} now={now} />}
           {tab === "board" && <ClubBoard token={entry.address} symbol={held} archived={info.archived} now={now} />}
           {tab === "members" && <ClubMembers token={entry.address} symbol={held} now={now} />}
+          {tab === "rewards" && (
+            <ClubRewards token={entry.address} symbol={held} wallet={me.member ? me.wallet : undefined} isOwner={me.role === "owner"} now={now} />
+          )}
           {tab === "manage" && me.role && staff && <ClubManage token={entry.address} role={me.role} now={now} />}
         </div>
 

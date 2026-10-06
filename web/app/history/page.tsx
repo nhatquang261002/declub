@@ -12,7 +12,7 @@ import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useDealsV2 } from "@/hooks/useDealsV2";
 import { useIntents } from "@/hooks/usePool";
-import { ON_DEAL_V2_ADDRESS, SHOW_INTENTS } from "@/lib/config";
+import { DECLUB_ESCROW_ADDRESS, SHOW_INTENTS } from "@/lib/config";
 import { intentAsListing } from "@/lib/intents";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 import type { DealV2 } from "@/lib/dealsV2";
@@ -37,7 +37,7 @@ export default function HistoryPage() {
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
   const deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
   const { info } = useDealsTokenInfo(deals);
-  const { ids: fillIds } = useFills(address, ON_DEAL_V2_ADDRESS);
+  const { ids: fillIds } = useFills(address, DECLUB_ESCROW_ADDRESS);
   const { error } = v2;
   const isLoading = (v2.isLoading || signed.isLoading) && !error;
 

@@ -1,6 +1,6 @@
 import { parseAbi } from "viem";
 
-/** The slice of `OnDealIntents` the pool and matcher use. Checked against the build in tests. */
+/** The slice of `DeClubIntents` the pool and matcher use. Checked against the build in tests. */
 export const intentsAbi = parseAbi([
   "struct Asset { uint8 assetType; address token; uint256 id; uint256 amount; }",
   "struct Intent { address maker; Asset[] give; Asset[] want; address feeToken; uint256 maxFee; uint64 deadline; uint256 nonce; }",

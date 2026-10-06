@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { createPublicClient, getAbiItem, http, type Address, type Hex, type PublicClient } from "viem";
-import { onDealV2Abi } from "../abi";
+import { deClubEscrowAbi } from "../abi";
 import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { ACTIVITY_CONTRACTS, recordActivity, viemReader, type IngestOptions, type Reader } from "./activity";
@@ -35,7 +35,7 @@ export type ChainScan = {
 /** Every contract whose events count: fills, and creations for the Clubs. */
 const WATCHED: Address[] = [...new Set([...FILL_CONTRACTS, ...ACTIVITY_CONTRACTS])];
 
-const EVENTS = [getAbiItem({ abi: onDealV2Abi, name: "TradeFilled" }), getAbiItem({ abi: onDealV2Abi, name: "TradeCreated" })];
+const EVENTS = [getAbiItem({ abi: deClubEscrowAbi, name: "TradeFilled" }), getAbiItem({ abi: deClubEscrowAbi, name: "TradeCreated" })];
 
 /** The public RPC answers `eth_getLogs` for at most 100 blocks (ADR 0004). */
 export const DEFAULT_RANGE = 100;
@@ -57,8 +57,8 @@ export function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
 }
 
 /** The last block the watcher has fully processed. */
-export const cursorKey = () => `ondeal:watch:${CHAIN_ID}:fills:cursor`;
-const lockKey = () => `ondeal:watch:${CHAIN_ID}:fills:lock`;
+export const cursorKey = () => `declub:watch:${CHAIN_ID}:fills:cursor`;
+const lockKey = () => `declub:watch:${CHAIN_ID}:fills:lock`;
 
 export type WatchOptions = {
   scan?: ChainScan;

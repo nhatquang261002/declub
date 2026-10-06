@@ -32,6 +32,7 @@ import {
   type IntentStatus,
   type PoolIntent,
 } from "@/lib/intents";
+import { CopyAddress } from "@/components/CopyAddress";
 
 export default function IntentPage() {
   const params = useParams<{ hash: string }>();
@@ -141,9 +142,12 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
             {
               label: "Maker's wallet",
               value: (
-                <a href={explorerAddress(intent.maker)} target="_blank" rel="noreferrer" className="font-mono text-xs font-semibold">
-                  {intent.maker} ↗
-                </a>
+                <span className="inline-flex flex-wrap items-baseline gap-x-2">
+                  <CopyAddress address={intent.maker} full className="text-xs font-semibold" />
+                  <a href={explorerAddress(intent.maker)} target="_blank" rel="noreferrer" className="font-mono text-xs font-semibold" title="View on the explorer">
+                    ↗
+                  </a>
+                </span>
               ),
             },
             { label: "Nonce", value: <span className="font-mono">{intent.nonce.toString()}</span> },

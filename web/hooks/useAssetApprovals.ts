@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useReadContracts } from "wagmi";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import { erc20Abi, erc721Abi } from "@/lib/contracts";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import type { WriteCall } from "./useTxFlow";
@@ -15,7 +15,7 @@ export type ApprovalStep = {
 };
 
 /**
- * The approvals OnDealV2 still needs before it can pull `assets` from `owner`, one step per
+ * The approvals DeClubEscrow still needs before it can pull `assets` from `owner`, one step per
  * ERC-20 (for the exact amount, no more) and one per NFT collection (setApprovalForAll, the
  * only way to cover several ids in one transaction). Empty means ready. MON needs none.
  *
@@ -26,7 +26,7 @@ export function useAssetApprovals(
   assets: readonly Asset[],
   info: ReadonlyMap<string, TokenInfo>,
 ) {
-  const spender = ON_DEAL_V2_ADDRESS;
+  const spender = DECLUB_ESCROW_ADDRESS;
 
   const { erc20s, collections } = useMemo(() => {
     const erc20s = assets.filter((a) => a.kind === "erc20");

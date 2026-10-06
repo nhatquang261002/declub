@@ -1,5 +1,6 @@
 import { isAddress } from "viem";
 import { linkedEthereumWallets } from "../profiles";
+import { clubInbox, type InboxDeps } from "./inbox";
 import type { MemberSort } from "../members";
 import type { Registry } from "../verifiedAssets";
 import { roleIn, type Deps as BoardDeps } from "./board";
@@ -109,6 +110,16 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
       { enabled: true, ...view },
       { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
     );
+  };
+}
+
+/** GET /api/me/club-inbox: likes on your posts, your pins and the rewards you earned (lib/server/inbox.ts). */
+export function clubInboxHandler(deps: Pick<RouteDeps, "gate"> & Pick<InboxDeps, "now" | "standings"> = {}) {
+  return async function GET(request: Request) {
+    const g = await (deps.gate ?? gateUser)(request, "me-club-inbox", 60);
+    if (g instanceof Response) return g;
+    const wallets = linkedEthereumWallets(g.user.linked_accounts);
+    return json({ enabled: true, items: await clubInbox(g.store, g.user.id, wallets, { now: deps.now, standings: deps.standings }) });
   };
 }
 

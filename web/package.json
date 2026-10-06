@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "abi": "wagmi generate",
+    "rewards:epoch": "node --import ./test/register.mjs scripts/rewards-epoch.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs --test --test-concurrency=1 \"test/**/*.test.ts\""
   },

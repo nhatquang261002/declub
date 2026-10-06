@@ -2,7 +2,7 @@ import { zeroAddress, type Address } from "viem";
 import { toAsset, type Asset, type RawAsset } from "./assets";
 import type { DealStatus } from "./deals";
 
-/** A OnDealV2 deal: what each side gives, as two lists of assets. */
+/** A DeClubEscrow deal: what each side gives, as two lists of assets. */
 export type DealV2 = {
   id: bigint;
   maker: Address;
@@ -20,7 +20,7 @@ export type DealV2 = {
   requested: readonly Asset[];
 };
 
-/** The shape `getTrade` returns (IOnDealV2.Deal). */
+/** The shape `getTrade` returns (IDeClubEscrow.Deal). */
 export type RawDealV2 = {
   maker: Address;
   expiry: bigint;

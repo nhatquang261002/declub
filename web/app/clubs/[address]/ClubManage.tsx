@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { formatUnits, parseUnits, type Address } from "viem";
 import { Alert } from "@/components/Alert";
-import { LinkIcon } from "@/components/Icons";
+import { Spinner } from "@/components/Spinner";
+import { ExternalIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
-import { useClubActions, useClubPage, useClubStaff } from "@/hooks/useClubBoard";
+import { useClubActions, useClubPage, useClubStaff, type ClubCoin } from "@/hooks/useClubBoard";
+import { useTokenInfo } from "@/hooks/useTokenInfo";
 import type { ViewerRole } from "@/hooks/useClubMembership";
 import { MAX_DESCRIPTION, MAX_LINKS } from "@/lib/clubPosts";
+import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
-import { ago, shortAddress } from "@/lib/format";
+import { ago } from "@/lib/format";
 import { Panel } from "./parts";
+import { CopyAddress } from "@/components/CopyAddress";
 
 /** What a log line says, in words. */
 const ACTIONS: Record<string, string> = {
@@ -30,6 +35,8 @@ const ACTIONS: Record<string, string> = {
   remove_owner: "removed the Owner:",
   claim_owner: "claimed ownership through owner():",
   edit_profile: "edited the Club page",
+  link_x: "linked the X account",
+  unlink_x: "unlinked the X account",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
@@ -94,7 +101,8 @@ function PageEditor({ token }: { token: string }) {
         </span>
       </label>
       <div className="flex items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={profile.isPending || draft === null}>
+        <button type="submit" className="btn-primary" aria-busy={profile.isPending} disabled={profile.isPending || draft === null}>
+          {profile.isPending && <Spinner />}
           {profile.isPending ? "Saving…" : "Save changes"}
         </button>
         {draft !== null && !profile.isPending && (
@@ -107,10 +115,194 @@ function PageEditor({ token }: { token: string }) {
   );
 }
 
+/** "1.5" → base units at `decimals`, or null when it isn't an amount above zero with at most that many decimals. */
+function toUnits(input: string, decimals: number): bigint | null {
+  const value = input.trim();
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(value) || (value.split(".")[1]?.length ?? 0) > decimals) return null;
+  const units = parseUnits(value, decimals);
+  return units > 0n ? units : null;
+}
+
+/**
+ * Whether holding the Club's memecoin earns the Holder badge, and from how much (ADR 0026). NFTs
+ * always do. Club Rewards follow the NFTs either way.
+ */
+function CoinEditor({ token, coin }: { token: string; coin: ClubCoin }) {
+  const { profile } = useClubActions(token);
+  const { info } = useTokenInfo([coin.token as Address]);
+  const decimals = info.get(coin.token)?.decimals;
+  const [draft, setDraft] = useState<{ on: boolean; amount: string } | null>(null);
+  const current = draft ?? { on: coin.on, amount: decimals === undefined ? "" : formatUnits(BigInt(coin.min), decimals) };
+  const units = decimals === undefined ? null : toUnits(current.amount, decimals);
+  const bad = current.on && current.amount.trim() !== "" && units === null;
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        profile.mutate({ coinHolders: { on: current.on, ...(units ? { min: units.toString() } : {}) } }, { onSuccess: () => setDraft(null) });
+      }}
+    >
+      <label className="flex items-start gap-3 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
+        <input type="checkbox" className="mt-0.5 size-4 accent-[#d83b45]" checked={current.on} onChange={(e) => setDraft({ ...current, on: e.target.checked })} />
+        <span>
+          <span className="font-bold">Holding {coin.symbol} makes a member a Holder</span>
+          <span className="block text-xs text-muted">
+            Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.
+          </span>
+        </span>
+      </label>
+      {current.on && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-bold">Minimum {coin.symbol}</span>
+          <input
+            className={field}
+            value={current.amount}
+            inputMode="decimal"
+            placeholder={decimals === undefined ? "Reading the token…" : "1000"}
+            disabled={decimals === undefined}
+            onChange={(e) => setDraft({ ...current, amount: e.target.value })}
+          />
+          <span className={`text-xs ${bad ? "text-danger" : "text-muted"}`}>
+            {bad
+              ? `Enter an amount above zero, with up to ${decimals} decimals.`
+              : `Summed over a member’s linked wallets.${coin.set ? "" : " Until you save, the verified list’s minimum applies."}`}
+          </span>
+        </label>
+      )}
+      <span className="text-xs text-muted">Badges catch up as the Members list is read; nobody’s is more than a day out of date.</span>
+      <button type="submit" className="btn-secondary btn-sm w-fit" disabled={profile.isPending || draft === null || bad}>
+        {profile.isPending ? "Saving…" : "Save"}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * The Club on X (ADR 0024): the project's accounts, linked by a post only they could make, and the
+ * tags that make an X post about the Club. Members' own X posts that match count for the Club.
+ */
+function XEditor({ token }: { token: string }) {
+  const page = useClubPage(token);
+  const { xStart, xVerify, xUnlink, profile } = useClubActions(token);
+  const [handle, setHandle] = useState("");
+  const [proof, setProof] = useState<{ handle: string; text: string } | null>(null);
+  const [url, setUrl] = useState("");
+  const [tags, setTags] = useState<string | null>(null);
+  const accounts = page?.x?.accounts ?? [];
+  const currentTags = tags ?? (page?.x?.tags ?? []).join(" ");
+  const parsed = currentTags.split(/[\s,]+/).filter(Boolean);
+  const badTag = parsed.find((t) => !normalizeTag(t));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-bold">Project X accounts</p>
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted">None linked. Link the project’s own account so posts that mention or quote it count in full.</p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {accounts.map((a) => (
+              <li key={a.handle} className="flex flex-wrap items-center gap-2 text-sm">
+                <a className="inline-flex items-center gap-1.5 font-bold hover:underline" href={`https://x.com/${a.handle}`} target="_blank" rel="noopener noreferrer">
+                  <XLogoIcon className="size-3.5" />@{a.handle} ✓
+                </a>
+                <a className="text-xs text-muted hover:underline" href={`https://x.com/i/status/${a.proof}`} target="_blank" rel="noopener noreferrer">
+                  proof
+                </a>
+                <button type="button" className="ml-auto text-xs font-bold text-muted hover:text-danger" disabled={xUnlink.isPending} onClick={() => xUnlink.mutate(a.handle)}>
+                  Unlink
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {accounts.length < MAX_X_ACCOUNTS && !proof && (
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              xStart.mutate(handle, { onSuccess: (r) => (setProof({ handle: r.handle, text: r.text }), setUrl("")) });
+            }}
+          >
+            <label className="relative min-w-48 flex-1">
+              <span className="sr-only">The project’s X handle</span>
+              <XLogoIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
+              <input className={`${field} pl-9`} value={handle} placeholder="@ProjectHandle" onChange={(e) => setHandle(e.target.value)} />
+            </label>
+            <button type="submit" className="btn-secondary btn-sm" disabled={xStart.isPending || handle.trim().length === 0}>
+              {xStart.isPending ? "…" : "Link account"}
+            </button>
+          </form>
+        )}
+
+        {proof && (
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
+            <p>
+              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete
+              the post once it’s linked.
+            </p>
+            <p className="rounded-lg bg-white p-2 font-mono text-xs break-all">{proof.text}</p>
+            <a
+              className="btn-secondary btn-sm w-fit"
+              href={`https://x.com/intent/post?text=${encodeURIComponent(proof.text)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Post it on X <ExternalIcon className="size-3" />
+            </a>
+            <form
+              className="flex flex-wrap gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                xVerify.mutate({ handle: proof.handle, url }, { onSuccess: () => (setProof(null), setHandle("")) });
+              }}
+            >
+              <input className={`${field} min-w-48 flex-1`} value={url} inputMode="url" placeholder="https://x.com/…/status/…" onChange={(e) => setUrl(e.target.value)} />
+              <button type="submit" className="btn-primary btn-sm" aria-busy={xVerify.isPending} disabled={xVerify.isPending || url.trim().length === 0}>
+                {xVerify.isPending && <Spinner />}
+                {xVerify.isPending ? "Checking…" : "Check and link"}
+              </button>
+              <button type="button" className="text-xs font-bold text-muted hover:text-[#111318]" onClick={() => setProof(null)}>
+                Cancel
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      <form
+        className="flex flex-col gap-1.5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          profile.mutate({ xTags: parsed }, { onSuccess: () => setTags(null) });
+        }}
+      >
+        <label className="text-sm font-bold" htmlFor="club-x-tags">
+          Tags
+        </label>
+        <input id="club-x-tags" className={field} value={currentTags} placeholder="#chog $CHOG chogs" onChange={(e) => setTags(e.target.value)} />
+        <span className={`text-xs ${badTag || parsed.length > MAX_X_TAGS ? "text-danger" : "text-muted"}`}>
+          {badTag
+            ? `“${badTag}” isn’t a tag: use a #hashtag, a $cashtag or a word of 2 to 30 letters, digits or _.`
+            : `Up to ${MAX_X_TAGS}, separated by spaces. A post that only matches a tag counts half. The Club’s ticker is always one.`}
+        </span>
+        {page?.x?.hint && <span className="text-xs text-muted">Right now a member’s own X post counts when it {page.x.hint}.</span>}
+        <button type="submit" className="btn-secondary btn-sm mt-1 w-fit" disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}>
+          Save tags
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /** The staff view: the Club's page text, bans, the moderation log, and claiming ownership. */
 export function ClubManage({ token, role, now }: { token: string; role: ViewerRole; now: number }) {
   const { log, ownership, bans, isLoading } = useClubStaff(token, true);
   const { unban } = useClubActions(token);
+  const page = useClubPage(token);
   const owner = isOwnerOrAdmin(role);
   const banned = bans ? [...bans.club.map((b) => ({ ...b, everywhere: false })), ...bans.everywhere.map((b) => ({ ...b, everywhere: true }))] : [];
 
@@ -118,14 +310,26 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
     <div className="flex flex-col gap-5">
       {ownership?.changed && (
         <Alert tone="warn" title="Ownership changed on-chain">
-          The Owner claimed this Club as <span className="font-mono">{shortAddress(ownership.claimed)}</span>, but the contract’s owner() is now{" "}
-          <span className="font-mono">{ownership.onchain ? shortAddress(ownership.onchain) : "unreadable or removed"}</span>. Review who should hold the Club.
+          The Owner claimed this Club as <CopyAddress address={ownership.claimed} />, but the contract’s owner() is now{" "}
+          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold the Club.
         </Alert>
       )}
 
       {owner && (
         <Panel title="Club page">
           <PageEditor token={token} />
+        </Panel>
+      )}
+
+      {owner && page?.coin && (
+        <Panel title={`${page.coin.symbol} holders`}>
+          <CoinEditor token={token} coin={page.coin} />
+        </Panel>
+      )}
+
+      {owner && (
+        <Panel title="The Club on X">
+          <XEditor token={token} />
         </Panel>
       )}
 
@@ -163,9 +367,9 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
               <li key={entry.id} className="relative">
                 <span className="absolute top-1.5 -left-[1.4rem] size-2.5 rounded-full border-2 border-[#111318] bg-[#f0b735]" aria-hidden />
                 <p className="flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="font-mono text-xs font-bold">{shortAddress(entry.actor)}</span>
+                  <CopyAddress address={entry.actor} className="text-xs font-bold" />
                   <span>{ACTIONS[entry.action] ?? entry.action}</span>
-                  {entry.target && <span className="font-mono text-xs break-all">{entry.target.length > 20 ? shortAddress(entry.target) : entry.target}</span>}
+                  {entry.target && (entry.target.length > 20 ? <CopyAddress address={entry.target} className="text-xs" /> : <span className="font-mono text-xs break-all">{entry.target}</span>)}
                   {entry.detail && <span className="text-xs text-muted">({entry.detail})</span>}
                 </p>
                 <p className="text-xs text-muted">{ago(Math.floor(entry.at / 1000), now)}</p>

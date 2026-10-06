@@ -1,10 +1,10 @@
+import { IPFS_GATEWAY } from "./config";
+
 export type ChogMetadata = {
   name: string;
   image: string | null;
   attributes: { trait_type: string; value: string }[];
 };
-
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
 const resolveUri = (uri: string) =>
   uri.startsWith("ipfs://") ? IPFS_GATEWAY + uri.slice("ipfs://".length) : uri;

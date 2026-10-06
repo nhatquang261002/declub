@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { encodeAbiParameters, encodeEventTopics, getAddress, zeroAddress, type Address, type Hex } from "viem";
-import { onDealV2Abi } from "../lib/abi";
+import { deClubEscrowAbi } from "../lib/abi";
 import { activityKey, ingestTx, readActivity, recordActivity, type ReceiptLike, type Reader } from "../lib/server/activity";
 import { fillsKey, listFills, recordFills } from "../lib/server/fills";
 import { memoryStore, type Store } from "../lib/server/store";
@@ -23,9 +23,9 @@ type Raw = ReturnType<typeof nft>;
 
 /** A log encoded the way the contract emits it, from the ABI. */
 function log(address: Address, eventName: string, args: Record<string, unknown>, logIndex = 0) {
-  const item = onDealV2Abi.find((i) => i.type === "event" && i.name === eventName);
+  const item = deClubEscrowAbi.find((i) => i.type === "event" && i.name === eventName);
   if (!item || item.type !== "event") throw new Error(`no event ${eventName}`);
-  const topics = encodeEventTopics({ abi: onDealV2Abi, eventName, args } as never) as Hex[];
+  const topics = encodeEventTopics({ abi: deClubEscrowAbi, eventName, args } as never) as Hex[];
   const data = encodeAbiParameters(
     item.inputs.filter((i) => !i.indexed),
     item.inputs.filter((i) => !i.indexed).map((i) => args[i.name as string]) as never,
@@ -132,7 +132,16 @@ describe("recordActivity", () => {
       assert.equal(event!.kind, "swapped");
       assert.deepEqual(event!.parties, [maker.toLowerCase(), taker.toLowerCase()]);
       assert.deepEqual(event!.tokens, [NFT.toLowerCase(), USD.toLowerCase()]);
+      assert.equal(event!.fee, undefined, "no FeeCharged, no fee");
     }
+  });
+
+  it("records a fill's protocol fee from the receipt, for that deal only", async () => {
+    const { reader } = fakeReader({ trade: { offered: [nft(NFT)], requested: [] } });
+    const fee = log(V2, "FeeCharged", { tradeId: 7n, recipient: OTHER, amount: 4_000_000_000_000_000_000n }, 1);
+    const otherDeal = log(V2, "FeeCharged", { tradeId: 8n, recipient: OTHER, amount: 1n }, 2);
+    await recordActivity(store, HASH, receipt([filled(0), fee, otherDeal]), opts(reader));
+    assert.equal((await readActivity(store, NFT))[0]!.fee, "4000000000000000000");
   });
 
   it("adds the proposal's assets when a fill came from accepting one", async () => {

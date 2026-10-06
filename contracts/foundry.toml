@@ -31,3 +31,4 @@ bracket_spacing = false
 # Verification uses Sourcify via MonadVision; flags live in script/README.md.
 [rpc_endpoints]
 monad_testnet = "https://testnet-rpc.monad.xyz"
+monad_mainnet = "https://rpc.monad.xyz"

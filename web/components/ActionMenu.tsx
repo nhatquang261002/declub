@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { MoreIcon } from "./Icons";
 import { usePopover } from "./Popover";
 
@@ -8,8 +9,12 @@ export type MenuAction = {
   label: string;
   icon?: ReactNode;
   onSelect: () => void;
-  /** Asked with window.confirm first: for what can't be undone. */
+  /** Asked in a small dialog first (the question is its title): for what can't be undone. */
   confirm?: string;
+  /** What the dialog explains under the question. */
+  confirmNote?: string;
+  /** The dialog's confirm button; defaults to the action's label. */
+  confirmLabel?: string;
   danger?: boolean;
 };
 
@@ -21,6 +26,7 @@ export type MenuAction = {
 export function ActionMenu({ groups, label }: { groups: ReadonlyArray<ReadonlyArray<MenuAction>>; label: string }) {
   const { open, setOpen, ref } = usePopover();
   const button = useRef<HTMLButtonElement>(null);
+  const [asking, setAsking] = useState<MenuAction | null>(null);
   const shown = groups.filter((g) => g.length > 0);
 
   useEffect(() => {
@@ -68,7 +74,8 @@ export function ActionMenu({ groups, label }: { groups: ReadonlyArray<ReadonlyAr
                   className={`menu-item ${action.danger ? "menu-item-danger" : ""}`}
                   onClick={() => {
                     setOpen(false);
-                    if (!action.confirm || window.confirm(action.confirm)) action.onSelect();
+                    if (action.confirm) setAsking(action);
+                    else action.onSelect();
                   }}
                 >
                   {action.icon}
@@ -78,6 +85,20 @@ export function ActionMenu({ groups, label }: { groups: ReadonlyArray<ReadonlyAr
             </div>
           ))}
         </div>
+      )}
+      {asking && (
+        <ConfirmDialog
+          title={asking.confirm!}
+          message={asking.confirmNote}
+          confirmLabel={asking.confirmLabel ?? asking.label}
+          danger={asking.danger}
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            const action = asking;
+            setAsking(null);
+            action.onSelect();
+          }}
+        />
       )}
     </div>
   );

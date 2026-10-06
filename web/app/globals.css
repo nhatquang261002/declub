@@ -714,6 +714,16 @@ body {
   font-weight: 800;
 }
 
+/* The owner's chosen picture, over the address colours (ADR 0028). */
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 /* Online dot on the corner of an avatar: the wallet is connected. */
 .avatar-dot {
   position: absolute;
@@ -1262,6 +1272,11 @@ body {
   box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
 }
 
+/* A list inside a panel. No overflow: hidden, so a row's menu or tooltip can hang past the panel's
+   edge; the first and last rows round the panel's corners themselves. */
+.club-list > :first-child { border-top-left-radius: calc(1rem - 2px); border-top-right-radius: calc(1rem - 2px); }
+.club-list > :last-child { border-bottom-left-radius: calc(1rem - 2px); border-bottom-right-radius: calc(1rem - 2px); }
+
 .club-card {
   display: flex;
   flex-direction: column;
@@ -1281,13 +1296,16 @@ body {
 }
 
 .club-hero {
-  overflow: hidden;
+  /* No overflow: hidden, so a tooltip in the stats can hang below the header. The cover and the
+     stats round their own outer corners instead. */
   border: 2px solid #111318;
   border-radius: 1.5rem;
   background: var(--chog-cream-500);
   color: #111318;
   box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
 }
+
+.club-hero > .club-cover { border-radius: calc(1.5rem - 2px) calc(1.5rem - 2px) 0 0; }
 
 :is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-muted { color: #4e5968; }
 :is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-danger { color: #a9282f; }
@@ -1312,6 +1330,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 2px solid #111318;
+  border-radius: 0 0 calc(1.5rem - 2px) calc(1.5rem - 2px);
   background: #fdf3c4;
 }
 
@@ -1448,6 +1467,30 @@ a.chip:hover { border-color: #111318; background: white; }
   outline-offset: 1px;
 }
 
+/* An address that copies itself on click (components/CopyAddress.tsx). */
+.copy-address {
+  display: inline-flex;
+  max-width: 100%;
+  cursor: copy;
+  align-items: baseline;
+  gap: 0.3em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-align: left;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 140ms ease;
+}
+
+.copy-address:hover { text-decoration-color: currentColor; }
+
+.copy-address:focus-visible {
+  outline: 3px solid var(--chog-pink-500);
+  outline-offset: 1px;
+  border-radius: 0.25rem;
+}
+
+.copy-address > svg { align-self: center; }
+
 .menu {
   position: absolute;
   top: calc(100% + 0.35rem);
@@ -1499,6 +1542,26 @@ a.chip:hover { border-color: #111318; background: white; }
 .post-pinned { background: rgb(240 183 53 / 0.14); }
 .post-hidden { background: repeating-linear-gradient(-45deg, transparent 0 10px, rgb(17 19 24 / 0.03) 10px 20px); }
 .post-hidden .post-text { opacity: 0.6; }
+/* A reply, inside its post's thread: tighter, and no stripe of its own. */
+.post-reply { gap: 0.65rem; padding: 0.7rem 0.85rem; }
+
+/* A like: a quiet pill that fills in when it's yours. */
+.post-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 2px solid rgb(17 19 24 / 0.25);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgb(17 19 24 / 0.7);
+  transition: transform 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+button.post-like:hover:not(:disabled) { border-color: #111318; color: #111318; transform: translate(-1px, -1px); }
+button.post-like:disabled { cursor: default; opacity: 0.7; }
+.post-like-on { border-color: #111318; background: rgb(240 183 53 / 0.45); color: #111318; }
 
 /* The deal or signed swap a "Looking for" post points at. */
 .post-link {
@@ -1518,6 +1581,32 @@ a.chip:hover { border-color: #111318; background: white; }
 
 .club-panel a.post-link { color: #111318; }
 .club-panel a.post-link:hover { color: #111318; box-shadow: 0.25rem 0.25rem 0 #111318; transform: translate(-1px, -1px); }
+
+/* A shared X post (ADR 0024): the post as plain text, opening on X. */
+.x-card {
+  display: flex;
+  max-width: 34rem;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 2px solid #111318;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.65rem 0.8rem;
+  box-shadow: 0.15rem 0.15rem 0 #111318;
+}
+.x-card-text { font-size: 0.88rem; line-height: 1.35rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.x-card-media { display: block; overflow: hidden; border: 2px solid #111318; border-radius: 0.6rem; }
+.x-card-media img { display: block; width: 100%; max-height: 22rem; object-fit: cover; }
+.club-panel a.x-card-open, a.x-card-open {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #4b5563;
+}
+.club-panel a.x-card-open:hover, a.x-card-open:hover { color: #111318; text-decoration: underline; }
 
 /* The characters left in a post, as a ring that fills. */
 .char-ring {

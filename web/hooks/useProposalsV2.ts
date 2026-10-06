@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useConnection, useReadContract } from "wagmi";
+import { useReadContract } from "wagmi";
 import { swapV2 } from "@/lib/contracts";
-import { demoProposals, isDemoDealId } from "@/lib/demoDeals";
 import { toProposal, type ProposalV2 } from "@/lib/proposals";
 
 const PAGE = 20;
@@ -14,10 +13,7 @@ const PAGE = 20;
  */
 export function useProposalsV2(dealId: bigint, enabled: boolean) {
   const [limit, setLimit] = useState(PAGE);
-  const { address } = useConnection();
-  // Offers on a mock open offer (lib/demoDeals.ts) are never read from the chain.
-  const demo = enabled && isDemoDealId(dealId);
-  const active = enabled && !!swapV2 && !demo;
+  const active = enabled && !!swapV2;
 
   const count = useReadContract({
     ...swapV2!,
@@ -47,11 +43,6 @@ export function useProposalsV2(dealId: bigint, enabled: boolean) {
     });
     return out.reverse();
   }, [page.data, dealId, offset]);
-
-  const mock = useMemo(() => (demo ? demoProposals(dealId, address) : []), [demo, dealId, address]);
-  if (demo) {
-    return { proposals: mock, total: BigInt(mock.length), hasMore: false, loadMore: () => {}, isLoading: false, error: null };
-  }
 
   return {
     proposals,

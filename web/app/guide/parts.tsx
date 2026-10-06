@@ -210,7 +210,7 @@ export function GuideFooter({ other }: { other: { href: string; title: string; b
       </Link>
       <div className={`${CARD} flex flex-col justify-center gap-3 p-6`}>
         <p className="font-black">Still stuck?</p>
-        <a href="mailto:support@on-deal.app" className="btn-secondary">Contact support</a>
+        <a href="mailto:support@declub.app" className="btn-secondary">Contact support</a>
       </div>
     </div>
   );

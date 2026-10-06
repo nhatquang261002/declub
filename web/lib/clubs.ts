@@ -1,6 +1,6 @@
 import type { Settlement } from "./intents";
 import type { AssetEntry, ClubEntry } from "./verifiedAssets";
-import { ON_DEAL_INTENTS_ADDRESS } from "./config";
+import { DECLUB_INTENTS_ADDRESS } from "./config";
 import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
 /**
@@ -15,7 +15,7 @@ export type ActivityEvent = {
   kind: ActivityKind;
   /** The contract that emitted it, lowercase. */
   contract: string;
-  /** The OnDealV2 trade id; for a signed swap, the settlement's transaction hash. */
+  /** The DeClubEscrow trade id; for a signed swap, the settlement's transaction hash. */
   deal: string;
   block: number;
   /** Unix seconds (the block's timestamp). */
@@ -24,9 +24,17 @@ export type ActivityEvent = {
   parties: string[];
   /** Every non-native token the deal names, lowercase. */
   tokens: string[];
+  /**
+   * A completed swap's protocol fee, every side together, in wei (a decimal string). Escrow swaps
+   * carry it from the receipt's `FeeCharged`; signed swaps get it when an epoch is built
+   * (lib/server/rewards.ts). Absent when there was no fee or it isn't known yet.
+   */
+  fee?: string;
+  /** An X share's strength factor (lib/xPosts.ts `strengthFactor`). */
+  weight?: number;
 };
 
-export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties });
+export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties, ...(e.weight !== undefined ? { weight: e.weight } : {}) });
 
 export type ClubStats = {
   /** Club Momentum. */
@@ -39,6 +47,8 @@ export type ClubStats = {
   created7d: number;
   /** Distinct wallets in the last 30 days. */
   traders30d: number;
+  /** Members' own X posts about the Club shared on its Board in the last 7 days. */
+  xShares7d: number;
   /** Unix seconds of the latest event, or null. */
   lastActive: number | null;
 };
@@ -54,6 +64,7 @@ export function summarize(events: readonly ActivityEvent[], now: number): ClubSt
     change: t.change,
     completed7d: week.filter((e) => e.kind === "swapped").length,
     created7d: week.filter((e) => e.kind === "created").length,
+    xShares7d: week.filter((e) => e.kind === "xshare").length,
     traders30d: score(scored, now).uniqueWallets,
     lastActive: events.reduce<number | null>((latest, e) => (latest === null || e.at > latest ? e.at : latest), null),
   };
@@ -72,7 +83,7 @@ export function settlementEvents(settlements: readonly Settlement[]): ActivityEv
     return {
       id: `${s.txHash.toLowerCase()}:settled`,
       kind: "swapped" as const,
-      contract: (ON_DEAL_INTENTS_ADDRESS ?? "").toLowerCase(),
+      contract: (DECLUB_INTENTS_ADDRESS ?? "").toLowerCase(),
       deal: s.txHash.toLowerCase(),
       block: s.blockNumber,
       at: Math.floor(s.at / 1000),
@@ -109,7 +120,7 @@ export type ClubInfo = {
   note: string;
   /** The Club's art, a path under `public/`, when the list gives one. */
   image?: string;
-  /** The asset that shares this Club: the memecoin of a collection's Club, or the other way round. */
+  /** The memecoin that shares this collection's Club, if it has one. */
   linked?: ClubAsset;
 };
 

@@ -1,20 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { useConnection, useReadContract, useReadContracts } from "wagmi";
+import { useReadContract, useReadContracts } from "wagmi";
 import { swapV2 } from "@/lib/contracts";
-import { DEMO_DEALS, demoDealsV2 } from "@/lib/demoDeals";
 import { toDealV2, type DealV2 } from "@/lib/dealsV2";
 
 /**
- * The newest `limit` OnDealV2 deals, newest first. Same approach as `useDeals` (ADR 0004):
+ * The newest `limit` DeClubEscrow deals, newest first. Same approach as `useDeals` (ADR 0004):
  * `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
- * Returns nothing while V2 isn't configured, and the mock deals while they're on (lib/demoDeals.ts).
+ * Returns nothing while V2 isn't configured.
  */
 export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
-  const { address } = useConnection();
-  const demo = enabled && DEMO_DEALS;
-  const active = enabled && !!swapV2 && !demo;
+  const active = enabled && !!swapV2;
   const count = useReadContract({
     ...swapV2!,
     functionName: "tradeCount",
@@ -46,18 +43,6 @@ export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; en
     });
     return out;
   }, [results.data, ids]);
-
-  const demoDeals = useMemo(() => (demo ? demoDealsV2(address) : []), [demo, address]);
-  if (demo) {
-    return {
-      enabled: true,
-      deals: demoDeals.slice(0, limit),
-      total: BigInt(demoDeals.length),
-      hasMore: demoDeals.length > limit,
-      isLoading: false,
-      error: null,
-    };
-  }
 
   return {
     enabled: active,

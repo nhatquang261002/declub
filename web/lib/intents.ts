@@ -48,7 +48,7 @@ export const CANCEL_TYPES = {
 } as const;
 
 export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "OnDealIntents", version: "3", chainId, verifyingContract }) as const;
+  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,
@@ -249,7 +249,7 @@ export function reasonText(reason: string | null): string | null {
     fee_allowance: "Your WMON approval for the protocol fee is missing or too small.",
     wrong_fee: "The protocol fee went up past the most this intent agreed to pay. Sign it again to keep it in play.",
     not_owner: "You no longer own an NFT this intent gives.",
-    not_approved: "An NFT this intent gives isn't approved for On Deal any more.",
+    not_approved: "An NFT this intent gives isn't approved for DeClub any more.",
     bad_token: "A token in this intent stopped answering.",
     nonce_used: "This intent's nonce was already used.",
     expired: "This intent's deadline passed.",

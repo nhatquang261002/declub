@@ -4,8 +4,12 @@ import type { Registry } from "../verifiedAssets";
 import {
   banUser,
   claimOwner,
-  createPost,
+  createSignedPost,
+  createSignedReply,
+  exportReplies,
+  listReplies,
   deletePost,
+  exportPosts,
   hidePost,
   listBans,
   listPosts,
@@ -16,17 +20,25 @@ import {
   roleIn,
   setRole,
   unbanUser,
+  likePost,
   updateProfile,
   type Actor,
   type Deps as BoardDeps,
 } from "./board";
 import { adminIds, loadProfile, loadRoles, readLog } from "./clubState";
+import { signalsOf, startXLink, unlinkX, verifyXLink } from "./xPosts";
+import { signalsHint } from "../xPosts";
+import type { ClubProfile } from "../clubPosts";
+import type { ClubEntry } from "../verifiedAssets";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { getMember } from "./members";
+import { coinRule } from "../members";
 import { clubOf, type Ctx } from "./memberRoutes";
 import { authenticate } from "./privy";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 import { isStaff } from "../clubRoles";
+import { lensOf } from "../lenses";
+import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -46,22 +58,38 @@ const REFUSALS: Record<string, [number, string]> = {
   archived: [409, "This Club is archived: it stays readable, but it isn’t taking changes."],
   not_member: [403, "Join the Club first."],
   banned: [403, "You can’t do that in this Club."],
-  no_profile: [403, "Share a verified X or Discord profile on your Account page first, so people can see who is posting."],
+  no_profile: [403, "Turn on “Show my profile to other traders” on your Account page first (with X or Discord linked), so people can see who is posting."],
   holders_only: [403, "The Owner has limited posting to holders."],
   bad_kind: [400, "A post is a note or a “looking for”."],
   empty: [400, "Write something first."],
   too_long: [400, "Posts are at most 280 characters."],
-  bad_link: [400, "Link a deal id or a signed-swap hash, and only on a “looking for” post."],
+  bad_link: [400, "A “looking for” post links a deal id or a signed-swap hash; a note links an X post."],
   link_not_found: [404, "That deal or signed swap wasn’t found."],
   link_mismatch: [422, "That deal or signed swap doesn’t involve this Club’s asset."],
   link_unavailable: [503, "Couldn’t check that link right now. Try again."],
+  x_not_found: [404, "That X post wasn’t found, or it isn’t public."],
+  x_unavailable: [503, "Couldn’t reach X to read that post. Try again."],
+  bad_handle: [400, "Give an X handle: up to 15 letters, digits or _."],
+  already_linked: [409, "That X account is already linked."],
+  too_many_accounts: [409, "A Club links at most 3 X accounts."],
+  xlink_expired: [409, "Start again: that code has expired, or none was asked for this account."],
+  xlink_mismatch: [422, "That post isn’t from that account, or it doesn’t have the code."],
+  xlink_unavailable: [503, "Couldn’t reach X to read that post. Try again."],
   cooldown: [429, "Wait a few seconds between posts."],
   rate_limited: [429, "You’ve reached the limit for now. Try again later."],
+  unsigned: [400, "Sign the post with your wallet first."],
+  wrong_club: [400, "That post was signed for another Club."],
+  not_clean: [400, "The signed text or link isn’t in the form the Board stores. Sign it again."],
+  stale: [400, "That signature is too old, or your clock is off. Sign it again."],
+  bad_signature: [401, "The signature doesn’t match your Club wallet. Sign with the wallet the Members list shows for you."],
+  wrong_signer: [409, "That signed post belongs to someone else."],
   not_found: [404, "Not found."],
   forbidden: [403, "You can’t do that."],
   own_post: [409, "You can’t report your own post."],
+  own_like: [409, "You can’t like your own post."],
   too_many_pinned: [409, "At most 3 posts can be pinned."],
   hidden: [409, "A hidden post can’t be pinned."],
+  thread_full: [409, "This post has as many replies as it can take."],
   too_many_moderators: [409, "A Club has at most 10 Moderators."],
   already_owner: [409, "They are already the Owner."],
   no_change: [409, "Nothing to change."],
@@ -115,7 +143,10 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
       const viewer = await softViewer(request, deps);
-      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id }, deps);
+      const url = new URL(request.url);
+      const lens = lensOf(url.searchParams.get("lens")).id;
+      const as = url.searchParams.get("as") ?? undefined;
+      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined }, deps);
       // Anonymous readers share one cached answer; a signed-in reader's depends on who they are.
       const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
       return Response.json({ enabled: true, posts, role }, { headers: { "Cache-Control": cache } });
@@ -125,9 +156,60 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-post");
       if (f instanceof Response) return f;
       const body = await bodyOf(request);
-      const result = await createPost(f.store, f.entry, f.user.id, { kind: body.kind, text: body.text, link: body.link }, deps);
-      return result.ok ? json({ enabled: true, post: result.post }, 201) : refuse(result.reason);
+      // Every post is signed by its author's Club wallet (ADR 0023), so it can be exported and checked.
+      const result = await createSignedPost(f.store, f.entry, f.user.id, { message: parsePostMessage(body.message), signature: body.signature }, deps);
+      // `xShare` tells the author whether their X post counted, and if not, why.
+      return result.ok ? json({ enabled: true, post: result.post, ...(result.xShare ? { xShare: result.xShare } : {}) }, 201) : refuse(result.reason);
     },
+  };
+}
+
+/** GET (public) and POST (members) /api/clubs/[token]/posts/[id]/replies (ADR 0032). */
+export function repliesHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: ItemCtx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false, replies: [] }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const viewer = await softViewer(request, deps);
+      const result = await listReplies(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
+      if (!result.ok) return refuse(result.reason);
+      const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
+      return Response.json({ enabled: true, replies: result.replies }, { headers: { "Cache-Control": cache } });
+    },
+
+    async POST(request: Request, ctx: ItemCtx) {
+      const f = await front(registry, ctx, request, deps, "club-reply");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const result = await createSignedReply(f.store, f.entry, f.user.id, (await ctx.params).id, { message: parseReplyMessage(body.message), signature: body.signature }, deps);
+      if (result.ok) return json({ enabled: true, post: result.post }, 201);
+      if (result.reason === "hidden") return refuse("hidden", "A hidden post can’t take replies.");
+      if (result.reason === "not_found") return refuse("not_found", "That post wasn’t found, or it’s a reply: replies go under the post.");
+      return refuse(result.reason);
+    },
+  };
+}
+
+/**
+ * GET /api/clubs/[token]/feed: every signed post on the Club's Board, newest first, as the exact
+ * EIP-712 message and signature, with the typed-data domain to check them against. Public, so any
+ * app can carry a Club's conversation or rank it its own way. Posts hidden by moderation are left out.
+ */
+export function feedHandler(registry: Registry) {
+  return async function GET(request: Request, ctx: Ctx) {
+    const entry = await clubOf(registry, ctx);
+    if (entry instanceof Response) return entry;
+    const store = getStore();
+    if (!store) return Response.json({ enabled: false, posts: [] }, { headers: { "Cache-Control": "no-store" } });
+    if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const [posts, replies] = await Promise.all([exportPosts(store, entry), exportReplies(store, entry)]);
+    return Response.json(
+      { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post, Reply: SOCIAL_TYPES.Reply }, posts, replies },
+      { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
+    );
   };
 }
 
@@ -149,6 +231,18 @@ export function reportHandler(registry: Registry, deps: RouteDeps = {}) {
     const result = await reportPost(f.store, f.entry, f.user.id, (await ctx.params).id, deps);
     return result.ok ? json({ enabled: true, hidden: result.hidden }) : refuse(result.reason);
   };
+}
+
+/** POST (like) and DELETE (take it back) /api/clubs/[token]/posts/[id]/like */
+export function likeHandlers(registry: Registry, deps: RouteDeps = {}) {
+  const act = (like: boolean) =>
+    async function (request: Request, ctx: ItemCtx) {
+      const f = await front(registry, ctx, request, deps, "club-like", 240);
+      if (f instanceof Response) return f;
+      const result = await likePost(f.store, f.entry, f.user.id, (await ctx.params).id, like);
+      return result.ok ? json({ enabled: true, likes: result.likes }) : refuse(result.reason);
+    };
+  return { POST: act(true), DELETE: act(false) };
 }
 
 /** POST /api/clubs/[token]/posts/[id]/hide  { hidden: boolean } */
@@ -228,6 +322,25 @@ export function rolesHandler(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
+/**
+ * The profile as the API serves it: what the Owner set, the Club's X signals (ADR 0024), and
+ * whether its memecoin earns the Holder badge (ADR 0026; null without one). `min` is base units.
+ */
+function publicProfile(entry: ClubEntry, profile: ClubProfile) {
+  const { description, links, holdersOnlyPosts } = profile;
+  const x = {
+    accounts: (profile.x?.accounts ?? []).map(({ handle, proof, linkedAt }) => ({ handle, proof, linkedAt })),
+    tags: profile.x?.tags ?? [],
+    hint: signalsHint(signalsOf(entry, profile)),
+  };
+  let coin = null;
+  if (entry.linked) {
+    const rule = coinRule(entry.linked, profile.coinHolders);
+    coin = { token: entry.linked.address.toLowerCase(), symbol: entry.linked.symbol, on: rule.on, min: rule.min.toString(), set: !!profile.coinHolders };
+  }
+  return { description, links, holdersOnlyPosts, x, coin };
+}
+
 /** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */
 export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
@@ -237,10 +350,10 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
       const store = getStore();
       if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
       if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-      const { description, links, holdersOnlyPosts } = await loadProfile(store, entry.address);
+      const profile = await loadProfile(store, entry.address);
       const roles = await loadRoles(store, entry.address);
       return Response.json(
-        { enabled: true, description, links, holdersOnlyPosts, hasOwner: !!roles.owner },
+        { enabled: true, ...publicProfile(entry, profile), hasOwner: !!roles.owner },
         { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
       );
     },
@@ -248,11 +361,37 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-mod");
       if (f instanceof Response) return f;
       const result = await updateProfile(f.store, f.entry, f.actor, await bodyOf(request), deps);
-      if (result.ok) {
-        const { description, links, holdersOnlyPosts } = result.profile;
-        return json({ enabled: true, description, links, holdersOnlyPosts });
+      return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason, result.message);
+    },
+  };
+}
+
+/**
+ * POST /api/clubs/[token]/x  { action: "start", handle } → the code to post from that account;
+ *                            { action: "verify", handle, url } → links it, if the post has the code.
+ * DELETE /api/clubs/[token]/x  { handle } → unlinks it. The Owner or an app admin (ADR 0024).
+ */
+export function xLinkHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async POST(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      if (body.action === "start") {
+        const result = await startXLink(f.store, f.entry, f.actor, body.handle, deps);
+        return result.ok ? json({ enabled: true, handle: result.handle, code: result.code, text: result.text, until: result.until }) : refuse(result.reason);
       }
-      return refuse(result.reason, result.message);
+      if (body.action === "verify") {
+        const result = await verifyXLink(f.store, f.entry, f.actor, { handle: body.handle, url: body.url }, deps);
+        return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason);
+      }
+      return refuse("invalid", "Send { action: \"start\", handle } or { action: \"verify\", handle, url }.");
+    },
+    async DELETE(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await unlinkX(f.store, f.entry, f.actor, (await bodyOf(request)).handle, deps);
+      return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason);
     },
   };
 }

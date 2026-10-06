@@ -1,5 +1,4 @@
 import { Redis } from "@upstash/redis";
-import { DEMO_CLUBS } from "../demoClubs";
 
 /**
  * The one place the web server keeps state that isn't in a contract (ADR 0011): Upstash Redis over
@@ -78,7 +77,11 @@ function upstash(redis: Redis): Store {
         .zremrangebyrank(key, 0, -(cap + 1))
         .exec();
     },
-    ranked: (key, limit) => redis.zrange<string[]>(key, 0, limit - 1, { rev: true }),
+    // The client parses JSON members back into objects; callers get the strings they stored.
+    async ranked(key, limit) {
+      const rows = await redis.zrange<unknown[]>(key, 0, limit - 1, { rev: true });
+      return rows.map((row) => (typeof row === "string" ? row : JSON.stringify(row)));
+    },
     async hit(key, windowSec) {
       const count = await redis.incr(key);
       if (count === 1) await redis.expire(key, windowSec);
@@ -151,34 +154,18 @@ export function memoryStore(): Store {
 }
 
 // Kept on globalThis so a dev server's hot reloads don't empty the in-memory store.
-const g = globalThis as typeof globalThis & { __ondealStore?: Store | null };
+const g = globalThis as typeof globalThis & { __declubStore?: Store | null };
 
 /** The store, or `null` when this deployment has none (production without Upstash credentials). */
 export function getStore(): Store | null {
-  if (g.__ondealStore !== undefined) return g.__ondealStore;
+  if (g.__declubStore !== undefined) return g.__declubStore;
   const creds = credentials();
-  g.__ondealStore = creds
+  g.__declubStore = creds
     ? upstash(new Redis(creds))
     : process.env.NODE_ENV !== "production"
-      ? devStore()
+      ? memoryStore()
       : null;
-  return g.__ondealStore;
-}
-
-/**
- * Development's in-memory store, filled with mock Clubs (lib/server/demoClubs.ts) unless
- * NEXT_PUBLIC_DEMO_CLUBS=false. Every call waits for the seeding, so no request sees it half done. The
- * import is dynamic because the seeding reaches modules that import this one.
- */
-function devStore(): Store {
-  const store = memoryStore();
-  if (!DEMO_CLUBS) return store;
-  const ready = import("./demoClubs")
-    .then((demo) => demo.seedDemoClubs(store))
-    .catch((error) => console.warn("Mock Clubs weren't seeded:", error));
-  return Object.fromEntries(
-    Object.entries(store).map(([name, method]) => [name, async (...args: unknown[]) => (await ready, (method as (...a: unknown[]) => unknown)(...args))]),
-  ) as Store;
+  return g.__declubStore;
 }
 
 /**
@@ -217,7 +204,7 @@ function trustedHops(value: string | undefined): number {
 /** True while `id` is within `limit` hits per `windowSec`. A store that errors never blocks anyone. */
 export async function withinLimit(store: Store, name: string, id: string, limit: number, windowSec: number): Promise<boolean> {
   try {
-    return (await store.hit(`ondeal:rl:${name}:${id}`, windowSec)) <= limit;
+    return (await store.hit(`declub:rl:${name}:${id}`, windowSec)) <= limit;
   } catch {
     return true;
   }

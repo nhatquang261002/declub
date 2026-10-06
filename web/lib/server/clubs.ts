@@ -2,11 +2,12 @@ import type { Address } from "viem";
 import { completedSwaps, mergeEvents, settlementEvents, summarize, toClubInfo, type ActivityEvent, type ClubDetail, type ClubSummary } from "../clubs";
 import type { Settlement } from "../intents";
 import { listSettlements } from "../pool";
-import { ON_DEAL_INTENTS_ADDRESS } from "../config";
+import { DECLUB_INTENTS_ADDRESS } from "../config";
 import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { readActivity } from "./activity";
 import { holderCount, memberCount } from "./members";
 import type { Store } from "./store";
+import { readXShares, xShareEvents } from "./xPosts";
 
 /**
  * What the Club routes serve (docs/09-clubs.md). A Club's activity comes from two places: the log
@@ -28,7 +29,7 @@ const POOL_TTL_MS = 30_000;
 const pooled = new Map<string, { at: number; events: ActivityEvent[] }>();
 
 async function poolEvents(token: Address, deps: Deps): Promise<ActivityEvent[]> {
-  if (!ON_DEAL_INTENTS_ADDRESS && !deps.settlements) return [];
+  if (!DECLUB_INTENTS_ADDRESS && !deps.settlements) return [];
   const key = token.toLowerCase();
   const hit = pooled.get(key);
   if (!deps.settlements && hit && Date.now() - hit.at < POOL_TTL_MS) return hit.events;
@@ -46,12 +47,13 @@ async function poolEvents(token: Address, deps: Deps): Promise<ActivityEvent[]> 
 /**
  * Every event known for a Club, newest first. The log keeps one list per Club, under its own
  * asset, whichever of its assets a deal named; the pool is asked about each asset, and a swap
- * that names both counts once.
+ * that names both counts once. Members' X shares (ADR 0024) are kept apart and join here.
  */
 export async function clubEvents(store: Store | null, club: ClubEntry, deps: Deps = {}): Promise<ActivityEvent[]> {
   const logged = store ? await readActivity(store, club.address).catch(() => []) : [];
+  const shared = store ? xShareEvents(await readXShares(store, club.address).catch(() => [])) : [];
   const pooled = await Promise.all(clubAssets(club).map((asset) => poolEvents(asset.address, deps)));
-  return mergeEvents(logged, ...pooled);
+  return mergeEvents(logged, shared, ...pooled);
 }
 
 export async function clubList(store: Store | null, entries: readonly ClubEntry[], deps: Deps = {}): Promise<ClubSummary[]> {

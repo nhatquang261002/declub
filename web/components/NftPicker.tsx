@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getAddress, isAddress, type Address } from "viem";
+import { getAddress, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedTokenIds, useTokenOwner, useTokenViews } from "@/hooks/useCollection";
 import { useMarketCollections } from "@/hooks/useMarketCollections";
 import { collectionLabel, featuredCollections, isFeatured, type CollectionInfo } from "@/lib/collections";
 import { useRecentCollections } from "@/hooks/useRecentCollections";
-import { shortAddress } from "@/lib/format";
+import { CopyAddress } from "@/components/CopyAddress";
+import { AssetSearch } from "@/components/AssetSearch";
+import type { SearchHit } from "@/lib/search";
+import { registry } from "@/lib/verifiedAssets";
 
 const PAGE = 12;
 const OWNED_STEP = 24;
-const MAX_SUGGESTIONS = 12;
 
 export type NftPickerProps = {
   /** The wallet whose NFTs are offered. Omit to browse a collection (the "you want" side). */
@@ -24,16 +26,20 @@ export type NftPickerProps = {
   taken: ReadonlySet<string>;
   onConfirm: (collection: Address, ids: bigint[]) => void;
   onClose: () => void;
+  /** The confirm button's text, where the NFTs aren't going into a deal. */
+  confirmLabel?: string;
 };
 
 const tokenKey = (collection: string, id: bigint) => `${collection.toLowerCase()}:${id}`;
+/** Whether no other NFT can be picked. Never with room for one: a new pick replaces the old. */
+const isFull = (selected: readonly bigint[], room: number) => room > 1 && selected.length >= room;
 
 /**
  * Pick NFTs without copying addresses and ids: search the collections people use (or paste a
  * contract address), then tick tokens from a grid. A wallet's own NFTs are listed when the
  * collection can enumerate them; otherwise the id is typed and checked against the chain.
  */
-export function NftPicker({ owner, collection: initial, room, taken, onConfirm, onClose }: NftPickerProps) {
+export function NftPicker({ owner, collection: initial, room, taken, onConfirm, onClose, confirmLabel }: NftPickerProps) {
   const [collection, setCollection] = useState<Address | null>(initial ?? null);
   const [selected, setSelected] = useState<bigint[]>([]);
   const panel = useRef<HTMLDivElement>(null);
@@ -50,8 +56,11 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
     };
   }, [onClose]);
 
+  // With room for one, picking another NFT swaps it in.
   const toggle = (id: bigint) =>
-    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : current.length < room ? [...current, id] : current));
+    setSelected((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : room === 1 ? [id] : current.length < room ? [...current, id] : current,
+    );
 
   return (
     <div
@@ -91,9 +100,10 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
               setSelected([]);
             }}
             onConfirm={() => onConfirm(collection, selected)}
+            confirmLabel={confirmLabel}
           />
         ) : (
-          <CollectionStep onSelect={setCollection} />
+          <CollectionStep owner={owner} onSelect={setCollection} />
         )}
       </div>
     </div>
@@ -102,14 +112,11 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
 
 // ─────────────────────────────────────────────────────────────── Step 1: the collection
 
-function CollectionStep({ onSelect }: { onSelect: (address: Address) => void }) {
-  const [query, setQuery] = useState("");
+function CollectionStep({ owner, onSelect }: { owner?: Address; onSelect: (address: Address) => void }) {
   const market = useMarketCollections();
   const recents = useRecentCollections();
-  const text = query.trim();
-  const pasted = isAddress(text) ? getAddress(text) : null;
 
-  // Featured first, then what you used lately, then what open deals use. One list, no repeats.
+  // What this browser already knows: featured, then what you used lately, then what open deals use.
   const sources = useMemo(() => {
     const out = new Map<string, "Featured" | "Recent" | "In open deals">();
     featuredCollections().forEach((a) => out.set(a.toLowerCase(), "Featured"));
@@ -118,53 +125,41 @@ function CollectionStep({ onSelect }: { onSelect: (address: Address) => void }) 
     return out;
   }, [market, recents]);
   const candidates = useMemo(() => [...sources.keys()].map((a) => getAddress(a)), [sources]);
-  const { infos, isLoading } = useCollectionInfos(candidates);
+  const { infos } = useCollectionInfos(candidates);
 
-  const q = text.toLowerCase();
-  const matches = candidates
-    .filter((a) => {
-      const info = infos.get(a.toLowerCase());
-      // Contracts that don't answer as an ERC-721 (an ERC-20 seen in a deal, say) aren't collections.
-      if (info && !info.isErc721) return false;
-      return !q || a.toLowerCase().includes(q) || `${info?.name ?? ""} ${info?.symbol ?? ""}`.toLowerCase().includes(q);
-    })
-    .slice(0, MAX_SUGGESTIONS);
+  // Contracts that don't answer as an ERC-721 (an ERC-20 seen in a deal, say) aren't collections.
+  const extra = useMemo(
+    () =>
+      candidates.flatMap((address): SearchHit[] => {
+        const info = infos.get(address.toLowerCase());
+        if (info && !info.isErc721) return [];
+        return [
+          {
+            kind: "erc721",
+            address,
+            name: info?.name ?? "",
+            symbol: info?.symbol ?? "",
+            logo: null,
+            tier: registry.tier(address) === "verified" ? "verified" : "unverified",
+            held: false,
+            spam: false,
+            tag: sources.get(address.toLowerCase()),
+          },
+        ];
+      }),
+    [candidates, infos, sources],
+  );
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="label" htmlFor="collection-search">Search collections, or paste a contract address</label>
-        <input
-          id="collection-search"
-          autoFocus
-          className="input"
-          placeholder="Name, symbol or 0x…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-
-      {pasted ? (
-        <PastedCollection address={pasted} onSelect={onSelect} />
-      ) : (
-        <>
-          {text.startsWith("0x") && <p className="text-sm text-muted">Keep typing: a contract address is 42 characters.</p>}
-          {isLoading && matches.length === 0 ? (
-            <p className="text-sm text-muted">Loading collections…</p>
-          ) : matches.length === 0 ? (
-            <p className="text-sm text-muted">
-              {text ? "No collection matches. Paste its contract address to look it up." : "No collections to suggest yet. Paste a contract address."}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {matches.map((a) => (
-                <CollectionRow key={a} address={a} info={infos.get(a.toLowerCase())} tag={sources.get(a.toLowerCase())} onSelect={() => onSelect(a)} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </div>
+    <AssetSearch
+      kind="erc721"
+      owner={owner}
+      extra={extra}
+      label="Search collections, or paste a contract address"
+      placeholder="Name, symbol or 0x…"
+      onSelect={(hit) => onSelect(hit.address)}
+      renderPasted={(address) => <PastedCollection address={address} onSelect={onSelect} />}
+    />
   );
 }
 
@@ -178,7 +173,7 @@ function CollectionRow({ address, info, tag, onSelect }: { address: Address; inf
       >
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Unnamed collection")}</span>
-          <span className="block font-mono text-xs text-muted">{shortAddress(address)}</span>
+          <CopyAddress address={address} inLink className="block text-xs text-muted" />
         </span>
         <span className="flex items-center gap-2 text-xs text-muted">
           {info?.totalSupply != null && <span>{info.totalSupply.toString()} items</span>}
@@ -196,7 +191,7 @@ function PastedCollection({ address, onSelect }: { address: Address; onSelect: (
   if (!info.isErc721) {
     return (
       <Alert tone="danger" title="Not an NFT collection">
-        {shortAddress(address)} doesn&apos;t answer as an ERC-721 collection. Check the address and the network.
+        <CopyAddress address={address} /> doesn&apos;t answer as an ERC-721 collection. Check the address and the network.
       </Alert>
     );
   }
@@ -218,6 +213,7 @@ function TokenStep({
   onToggle,
   onChangeCollection,
   onConfirm,
+  confirmLabel,
 }: {
   collection: Address;
   owner?: Address;
@@ -227,6 +223,7 @@ function TokenStep({
   onToggle: (id: bigint) => void;
   onChangeCollection: () => void;
   onConfirm: () => void;
+  confirmLabel?: string;
 }) {
   const { info } = useCollectionInfo(collection);
   const enumerable = !!info?.enumerable;
@@ -237,7 +234,7 @@ function TokenStep({
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-[1.5px] border-[#111318]/15 bg-white/70 px-3 py-2">
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Collection")}</span>
-          <span className="block font-mono text-xs text-muted">{shortAddress(collection)}</span>
+          <CopyAddress address={collection} className="block text-xs text-muted" />
         </span>
         <button type="button" className="btn-secondary btn-sm" onClick={onChangeCollection}>
           Change collection
@@ -262,7 +259,7 @@ function TokenStep({
           {room < 10 && ` · room for ${room}`}
         </span>
         <button type="button" className="btn-primary" disabled={selected.length === 0} onClick={onConfirm}>
-          {selected.length <= 1 ? "Add NFT" : `Add ${selected.length} NFTs`}
+          {confirmLabel ?? (selected.length <= 1 ? "Add NFT" : `Add ${selected.length} NFTs`)}
         </button>
       </div>
     </div>
@@ -296,7 +293,7 @@ function OwnedGrid({ collection, owner, enumerable, taken, selected, onToggle, r
       </p>
       <TileGrid>
         {ids.slice(0, shown).map((id) => (
-          <Tile key={id.toString()} id={id} view={views.get(id.toString())} taken={taken.has(tokenKey(collection, id))} selected={selected.includes(id)} full={selected.length >= room} onClick={() => onToggle(id)} />
+          <Tile key={id.toString()} id={id} view={views.get(id.toString())} taken={taken.has(tokenKey(collection, id))} selected={selected.includes(id)} full={isFull(selected, room)} onClick={() => onToggle(id)} />
         ))}
       </TileGrid>
       {ids.length > shown && (
@@ -328,10 +325,10 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
             key={id.toString()}
             id={id}
             view={views.get(id.toString())}
-            caption={views.get(id.toString())?.owner ? `held by ${shortAddress(views.get(id.toString())!.owner!)}` : undefined}
+            caption={views.get(id.toString())?.owner ? <>held by <CopyAddress address={views.get(id.toString())!.owner!} inLink /></> : undefined}
             taken={taken.has(tokenKey(collection, id))}
             selected={selected.includes(id)}
-            full={selected.length >= room}
+            full={isFull(selected, room)}
             onClick={() => onToggle(id)}
           />
         ))}
@@ -366,7 +363,7 @@ function Tile({
 }: {
   id: bigint;
   view?: { name: string | null; image: string | null };
-  caption?: string;
+  caption?: React.ReactNode;
   taken: boolean;
   selected: boolean;
   full: boolean;
@@ -436,7 +433,7 @@ function ManualId({
             ? "Your wallet doesn't own this token."
             : already
               ? "Already added."
-              : selected.length >= room
+              : isFull(selected, room)
                 ? "No room for more on this side."
                 : null;
   const ok = id !== null && !check.isLoading && check.exists && mine && !problem;
@@ -468,7 +465,7 @@ function ManualId({
         {ok && (
           <span className="text-xs text-mint">
             {view?.name ?? `#${id}`}
-            {!owner && check.owner && ` · held by ${shortAddress(check.owner)}`}
+            {!owner && check.owner && <> · held by <CopyAddress address={check.owner} /></>}
           </span>
         )}
         {id !== null && problem && <span className={`text-xs ${problem === "Checking…" ? "text-muted" : "text-warn"}`}>{problem}</span>}

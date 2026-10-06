@@ -5,19 +5,21 @@ import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pills } from "@/components/Pills";
 import { HolderBadge } from "@/components/HolderBadge";
-import { BanIcon, CrownIcon, ShieldIcon } from "@/components/Icons";
+import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions } from "@/hooks/useClubBoard";
 import { useClubMembers, useClubMembership, type ViewerRole } from "@/hooks/useClubMembership";
+import { useFollows } from "@/hooks/useSocial";
+import { FollowButton } from "@/components/FollowButton";
 import { isOwnerOrAdmin, mayActOn } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
 import type { MemberSort, PublicMember } from "@/lib/members";
 import { Empty, Loading } from "./parts";
 
 const SORTS = [
-  { value: "momentum", label: "Top traders" },
+  { value: "momentum", label: "Most active" },
   { value: "new", label: "Newest" },
 ] as const;
 
@@ -44,6 +46,17 @@ export function RoleChip({ role }: { role?: PublicMember["role"] }) {
   return null;
 }
 
+/** Epochs in a row of posting on the Board (ADR 0032); shown from the second. */
+export function StreakChip({ streak }: { streak?: number }) {
+  if (!streak || streak < 2) return null;
+  return (
+    <span className="chip chip-peach" title={`Active on the Board ${streak} epochs in a row`}>
+      <FlameIcon />
+      {streak} wk
+    </span>
+  );
+}
+
 /** What the viewer's role lets them do to this member, by the rule the server applies too. */
 function staffActions(viewer: ViewerRole | undefined, m: PublicMember, actions: ReturnType<typeof useClubActions>): MenuAction[][] {
   if (!viewer) return [];
@@ -61,7 +74,8 @@ function staffActions(viewer: ViewerRole | undefined, m: PublicMember, actions: 
     roles.push({
       label: "Hand over the Club",
       icon: <CrownIcon />,
-      confirm: "Hand the Club to this member? You become a regular member.",
+      confirm: "Hand the Club to this member?",
+      confirmNote: "You become a regular member.",
       onSelect: () => actions.role.mutate({ wallet: m.wallet, role: "owner" }),
     });
   }
@@ -69,7 +83,8 @@ function staffActions(viewer: ViewerRole | undefined, m: PublicMember, actions: 
     label: "Ban from the Club",
     icon: <BanIcon />,
     danger: true,
-    confirm: "Ban this member from the Club? They are removed and can’t rejoin.",
+    confirm: "Ban this member?",
+    confirmNote: "They are removed from the Club and can’t rejoin.",
     onSelect: () => actions.ban.mutate({ wallet: m.wallet }),
   };
   return [roles, [ban]];
@@ -108,6 +123,7 @@ function Podium({
             <span className="flex flex-wrap justify-center gap-1.5">
               <RoleChip role={m.role} />
               {m.holder && <HolderBadge symbol={symbol} />}
+              <StreakChip streak={m.streak} />
             </span>
             <span className="text-xs text-muted">
               {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}
@@ -125,6 +141,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
   const { view, isLoading, error } = useClubMembers(token, sort);
   const me = useClubMembership(token);
   const actions = useClubActions(token);
+  const follows = useFollows();
   const staff = me.role !== undefined && me.role !== "member";
 
   if (error && !view) return <LoadError title="Couldn’t load the members" error={error} />;
@@ -159,7 +176,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
             <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />
           )}
           {rest.length > 0 && (
-            <ol className="club-panel divide-y divide-[#111318]/10 overflow-hidden" start={podium ? PODIUM + 1 : 1}>
+            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={podium ? PODIUM + 1 : 1}>
               {rest.map((m, i) => {
                 const rank = i + 1 + (podium ? PODIUM : 0);
                 const mine = me.wallet === m.wallet;
@@ -170,8 +187,10 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                         <Who address={m.wallet} mine={mine} />
+                        <FollowButton target={m.wallet} follows={follows} />
                         <RoleChip role={m.role} />
                         {m.holder && <HolderBadge symbol={symbol} />}
+                        <StreakChip streak={m.streak} />
                       </div>
                       <p className="text-xs text-muted">
                         Joined {ago(Math.floor(m.joinedAt / 1000), now)} · {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}

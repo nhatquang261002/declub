@@ -4,18 +4,21 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pills } from "@/components/Pills";
-import { LinkIcon } from "@/components/Icons";
+import { LinkIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostItem } from "@/components/PostItem";
+import { Spinner } from "@/components/Spinner";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
+import { useFollows } from "@/hooks/useSocial";
 import { POST_MAX, REPORTS_TO_HIDE, type PostKind } from "@/lib/clubPosts";
 import { isStaff } from "@/lib/clubRoles";
+import { LENSES, type LensId } from "@/lib/lenses";
 import { Empty, Loading } from "./parts";
 
 const KINDS: { value: PostKind; label: string; hint: string }[] = [
-  { value: "note", label: "Note", hint: "Say something to the Club" },
+  { value: "note", label: "Note", hint: "Say something to the Club, or share an X post" },
   { value: "looking", label: "Looking for", hint: "What you want to buy or trade for" },
 ];
 
@@ -39,8 +42,8 @@ function CharRing({ length }: { length: number }) {
   );
 }
 
-function Composer({ token, wallet }: { token: string; wallet?: string }) {
-  const { post } = useClubActions(token);
+function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xHint?: string }) {
+  const { post, postStage } = useClubActions(token);
   const [kind, setKind] = useState<PostKind>("note");
   const [text, setText] = useState("");
   const [link, setLink] = useState("");
@@ -53,7 +56,7 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         post.mutate(
-          { kind, text, ...(kind === "looking" && link.trim() ? { link: link.trim() } : {}) },
+          { kind, text, wallet, ...(link.trim() ? { link: link.trim() } : {}) },
           { onSuccess: () => (setText(""), setLink("")) },
         );
       }}
@@ -70,7 +73,7 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
                 type="button"
                 aria-pressed={kind === k.value}
                 className={`chip px-3 py-1 text-xs ${kind === k.value ? "chip-peach" : "hover:bg-white"}`}
-                onClick={() => setKind(k.value)}
+                onClick={() => (setKind(k.value), setLink(""))}
               >
                 {k.label}
               </button>
@@ -85,8 +88,30 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
             value={text}
             maxLength={POST_MAX * 2}
             placeholder={kind === "looking" ? "WTB any Chog with a crown, 2 MON over floor" : hint}
+            readOnly={post.isPending}
             onChange={(event) => setText(event.target.value)}
           />
+          {kind === "note" && (
+            <div className="flex flex-col gap-1.5">
+              <label className="relative">
+                <span className="sr-only">An X post to share (optional)</span>
+                <XLogoIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
+                <input
+                  className="input border-2 border-[#111318]/25 bg-white pl-9 focus:border-[#111318]"
+                  value={link}
+                  readOnly={post.isPending}
+                  inputMode="url"
+                  placeholder="Share an X post: paste its link (optional)"
+                  onChange={(event) => setLink(event.target.value)}
+                />
+              </label>
+              {xHint && (
+                <p className="text-xs text-muted">
+                  Your own X post counts for the Club, if you hold its asset, when it {xHint}. One a day.
+                </p>
+              )}
+            </div>
+          )}
           {kind === "looking" && (
             <label className="relative">
               <span className="sr-only">Deal id or signed-swap hash (optional)</span>
@@ -94,17 +119,25 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
               <input
                 className="input border-2 border-[#111318]/25 bg-white pl-9 focus:border-[#111318]"
                 value={link}
+                readOnly={post.isPending}
                 placeholder="Attach a deal id or signed-swap hash (optional)"
                 onChange={(event) => setLink(event.target.value)}
               />
             </label>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted">Plain text. Links in a post aren’t clickable.</p>
+            <p className="text-xs text-muted" role="status">
+              {post.isPending
+                ? postStage === "sending"
+                  ? "Signed. Posting it to the Club…"
+                  : "Waiting for you in your wallet. If nothing opened, check your wallet extension."
+                : "Plain text. Your Club wallet signs each post, so it’s yours to take anywhere."}
+            </p>
             <div className="flex items-center gap-3">
               <CharRing length={length} />
-              <button type="submit" className="btn-primary btn-sm px-5" disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}>
-                {post.isPending ? "Posting…" : "Post"}
+              <button type="submit" className="btn-primary btn-sm px-5" aria-busy={post.isPending} disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}>
+                {post.isPending && <Spinner />}
+                {post.isPending ? (postStage === "sending" ? "Posting…" : "Sign in wallet…") : "Sign & post"}
               </button>
             </div>
           </div>
@@ -133,10 +166,15 @@ function CantPost({ token, symbol, reason }: { token: string; symbol: string; re
 
 /** The Club's board: member posts, newest first, pinned ones on top. */
 export function ClubBoard({ token, symbol, archived, now }: { token: string; symbol: string; archived: boolean; now: number }) {
-  const { enabled, posts, isLoading, error } = useClubPosts(token);
+  const follows = useFollows();
+  const [lens, setLens] = useState<LensId>("newest");
+  // Following needs to know who's reading; without a wallet it falls back to everything.
+  const lenses = LENSES.filter((l) => l.id !== "following" || follows.me);
+  const active = lenses.find((l) => l.id === lens) ?? lenses[0]!;
+  const { enabled, posts, isLoading, error } = useClubPosts(token, active.id, follows.me);
   const me = useClubMembership(token);
   const page = useClubPage(token);
-  const { report, remove, hide, pin, ban } = useClubActions(token);
+  const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
   const shown = useMemo(() => (filter === "all" ? posts : posts.filter((p) => p.kind === "looking")), [posts, filter]);
 
@@ -153,17 +191,21 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         holdersOnly ? (
           <CantPost token={token} symbol={symbol} reason="holders" />
         ) : (
-          <Composer token={token} wallet={me.wallet} />
+          <Composer token={token} wallet={me.wallet} xHint={page?.x?.hint} />
         )
       ) : (
         <CantPost token={token} symbol={symbol} reason="join" />
       )}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <Pills value={active.id} options={lenses.map((l) => ({ value: l.id, label: l.name }))} onChange={setLens} label="Order posts by" />
         <Pills value={filter} options={FILTERS} onChange={setFilter} label="Show posts" />
+      </div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted">{active.description}</p>
         {me.member && !archived && (
           <p className="text-xs text-muted">
-            Posting needs a verified X or Discord profile on your{" "}
+            Posting needs a linked X or Discord account with “Show my profile” turned on in your{" "}
             <Link href="/account" className="font-bold underline">
               Account
             </Link>
@@ -175,23 +217,31 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
       {isLoading ? (
         <Loading label="Loading the board" />
       ) : shown.length === 0 ? (
-        <Empty title={filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}>
-          {me.member && !archived ? "Start it off: say hello, or post what you’re looking for." : "Posts from members will show up here."}
+        <Empty title={active.id === "following" ? "Nobody you follow has posted here" : filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}>
+          {active.id === "following"
+            ? "Follow members from their posts or the Members list to see them here."
+            : me.member && !archived
+              ? "Start it off: say hello, or post what you’re looking for."
+              : "Posts from members will show up here."}
         </Empty>
       ) : (
-        <ul className="club-panel overflow-hidden">
+        <ul className="club-panel club-list">
           {shown.map((post) => (
             <PostItem
               key={post.id}
               post={post}
               role={me.role}
               now={now}
+              follows={follows}
+              thread={{ token, wallet: me.wallet, canReply: !!me.member && !archived && !holdersOnly }}
               actions={{
                 report: (id) => report.mutate(id),
+                like: (id, on) => like.mutate({ id, like: on }),
                 remove: (id) => remove.mutate(id),
                 hide: (id, hidden) => hide.mutate({ id, hidden }),
                 pin: (id, pinned) => pin.mutate({ id, pinned }),
                 ban: (id) => ban.mutate({ post: id }),
+                liking: like.isPending ? like.variables?.id : undefined,
               }}
             />
           ))}

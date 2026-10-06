@@ -9,8 +9,10 @@ import { PageHeader } from "@/components/Page";
 import { useToast } from "@/components/Toast";
 import { KIND_LABEL, SOCIAL_KINDS, linkedRows, type AccountKind, type LinkedRow, type SocialKind } from "@/lib/accounts";
 import { PRIVY_APP_ID } from "@/lib/config";
-import { shortAddress } from "@/lib/format";
 import { PROFILE_LABEL, type Profile } from "@/lib/profiles";
+import { CopyAddress } from "@/components/CopyAddress";
+import { RewardsClaim } from "@/components/RewardsClaim";
+import { AvatarSection } from "./AvatarSection";
 
 export default function AccountPage() {
   return (
@@ -81,6 +83,17 @@ function Account() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AvatarSection />
+
+      <section className="page-section px-5 py-5">
+        <h2 className="text-lg font-semibold">Your Club rewards</h2>
+        <p className="mt-1 mb-4 text-sm text-muted">
+          What the Clubs you hold in paid this wallet from their swaps’ fees. Rewards go to your Club wallet, the one each
+          Club’s Members list shows; switch to it below to see its rewards here.
+        </p>
+        <RewardsClaim account={active} />
+      </section>
+
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Linked accounts</h2>
         <p className="mt-1 text-sm text-muted">
@@ -256,7 +269,7 @@ function ShareProfile() {
       ) : available ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm text-muted">
-            Would show <span className="font-semibold text-white">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
+            Would show <span className="font-semibold text-[#111318]">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
             every wallet linked to this sign-in.
           </span>
           <button className="btn-primary" disabled={busy} onClick={share}>
@@ -293,7 +306,7 @@ function Row({
           {badge && <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[0.65rem] text-mint">{badge}</span>}
         </span>
         <span className="truncate font-mono text-sm">
-          {row.kind === "wallet" ? shortAddress(row.label as `0x${string}`) : row.label}
+          {row.kind === "wallet" ? <CopyAddress address={row.label} /> : row.label}
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">

@@ -5,7 +5,7 @@ import type { Address, Hex } from "viem";
 import { useConfig } from "wagmi";
 import { getConnection, readContracts, signTypedData, switchChain } from "wagmi/actions";
 import { useQueryClient } from "@tanstack/react-query";
-import { CHAIN_ID, ON_DEAL_INTENTS_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, DECLUB_INTENTS_ADDRESS } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { describeError } from "@/lib/errors";
 import { useToast } from "@/components/Toast";
@@ -16,8 +16,9 @@ import type { Asset } from "@/lib/assets";
 import type { TxState } from "./useTxFlow";
 
 // Signing an intent costs no gas, so this is the signed-message sibling of useTxFlow:
-//   idle → switching-chain → awaiting-signature → posting → idle (the caller shows the result)
-//                       ╰──────────────┴────────────────────► error (decoded)
+//   idle → switching-chain → preparing → awaiting-signature → posting → syncing → idle
+//                       ╰──────────────┴─────────────────────────────────► error (decoded)
+// (the caller shows the result)
 // It reuses TxState so TxButton and TxStatus work unchanged.
 
 /** How many nonces past the highest one this wallet has used are checked on-chain at once. */
@@ -57,7 +58,7 @@ export function useSignFlow() {
   const guarded = useCallback(
     async <T,>(work: (account: Address) => Promise<T>): Promise<T | null> => {
       try {
-        if (!ON_DEAL_INTENTS_ADDRESS || !swapIntents) throw new Error("Intents aren't enabled on this deployment.");
+        if (!DECLUB_INTENTS_ADDRESS || !swapIntents) throw new Error("Intents aren't enabled on this deployment.");
         const connection = getConnection(config);
         if (!connection.address) throw new Error("Connect a wallet first.");
         if (connection.chainId !== chain.id) {
@@ -65,8 +66,10 @@ export function useSignFlow() {
           await switchChain(config, { chainId: CHAIN_ID });
         }
         const out = await work(connection.address);
-        setState({ status: "idle" });
+        // Stays busy until the app has caught up, so the button can't be pressed twice meanwhile.
+        setState({ status: "syncing" });
         await queryClient.invalidateQueries();
+        setState({ status: "idle" });
         return out;
       } catch (error) {
         const described = describeError(error);
@@ -82,6 +85,8 @@ export function useSignFlow() {
   const post = useCallback(
     ({ give, want, ttlSeconds }: NewIntent): Promise<Hex | null> =>
       guarded(async (maker) => {
+        // Two reads before the wallet opens; the nonce one pages through the maker's whole history.
+        setState({ status: "preparing" });
         const nonce = await freeNonce(config, maker);
         // The fee is read from the contract at the moment of signing and signed as the most this
         // maker pays (ADR 0018): a later cut charges less, a later raise above it makes the intent
@@ -106,7 +111,7 @@ export function useSignFlow() {
         setState({ status: "awaiting-signature" });
         const signature = await signTypedData(config, {
           account: maker,
-          ...intentTypedData(ON_DEAL_INTENTS_ADDRESS!, intent),
+          ...intentTypedData(DECLUB_INTENTS_ADDRESS!, intent),
         });
         setState({ status: "posting" });
         const out = await submitIntent(intent, signature);
@@ -126,7 +131,7 @@ export function useSignFlow() {
         setState({ status: "awaiting-signature" });
         const signature = await signTypedData(config, {
           account: maker,
-          ...cancelTypedData(ON_DEAL_INTENTS_ADDRESS!, hash),
+          ...cancelTypedData(DECLUB_INTENTS_ADDRESS!, hash),
         });
         setState({ status: "posting" });
         await cancelIntent(hash, signature);

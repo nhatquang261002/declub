@@ -1,7 +1,7 @@
 # 05 · Frontend
 
 Stack: **Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · wagmi 3 · viem 2 · Tailwind 4 · @tanstack/react-query 5**. Package manager: npm.
-Writes and most reads go straight to Monad over RPC. The server answers what the chain can't: saves, profiles and Clubs, and the deal book, which searches and filters every deal ([ADR 0020](adr/0020-server-side-deal-book.md)). The app uses `OnDealV2` only; OnDeal (v1) stays in `contracts/` but isn't in the app.
+Writes and most reads go straight to Monad over RPC. The server answers what the chain can't: saves, profiles and Clubs, and the deal book, which searches and filters every deal ([ADR 0020](adr/0020-server-side-deal-book.md)). The app uses `DeClubEscrow` for locked deals and `DeClubIntents` for signed swaps.
 
 Status: Current frontend reference. Implementation status and remaining live verification are
 tracked in [06 · Roadmap](06-roadmap.md).
@@ -77,7 +77,7 @@ web/
 ### Config
 
 - `next.config.ts` loads the **repo-root `.env`**, so the web app and the Foundry scripts share one file, but it copies only the `NEXT_PUBLIC_*` values from it. Server secrets (`PRIVY_APP_SECRET`, `UPSTASH_*`, `CRON_SECRET`, …) go in `web/.env.local` or the host's environment. `web/.env*` and real environment variables win over the root file.
-- Most values default to the testnet deployment, so `npm run dev` works with no `.env` at all (with the mock deals below). `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` and `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` have no default: without them there are no live deals or signed swaps.
+- Most values default to the testnet deployment, so `npm run dev` works with no `.env` at all. `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS` and `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` have no default: without them there are no live deals or signed swaps.
 - `NEXT_PUBLIC_CHOG_MINTABLE` is still read into `lib/config.ts` (`CHOG_MINTABLE`), but nothing uses it: the app has no mint panel.
 - With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (Google, X, Discord or a wallet), and `/account` manages linked accounts and active wallets ([ADR 0010](adr/0010-privy-sign-in.md)). Email is linkable from `/account` for recovery but is not currently a login method. Embedded wallets are **off by default**; set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` only after enabling them in the Privy dashboard. Without the app id, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963) are available. WalletConnect is not configured.
 
@@ -91,7 +91,7 @@ scattering hex values through JSX or utility definitions.
 
 ### ABIs
 
-`@wagmi/cli` with the Foundry plugin reads `contracts/out/{OnDealV2,OnDealIntents,MockChog}.sol` and writes `lib/abi.ts` (`onDealV2Abi`, `onDealIntentsAbi`, `mockChogAbi`, all `as const`). It isn't generating hooks. The generic wagmi hooks are fully typed from the `as const` ABIs, which is enough. The file is committed so the app builds without Foundry; run `npm run abi` after changing a contract.
+`@wagmi/cli` with the Foundry plugin reads `contracts/out/{DeClubEscrow,DeClubIntents,MockChog}.sol` and writes `lib/abi.ts` (`deClubEscrowAbi`, `deClubIntentsAbi`, `mockChogAbi`, all `as const`). It isn't generating hooks. The generic wagmi hooks are fully typed from the `as const` ABIs, which is enough. The file is committed so the app builds without Foundry; run `npm run abi` after changing a contract.
 
 ## Screens → contract calls
 
@@ -99,7 +99,7 @@ scattering hex values through JSX or utility definitions.
 |---|---|---|---|
 | **Open Deals** `/deals` | `/api/deals` (the server reads `tradeCount` + multicall `getTrade`, and the pool) | — | ✓ |
 | **Account** `/account` | Privy user, linked accounts, linked wallets and shared-profile state | link/unlink accounts, connect/switch wallet, share/stop sharing profile | ✓ when Privy is configured |
-| **Create** `/create` | one wizard, OnDealV2 or a signed intent (see *Create wizard*) | approvals, `createTrade` / `createTraitTrade` / `createOpenOffer` | ✓ |
+| **Create** `/create` | one wizard, DeClubEscrow or a signed intent (see *Create wizard*) | approvals, `createTrade` / `createTraitTrade` / `createOpenOffer` | ✓ |
 | **History** `/history` | the newest 200 V2 deals, server-verified fills (or browser fallback), and the connected wallet's signed swaps | — | ✓ |
 
 ### Copy vocabulary
@@ -137,9 +137,9 @@ A bell in the header (connected wallets only). There is no event stream to subsc
 
 Read state is kept in localStorage per wallet as a resilient browser copy and, when Privy plus a store are configured, is merged with the user's server-side state through `/api/state`. Recent collections use the same per-user server state. On the first visit for a wallet, existing Accepted items are marked read so old deals don't show up as news. Direct offers and expiries stay unread because they need action. The optional browser alert (`Notification` API, turned on from the bell's panel) fires for items that turn up while the tab is in the background. It cannot reach a closed tab; that needs a server-side trigger.
 
-### OnDealV2 in the frontend (Phase 4)
+### DeClubEscrow in the frontend (Phase 4)
 
-V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is the deal contract. Until `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` is set, `swapV2` in `lib/contracts.ts` is `undefined` and the deal screens say deals aren't enabled (the mock deals still show in development).
+V2 ([ADR 0005](adr/0005-generic-asset-model.md)) is the deal contract. Until `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS` is set, `swapV2` in `lib/contracts.ts` is `undefined` and the deal screens say deals aren't enabled.
 
 **Files:**
 
@@ -181,7 +181,7 @@ Choices worth knowing:
 
 An NFT row is no longer a collection address plus a typed id. **+ NFT** (and **Change** on a row) opens `components/NftPicker.tsx`:
 
-1. **Collection.** A search box over the collections the app can know about without an indexer: the Chog collection and `NEXT_PUBLIC_KNOWN_COLLECTIONS` (*Featured*), the ones this browser used before (*Recent*, localStorage), and the ones open deals and signed swaps use (*In open deals*, from `useMarketCollections`). Search matches name, symbol or address. **Pasting a contract address** reads it on-chain first (`supportsInterface` for ERC-721, then name, symbol, supply) and refuses anything that isn't an NFT collection.
+1. **Collection.** A search box (`components/AssetSearch.tsx`, over `GET /api/search`, [ADR 0027](adr/0027-on-chain-asset-search.md)): the wallet's holdings first, then verified collections, then the rest. Where the wallet is giving, it starts on **My holdings** with an **All** switch. Beside the server's results it shows the collections the app already knows without an indexer: the Chog collection and `NEXT_PUBLIC_KNOWN_COLLECTIONS` (*Featured*), the ones this browser used before (*Recent*, localStorage), and the ones open deals and signed swaps use (*In open deals*, from `useMarketCollections`). Search matches name, symbol or address. **Pasting a contract address** reads it on-chain first (`supportsInterface` for ERC-721, then name, symbol, supply) and refuses anything that isn't an NFT collection.
 2. **Tokens.** On the side the wallet is giving (the editor gets `owner`), the wallet's own NFTs in a grid with art, via `tokenOfOwnerByIndex` (first 100). On the side it is asking for, the collection is browsed a page at a time via `tokenByIndex`, with the holder under each token. Tick several and add them in one go.
 3. **Typed id.** Below the grid, for collections that can't list tokens or ids the grid doesn't show. The id is checked with `ownerOf`: it must exist, and on the giving side must be the wallet's.
 
@@ -191,17 +191,20 @@ An NFT row is no longer a collection address plus a typed id. **+ NFT** (and **C
 | `hooks/useCollection.ts` | `useCollectionInfos`, `useOwnedTokenIds`, `useBrowseTokenIds`, `useTokenViews` (art and name from `tokenURI`), `useTokenOwner` |
 | `hooks/useMarketCollections.ts` | Collections used by open deals and signed swaps, most used first |
 | `components/NftPicker.tsx` | The dialog |
+| `components/AssetSearch.tsx`, `components/TokenPicker.tsx` | The shared search box and result list, and the ERC-20 dialog |
+| `hooks/useAssetSearch.ts` | `GET /api/search`, debounced, last answer kept while the next loads |
+| `lib/search.ts`, `lib/server/chainSearch.ts` | The hit shape, ranking and provider parsing; the Moralis adapter, chain fallback and `runSearch` |
 
 Choices worth knowing:
 
-- **No indexer, so no "all collections" and no "everything I own".** A collection that isn't enumerable can't list a wallet's tokens, so the picker falls back to the typed, checked id. Finding a collection you hold means pasting its address, unless it's featured, recent or already in a deal.
+- **Holdings come from a provider where one covers the chain.** With `MORALIS_API_KEY` on Monad mainnet, "everything I own" is the wallet's collections and tokens, and tokens are searched by name. On testnet, or if the provider fails, only the assets the app knows are checked (`balanceOf`). A collection Moralis can't find by name (unheld, unverified, not featured, recent or in a deal) is still found by pasting its address. A collection that isn't enumerable still can't list a wallet's tokens, so the picker falls back to the typed, checked id.
 - **Names are the contract's own words.** Any contract can call itself "Chog", so every collection is shown with its short address, and only the configured ones are tagged *Featured*.
 - **Token art is an image URL from metadata**, so only `http(s)` and inline `data:image/` are shown (`safeImage`), in a plain `<img>` with no referrer.
-- Draft rows are unchanged (`token`, `value`), so `assetDraft`, approvals and the contracts see nothing new. Not done: the same search for ERC-20 tokens (a pasted address still shows its on-chain symbol and decimals).
+- Draft rows are unchanged (`token`, `value`), so `assetDraft`, approvals and the contracts see nothing new. ERC-20 rows have the same search: **Search** beside the address field opens `components/TokenPicker.tsx` (holdings first, a pasted address read from its contract), and the address field still works.
 
 ### Intents in the frontend (Phase 4)
 
-Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) are optional: the screens appear once `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` is set, and `swapIntents` in `lib/contracts.ts` is `undefined` before that. They are not a separate product in the UI: a signed swap is a **deal that settles differently**, so it shares the Create wizard, the deals list and History with locked deals. They read and write the matcher's pool over HTTP (`NEXT_PUBLIC_POOL_URL`, default `http://127.0.0.1:8787`), so the matcher has to be running ([matcher/README.md](../matcher/README.md)). A pool that is down only costs the signed swaps (a notice in the list, an error on the sign step); locked deals read straight from the chain.
+Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) are optional: the screens appear once `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` is set, and `swapIntents` in `lib/contracts.ts` is `undefined` before that. They are not a separate product in the UI: a signed swap is a **deal that settles differently**, so it shares the Create wizard, the deals list and History with locked deals. They read and write the matcher's pool over HTTP (`NEXT_PUBLIC_POOL_URL`, default `http://127.0.0.1:8787`), so the matcher has to be running ([matcher/README.md](../matcher/README.md)). A pool that is down only costs the signed swaps (a notice in the list, an error on the sign step); locked deals read straight from the chain.
 
 | Where | What |
 |---|---|
@@ -278,34 +281,32 @@ otherwise (canFill)                → "Take the deal": steps, fee note,
 
 ## Clubs
 
-[Spec](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md). Two routes, `/clubs` and `/clubs/[address]`, with "Clubs" in the header's `NAV`. Nothing on these screens calls a contract: a Club's Market reads the deal book (`useClubMarket` → `useDealBook`, `/api/deals?token=`) and the pool, and everything else comes from the Club routes under `/api/clubs`.
+[Spec](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md). Two routes, `/clubs` and `/clubs/[address]`, with "Clubs" in the header's `NAV`. Only the Rewards tab calls a contract (`DeClubRewards`: reading each leaf's epoch and `isClaimed`, and `claimMany`); a Club's Market reads the deal book (`useClubMarket` → `useDealBook`, `/api/deals?token=`) and the pool, and everything else comes from the Club routes under `/api/clubs`.
 
 | Screen | Reads | Writes |
 |---|---|---|
 | **Clubs** `/clubs` | the verified list (`web/data/assets.json`) at once; `/api/clubs` fills in Momentum and counts; `/api/me/clubs` for "Your Clubs" | — |
 | **Home** `/` (`#clubs`) | `ClubsIntro`: what Clubs are and how Momentum works; `ClubsTeaser` reads `/api/clubs` for the three busiest | — |
-| **Club** `/clubs/[address]` | `/api/clubs/[token]`, the Market from `useClubMarket` (`/api/deals?token=` + the pool's `token=` filter), `/members`, `/posts`, `/membership`, `/profile` | join/leave, post, report, and the staff actions below |
+| **Club** `/clubs/[address]` | `/api/clubs/[token]`, the Market from `useClubMarket` (`/api/deals?token=` + the pool's `token=` filter), `/members`, `/posts?lens=`, `/membership`, `/profile`, `/rewards`; `/api/rewards/me` and the rewards contract for Your share; `/api/wallets/[me]/follows` | join/leave, sign and post, follow, report, claim rewards, and the staff actions below |
+| **Account** `/account` | `/api/rewards/me` for the active wallet, then the rewards contract | claim rewards (`claimMany`) |
 
 **Without a store or Privy,** the routes return `{enabled:false}` and the screens show a read-only Club with a "not configured" note (like `NotConfigured` on the Account page). The cards still draw from the list; only the numbers are missing, and a note says so.
 
 **Explaining vs. using.** The home page explains Clubs (`components/ClubsIntro.tsx`: the three parts of a Club, the Momentum rules, the heat scale) and `/clubs` only works with them. `/clubs` is built for many Clubs: totals as chips, "Your Clubs", **Most active right now** (the top three by Momentum, as cards), **Rising this week** (biggest weekly gain) and **Most traded · 7 days** boards, then **All Clubs**: search by name, symbol or address, Collections / Memecoins, six sorts (busiest, rising, most traded, most members, recently active, A–Z), a list view (`ClubRow`, the default) or cards, remembered per browser, and "Show more" by 12. Archived Clubs sort last.
 
-**Mock Clubs.** Outside production, `lib/demoClubs.ts` adds mock assets to `registry`: 11 Clubs at every pace (hot, busy, rising, steady, fading, quiet, one archived), two memecoins that share a collection's Club (CHOG with Mock Chog, TOADZ with Testnet Toads), and wrapped MON and a stablecoin, verified with no Club. The dev server's in-memory store is seeded with members, verified handles, posts, roles, swaps and a moderation log for every Club (`lib/server/demoClubs.ts`), through the same keys the real writes use. `NEXT_PUBLIC_DEMO_CLUBS=false` turns both off; the tests do. The seed runs once per server start.
-
-**Mock deals.** Outside production, `lib/demoDeals.ts` stands in for the chain and the intent pool, so every deal screen can be seen in every state: 12 deals (`/v2/deal/9101`–`9112`: exact swaps, two open offers with offers in every state, private offers, an eight-asset bundle), and 11 signed swaps, including a settled ring of three and a pair. With a wallet connected, some deals are made by it or addressed to it. The hooks (`useDeal(s)V2`, `useProposalsV2`, `usePool`, `useTokenInfo`) and `/api/deals` return the mocks, and `SHOW_V2` / `SHOW_INTENTS` in `lib/config.ts` show the multi-asset and signed screens even with no contract configured. Mock ids start at 9000 and the token addresses are made up; `useTxFlow` refuses a write for one with `MockWriteError` before the wallet opens. `NEXT_PUBLIC_DEMO_DEALS=false` turns it all off.
-
 **Look.** Each Club wears one of five brand covers (`.club-theme-N` in `globals.css`), picked from its address by `clubTheme()` in `components/ClubArt.tsx`, so it looks the same everywhere. `ClubAvatar` shows the asset's `image` from the assets list, or its initials on the cover colours; a collection is a rounded square, a token a coin. Cards and panels use `.club-card` / `.club-panel` (the cream sticker of `page-section` without the tape). `HeatMeter` puts Momentum into words with five bars: Quiet, Stirring, Active, Busy, Hot (`heat()` in `lib/clubs.ts`). The Club styles sit in `@layer components`, so a utility on the same element wins.
 
-**Tabs:** Market, Board, Members, and Manage for staff only, each with its count, in the sticker tab bar. Which one is open lives in the URL (`?tab=board`), so a section can be linked; Manage needs the `role` returned by `GET .../membership`. Inside a section, second-level switches (For trade / Wanted / Recent swaps, the Board filter, the Members sort) use the lighter `components/Pills.tsx`. Per-row actions (report, delete, hide, pin, ban, roles, leave) sit behind a "⋯" `components/ActionMenu.tsx`, which asks `window.confirm` for what can't be undone.
+**Tabs:** Market, Board, Members, Rewards, and Manage for staff only, each with its count, in the sticker tab bar. Which one is open lives in the URL (`?tab=board`), so a section can be linked; Manage needs the `role` returned by `GET .../membership`. Inside a section, second-level switches (For trade / Wanted / Recent swaps, the Board filter, the Members sort) use the lighter `components/Pills.tsx`. Per-row actions (report, delete, hide, pin, ban, roles, leave) sit behind a "⋯" `components/ActionMenu.tsx`, which asks `window.confirm` for what can't be undone.
 
 - **Market** (`ClubMarket.tsx`): For trade and Wanted use `ListingGrid`; Recent swaps is the Club's latest completed swaps, with who traded and a link to the deal (or, for a signed swap, its transaction). The page loads `useClubMarket` once and passes it down, so the tab count and the tab agree. An empty list says what would be there and offers Create deal. It says when more than 50 locked deals name the asset (the rest are found from Deals) or the pool didn't answer.
-- **Board** (`ClubBoard.tsx`, `PostItem.tsx`): a composer for members (Note or Looking for, a ring counting down the 280 characters, the link field) and the feed, pinned first, with an All / Looking for filter. A visitor sees a "Join the conversation" panel; a member who doesn't hold the asset in a holders-only Club is told why they can't post. Each post's menu offers Report, Delete (author or staff), and for staff Hide or Restore and Ban author, and for the Owner Pin. A hidden post shows "hidden after reports" to everyone else.
-- **Members** (`ClubMembers.tsx`): the leaderboard, with a podium for the top three once three members have traded, a bar for each member's share of the top score, a Newest sort, `HolderBadge`, and Owner/Moderator chips. Staff get a menu by role: make or remove moderator, hand over, ban. It is shown only when the viewer's role may act on that row (`mayActOn` in `lib/clubRoles.ts`, the same rule the server applies), and the server decides regardless.
+- **Board** (`ClubBoard.tsx`, `PostItem.tsx`): a composer for members (Note or Looking for, a ring counting down the 280 characters, the link field: an X post on a note, with the Club's "what counts" hint from the profile's `x.hint`; a deal or signed swap on Looking for) whose **Sign & post** has the member's Club wallet sign the post first (`useClubActions().post` → `useSocialSign`, refusing another connected wallet before it opens), and the feed, pinned first, in the order of the lens pills (Newest, Most active, Holders, Following; Following only with a wallet connected) and with an All / Looking for filter. Each post shows a **Signed** chip and a **Follow** button (`FollowButton`, `useFollows`) beside its author. A shared X post is a card drawn from the stored copy (no X script): author, time, text, "Their own post" and "Counts" chips, and **View on X**. After posting, a toast says whether the author's own X post counted, and why not (ADR 0024). **Manage → The Club on X** (Owner) links the project's X account by a proof post and edits the tags. A visitor sees a "Join the conversation" panel; a member who doesn't hold the asset in a holders-only Club is told why they can't post. Each post's menu offers Report, Delete (author or staff), and for staff Hide or Restore and Ban author, and for the Owner Pin. A hidden post shows "hidden after reports" to everyone else.
+- **Members** (`ClubMembers.tsx`): the leaderboard, with a **Follow** button on each row, with a podium for the top three once three members have traded, a bar for each member's share of the top score, a Newest sort, `HolderBadge`, and Owner/Moderator chips. Staff get a menu by role: make or remove moderator, hand over, ban. It is shown only when the viewer's role may act on that row (`mayActOn` in `lib/clubRoles.ts`, the same rule the server applies), and the server decides regardless.
+- **Rewards** (`ClubRewards.tsx`, `components/RewardsClaim.tsx`, `hooks/useRewards.ts`): how the Club earns (from `REWARDS`), the running epoch and when it closes, Your share (ready, on its way, earned here, and one **Claim** for every open epoch, through `useTxFlow`), the latest epoch's fees and pools, who earned, and earlier epochs. Each leaf's state comes from the chain: on its way (not published or not open), ready, claimed or expired.
 - **Manage** (`ClubManage.tsx`): the page editor (description, up to 3 `https://` links, "holders only can post"), the ban list, the "ownership changed on-chain" note (admins) and the moderation log as a timeline.
 
 **Side column** (`ClubSidebar.tsx`): the heat scale with this Club's step marked, the top five traders (hidden while the Members tab is open) and the asset's details: contract with copy and explorer link, kind, and why it is verified. Below `lg` it follows the tab content.
 
-**Header** (`app/clubs/[address]/page.tsx`): the cover with the avatar over its edge, name, symbol and kind, a Verified chip (its tooltip is the list's note), when it was last active, `JoinClubButton` (Leave sits in its "⋯" menu), the description and links, and a stats strip (Momentum and its weekly change, members and holders, swaps and new deals in 7 days, traders in 30 days, heat). Under it, as alerts: a **Claim** prompt for a member whose wallet is the token's `owner()` when the Club has no Owner, the archived note, and the activity-log note.
+**Header** (`app/clubs/[address]/page.tsx`): the cover with the avatar over its edge, name, symbol and kind, a Verified chip (its tooltip is the list's note), when it was last active, `JoinClubButton` (Leave sits in its "⋯" menu), the description and links, and a stats strip (Momentum and its weekly change, members and holders, swaps and new deals in 7 days, traders in 30 days, heat). Under it, as alerts: a **Claim** prompt for a member whose wallet is the token's `owner()` when the Club has no Owner, the Owner's "Club fund is ready" (to the Rewards tab; worded apart from claiming the Club), the archived note, and the activity-log note.
 
 **Sign-in and writes.** `hooks/useSignIn.ts` opens Privy; `hooks/useClubMembership.ts`, `useClubBoard.ts` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`) use React Query and `useAccessToken`, send the Privy access token, and report errors through `useToast`. A failed load uses `LoadError`. Server refusals (`banned`, `cooldown`, `rate_limited`, `link_mismatch`, …) arrive as `{error, message}` and the message is what the toast shows.
 
@@ -365,13 +366,11 @@ Where errors show up:
 | `TradeNotExpired` | This deal hasn't expired yet. |
 | `NotAllowedTaker` | This is a private offer for another wallet. |
 | `SelfFill` | You can't accept your own deal. |
-| `WrongMonAmount` (v1) | The MON amount doesn't match the deal. |
-| `WrongNativeAmount` (V2) | The MON sent doesn't match the deal plus the protocol fee. |
+| `WrongNativeAmount` | The MON sent doesn't match the deal plus the protocol fee. |
 | `WrongFee` (signed swaps) | The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token. |
 | `NotMaker` | Only the creator of this deal can do that. |
 | `EmptySide` | Add at least one asset or some MON to each side. |
-| `MonOnBothSides` | Put MON on one side only. |
-| `TooManyAssets` (and v1's `TooManyTokens`) | Up to 10 assets per side. |
+| `TooManyAssets` | Up to 10 assets per side. |
 | `ExpiryInPast` | Pick an expiry in the future. |
 | `InvalidAsset` | One of the assets in this deal isn't valid. |
 | `DuplicateAsset` | The same asset is listed twice on one side. |
@@ -392,14 +391,22 @@ Where errors show up:
 | `InvalidTraitProof` | One of the NFTs you chose isn't in the set this deal asks for. |
 | `NothingToClaim` | There's nothing to claim. |
 | `ClaimFailed` | The transfer still failed. Your claim is kept, so try again later. |
-| ERC-721 `ERC721InsufficientApproval` | Approve On Deal to move your assets first. |
+| ERC-721 `ERC721InsufficientApproval` | Approve DeClub to move your assets first. |
 | ERC-721 `ERC721IncorrectOwner` | An asset in this deal isn't owned by the wallet sending it. |
 | ERC-721 `ERC721NonexistentToken` | One of these assets doesn't exist. |
 | ERC-20 `ERC20InsufficientBalance` | You don't have enough of that token. |
-| ERC-20 `ERC20InsufficientAllowance` | Approve On Deal to spend that token first. |
+| ERC-20 `ERC20InsufficientAllowance` | Approve DeClub to spend that token first. |
 | `SafeERC20FailedOperation` | The token transfer failed. |
+| `UnknownEpoch` (rewards) | That rewards epoch hasn't been published yet. |
+| `NotOpenYet` (rewards) | These rewards aren't open yet. Try again once the review day has passed. |
+| `EpochClosed` (rewards) | This epoch's claim window has ended. |
+| `AlreadyClaimed` (rewards) | These rewards were already claimed. |
+| `InvalidProof` (rewards) | These rewards don't match the published epoch. Reload and try again. |
+| `OverClaim` (rewards) | This epoch has already paid out everything it was funded with, so it can't pay this claim. |
+| `PayoutFailed` (rewards) | The wallet couldn't receive the MON. |
+| `ZeroAccount` (rewards) | There's no wallet to pay. |
 
-The ERC-721 and ERC-20 errors are raised by the token contracts and bubble up through `OnDealV2`. `lib/contracts.ts` appends them to the swap ABI (the ERC-721 ones from MockChog's ABI, the ERC-20 ones declared by hand) so viem can decode them by name. `lib/errors.ts` still carries copy for v1-only errors (`WrongMonAmount`, `NothingToWithdraw`, `WithdrawFailed`) and MockChog's `InvalidQuantity` ("Mint between 1 and 20 at a time."), which the app no longer sends. Any other error name shows as "The contract rejected this (Name)."
+The ERC-721 and ERC-20 errors are raised by the token contracts and bubble up through `DeClubEscrow`. `lib/contracts.ts` appends them to the swap ABI (the ERC-721 ones from MockChog's ABI, the ERC-20 ones declared by hand) so viem can decode them by name. `lib/errors.ts` also carries MockChog's `InvalidQuantity` ("Mint between 1 and 20 at a time."), which the app no longer sends. Any other error name shows as "The contract rejected this (Name)."
 
 ## Create wizard
 
@@ -409,17 +416,17 @@ The header has no Create tab, but a Create button sits beside the wallet. `/crea
 2. **Your assets.** What you give, plus the optional "only this wallet" address and the expiry (1h / 24h / 7d / never, default 24h).
 3. **Confirm.** Both sides, the terms, then the approval and Create buttons.
 
-All three kinds use `OnDealV2` ([ADR 0006](adr/0006-trait-requests-in-v2.md)); without it configured they are unavailable:
+All three kinds use `DeClubEscrow` ([ADR 0006](adr/0006-trait-requests-in-v2.md)); without it configured they are unavailable:
 
 | Kind | Contract | Assets | Component |
 |---|---|---|---|
-| Open offer | `OnDealV2` | any | `MultiFlow` |
-| Exact request | `OnDealV2` | any | `MultiFlow` |
-| By trait | `OnDealV2` | any collection with readable traits (+ optional exact assets) | `MultiFlow` |
+| Open offer | `DeClubEscrow` | any | `MultiFlow` |
+| Exact request | `DeClubEscrow` | any | `MultiFlow` |
+| By trait | `DeClubEscrow` | any collection with readable traits (+ optional exact assets) | `MultiFlow` |
 
 ### Protocol fee in the app
 
-[ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). The fee is read from the contracts, never from config. The fee admin can change it, so it is re-read every minute rather than cached for good (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `OnDealV2.fee()`, `useIntentFee()` reads `OnDealIntents.FEE_TOKEN()` and `fee()`, and both read `pendingFee()` / `pendingFeeAt()` for a queued raise). The buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0 and no raise is queued) wherever it is paid, saying it is only charged if the deal completes. On the create and signing steps a queued raise adds "Scheduled to rise to X from <date>" and what that means for what is being made.
+[ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). The fee is read from the contracts, never from config. The fee admin can change it, so it is re-read every minute rather than cached for good (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `DeClubEscrow.fee()`, `useIntentFee()` reads `DeClubIntents.FEE_TOKEN()` and `fee()`, and both read `pendingFee()` / `pendingFeeAt()` for a queued raise). The buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0 and no raise is queued) wherever it is paid, saying it is only charged if the deal completes. On the create and signing steps a queued raise adds "Scheduled to rise to X from <date>" and what that means for what is being made.
 
 - **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): create sends `native amount + fee()`. A fill or a proposal sends `native amount + deal.fee`, the fee the deal was listed with (`getTrade(id).fee`, `DealV2.fee`), never the current one. The deal page also checks for a native `claimable` credit when the deal has a fee, because a refused fee refund is credited as MON.
 - **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads `fee()` at the moment of signing and signs it as `maxFee`, with `feeToken`, in the `Intent` (EIP-712 domain version `3`, `lib/intents.ts`; `test/intents.test.ts` pins the hashing to the contract's type string). The intent page shows the fee charged now when a cut has brought it below `maxFee`. `useIntentReadiness` counts the fee on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.

@@ -2,6 +2,7 @@
 
 import { ActionMenu } from "@/components/ActionMenu";
 import { HolderBadge } from "@/components/HolderBadge";
+import { Spinner } from "@/components/Spinner";
 import { CheckIcon, SignOutIcon } from "@/components/Icons";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useSignIn } from "@/hooks/useSignIn";
@@ -62,7 +63,8 @@ export function JoinClubButton({
                 label: m.pending ? "Leaving…" : "Leave this Club",
                 icon: <SignOutIcon />,
                 danger: true,
-                confirm: "Leave this Club? Your wallet comes off the Members list. You can join again later.",
+                confirm: "Leave this Club?",
+                confirmNote: "Your wallet comes off the Members list. You can join again later.",
                 onSelect: m.leave,
               },
             ],
@@ -74,7 +76,8 @@ export function JoinClubButton({
   if (archived) return <span className="chip">Not taking new members</span>;
   return (
     <div className="flex flex-col items-start gap-1.5 sm:items-end">
-      <button type="button" className="btn-primary px-6" disabled={m.pending} onClick={m.join}>
+      <button type="button" className="btn-primary px-6" aria-busy={m.pending} disabled={m.pending} onClick={m.join}>
+        {m.pending && <Spinner />}
         {m.pending ? "Joining…" : "Join Club"}
       </button>
       {hint && <p className="text-xs text-muted">Shows your wallet on the Members list.</p>}

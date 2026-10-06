@@ -5,7 +5,7 @@ import {IFeeAdmin} from "./interfaces/IFeeAdmin.sol";
 
 /// @title FeeAdmin: the protocol fee amount, adjustable within a ceiling fixed at deploy
 /// @notice See IFeeAdmin and docs/adr/0018-adjustable-protocol-fee.md.
-/// @dev Shared by OnDealV2 and OnDealIntents. No external calls, so nothing here needs a
+/// @dev Shared by DeClubEscrow and DeClubIntents. No external calls, so nothing here needs a
 ///      reentrancy guard. A queued raise is always above the fee in force: a cut drops it, and
 ///      nothing else changes the fee while it waits.
 abstract contract FeeAdmin is IFeeAdmin {

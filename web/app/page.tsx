@@ -1,26 +1,27 @@
 import Link from "next/link";
 import Image from "next/image";
-import { OnDealArt } from "@/components/ChogArt";
+import { DeClubArt } from "@/components/ChogArt";
 import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
 import { LogoMark, Wordmark } from "@/components/Logo";
-import { explorerAddress, ON_DEAL_V2_ADDRESS } from "@/lib/config";
+import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
+import { REWARDS, percent } from "@/lib/rewards";
 
 const STEPS = [
   {
     number: "01",
-    title: "Lock your offer",
-    body: "Pick the assets (and any MON) you want to give. Creating the deal escrows your side in the contract.",
+    title: "Join your Club",
+    body: "Every verified Monad NFT collection has one, with its memecoin if it has one. Join with your wallet; holding the NFT makes you a Holder, and the Owner can let the coin count too.",
   },
   {
     number: "02",
-    title: "Name what you want",
-    body: "Ask for specific assets, a trait, or MON. Keep it public, or address it to a single wallet.",
+    title: "Trade and talk inside it",
+    body: "Swap with other members, lock a deal or sign one, and post what you’re after. Your wallet signs your posts, so they’re yours.",
   },
   {
     number: "03",
-    title: "Swap atomically",
-    body: "When someone accepts, both sides move in one transaction. Either everything transfers or nothing does.",
+    title: "Own a share of the market",
+    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s biggest Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
   },
 ];
 
@@ -38,29 +39,32 @@ export default function HomePage() {
                 height={18}
                 className="size-[18px] rounded-full"
               />
-              Peer-to-peer deals · Monad testnet
+              De(al) Club · Monad testnet
             </div>
             <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
-              Swap what you have
-              <span className="block text-accent">for what you want.</span>
+              Your community’s market,
+              <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Swap assets peer-to-peer. Lock your offer, find the one you want, and let the
-              contract settle both sides together. No middlemen. Just a little chaos.
+              Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own,
+              and Holders earn a share of the fees their Club’s swaps pay.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/deals" className="btn-primary">
-                Browse deals <span aria-hidden>↗</span>
+              <Link href="/clubs" className="btn-primary">
+                Explore Clubs <span aria-hidden>→</span>
+              </Link>
+              <Link href="/deals" className="btn-secondary">
+                Browse deals
               </Link>
               <CreateDealButton />
             </div>
           </div>
-          <OnDealArt />
+          <DeClubArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>Non-custodial</strong><span>Your assets stay yours until a swap</span></div>
-          <div className="hero-stat"><strong>Permissionless</strong><span>Public or direct offers, your choice</span></div>
-          <div className="hero-stat"><strong>Pay only on success</strong><span>A small flat fee, only when a deal completes</span></div>
+          <div className="hero-stat"><strong>{percent(REWARDS.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
+          <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
+          <div className="hero-stat"><strong>Non-custodial</strong><span>Assets move only in swaps you approve</span></div>
         </div>
       </section>
 
@@ -83,12 +87,12 @@ export default function HomePage() {
 
       <section className="page-section flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
         <div>
-          <p className="font-semibold">New to On Deal?</p>
+          <p className="font-semibold">New to DeClub?</p>
           <p className="mt-1 text-sm text-muted">
-            Learn how escrow, approvals, expiry, and atomic settlement work.
+            Learn how Clubs, rewards and signed posts work, and how a swap settles safely.
           </p>
         </div>
-        <Link href="/guide" className="btn-secondary shrink-0">Read the field guide</Link>
+        <Link href="/guide/clubs" className="btn-secondary shrink-0">Read the field guide</Link>
       </section>
 
       <footer className="relative mt-12 overflow-hidden rounded-2xl border-2 border-[#111318] bg-[#171a22] p-6 text-sm text-white shadow-[0.45rem_0.45rem_0_#d83b45] sm:p-9">
@@ -102,14 +106,14 @@ export default function HomePage() {
                 <Wordmark className="text-2xl" />
               </div>
               <p className="mt-5 text-xl font-semibold leading-tight text-[#fff4cf] sm:text-2xl">
-                Trade with a little more confidence.
+                Communities that own their market.
               </p>
               <p className="mt-2 leading-6 text-white/60">
-                Non-custodial peer-to-peer swaps for digital assets on Monad testnet.
+                Clubs, swaps and rewards for Monad’s NFT collections and their coins, on Monad testnet.
               </p>
             </div>
             <a
-              href="mailto:support@on-deal.app"
+              href="mailto:support@declub.app"
               className="rounded-xl border border-[#f0b735] px-4 py-3 font-semibold text-[#f0b735] transition-colors hover:bg-[#f0b735] hover:text-[#111318]"
             >
               Need a hand? Contact support <span aria-hidden>↗</span>
@@ -120,8 +124,8 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Explore</p>
               <nav className="mt-3 grid gap-2 text-white/70">
-                <Link href="/deals" className="hover:text-white">Browse deals <span aria-hidden>↗</span></Link>
-                <Link href="/clubs" className="hover:text-white">Clubs</Link>
+                <Link href="/clubs" className="hover:text-white">Clubs <span aria-hidden>↗</span></Link>
+                <Link href="/deals" className="hover:text-white">Browse deals</Link>
                 <Link href="/history" className="hover:text-white">History</Link>
                 <Link href="/guide" className="hover:text-white">Guide</Link>
               </nav>
@@ -129,9 +133,9 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">On-chain</p>
               <nav className="mt-3 grid gap-2 text-white/70">
-                {ON_DEAL_V2_ADDRESS && (
-                  <a href={explorerAddress(ON_DEAL_V2_ADDRESS)} target="_blank" rel="noreferrer" className="hover:text-white">
-                    View On Deal contract <span aria-hidden>↗</span>
+                {DECLUB_ESCROW_ADDRESS && (
+                  <a href={explorerAddress(DECLUB_ESCROW_ADDRESS)} target="_blank" rel="noreferrer" className="hover:text-white">
+                    View DeClub contract <span aria-hidden>↗</span>
                   </a>
                 )}
                 <span>Monad testnet</span>

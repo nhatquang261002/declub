@@ -1,5 +1,5 @@
-import { shortAddress } from "@/lib/format";
 import { describePicks, type TraitClause } from "@/lib/traitSpec";
+import { CopyAddress } from "@/components/CopyAddress";
 
 /** Whether the request, rebuilt from its published description, commits to the deal's root. */
 export type ClauseCheck = "matches" | "differs" | "checking" | "unavailable";
@@ -34,7 +34,7 @@ export function TraitClauseSummary({
         </span>
       </div>
       <p className="mt-1 text-xs text-[#5d6270]">
-        From <span className="font-mono">{shortAddress(clause.token)}</span>
+        From <CopyAddress address={clause.token} />
         {matches !== undefined && ` · ${matches.toLocaleString()} NFT${matches === 1 ? "" : "s"} match today`}
       </p>
       {check && (

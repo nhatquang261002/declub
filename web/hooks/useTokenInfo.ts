@@ -6,7 +6,6 @@ import { useReadContracts } from "wagmi";
 import { erc20Abi } from "viem";
 import { CHAIN_ID } from "@/lib/config";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
-import { DEMO_DEALS, demoTokenInfo } from "@/lib/demoDeals";
 import type { DealV2 } from "@/lib/dealsV2";
 
 /**
@@ -26,9 +25,6 @@ export function useTokenInfo(tokens: readonly Address[]) {
   const info = useMemo(() => {
     const out = new Map<string, TokenInfo>();
     tokens.forEach((token, i) => {
-      // Mock tokens (lib/demoDeals.ts) have no contract to answer.
-      const mock = DEMO_DEALS ? demoTokenInfo(token) : undefined;
-      if (mock) return void out.set(token.toLowerCase(), mock);
       const symbol = result.data?.[i * 2];
       const decimals = result.data?.[i * 2 + 1];
       if (symbol?.status === "success" && decimals?.status === "success") {

@@ -1,6 +1,6 @@
 # 07 · User Guide
 
-On Deal is a peer-to-peer, non-custodial way to swap digital assets on Monad: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
+DeClub gives every verified Monad NFT collection a Club, with its memecoin if it has one: a place to trade it, talk about it and share in the fees its market pays. Trading is peer-to-peer and non-custodial: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
 
 The in-app version of this guide has two bases, side by side: **Deals** at `/guide` ([page](../web/app/guide/page.tsx)) and **Clubs** at `/guide/clubs` ([page](../web/app/guide/clubs/page.tsx)).
 
@@ -78,6 +78,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 - **Locked deals** take it in MON with your side, hold it, and refund it if the deal doesn't complete. A deal keeps the fee it was listed with, for both sides.
 - **Signed swaps** take it in WMON from your wallet when the swap settles. You sign the most you'll pay; if the fee is cut before then, you pay less.
 - The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. It can never go above a ceiling set when the contract was deployed ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)).
+- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
 - You also pay Monad's network gas.
 
 ## Finding deals and keeping track
@@ -90,6 +91,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 
 The **Account** page (signed in with Privy) lets you:
 
+- set **Your avatar**: pick an NFT one of your linked wallets holds (**Pick from my NFTs**) or upload a picture. It shows on your wallet everywhere, on every wallet linked to your sign-in, and an NFT avatar disappears while your wallets no longer hold it;
 - link or unlink email, Google, X and Discord;
 - link several wallets and choose the one you trade with (**Use this wallet**);
 - turn on **Show my profile to other traders**, which shows your X or Discord handle beside your wallet on your deals and lets people find you by handle;
@@ -97,35 +99,65 @@ The **Account** page (signed in with Privy) lets you:
 
 ## Clubs and Momentum
 
-A **Club** is the community for one verified NFT collection or memecoin, such as Chog. A memecoin can share its collection's Club. Open **Clubs** in the header to see them all, busiest first. Each Club has four tabs:
+A **Club** is the community for one verified NFT collection, such as Chog. A memecoin made for the collection shares its Club; a memecoin has no Club of its own. The Club's Owner decides whether holding the coin makes you a Holder, and from how much. Open **Clubs** in the header to see them all, busiest first. Each Club has these tabs:
 
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
-- **Board:** short posts from members.
-- **Members:** a leaderboard of the people in the Club.
+- **Board:** short posts from members, signed by their wallets, in the order you pick.
+- **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
+- **Rewards:** what the Club's swaps paid in fees, what went to its Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
 
 **Joining.** Sign in, link a wallet, and press **Join**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. **Leave** takes you off the list again.
 
-**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection, or the minimum amount of a token; in a shared Club, either one). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
+**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection; in a Club with a memecoin, also the coin, if the Owner lets it count, from the minimum they set). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
 
-**Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet. Posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
+**Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet; so does a Holder's own X post about the Club shared on its Board (see below), one a day. Other posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
 
-**Posting.** You need to be a member and to have shared a verified X or Discord profile (Account page). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+**Posting.** You need to be a member and to have linked an X or Discord account and turned on “Show my profile to other traders” (Account page; linking alone isn’t enough). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. A *Note* can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+
+**Sharing your X posts.** Any public X post can be shared as a card. Your **own** post (from the X account linked to your profile) counts for the Club, adding to your Momentum and your Holder bonus, when:
+
+- you hold the Club's asset;
+- you posted it on X in the last 48 hours;
+- it is about the Club: it links the Club or its token, mentions, quotes or replies to the project's X account (shown as "@handle ✓" on the Club page), or uses one of the Club's tags (a tag alone counts half). The composer lists them.
+
+One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. For now every counted X post adds the same, however it does on X. Counting likes, reposts, quotes and replies (and dropping X posts you delete) is in development and not coming soon.
+
+**Your posts are signed.** When you press **Sign & post**, your Club wallet (the one the Members list shows for you) signs the post. It costs no gas and moves nothing. If another wallet is connected, the app asks you to switch first. Because each post is signed, it's your own record: anyone can check it, and each Club's posts are public with their signatures at `/api/clubs/<address>/feed`, yours across Clubs at `/api/wallets/<your wallet>/posts`.
+
+**Choosing the order.** Above the Board, pick a lens: **Newest**; **Most active**, where posts from the members most active in the Club (trading, and their X posts about it) rise and older ones sink; **Holders**, only posts from members who hold it; or **Following**, only posts from wallets you follow (connect a wallet to see it). Pinned posts stay on top, except under Following.
+
+**Following.** Press **Follow** beside a member's name, on a post or in the Members list. Your connected wallet signs the follow, which must be one of the wallets linked to your account. Press again to unfollow. Your follows are public at `/api/wallets/<your wallet>/follows`.
 
 **Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different Holders (or staff) have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it. Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
+
+### Rewards
+
+Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
+
+- **50%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
+  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Every counted post earns the same; counting X engagement (well-received posts earning up to 30 more points a week) is in development and not coming soon. A Holder who does nothing still gets their base share.
+- **25%** goes to the **Club fund**, which the Club's Owner collects.
+- The rest stays with the protocol.
+
+A swap that names two Clubs' assets splits its fee between them. If a Club has no Holder members yet, or no Owner, that part waits and is added to the next week's.
+
+**Claiming.** After an epoch ends it is worked out and published, and claims open a day later, so a mistake can be caught first. Then press **Claim** on a Club's **Rewards** tab or on your **Account** page: one claim collects every open week, in MON. Anyone can send a claim for you, but the MON always goes to your wallet. Unclaimed rewards can be collected for 90 days.
+
+Every week's numbers, and the proof for every payout, are public at `/api/rewards/epochs/<n>`. Rewards say a market has been busy, not that an asset is safe; and trading with yourself to earn them loses money, because each side pays the whole fee and only part of it comes back, shared with every Holder.
 
 ### Roles
 
 | Role | Who | Can |
 |---|---|---|
-| **Owner** | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page. Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders |
+| **Owner** | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page (that claims the Club; the Club fund is collected under **Rewards**). Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders. Collects the Club fund each week |
 | **Moderator** | Appointed by the Owner | Hide, restore and delete posts, ban and unban members of this Club (but not lift a ban the Owner made). Can't act on the Owner or other moderators |
 | **Member** | Anyone who joined | Post, report, appear on the leaderboard |
 | **Visitor** | Not signed in or not joined | Read only |
 
 The app's admins can do all of this in every Club and ban someone from all of them. A banned person leaves the Club, loses any role and can't rejoin or post. Staff actions are written to a log that only staff can read.
 
-Clubs are community pages, not part of the contracts: nothing in a deal, a fee or a settlement depends on one. Posts and memberships are kept by the app's server, and a Club only exists for assets on the verified list, so a copycat collection can't get one.
+A deal settles the same whether or not you're in a Club: nothing in a deal or its fee depends on one, and rewards are paid afterwards from a separate contract. Posts and memberships are kept by the app's server, and a Club only exists for assets on the verified list, so a copycat collection can't get one.
 
 ## Safety guidelines
 
@@ -135,9 +167,9 @@ Clubs are community pages, not part of the contracts: nothing in a deal, a fee o
 - Read the fee line before you confirm. It is only charged when the deal completes.
 - This is a Monad testnet demo with test assets. Do not use valuable mainnet assets.
 - Never approve or send assets to a contract address copied from an untrusted message.
-- An open offer's note, a Club post or a profile link is written by a person, not checked by On Deal. A handle, a Holder badge or a high Momentum is not an endorsement. Check the deal itself before you sign.
+- An open offer's note, a Club post or a profile link is written by a person, not checked by DeClub. A handle, a Holder badge or a high Momentum is not an endorsement. Check the deal itself before you sign.
 
 ## For maintainers
 
 - The Guide page's comparison and the create screen's six settlement chips (*Can't fail*, *Costs gas*, *Assets locked*, *Free*, *Nothing locked*, *Can fail*) read the same words from `web/lib/settlementTerms.ts`. Each chip's tooltip links to its entry on the Guide (`/guide#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), so change a reason there and both follow.
-- The settlement section only appears when signed swaps are configured (`NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS`). The reasoning behind the two paths is in [ADR 0008](adr/0008-trade-intents.md) and [ADR 0009](adr/0009-ring-swaps.md).
+- The settlement section only appears when signed swaps are configured (`NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`). The reasoning behind the two paths is in [ADR 0008](adr/0008-trade-intents.md) and [ADR 0009](adr/0009-ring-swaps.md).

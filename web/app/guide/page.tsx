@@ -5,6 +5,7 @@ import { CreateDealButton } from "@/components/CreateDealButton";
 import { CheckIcon, ShieldIcon, SwapIcon, WalletIcon } from "@/components/Icons";
 import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
+import { REWARDS, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
 import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "./parts";
 
@@ -146,6 +147,7 @@ const FEES = [
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
+  `Most of it goes back to the community: ${percent(REWARDS.holderBps)} to the traded asset's Club top Holders and ${percent(REWARDS.fundBps)} to its Club fund, each week.`,
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [
@@ -159,7 +161,7 @@ const SAFETY = [
   "Check who can accept and when the deal expires.",
   "Compare a handle and its wallet with your conversation. Lookalikes exist.",
   "Never approve a contract address someone sent you in a message.",
-  "An open offer's note is written by its maker, not checked by On Deal.",
+  "An open offer's note is written by its maker, not checked by DeClub.",
 ];
 
 /** Locked deals against signed swaps, row by row. The one-line reasons live in lib/settlementTerms.ts. */
@@ -192,10 +194,10 @@ const HANDLE_FAQ: [string, string] = [
 ];
 
 const FAQ: ReadonlyArray<[string, string]> = [
-  ["What is On Deal?", "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets."],
+  ["What is DeClub?", "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets."],
   ["Do I have to trust the other person?", "No. The swap is atomic: every transfer in it succeeds, or the whole transaction is undone. The other side can never take your assets without sending theirs."],
-  ["Where are my assets while a deal is open?", "In a locked deal, inside the On Deal contract, until the deal is accepted, you cancel it, or it expires and you reclaim it. In a signed swap, they never leave your wallet."],
-  ["Why do I need to approve On Deal?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
+  ["Where are my assets while a deal is open?", "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it. In a signed swap, they never leave your wallet."],
+  ["Why do I need to approve DeClub?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
   ["What is an open offer?", "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders."],
   ["Is this mainnet?", "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract."],
 ];

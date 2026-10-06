@@ -8,9 +8,9 @@ import { CHAIN_ID } from "@/lib/config";
 // store is off (ADR 0012, hooks/useFills.ts): who filled a public deal is recorded only in the
 // TradeFilled event, and the public RPC can't scan logs from the deploy block (100-block cap).
 
-const EVENT = "ondeal:fills";
+const EVENT = "declub:fills";
 const key = (contract: string, account: string) =>
-  `ondeal:fills:${CHAIN_ID}:${contract}:${account.toLowerCase()}`;
+  `declub:fills:${CHAIN_ID}:${contract}:${account.toLowerCase()}`;
 
 function read(contract: string | undefined, account: string | undefined): string {
   if (!contract || !account) return "[]";

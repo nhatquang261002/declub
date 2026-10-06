@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OnDealV2} from "../src/OnDealV2.sol";
-import {OnDealIntents} from "../src/OnDealIntents.sol";
+import {DeClubEscrow} from "../src/DeClubEscrow.sol";
+import {DeClubIntents} from "../src/DeClubIntents.sol";
 import {IFeeAdmin} from "../src/interfaces/IFeeAdmin.sol";
 import {MockERC20} from "../src/mocks/MockERC20.sol";
 
@@ -340,17 +340,17 @@ abstract contract FeeAdminTest is Test {
     }
 }
 
-contract FeeAdminOnDealV2Test is FeeAdminTest {
+contract FeeAdminDeClubEscrowTest is FeeAdminTest {
     function _deploy(uint256 fee, uint256 maxFee, address recipient, address admin_)
         internal
         override
         returns (IFeeAdmin)
     {
-        return new OnDealV2(fee, maxFee, recipient, admin_);
+        return new DeClubEscrow(fee, maxFee, recipient, admin_);
     }
 }
 
-contract FeeAdminOnDealIntentsTest is FeeAdminTest {
+contract FeeAdminDeClubIntentsTest is FeeAdminTest {
     MockERC20 internal wmon = new MockERC20("Wrapped MON", "WMON");
 
     function _deploy(uint256 fee, uint256 maxFee, address recipient, address admin_)
@@ -358,6 +358,6 @@ contract FeeAdminOnDealIntentsTest is FeeAdminTest {
         override
         returns (IFeeAdmin)
     {
-        return new OnDealIntents(address(wmon), fee, maxFee, recipient, admin_);
+        return new DeClubIntents(address(wmon), fee, maxFee, recipient, admin_);
     }
 }

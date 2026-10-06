@@ -23,6 +23,7 @@ describe("constants", () => {
       washFactor: 0.5,
       washDays: 7,
       breadthDivisor: 4,
+      xShareWeight: 3,
     });
   });
 });

@@ -1,9 +1,11 @@
 import { createPublicClient, erc20Abi, http, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
-import type { ActivityEvent } from "../clubs";
+import { toScored, type ActivityEvent } from "../clubs";
 import {
   MAX_MEMBERS,
+  RECHECK_PER_READ,
+  coinRule,
   isHolder,
   pickDisplayWallet,
   rankMembers,
@@ -11,13 +13,16 @@ import {
   withWallets,
   type MemberRow,
   type MemberSort,
+  type CoinRule,
   type MembersView,
 } from "../members";
 import { score } from "../momentum";
 import { profileKey, userWalletsKey, type StoredProfile } from "../profiles";
 import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { withoutUser } from "../clubRoles";
-import { isBanned, loadRoles, saveRoles } from "./clubState";
+import { epochAt } from "../rewards";
+import { isBanned, loadProfile, loadRoles, saveRoles } from "./clubState";
+import { liveStreak, readStreaks } from "./streaks";
 import type { Store } from "./store";
 
 /**
@@ -26,9 +31,9 @@ import type { Store } from "./store";
  * badge is a balance read on the server and is out of date by at most a day.
  */
 
-export const membersKey = (token: string) => `ondeal:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
-export const memberKey = (token: string, userId: string) => `ondeal:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
-export const userClubsKey = (userId: string) => `ondeal:user-clubs:${userId}`;
+export const membersKey = (token: string) => `declub:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
+export const memberKey = (token: string, userId: string) => `declub:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
+export const userClubsKey = (userId: string) => `declub:user-clubs:${userId}`;
 
 /**
  * One balance per wallet, in the same order, or `null` when the chain can't be read. The same
@@ -71,15 +76,27 @@ export async function sharedWallets(store: Store, userId: string): Promise<Set<s
 export const getMember = (store: Store, token: string, userId: string) => store.get<MemberRow>(memberKey(token, userId));
 
 /**
- * The row's holder flag as of now: holding any of the Club's assets earns it. The old row comes
- * back when the chain couldn't be read and what it could read doesn't already settle it.
+ * The Club's Holder rule for its memecoin, and when it last changed (epoch ms, 0 when never), or
+ * null for a Club without one.
  */
-async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps): Promise<MemberRow> {
+async function coinRuleOf(store: Store, entry: ClubEntry): Promise<{ rule: CoinRule; since: number } | null> {
+  if (!entry.linked) return null;
+  const { coinHolders } = await loadProfile(store, entry.address);
+  return { rule: coinRule(entry.linked, coinHolders), since: coinHolders?.at ?? 0 };
+}
+
+/**
+ * The row's holder flag as of now: holding any NFT of the collection earns it, and so does enough
+ * of its memecoin when the Club counts it. The old row comes back when the chain couldn't be read
+ * and what it could read doesn't already settle it.
+ */
+async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps, coin: CoinRule | undefined): Promise<MemberRow> {
   const read = deps.holdings ?? viemHoldings;
+  const counted = clubAssets(entry).filter((asset) => asset.kind === "erc721" || coin?.on !== false);
   const results = await Promise.all(
-    clubAssets(entry).map(async (asset) => {
+    counted.map(async (asset) => {
       const balances = await read(asset.address, row.wallets as Address[]).catch(() => null);
-      return balances && isHolder(asset, balances);
+      return balances && isHolder(asset, balances, asset.kind === "erc20" ? coin : undefined);
     }),
   );
   if (!results.includes(true) && results.includes(null)) return row;
@@ -109,7 +126,7 @@ export async function joinClub(
   const base: MemberRow = existing
     ? withWallets(existing, wallets, display)
     : { userId, wallets: wallets.map((w) => w.toLowerCase()), displayWallet: display, holder: false, holderCheckedAt: 0, joinedAt: nowOf(deps) };
-  const row = base.holderCheckedAt === 0 ? await checked(entry, base, deps) : base;
+  const row = base.holderCheckedAt === 0 ? await checked(entry, base, deps, (await coinRuleOf(store, entry))?.rule) : base;
 
   await store.set(memberKey(entry.address, userId), row);
   await store.addMember(membersKey(entry.address), userId);
@@ -180,19 +197,21 @@ export async function listMembers(
   deps: MemberDeps = {},
 ): Promise<MembersView> {
   let rows = await allRows(store, entry.address);
-  const stale = staleRows(rows, nowOf(deps));
+  const coin = await coinRuleOf(store, entry);
+  const stale = staleRows(rows, nowOf(deps), RECHECK_PER_READ, coin?.since);
   if (stale.length > 0) {
-    const fresh = new Map((await Promise.all(stale.map((row) => checked(entry, row, deps)))).map((row) => [row.userId, row]));
+    const fresh = new Map((await Promise.all(stale.map((row) => checked(entry, row, deps, coin?.rule)))).map((row) => [row.userId, row]));
     await Promise.all(
       [...fresh].filter(([id, row]) => row !== stale.find((s) => s.userId === id)).map(([id, row]) => store.set(memberKey(entry.address, id), row)),
     );
     rows = rows.map((row) => fresh.get(row.userId) ?? row);
   }
-  const scores = score(
-    events.map((e) => ({ kind: e.kind, at: e.at, parties: e.parties })),
-    nowSec,
-  );
-  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address));
+  // `toScored` keeps an X share's weight, so a weak one counts half here too, as in the lenses.
+  const scores = score(events.map(toScored), nowSec);
+  const current = epochAt(nowSec);
+  const recorded = await readStreaks(store, entry.address);
+  const streaks = new Map(rows.map((row) => [row.userId, liveStreak(recorded[row.userId], current)]));
+  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks);
 }
 
 /** How many members hold the asset, as of their last check. Reads every row. */

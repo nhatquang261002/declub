@@ -8,7 +8,7 @@ import { useAccessToken } from "@/hooks/useAccessToken";
 import { call } from "@/hooks/useClubMembership";
 import { PRIVY_APP_ID } from "@/lib/config";
 import { EXPIRIES, expiryLabelOf, type Terms } from "@/lib/createFlow";
-import { shortAddress } from "@/lib/format";
+import { CopyAddress } from "@/components/CopyAddress";
 import { PROFILE_LABEL, handleLabel, looksLikeHandle, type HandleMatch } from "@/lib/profiles";
 
 export function StepHeading({ title, blurb }: { title: string; blurb?: string }) {
@@ -160,7 +160,7 @@ function HandleMatches({ matches, onPick }: { matches: HandleMatch[]; onPick: (w
                   <span className="font-semibold">{handleLabel(match)}</span>
                   <span className="text-xs text-muted">on {PROFILE_LABEL[match.provider]}</span>
                 </span>
-                <span className="font-mono text-xs">{shortAddress(wallet)}</span>
+                <CopyAddress address={wallet} inLink className="text-xs" />
               </button>
             </li>
           )),

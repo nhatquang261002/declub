@@ -15,15 +15,10 @@ const COPY: Record<string, string> = {
   TradeNotExpired: "This deal hasn't expired yet.",
   NotAllowedTaker: "This is a private offer for another wallet.",
   SelfFill: "You can't accept your own deal.",
-  WrongMonAmount: "The MON amount doesn't match the deal.",
   NotMaker: "Only the creator of this deal can do that.",
   EmptySide: "Add at least one asset or some MON to each side.",
-  MonOnBothSides: "Put MON on one side only.",
-  TooManyTokens: "Up to 10 assets per side.",
   ExpiryInPast: "Pick an expiry in the future.",
-  NothingToWithdraw: "There's nothing to withdraw.",
-  WithdrawFailed: "Your wallet couldn't receive the MON.",
-  ERC721InsufficientApproval: "Approve On Deal to move your assets first.",
+  ERC721InsufficientApproval: "Approve DeClub to move your assets first.",
   ERC721IncorrectOwner: "An asset in this deal isn't owned by the wallet sending it.",
   ERC721NonexistentToken: "One of these assets doesn't exist.",
   WrongNativeAmount: "The MON sent doesn't match the deal plus the protocol fee.",
@@ -49,9 +44,18 @@ const COPY: Record<string, string> = {
   NothingToClaim: "There's nothing to claim.",
   ClaimFailed: "The transfer still failed. Your claim is kept, so try again later.",
   ERC20InsufficientBalance: "You don't have enough of that token.",
-  ERC20InsufficientAllowance: "Approve On Deal to spend that token first.",
+  ERC20InsufficientAllowance: "Approve DeClub to spend that token first.",
   SafeERC20FailedOperation: "The token transfer failed.",
   InvalidQuantity: "Mint between 1 and 20 at a time.",
+  // DeClubRewards (ADR 0022)
+  UnknownEpoch: "That rewards epoch hasn't been published yet.",
+  NotOpenYet: "These rewards aren't open yet. Try again once the review day has passed.",
+  EpochClosed: "This epoch's claim window has ended.",
+  AlreadyClaimed: "These rewards were already claimed.",
+  InvalidProof: "These rewards don't match the published epoch. Reload and try again.",
+  OverClaim: "This epoch has already paid out everything it was funded with, so it can't pay this claim.",
+  PayoutFailed: "The wallet couldn't receive the MON.",
+  ZeroAccount: "There's no wallet to pay.",
 };
 
 export type ErrorKind = "rejected" | "funds" | "reverted" | "network" | "wallet" | "pool" | "unknown";
@@ -81,20 +85,10 @@ function rawMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** A write for a mock deal (lib/demoDeals.ts): refused before anything reaches a wallet. */
-export class MockWriteError extends Error {
-  constructor() {
-    super("This is mock data for previewing the app, so nothing was sent. Set NEXT_PUBLIC_DEMO_DEALS=false to use live deals.");
-    this.name = "MockWriteError";
-  }
-}
-
 /** Turns anything thrown by wagmi/viem/the pool into a title, one readable sentence and optional details. */
 export function describeError(error: unknown): AppError {
   const raw = rawMessage(error);
   const details = (message: string) => (raw && raw !== message ? clip(raw) : undefined);
-
-  if (error instanceof MockWriteError) return { kind: "unknown", title: "Mock deal", message: error.message };
 
   if (error instanceof PoolError) {
     return { kind: "pool", title: "Intent pool refused this", message: error.message, details: `Pool code: ${error.code}` };

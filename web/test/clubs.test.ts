@@ -33,7 +33,7 @@ const created = (over: Partial<ActivityEvent> = {}) => event({ kind: "created", 
 
 describe("summarize", () => {
   it("is all zeros for a Club nobody has traded in", () => {
-    assert.deepEqual(summarize([], NOW), { momentum: 0, change: 0, completed7d: 0, created7d: 0, traders30d: 0, lastActive: null });
+    assert.deepEqual(summarize([], NOW), { momentum: 0, change: 0, completed7d: 0, created7d: 0, traders30d: 0, xShares7d: 0, lastActive: null });
   });
 
   it("counts the week, the month and the latest event", () => {
@@ -196,8 +196,8 @@ describe("Club data", () => {
   it("lists Clubs busiest first, and keeps list order for ties", async () => {
     const entries = parseAssets([
       { chainId: 10143, address: NFT, kind: "erc721", name: "Quiet", symbol: "Q", status: "verified", note: "x" },
-      { chainId: 10143, address: USD, kind: "erc20", category: "memecoin", name: "Busy", symbol: "B", status: "verified", note: "x" },
-      { chainId: 10143, address: OTHER, kind: "erc20", category: "memecoin", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
+      { chainId: 10143, address: USD, kind: "erc721", name: "Busy", symbol: "B", status: "verified", note: "x" },
+      { chainId: 10143, address: OTHER, kind: "erc721", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
     ]);
     await store.rank(activityKey(USD), [{ member: JSON.stringify(swap({ id: "u:0", tokens: [USD.toLowerCase()] })), score: NOW }], 10);
     const rows = await clubList(store, entries, { now: () => NOW, settlements: async () => [] });

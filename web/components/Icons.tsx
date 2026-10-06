@@ -42,6 +42,9 @@ export const MoreIcon = (p: P) => (<Icon {...p}><circle cx="5.5" cy="12" r="1" f
 export const ArrowLeftIcon = (p: P) => (<Icon {...p}><path d="M19 12H5" /><path d="m11 6-6 6 6 6" /></Icon>);
 export const SearchIcon = (p: P) => (<Icon {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></Icon>);
 export const PinIcon = (p: P) => (<Icon {...p}><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" /><path d="M12 14v6" /></Icon>);
+export const HeartIcon = ({ filled, ...p }: P & { filled?: boolean }) => (
+  <Icon {...p}><path fill={filled ? "currentColor" : "none"} d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10Z" /></Icon>
+);
 export const FlagIcon = (p: P) => (<Icon {...p}><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></Icon>);
 export const TrashIcon = (p: P) => (<Icon {...p}><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6.5 7l1 12.5h9l1-12.5" /></Icon>);
 export const EyeIcon = (p: P) => (<Icon {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></Icon>);
@@ -57,6 +60,7 @@ export const FlameIcon = (p: P) => (<Icon {...p}><path d="M12 21c-3.9 0-6.5-2.6-
 export const ListIcon = (p: P) => (<Icon {...p}><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r=".9" fill="currentColor" /><circle cx="4.5" cy="12" r=".9" fill="currentColor" /><circle cx="4.5" cy="18" r=".9" fill="currentColor" /></Icon>);
 export const GridIcon = (p: P) => (<Icon {...p}><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></Icon>);
 export const TrendUpIcon = (p: P) => (<Icon {...p}><path d="m3.5 17 6-6 4 4 7-7.5" /><path d="M15 7.5h5.5V13" /></Icon>);
+export const CoinIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5" /><path d="M14.8 9.2c-.5-.9-1.6-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2s1.2 1.7 2.8 2.1c1.6.3 2.8.9 2.8 2.1s-1.2 2-2.8 2c-1.2 0-2.3-.5-2.8-1.4" /><path d="M12 6v1.8M12 16.2V18" /></Icon>);
 export const BadgeCheckIcon = (p: P) => (<Icon {...p}><path d="M12 2.8l2.2 1.6 2.7-.1.8 2.6 2.2 1.6-.8 2.6.8 2.6-2.2 1.6-.8 2.6-2.7-.1L12 21.2l-2.2-1.6-2.7.1-.8-2.6-2.2-1.6.8-2.6-.8-2.6 2.2-1.6.8-2.6 2.7.1L12 2.8Z" /><path d="m8.8 12.2 2.2 2.2 4.3-4.6" /></Icon>);
 
 /** The X logo. Filled rather than stroked, so it doesn't use the shared stroke icon frame. */

@@ -2,6 +2,8 @@
 
 One file per decision. The status line at the top of each record is the source of truth; this index repeats it in short.
 
+The project was On Deal until [ADR 0021](0021-declub-pivot.md) renamed it DeClub: ADRs 0001–0020 keep the names they were written with (`OnDeal` is the deleted v1 escrow, `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents`).
+
 | # | Decision | Status | Summary |
 |---|---|---|---|
 | 0001 | [Atomic fill instead of a two-sided deposit phase](0001-atomic-fill.md) | Accepted | The taker's one transaction pays and receives, so a trade never sits half deposited. |
@@ -24,3 +26,15 @@ One file per decision. The status line at the top of each record is the source o
 | 0018 | [An adjustable protocol fee, capped at deploy, with raises on a delay](0018-adjustable-protocol-fee.md) | Accepted | A fee admin can cut the fee at once or raise it after 7 days, never above a ceiling fixed at deploy. |
 | 0019 | [Fill watcher: follow the chain for fills and Club activity](0019-fill-watcher.md) | Accepted | A cron route scans new blocks for fills and creations and records them through the receipt checks. |
 | 0020 | [Search and filter the whole deal book on the server](0020-server-side-deal-book.md) | Accepted | The server holds every deal in memory and answers searched, filtered pages; OnDeal v1 leaves the app. |
+| 0021 | [De(al) Club: Clubs are the product, swaps fund them](0021-declub-pivot.md) | Accepted | The project becomes De(al) Club; contracts and identifiers are renamed, and the v1 escrow is deleted. |
+| 0022 | [Club Rewards: a share of the fees goes back to the Club](0022-club-rewards.md) | Accepted | Each epoch, 50% of a Club's swap fees goes to its Holders by holdings and 25% to its Owner, claimed against a Merkle root on `DeClubRewards`. |
+| 0023 | [Signed posts, follows and feed lenses](0023-signed-posts-and-lenses.md) | Accepted | Posts and follows are signed by the member's wallet and exported; the reader picks how the Board is ordered. |
+| 0024 | [X posts, Momentum and the Holder bonus](0024-x-posts-and-the-holder-bonus.md) | Accepted | A Holder's own X post about the Club, shared on its Board, counts in Momentum and adds up to 50% to their Holder share, weighed by its reach once that is turned on (in development). |
+| 0025 | [Clubs are for NFT collections; a memecoin joins one](0025-clubs-are-for-nft-collections.md) | Accepted | Only a collection has a Club; a memecoin joins its collection's, makes Holders, and earns no Club Rewards shares. |
+| 0026 | [The Owner sets the coin-holder rule](0026-owner-sets-the-coin-holder-rule.md) | Accepted | A Club's Owner decides whether holding its memecoin earns the Holder badge, and from what minimum. |
+| 0027 | [On-chain asset search, with your holdings first](0027-on-chain-asset-search.md) | Accepted | One search over tokens and NFT collections: Moralis where it covers the chain, the chain itself elsewhere; holdings first, then verified. |
+| 0028 | [Account avatars: an NFT you hold, or a picture](0028-account-avatars.md) | Accepted | A signed-in user picks one avatar for all their linked wallets: an NFT the chain says they hold (shown only while they do) or an upload kept on the server. |
+| 0029 | [Top Holders get paid, and the bonus counts posts only](0029-top-holders-and-posts-only-bonus.md) | Accepted | Only a Club's 10 biggest Holders share the Holder pool, and the activity bonus counts a Holder's own X posts, not trading. |
+| 0030 | [Likes, the Club inbox and the weekly recap](0030-likes-club-inbox-and-recap.md) | Accepted | Members like Board posts (no reward attached, so nothing to farm); the bell tells authors about likes, pins and earned rewards; the Rewards tab offers a weekly recap to post on X. |
+| 0031 | [Share a deal on X](0031-share-a-deal-on-x.md) | Accepted | A deal page has a server-drawn preview card and a Share on X button for live offers and completed swaps; the post names the Club. |
+| 0032 | [Live standings, active days and streaks, and replies](0032-live-standings-active-days-and-replies.md) | Accepted | The Rewards tab shows the running epoch's race and your estimate; each day you post on the Board and each epoch in a row of posting add to the Holder bonus; Board posts take one level of signed replies, which earn nothing. |

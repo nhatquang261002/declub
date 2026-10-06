@@ -1,7 +1,7 @@
 import { formatUnits, toHex, zeroAddress, type Address, type Hex } from "viem";
 import { formatMon } from "./format";
 
-/** Mirrors IOnDealV2.AssetType. */
+/** Mirrors IDeClubEscrow.AssetType. */
 export const ASSET_TYPE = { native: 0, erc20: 1, erc721: 2, trait: 3 } as const;
 export type AssetKind = "native" | "erc20" | "erc721" | "trait";
 /** The kinds a maker can type into a row. A trait request has its own editor. */
@@ -20,7 +20,7 @@ export type Asset = {
   amount: bigint;
 };
 
-/** The shape `getTrade` returns for one asset (IOnDealV2.Asset). */
+/** The shape `getTrade` returns for one asset (IDeClubEscrow.Asset). */
 export type RawAsset = { assetType: number; token: Address; id: bigint; amount: bigint };
 
 export function toAsset(raw: RawAsset): Asset | null {

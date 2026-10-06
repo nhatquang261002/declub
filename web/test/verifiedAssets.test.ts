@@ -25,7 +25,7 @@ describe("assets.json", () => {
 
   it("accepts a minimal entry and the optional fields", () => {
     assert.equal(parseAssets([entry()]).length, 1);
-    assert.equal(parseAssets([entry({ club: "archived" }), entry({ address: B, kind: "erc20", category: "memecoin", minHolding: "5" })]).length, 2);
+    assert.equal(parseAssets([entry({ club: "archived" }), entry({ address: B, kind: "erc20", category: "memecoin", minHolding: "5", club: A })]).length, 2);
     assert.equal(parseAssets([entry({ image: "/art/chogs/chog-01.png" })]).length, 1);
   });
 
@@ -43,7 +43,7 @@ describe("assets.json", () => {
       ["image outside public", [entry({ image: "/../secret.png" })]],
       ["image without an extension", [entry({ image: "/art/chog" })]],
       ["minHolding on an NFT", [entry({ minHolding: "1" })]],
-      ["minHolding zero", [entry({ kind: "erc20", category: "memecoin", minHolding: "0" })]],
+      ["minHolding zero", [entry({ kind: "erc20", category: "memecoin", minHolding: "0", club: B })]],
       ["duplicate on a chain", [entry(), entry()]],
       ["erc20 without a category", [entry({ kind: "erc20" })]],
       ["unknown category", [entry({ kind: "erc20", category: "governance" })]],
@@ -51,6 +51,10 @@ describe("assets.json", () => {
       ["a Club for a stablecoin", [entry({ kind: "erc20", category: "stablecoin", club: true })]],
       ["an archived Club for wrapped MON", [entry({ kind: "erc20", category: "wrapped", club: "archived" })]],
       ["a Club address in lowercase", [entry({ address: B, kind: "erc20", category: "memecoin", club: A.toLowerCase() })]],
+      ["a memecoin's own Club", [entry({ address: B, kind: "erc20", category: "memecoin" })]],
+      ["a memecoin's own Club, said outright", [entry({ address: B, kind: "erc20", category: "memecoin", club: true })]],
+      ["a memecoin's own archived Club", [entry({ address: B, kind: "erc20", category: "memecoin", club: "archived" })]],
+      ["a collection joining another Club", [entry({ club: B })]],
     ];
     for (const [name, list] of bad) assert.throws(() => parseAssets(list), Error, name);
   });
@@ -97,15 +101,17 @@ describe("registry", () => {
     assert.ok(registry.clubFor(A, 10143));
   });
 
-  it("gives collections and memecoins a Club, and no other token", () => {
+  it("gives only collections a Club", () => {
     const tokens = makeRegistry(
-      parseAssets(
-        (["memecoin", "stablecoin", "wrapped", "other"] as const).map((category, i) =>
-          entry({ address: `0x${String(i + 1).padStart(40, "0")}`, kind: "erc20", category, symbol: category }),
+      parseAssets([
+        entry(),
+        ...(["memecoin", "stablecoin", "wrapped", "other"] as const).map((category, i) =>
+          entry({ address: `0x${String(i + 1).padStart(40, "0")}`, kind: "erc20", category, symbol: category, ...(category === "memecoin" ? { club: false } : {}) }),
         ),
-      ),
+      ]),
     );
-    assert.deepEqual(tokens.clubs(10143).map((e) => e.symbol), ["memecoin"]);
+    assert.deepEqual(tokens.clubs(10143).map((e) => e.symbol), ["MCHOG"]);
+    assert.equal(tokens.clubFor(`0x${"1".padStart(40, "0")}`, 10143), null, "a memecoin with club: false has none");
     assert.equal(tokens.tier(`0x${"2".padStart(40, "0")}`, 10143), "verified");
   });
 });
@@ -120,12 +126,6 @@ describe("paired Clubs", () => {
     assert.equal(r.clubFor(B, 10143)?.address, A, "the coin's address finds the collection's Club");
     assert.equal(r.clubFor(A, 10143)?.linked?.symbol, "CHOG");
     assert.equal(r.clubFor(B.toLowerCase(), 10143)?.linked?.address, B);
-  });
-
-  it("works the other way round: a collection in its memecoin's Club", () => {
-    const r = makeRegistry(parseAssets([entry({ club: B }), coin({ club: undefined })]));
-    assert.deepEqual(r.clubs(10143).map((e) => e.symbol), ["CHOG"]);
-    assert.equal(r.clubFor(A, 10143)?.symbol, "CHOG");
   });
 
   it("keeps the collection's archive setting for both", () => {
@@ -145,9 +145,8 @@ describe("paired Clubs", () => {
       ["a Club that isn't listed", parseAssets([coin()])],
       ["a Club switched off", parseAssets([entry({ club: false }), coin()])],
       ["a Club with no community", parseAssets([entry({ address: C, kind: "erc20", category: "stablecoin", symbol: "USD" }), coin({ club: C })])],
-      ["two of a kind", parseAssets([entry(), entry({ address: C, symbol: "MORE", club: A })])],
       ["a second asset", parseAssets([entry(), coin(), third])],
-      ["a chain of Clubs", parseAssets([entry(), coin(), entry({ address: C, symbol: "PET", club: B })])],
+      ["a chain of Clubs", parseAssets([entry(), coin(), coin({ address: C, symbol: "PURP", club: B })])],
       ["another chain's Club", parseAssets([entry({ chainId: 143 }), coin()])],
     ];
     for (const [name, list] of bad) assert.throws(() => makeRegistry(list), Error, name);

@@ -10,10 +10,17 @@ export type NotificationKind =
   | "expired"
   | "intent-settled"
   | "intent-paused"
-  | "intent-dropped";
+  | "intent-dropped"
+  | "club-like"
+  | "club-pinned"
+  | "club-reward"
+  | "club-reply"
+  | "club-xshare"
+  | "club-rank"
+  | "club-closing";
 
 /** Kinds that report something that already happened and need nothing from the user. */
-export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped"];
+export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped", "club-like", "club-pinned", "club-reply", "club-xshare"];
 
 export type AppNotification = {
   /** Stable per (kind, deal or intent), so read state survives reloads. */
@@ -116,6 +123,20 @@ export function deriveNotifications(
 
   return sortNotifications(out);
 }
+
+/** What the server says a signed-in member should hear about their Clubs (lib/server/inbox.ts). */
+export type ClubInboxItem = {
+  key: string;
+  kind: "club-like" | "club-pinned" | "club-reward" | "club-reply" | "club-xshare" | "club-rank" | "club-closing";
+  at: number;
+  title: string;
+  body: string;
+  href: string;
+};
+
+/** The Club inbox as notifications: all news, none needing a transaction from the bell. */
+export const clubNotifications = (items: readonly ClubInboxItem[]): AppNotification[] =>
+  items.map((i) => ({ key: i.key, kind: i.kind, recency: BigInt(Math.floor(i.at)), title: i.title, body: i.body, href: i.href, actionable: false }));
 
 /** Actionable first, then newest first. */
 export function sortNotifications(list: AppNotification[]): AppNotification[] {

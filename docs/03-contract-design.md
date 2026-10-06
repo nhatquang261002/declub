@@ -1,19 +1,19 @@
 # 03 · Contract Design
 
-The app uses two contracts. Both inherit one fee module.
+The app uses three contracts. The two deal contracts inherit one fee module; the third pays Club rewards.
 
 | Contract | Interface (source of truth) | What it does |
 |---|---|---|
-| [`OnDealV2`](../contracts/src/OnDealV2.sol) | [`IOnDealV2.sol`](../contracts/src/interfaces/IOnDealV2.sol) | Locked deals. The maker's side sits in escrow until a taker fills it. Any ERC-721, ERC-20 and MON, in any mix; exact, trait and open-offer deals. |
-| [`OnDealIntents`](../contracts/src/OnDealIntents.sol) | [`IOnDealIntents.sol`](../contracts/src/interfaces/IOnDealIntents.sol) | Signed swaps. No escrow: pairs and rings of up to 4 settle wallet to wallet when anyone (the matcher) submits them. |
+| [`DeClubEscrow`](../contracts/src/DeClubEscrow.sol) | [`IDeClubEscrow.sol`](../contracts/src/interfaces/IDeClubEscrow.sol) | Locked deals. The maker's side sits in escrow until a taker fills it. Any ERC-721, ERC-20 and MON, in any mix; exact, trait and open-offer deals. |
+| [`DeClubIntents`](../contracts/src/DeClubIntents.sol) | [`IDeClubIntents.sol`](../contracts/src/interfaces/IDeClubIntents.sol) | Signed swaps. No escrow: pairs and rings of up to 4 settle wallet to wallet when anyone (the matcher) submits them. |
 | [`FeeAdmin`](../contracts/src/FeeAdmin.sol) | [`IFeeAdmin.sol`](../contracts/src/interfaces/IFeeAdmin.sol) | The protocol fee amount, shared by both. |
-| [`OnDeal`](../contracts/src/OnDeal.sol) (v1) | [`IOnDeal.sol`](../contracts/src/interfaces/IOnDeal.sol) | The original single-collection Chog escrow. Still in the source and on testnet, but the app no longer reads or writes it ([below](#ondeal-v1-legacy-not-used-by-the-app)). |
+| [`DeClubRewards`](../contracts/src/DeClubRewards.sol) | [`IDeClubRewards.sol`](../contracts/src/interfaces/IDeClubRewards.sol) | Club rewards: each epoch's payouts, funded by the operator and claimed against a Merkle root ([below](#declubrewards-club-rewards)). |
 
-The app reads `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` and `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` (`web/lib/config.ts`, `web/lib/contracts.ts`). The old "Phase 4" sketch of generalized assets and ring swaps was built as these two contracts ([ADR 0005](adr/0005-generic-asset-model.md), [ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)).
+The app reads `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS`, `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` and `NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS` (`web/lib/config.ts`, `web/lib/contracts.ts`). The old "Phase 4" sketch of generalized assets and ring swaps was built as these two contracts ([ADR 0005](adr/0005-generic-asset-model.md), [ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)).
 
-## OnDealV2 (locked deals)
+## DeClubEscrow (locked deals)
 
-Reasoning: [ADR 0005](adr/0005-generic-asset-model.md) (generic assets), [ADR 0006](adr/0006-trait-requests-in-v2.md) (traits), [ADR 0007](adr/0007-open-offers.md) (open offers). It's a separate contract from v1, and v1 is untouched. Its constructor takes only the protocol fee settings: the fee, its ceiling, where it goes and who may change it (see [Protocol fee](#protocol-fee-ondealv2)).
+Reasoning: [ADR 0005](adr/0005-generic-asset-model.md) (generic assets), [ADR 0006](adr/0006-trait-requests-in-v2.md) (traits), [ADR 0007](adr/0007-open-offers.md) (open offers). Its constructor takes only the protocol fee settings: the fee, its ceiling, where it goes and who may change it (see [Protocol fee](#protocol-fee-declubescrow)).
 
 ```solidity
 enum Status { None, Open, Filled, Cancelled }
@@ -25,7 +25,7 @@ enum ProposalStatus { None, Active, Accepted, Withdrawn, Rejected }
 struct Proposal { address proposer; ProposalStatus status; Asset[] assets; }
 ```
 
-The trade lifecycle is v1's ([state machine](#state-machine)): `Open → Filled | Cancelled`, expiry derived from `expiry` (0 = never). `fee` is the fee in force when the trade was created. There are three kinds of deal:
+A trade moves `Open → Filled | Cancelled` and never leaves a terminal state. Expiry is derived from `expiry` (0 = never), never stored as a status: an expired trade is still `Open` until the maker cancels it or anyone reclaims it for the maker. `fee` is the fee in force when the trade was created. There are three kinds of deal:
 
 | Kind | Created with | `requested` | Settled by |
 |---|---|---|---|
@@ -37,7 +37,7 @@ An `ERC721Trait` asset keeps the Merkle root of the allowed ids in `id`, and in 
 
 On an open offer, takers escrow proposals and the maker accepts one. Proposal ids count from 0 within each trade. A proposal moves `Active → Accepted | Withdrawn | Rejected` and never changes its assets.
 
-### OnDealV2 functions
+### DeClubEscrow functions
 
 | Function | What it does |
 |---|---|
@@ -81,10 +81,8 @@ On an open offer, takers escrow proposals and the maker accepts one. Proposal id
 | `withdrawProposal` | `UnknownProposal`, `NotProposer`, `ProposalNotActive`. No check on the trade: it works while the offer is open, after it expired, and after it was cancelled or filled. |
 | `rejectProposal` | `TradeNotOpen`, `NotMaker`, `UnknownProposal`, `ProposalNotActive`. No expiry check, so the maker can still reject after expiry while the trade is open. |
 | `acceptProposal` | `TradeNotOpen`, `NotMaker`, `TradeIsExpired`, `UnknownProposal`, `ProposalNotActive`. |
-| `cancelTrade` / `reclaimExpired` | `TradeNotOpen`, `NotMaker` / `TradeNotOpen`, `TradeNotExpired` (as v1). |
+| `cancelTrade` / `reclaimExpired` | `TradeNotOpen`, `NotMaker` / `TradeNotOpen`, `TradeNotExpired`. |
 | `claim` | `NothingToClaim`, or `ClaimFailed` if the transfer fails again (the credit stays). |
-
-The fill, cancel and reclaim checks are v1's, with `WrongNativeAmount` in place of `WrongMonAmount`.
 
 ### Payouts
 
@@ -96,7 +94,7 @@ _payout(to, asset):                      // never reverts
 
 `claim` zeroes the credit, emits `Claimed`, then transfers and reverts with `ClaimFailed` if that fails (which restores the credit). Every payout out of escrow takes this never-reverting path: fills, accepts, cancels, reclaims, rejects, withdrawals, fee releases and fee refunds.
 
-### OnDealV2 events
+### DeClubEscrow events
 
 | Event | Emitted by |
 |---|---|
@@ -112,11 +110,11 @@ _payout(to, asset):                      // never reverts
 
 Plus the [`FeeAdmin`](#feeadmin) events.
 
-### Protocol fee (`OnDealV2`)
+### Protocol fee (`DeClubEscrow`)
 
 Reasoning: [ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). `constructor(uint256 initialFee, uint256 maxFee, address feeRecipient, address admin)`. `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor refuses a ceiling above `MAX_FEE_LIMIT` (500 MON) or a fee above the ceiling (`FeeTooHigh`), and a non-zero ceiling without a recipient (`NoFeeRecipient`). A fee of 0 (tests, testnet) charges and emits nothing.
 
-The fee amount is the one thing that can change ([`FeeAdmin`](#feeadmin), shared with `OnDealIntents`). The fee admin can `setFee` lower at once, or queue a raise that the admin makes live with `applyFee` once `FEE_RAISE_DELAY` (7 days) has passed, never above `MAX_FEE`. The role moves in two steps, and `renounceFeeAdmin` fixes the fee for good. A zero admin at deploy is a fixed fee.
+The fee amount is the one thing that can change ([`FeeAdmin`](#feeadmin), shared with `DeClubIntents`). The fee admin can `setFee` lower at once, or queue a raise that the admin makes live with `applyFee` once `FEE_RAISE_DELAY` (7 days) has passed, never above `MAX_FEE`. The role moves in two steps, and `renounceFeeAdmin` fixes the fee for good. A zero admin at deploy is a fixed fee.
 
 **Each trade records `fee()` when it is created** (`Trade.fee`, a `uint96` packed beside `taker`), and both sides pay that recorded fee. A change never touches a deal already listed. Every side sends the trade's fee with its own call and the contract only **holds** it:
 
@@ -135,13 +133,13 @@ A completed deal sends `2 × t.fee` to the recipient in one payout. Refunds retu
 
 Create **2.2M**, fill **0.9M**. A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
 
-## OnDealIntents (signed swaps)
+## DeClubIntents (signed swaps)
 
-Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)). Spec in [`IOnDealIntents.sol`](../contracts/src/interfaces/IOnDealIntents.sol).
+Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-trade-intents.md), [ADR 0009](adr/0009-ring-swaps.md)). Spec in [`IDeClubIntents.sol`](../contracts/src/interfaces/IDeClubIntents.sol).
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents (`BadCycleSize`), one signature each (`SignatureCountMismatch`). `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces (bit `nonce & 0xff` of word `nonce >> 8`), so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`OnDealIntents`, version `3`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
+- Signatures: EIP-712 (`DeClubIntents`, version `3`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
 - Rules on every intent in a cycle:
 
   | Rule | Error |
@@ -157,7 +155,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 - `want` is a floor: ERC-20 amounts are minimums, NFTs are exact ids. Each `give` is paid in full, so anything beyond the next maker's `want` (a larger amount, extra assets) goes to that maker.
 - The contract puts no upper bound on `deadline`. The pool only accepts deadlines 60 s to 7 days out; that's pool policy.
-- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `OnDealV2`. Each intent signs `feeToken` and `maxFee`, the most its maker pays. After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
+- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `DeClubEscrow`. Each intent signs `feeToken` and `maxFee`, the most its maker pays. After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
 - ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`, as in V2); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
 - Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
 - The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`) and has no `receive()`. Its only admin is the fee admin, over the fee amount.
@@ -170,7 +168,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 ## FeeAdmin
 
-[`FeeAdmin.sol`](../contracts/src/FeeAdmin.sol) is an abstract contract that `OnDealV2` and `OnDealIntents` both inherit ([ADR 0018](adr/0018-adjustable-protocol-fee.md)). The fee amount is the only thing about either deployed contract that can change. Constants: `MAX_FEE_LIMIT = 500 ether` and `FEE_RAISE_DELAY = 7 days`. Immutable: `MAX_FEE` and `FEE_RECIPIENT`. The fee, a queued raise and its time share one slot.
+[`FeeAdmin.sol`](../contracts/src/FeeAdmin.sol) is an abstract contract that `DeClubEscrow` and `DeClubIntents` both inherit ([ADR 0018](adr/0018-adjustable-protocol-fee.md)). The fee amount is the only thing about either deployed contract that can change. Constants: `MAX_FEE_LIMIT = 500 ether` and `FEE_RAISE_DELAY = 7 days`. Immutable: `MAX_FEE` and `FEE_RECIPIENT`. The fee, a queued raise and its time share one slot.
 
 | Function | Caller | What it does |
 |---|---|---|
@@ -183,11 +181,44 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 Every admin-only call reverts with `NotFeeAdmin(caller)` for anyone else. Views: `fee`, `pendingFee`, `pendingFeeAt`, `feeAdmin`, `pendingFeeAdmin`, `MAX_FEE`, `MAX_FEE_LIMIT`, `FEE_RAISE_DELAY`, `FEE_RECIPIENT`.
 
-The contract accepts any ceiling up to 500 MON (or 500 WMON for intents). The deploy scripts default `PROTOCOL_FEE_MAX_WEI` to 4 × the launch fee; that's a script default, not a contract rule.
+The contract accepts any ceiling up to 500 MON (or 500 WMON for intents). The deploy scripts require `PROTOCOL_FEE_MAX_WEI` whenever there is a fee, and a `FEE_ADMIN` whenever the ceiling isn't 0 unless `FEE_FIXED=true` (see [script/README.md](../contracts/script/README.md)); neither is a contract rule.
+
+## DeClubRewards (Club rewards)
+
+Reasoning: [ADR 0022](adr/0022-club-rewards.md). A Merkle distributor in MON, one root per epoch. It knows nothing about Clubs, deals or fees: the web server works out each epoch's payouts ([09 · Clubs](09-clubs.md#rewards)) and the operator publishes them. It holds no tokens, only MON.
+
+```solidity
+struct Epoch { bytes32 root; uint128 total; uint128 claimed; uint64 openAt; bool closed; }
+struct Claim { uint64 epoch; address account; uint256 amount; bytes32[] proof; }
+// leaf = keccak256(bytes.concat(keccak256(abi.encode(block.chainid, address(this), epoch, account, amount))))
+```
+
+| Function | What it does |
+|---|---|
+| `publish(epoch, root) payable` | Operator. Records the root with `total = msg.value` and `openAt = now + CLAIM_DELAY`. Once per epoch number; epochs can come in any order. |
+| `revoke(epoch)` | Operator, before `openAt` (so nothing is claimed yet). Deletes the epoch and refunds `total` to the operator; the number can be published again. |
+| `claim(epoch, account, amount, proof)` | Anyone. Pays `amount` to `account` if the proof shows that leaf, once, while the epoch is open and not swept. Never more than the epoch's own `total` in all. |
+| `claimMany(claims)` | `claim` for several leaves, all or nothing. |
+| `sweep(epoch)` | Operator, from `openAt + CLAIM_WINDOW`. Sends what's unclaimed to the operator and closes the epoch for good. |
+| `transferOperator(next)` / `acceptOperator()` | Two-step handover, like `FeeAdmin`'s. A zero `next` cancels. |
+| `epochs`, `isClaimed`, `leaf`, `operator`, `pendingOperator`, `CLAIM_DELAY`, `CLAIM_WINDOW`, `MAX_CLAIM_DELAY` (7 days), `MIN_CLAIM_WINDOW` (1 day), `MAX_CLAIM_WINDOW` (365 days) | Views. `CLAIM_DELAY` and `CLAIM_WINDOW` are fixed at deploy within those bounds. |
+
+| Call | Reverts with |
+|---|---|
+| constructor | `NoOperator`, `BadTiming(delay, window)` |
+| `publish` | `NotOperator`, `EpochExists`, `EmptyRoot`, `NothingFunded` |
+| `revoke` | `NotOperator`, `UnknownEpoch`, `RevokeTooLate`, `PayoutFailed` |
+| `claim`, `claimMany` | `ZeroAccount`, `UnknownEpoch`, `EpochClosed`, `NotOpenYet(epoch, openAt)`, `AlreadyClaimed`, `InvalidProof`, `OverClaim(epoch, claimed, total)`, `PayoutFailed(account)` |
+| `sweep` | `NotOperator`, `UnknownEpoch`, `EpochClosed`, `SweepTooEarly(epoch, at)`, `PayoutFailed` |
+| `acceptOperator` | `NotPendingOperator` |
+
+Events: `EpochPublished(epoch, root, total, openAt)`, `EpochRevoked(epoch, refund)`, `RewardClaimed(epoch, account, amount)`, `EpochSwept(epoch, to, amount)`, `OperatorTransferStarted`, `OperatorTransferred`.
+
+A payout that the account refuses reverts the claim (`PayoutFailed`): nothing else is at stake, and the leaf can be claimed again once the account accepts MON. Every entry point is `nonReentrant`, and state is written before the send.
 
 ## Phase 3: trait-based requests
 
-Built: in v1 as `createTrade` / `fillTrade` overloads ([below](#trait-overloads)), and in `OnDealV2` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)). The app uses only the V2 version.
+Built in `DeClubEscrow` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)). The first version, overloads on the deleted v1 escrow, used the same design.
 
 Traits live in off-chain metadata, so the contract can't read them. The options considered:
 
@@ -197,7 +228,7 @@ Traits live in off-chain metadata, so the contract can't read them. The options 
 | B. Signed attestation | A trusted signer signs `(tokenId, traitsHash)`. | Flexible | Adds a trusted party |
 | C. On-chain trait registry | A trait table is written on-chain once. | Fully on-chain | Needs a large upfront write, and only the collection owner can do it credibly |
 
-Both versions use the same leaf, `keccak256(abi.encode(collection, tokenId))`, and a sorted-pair tree, so `web/lib/merkle.ts` builds both. The contract checks the count, rejects duplicate ids and verifies every proof before transferring anything. It proves only membership in the set; whether the set matches the traits it claims is checked by clients (V2 stores the maker's `spec` so they can rebuild it).
+The leaf is `keccak256(abi.encode(collection, tokenId))` in a sorted-pair tree, built by `web/lib/merkle.ts`. The contract checks the count, rejects duplicate ids and verifies every proof before transferring anything. It proves only membership in the set; whether the set matches the traits it claims is checked by clients (the contract stores the maker's `spec` so they can rebuild it).
 
 "Up to 3 MON" becomes the taker's choice of payment within a bound. Keep it simple: amounts on a locked deal are exact. Price negotiation stays off-chain, or goes through an open offer's proposals.
 
@@ -228,7 +259,7 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 
 ### MockERC20
 
-[`MockERC20.sol`](../contracts/src/mocks/MockERC20.sol): `ERC20(name, symbol)`, 18 decimals. `mint(to, amount)` is open to anyone, up to `MAX_MINT_PER_TX = 1_000_000 ether` per call (`InvalidAmount` for 0 or more). `DeployV2.s.sol` deploys it as "Mock USD" (mUSD).
+[`MockERC20.sol`](../contracts/src/mocks/MockERC20.sol): `ERC20(name, symbol)`, 18 decimals. `mint(to, amount)` is open to anyone, up to `MAX_MINT_PER_TX = 1_000_000 ether` per call (`InvalidAmount` for 0 or more). `DeployEscrow.s.sol` deploys it as "Mock USD" (mUSD).
 
 ### MockWMON
 
@@ -236,220 +267,34 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 
 ## Deployment
 
-Three scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). Each `deploy` requires `block.chainid` to be 10143 (Monad testnet) or 31337 (Anvil) and reverts with "testnet deployment only" anywhere else. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
+Four scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). `DeployChog` deploys mocks, so it requires `block.chainid` 10143 (Monad testnet) or 31337 (Anvil) and reverts with "testnet deployment only" anywhere else; the other three also run on Monad mainnet (143), with stricter rules there, and revert with "unsupported chain" on any other chain. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
 
-### `DeployV2.s.sol`
+### `DeployEscrow.s.sol`
 
-1. Deploy `OnDealV2(fee, maxFee, feeRecipient, feeAdmin)` from `PROTOCOL_FEE_WEI` (default 0), `PROTOCOL_FEE_MAX_WEI` (default 4 × the fee), `FEE_RECIPIENT` and `FEE_ADMIN` (default none, a fixed fee).
+1. Deploy `DeClubEscrow(fee, maxFee, feeRecipient, feeAdmin)` from `PROTOCOL_FEE_WEI` (default 0), `PROTOCOL_FEE_MAX_WEI` (required with a fee), `FEE_RECIPIENT` and `FEE_ADMIN` (required with a non-zero ceiling unless `FEE_FIXED=true`, which deploys a fee nobody can change).
 2. With `DEPLOY_MOCK_ERC20=true`, deploy `MockERC20("Mock USD", "mUSD")` and mint `DEMO_MINT_AMOUNT` whole tokens (default 1000) to each address in `DEMO_WALLETS`.
-3. Print `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_V2_DEPLOY_BLOCK`, the fee settings read back from the contract, and `NEXT_PUBLIC_MOCK_ERC20_ADDRESS` when the mock was deployed.
+3. Print `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS`, `NEXT_PUBLIC_DECLUB_ESCROW_DEPLOY_BLOCK`, the fee settings read back from the contract, and `NEXT_PUBLIC_MOCK_ERC20_ADDRESS` when the mock was deployed.
 
 ### `DeployIntents.s.sol`
 
 1. With `DEPLOY_MOCK_WMON=true` and no `FEE_TOKEN`, deploy `MockWMON` and use it as the fee token.
-2. Deploy `OnDealIntents(feeToken, fee, maxFee, feeRecipient, feeAdmin)` from `FEE_TOKEN`, `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI` (default 4 × the fee), `FEE_RECIPIENT` and `FEE_ADMIN`.
-3. Print `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_INTENTS_DEPLOY_BLOCK`, `MOCK_WMON_ADDRESS` when the mock was deployed, and the fee settings read back from the contract.
+2. Deploy `DeClubIntents(feeToken, fee, maxFee, feeRecipient, feeAdmin)` from `FEE_TOKEN`, `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT` and `FEE_ADMIN`, with the same rules as above. A given `FEE_TOKEN` must first wrap and unwrap 1 wei in the script's local simulation, with 18 decimals, or the script stops before broadcasting.
+3. Print `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`, `NEXT_PUBLIC_DECLUB_INTENTS_DEPLOY_BLOCK`, `MOCK_WMON_ADDRESS` when the mock was deployed, and the fee settings read back from the contract.
 
-### `Deploy.s.sol` (v1, legacy)
+### `DeployRewards.s.sol`
 
-1. If `CHOG_ADDRESS` is empty:
-   - with `DEPLOY_CHOG_MIRROR=true`, deploy `ChogGenesisMirror`, mint `DEMO_MINT_PER_WALLET` (default 5) to each address in `DEMO_WALLETS`, then mint the rest of the 1,969 to `MIRROR_CATALOG_OWNER` (default: the deployer) in batches of `MIRROR_MINT_BATCH` (default 20);
-   - otherwise deploy `MockChog` and mint `DEMO_MINT_PER_WALLET` (at most 20) to each address in `DEMO_WALLETS`.
-2. Deploy `OnDeal(chog)`.
-3. Print `NEXT_PUBLIC_CHOG_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_ADDRESS` and `NEXT_PUBLIC_ON_DEAL_DEPLOY_BLOCK`. The app reads `NEXT_PUBLIC_CHOG_ADDRESS`; nothing reads the other two any more.
+1. Deploy `DeClubRewards(operator, claimDelay, claimWindow)` from `REWARDS_OPERATOR` (required), `REWARDS_CLAIM_DELAY` (default 1 day, 0 for a demo) and `REWARDS_CLAIM_WINDOW` (default 90 days).
+2. On mainnet, refuse an operator with no code (it must be a Safe) and a claim delay under a day.
+3. Print `NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS`, `NEXT_PUBLIC_DECLUB_REWARDS_DEPLOY_BLOCK`, and the operator, delay and window read back from the contract.
+
+### `DeployChog.s.sol` (testnet only)
+
+1. With `DEPLOY_CHOG_MIRROR=true`, deploy `ChogGenesisMirror`, mint `DEMO_MINT_PER_WALLET` (default 5) to each address in `DEMO_WALLETS`, then mint the rest of the 1,969 to `MIRROR_CATALOG_OWNER` (default: the deployer) in batches of `MIRROR_MINT_BATCH` (default 20).
+2. Otherwise deploy `MockChog` and mint `DEMO_MINT_PER_WALLET` (at most 20) to each address in `DEMO_WALLETS`.
+3. Print `NEXT_PUBLIC_CHOG_ADDRESS`.
 
 The printed deploy blocks are the simulation block, a lower bound; the exact block is in the broadcast receipts.
 
 ### Deployed vs source
 
-The testnet deployments predate the current source. They were deployed under the contracts' earlier names (`ChogSwap`, `ChogSwapV2`, `ChogSwapIntents`), and none of them has `fee()` or `feeAdmin()`: the `OnDealV2` deployments predate the protocol fee and `FeeAdmin`, and the intents deployment signs with the EIP-712 domain `("ChogSwapIntents", "1")`, while the code, the matcher and the app use `("OnDealIntents", "3")` with `feeToken` and `maxFee`. The current `OnDealV2` and `OnDealIntents` have to be redeployed (`DeployV2.s.sol`, `DeployIntents.s.sol`) before the fee and signed swaps work on testnet.
-
-| Record (`contracts/broadcast/…/10143/`) | Contracts |
-|---|---|
-| `DeployV2.s.sol/run-1790829432382.json` | `ChogSwapV2` `0x73591F76d7deE66F683A979cEffb4356982EE1bB` (block 67163690), the address the app's local `.env` uses |
-| `DeployV2.s.sol/run-latest.json` | a later `ChogSwapV2` `0x67a4a4ddfab155689ce2ee40c9c2157cea8e68fc` |
-| `DeployIntents.s.sol/run-latest.json` | `ChogSwapIntents` `0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2` (block 67194397) |
-| `Deploy.s.sol/run-latest.json` | v1 `ChogSwap` `0xe42f1c5f13b2c8206624fe106d38738a43cb94ec` and `ChogGenesisMirror` `0x32a325b0640594377d0708ca9081c93da95e1908` (the Chog collection in the app's local `.env`) |
-| `Deploy.s.sol/run-1790581370358.json` | the original v1 `ChogSwap` `0xa3301cec17d13ed03e343cdfdd14ab027b8ec298` and `MockChog` `0x220a2c52fd27252e7cd6163a7bf1b6ae159d26e4` (still the `CHOG_ADDRESS` default in `web/lib/config.ts`) |
-
----
-
-## OnDeal (v1, legacy: not used by the app)
-
-Interface: [`contracts/src/interfaces/IOnDeal.sol`](../contracts/src/interfaces/IOnDeal.sol)
-Implementation: [`contracts/src/OnDeal.sol`](../contracts/src/OnDeal.sol)
-
-The original contract. The app no longer reads or writes it (since commit `f48252c`). It stays in the source, with its tests, and is still deployed on testnet.
-
-### Scope of v1
-
-- One ERC-721 collection, fixed at deploy (`chog`, immutable).
-- Native MON on either side of a trade, but not both.
-- Exact token ids, or any `count` ids from a Merkle set ([trait overloads](#trait-overloads)).
-- No fees, no admin, no pausing, no upgradeability.
-
-### State machine
-
-```text
-                 createTrade
-                     │   (maker's Chogs + MON pulled into escrow)
-                     ▼
-                ┌─────────┐
-                │  OPEN   │──── block.timestamp > expiry ───► "expired" (derived, still OPEN)
-                └────┬────┘                                        │
-        fillTrade    │    cancelTrade (maker)                      │ reclaimExpired (anyone)
-       ┌─────────────┴──────────────┐                              │ cancelTrade (maker)
-       ▼                            ▼                              ▼
-  ┌─────────┐                 ┌───────────┐ ◄────────────────────────┘
-  │ FILLED  │                 │ CANCELLED │
-  └─────────┘                 └───────────┘
-  escrow → taker              escrow → maker
-  taker side → maker
-```
-
-- `Status { None, Open, Filled, Cancelled }`. `None` is what an unknown id reads as.
-- **Expired is derived, not stored.** `isExpired(id) = expiry != 0 && block.timestamp > expiry`. No transaction is needed to "expire" a trade.
-- Both terminal states are final. Every mutating function requires `status == Open`.
-- The spec's `ACCEPTED / DEPOSITING / READY` states are dropped because the fill is atomic ([ADR 0001](adr/0001-atomic-fill.md)).
-
-### Storage
-
-```solidity
-address public immutable chog;                    // cast to IERC721 at call sites
-uint256 public constant MAX_TOKENS_PER_SIDE = 10;
-
-uint256 public tradeCount;                        // last id issued; ids start at 1
-mapping(uint256 => Trade) internal _trades;
-mapping(address => uint256) public pendingWithdrawal;
-mapping(uint256 => bytes32) public requestedRoot;  // trait trades only
-mapping(uint256 => uint256) public requestedCount; // trait trades only
-```
-
-`Trade` fields (see the interface for NatSpec): `maker, expiry(uint64), status, taker, offeredMon, requestedMon, offeredIds[], requestedIds[]`.
-Slot packing: `maker + expiry + status` fit in one slot.
-
-### Functions
-
-Every mutating function is `nonReentrant` and follows checks → effects → interactions. Events are emitted in the effects step, before any external call.
-
-#### `createTrade(offeredIds, requestedIds, requestedMon, taker, expiry) payable → tradeId`
-
-| Check | Error |
-|---|---|
-| `offeredIds.length == 0 && msg.value == 0` | `EmptySide` |
-| `requestedIds.length == 0 && requestedMon == 0` | `EmptySide` |
-| `msg.value > 0 && requestedMon > 0` | `MonOnBothSides` |
-| either array longer than `MAX_TOKENS_PER_SIDE` | `TooManyTokens` |
-| `expiry != 0 && expiry <= block.timestamp` | `ExpiryInPast` |
-
-Effects: `tradeId = ++tradeCount`, store the trade with `offeredMon = msg.value` and `status = Open`.
-Interactions: `chog.transferFrom(msg.sender, address(this), id)` for each offered id. The Chog contract reverts if the caller doesn't own an id or hasn't approved the contract. Duplicate ids revert naturally, because the second pull comes from an address that no longer owns the token.
-Emit `TradeCreated`.
-
-> Requested ids aren't checked against current owners at creation. Ownership can change before a fill, and the fill checks it anyway.
-
-#### `fillTrade(tradeId) payable`
-
-| Check | Error |
-|---|---|
-| `status != Open` | `TradeNotOpen` |
-| `isExpired` | `TradeIsExpired` |
-| `taker != 0 && msg.sender != taker` | `NotAllowedTaker` |
-| `msg.sender == maker` | `SelfFill` |
-| `msg.value != requestedMon` | `WrongMonAmount(expected, sent)` |
-
-Effects: `status = Filled`.
-Interactions, in order:
-1. `chog.transferFrom(msg.sender, maker, id)` for each requested id (the taker's side goes straight to the maker)
-2. `chog.transferFrom(address(this), msg.sender, id)` for each offered id
-3. `_sendMon(maker, requestedMon)`
-4. `_sendMon(msg.sender, offeredMon)`
-
-Emit `TradeFilled(tradeId, maker, msg.sender)`.
-
-#### Trait overloads
-
-- `createTrade(offeredIds, root, count, requestedMon, taker, expiry) payable → tradeId`: the requested side is any `count` ids from the Merkle set `root` (plus `requestedMon`). Checks as above, except `InvalidTraitRequest` for a zero `root` or `count`, and `TooManyTokens` for a `count` over 10. Stores `requestedRoot` and `requestedCount`, leaves `requestedIds` empty, and emits `TraitTradeCreated`.
-- `fillTrade(tradeId, requestedIds, proofs) payable`: the plain fill's checks, plus `InvalidTraitRequest` if the trade has no root, the number of ids or proofs isn't `count`, or an id repeats, and `InvalidTraitProof(tokenId)` for an id outside the set. All proofs are checked before anything moves. Then as `fillTrade(tradeId)`, with the supplied ids going taker → maker.
-- `traitLeaf(tokenId)` = `keccak256(abi.encode(chog, tokenId))`, so a root built for another collection can't be reused.
-
-`count` is how many ids the taker hands over; the set itself can be larger.
-
-**Known flaw:** the plain `fillTrade(tradeId)` doesn't check `requestedRoot`. A trait trade has no `requestedIds`, so calling the plain fill on one moves no Chog from the taker: the taker pays only `requestedMon` and takes the escrow. Any open v1 trait trade can be taken this way. Don't create trait trades on v1; `OnDealV2`'s `fillTrade` reverts with `TraitFillRequired` instead.
-
-#### `cancelTrade(tradeId)`
-
-Checks: `status == Open` (`TradeNotOpen`) and `msg.sender == maker` (`NotMaker`). This works whether or not the trade has expired.
-Effects: `status = Cancelled`. Interactions: `_refund(trade)`. Emit `TradeCancelled`.
-
-#### `reclaimExpired(tradeId)`
-
-Checks: `status == Open` and `isExpired` (`TradeNotExpired`). Anyone can call it.
-Effects: `status = Cancelled`. Interactions: `_refund(trade)`, which pays the **maker**, never the caller. Emit `TradeReclaimed(tradeId, maker, msg.sender)`.
-
-#### `withdraw()`
-
-`amount = pendingWithdrawal[msg.sender]`. If it's zero, revert with `NothingToWithdraw`. Otherwise zero the balance and then `call{value: amount}`. If the call fails, revert with `WithdrawFailed` (the zeroing is rolled back with it). Emit `Withdrawn`.
-
-#### Internal helpers
-
-```text
-_refund(t):  for id in t.offeredIds: chog.transferFrom(this, t.maker, id)
-             _sendMon(t.maker, t.offeredMon)
-
-_sendMon(to, amt):
-    if amt == 0: return
-    (ok,) = to.call{value: amt}("")      // forwards all gas (nonReentrant guards us)
-    if !ok: pendingWithdrawal[to] += amt; emit WithdrawalCredited(to, amt)
-```
-
-`_sendMon` never reverts. A recipient that rejects MON can't block a fill, cancel or reclaim; the MON is held for them to withdraw.
-
-#### Views
-
-`chog()`, `MAX_TOKENS_PER_SIDE()`, `tradeCount()`, `getTrade(id)`, `requestedRoot(id)`, `requestedCount(id)`, `traitLeaf(tokenId)`, `isExpired(id)`, `pendingWithdrawal(addr)`.
-
-### Transfer choices
-
-- **`transferFrom` everywhere, never `safeTransferFrom`.** Recipients are always the trade's own parties, and every one of them was a transaction sender that already interacted with the Chog contract. Plain `transferFrom` also gives recipients no `onERC721Received` callback to re-enter through.
-- **No `IERC721Receiver`, no `receive()` or `fallback()`.** Chogs sent with `safeTransferFrom` and plain MON transfers to the contract revert instead of getting stranded. Assets only get in through `createTrade` (the maker's Chogs and MON) and `fillTrade` (the taker's MON, passed straight on to the maker).
-- The Chog is assumed to be a standard ERC-721 (OpenZeppelin-compatible `transferFrom` that reverts on failure). Check this before pointing the deployment at the real collection.
-
-### Events
-
-| Event | Emitted by | Indexed |
-|---|---|---|
-| `TradeCreated(id, maker, taker, offeredIds, offeredMon, requestedIds, requestedMon, expiry)` | `createTrade` | id, maker, taker |
-| `TraitTradeCreated(id, maker, taker, offeredIds, offeredMon, requestedRoot, requestedCount, requestedMon, expiry)` | trait `createTrade` overload | id, maker, taker |
-| `TradeFilled(id, maker, taker)` | `fillTrade` | all |
-| `TradeCancelled(id, maker)` | `cancelTrade` | all |
-| `TradeReclaimed(id, maker, caller)` | `reclaimExpired` | all |
-| `WithdrawalCredited(account, amount)` | `_sendMon` on failure | account |
-| `Withdrawn(account, amount)` | `withdraw` | account |
-
-`TradeCreated` carries all the terms, so a client can rebuild every trade from logs alone and then call `getTrade` only to confirm the live status.
-
-### Errors
-
-`EmptySide`, `MonOnBothSides`, `TooManyTokens(count, max)`, `ExpiryInPast(expiry)`, `TradeNotOpen(id)`, `TradeIsExpired(id)`, `TradeNotExpired(id)`, `NotMaker(id)`, `NotAllowedTaker(id)`, `SelfFill(id)`, `WrongMonAmount(expected, sent)`, `InvalidTraitRequest`, `InvalidTraitProof(tokenId)`, `NothingToWithdraw`, `WithdrawFailed`.
-
-Deploy-time only (declared on `OnDeal`, not the interface): `InvalidCollection(chog)`, raised when the collection address has no code, which includes `address(0)`.
-
-The frontend maps each error to a readable message ([05 · Frontend](05-frontend.md#error-messages)).
-
-### Gas bounds
-
-`MAX_TOKENS_PER_SIDE = 10` caps a fill at 20 NFT transfers plus 2 MON sends.
-
-Measured with `forge test --gas-report`:
-
-| Call | Typical | Worst case |
-|---|---|---|
-| `createTrade` | ~278k (1 ↔ 1) | ~1.07M (10 ↔ 10) |
-| `fillTrade` | ~162k (1 ↔ 1) | ~835k (10 ↔ 10 + MON; test asserts < 1.5M) |
-| `cancelTrade` | ~115k | ~177k |
-| `reclaimExpired` | ~171k | ~198k |
-| `withdraw` | ~42k | |
-| Deploy | MockChog ~1.97M, OnDeal ~1.14M (estimated against Monad testnet) | |
-
-Most of `createTrade`'s cost is storing both id arrays. That's what lets `getTrade` return a trade's full terms after it closes.
+Nothing on testnet runs the current source. Every deployment predates the rename to DeClub ([ADR 0021](adr/0021-declub-pivot.md)): they were deployed as `ChogSwapV2` / `OnDealV2` and `ChogSwapIntents` / `OnDealIntents`, and the intents ones sign with an older EIP-712 domain, not `("DeClubIntents", "1")`. `DeClubEscrow` and `DeClubIntents` have to be deployed (`DeployEscrow.s.sol`, `DeployIntents.s.sol`) before the app works against them. The old records stay in `contracts/broadcast/` under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`, `DeployIntents.s.sol`); the [README](../README.md#retired-deployments) lists them.
