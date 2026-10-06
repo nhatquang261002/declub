@@ -16,8 +16,9 @@ import type { Asset } from "@/lib/assets";
 import type { TxState } from "./useTxFlow";
 
 // Signing an intent costs no gas, so this is the signed-message sibling of useTxFlow:
-//   idle → switching-chain → awaiting-signature → posting → idle (the caller shows the result)
-//                       ╰──────────────┴────────────────────► error (decoded)
+//   idle → switching-chain → preparing → awaiting-signature → posting → syncing → idle
+//                       ╰──────────────┴─────────────────────────────────► error (decoded)
+// (the caller shows the result)
 // It reuses TxState so TxButton and TxStatus work unchanged.
 
 /** How many nonces past the highest one this wallet has used are checked on-chain at once. */
@@ -65,8 +66,10 @@ export function useSignFlow() {
           await switchChain(config, { chainId: CHAIN_ID });
         }
         const out = await work(connection.address);
-        setState({ status: "idle" });
+        // Stays busy until the app has caught up, so the button can't be pressed twice meanwhile.
+        setState({ status: "syncing" });
         await queryClient.invalidateQueries();
+        setState({ status: "idle" });
         return out;
       } catch (error) {
         const described = describeError(error);
@@ -82,6 +85,8 @@ export function useSignFlow() {
   const post = useCallback(
     ({ give, want, ttlSeconds }: NewIntent): Promise<Hex | null> =>
       guarded(async (maker) => {
+        // Two reads before the wallet opens; the nonce one pages through the maker's whole history.
+        setState({ status: "preparing" });
         const nonce = await freeNonce(config, maker);
         // The fee is read from the contract at the moment of signing and signed as the most this
         // maker pays (ADR 0018): a later cut charges less, a later raise above it makes the intent

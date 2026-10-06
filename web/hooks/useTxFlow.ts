@@ -23,16 +23,21 @@ import { useToast } from "@/components/Toast";
 import { mayFill, mayReport, reportTx } from "@/lib/fillReport";
 import { chain } from "@/lib/wagmi";
 
-// idle → simulating → awaiting-signature → pending → confirmed
-//                ╰──────────────┴────────────┴──► error (decoded)
+// idle → simulating → awaiting-signature → pending → syncing → confirmed
+//                ╰──────────────┴────────────┴──────────► error (decoded)
 export type TxState =
   | { status: "idle" }
   | { status: "switching-chain" }
   | { status: "simulating" }
   | { status: "awaiting-signature" }
-  // Signed intents only (useSignFlow): the signature is made, the pool is being told.
+  // Signed intents only (useSignFlow): reading the nonce and fee, then the signature is made and
+  // the pool is told.
+  | { status: "preparing" }
   | { status: "posting" }
   | { status: "pending"; hash: Hash }
+  // It landed; the app is recording it and refreshing what it shows. `hash` is absent for a
+  // signed intent, which has no transaction.
+  | { status: "syncing"; hash?: Hash }
   | { status: "confirmed"; hash: Hash }
   | ({ status: "error"; hash?: Hash } & AppError);
 
@@ -98,12 +103,14 @@ export function useTxFlow() {
         const receipt = await waitForTransactionReceipt(config, { hash, chainId: chain.id });
         if (receipt.status !== "success") throw new Error("The transaction reverted on-chain.");
 
-        setState({ status: "confirmed", hash });
+        // Stays busy until the app has caught up, so the button can't be pressed twice meanwhile.
+        setState({ status: "syncing", hash });
         // History needs the filler on record before it refetches (lib/fillReport.ts).
         if (mayFill(call)) await reportTx(hash);
         // A new deal only feeds a Club, so nothing waits for it.
         else if (mayReport(call)) void reportTx(hash);
         await queryClient.invalidateQueries();
+        setState({ status: "confirmed", hash });
         return receipt;
       } catch (error) {
         // The toast is what the user sees wherever they've scrolled; `state` keeps the record

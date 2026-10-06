@@ -49,6 +49,8 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const [wantRows, setWantRows] = useState<DraftRow[]>(() => [newRow("erc20", MOCK_ERC20_ADDRESS ?? "")]);
   const [deadline, setDeadline] = useState<DeadlineKey>(DEFAULT_DEADLINE);
   const [scope, setScope] = useState<NftScope>("token");
+  // Set once the swap is posted: the signing state is idle again by then, but its page is still opening.
+  const [opening, setOpening] = useState(false);
 
   const feeTokenAddress = fee?.token;
   const tokens = useMemo(
@@ -74,7 +76,10 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   async function submit() {
     if (!address || blocker || poolDown) return;
     const hash = await sign.post({ give: give.assets, want: want.assets, ttlSeconds: deadlineSeconds(deadline) });
-    if (hash) router.push(`/intent/${hash}`);
+    if (hash) {
+      setOpening(true);
+      router.push(`/intent/${hash}`);
+    }
   }
 
   const escrowHint = (
@@ -225,7 +230,12 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
             {readiness.steps.length > 1 ? ` (1 of ${readiness.steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={sign.state} disabled={!!blocker || poolDown || readiness.isLoading} onClick={submit}>
+          <TxButton
+            state={sign.state}
+            busyLabel={opening ? "Opening your swap…" : undefined}
+            disabled={!!blocker || poolDown || readiness.isLoading}
+            onClick={submit}
+          >
             Sign and post
           </TxButton>
         )}

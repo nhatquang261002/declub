@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call, type ViewerRole } from "@/hooks/useClubMembership";
-import { useSocialSign } from "@/hooks/useSocial";
+import { useSocialSign, type SocialStage } from "@/hooks/useSocial";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
 import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
@@ -94,6 +95,9 @@ export function useClubActions(token: string) {
   const sign = useSocialSign();
   const key = token.toLowerCase();
   const base = `/api/clubs/${token}`;
+  // Posts and replies are signed first, so say whether the wallet or the server is being waited on.
+  const [postStage, setPostStage] = useState<SocialStage>();
+  const [replyStage, setReplyStage] = useState<SocialStage>();
 
   const refresh = (...names: string[]) => {
     for (const name of names) void queryClient.invalidateQueries({ queryKey: [name, key] });
@@ -110,6 +114,8 @@ export function useClubActions(token: string) {
   const send = <T,>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
 
   return {
+    postStage,
+    replyStage,
     // A post is signed by the member's Club wallet before it's sent (ADR 0023).
     post: useAct(async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
       const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
@@ -118,8 +124,15 @@ export function useClubActions(token: string) {
           draft.reason !== "bad_link" ? "Write something first, at most 280 characters." : v.kind === "note" ? "Paste the link of an X post." : "Link a deal id or a signed-swap hash.",
         );
       }
-      const { signature } = await sign(postTypedData(draft.message), v.wallet);
-      const result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
+      let result: { xShare?: XShareVerdict };
+      try {
+        setPostStage("signing");
+        const { signature } = await sign(postTypedData(draft.message), v.wallet);
+        setPostStage("sending");
+        result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
+      } finally {
+        setPostStage(undefined);
+      }
       // Tell the author whether their own X post counted (ADR 0024); someone else's is just a card.
       const share = result.xShare;
       if (share?.counted) {
@@ -137,8 +150,14 @@ export function useClubActions(token: string) {
     reply: useAct(async (v: { parent: string; text: string; wallet?: string }) => {
       const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
       if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
-      const { signature } = await sign(replyTypedData(draft.message), v.wallet);
-      return send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
+      try {
+        setReplyStage("signing");
+        const { signature } = await sign(replyTypedData(draft.message), v.wallet);
+        setReplyStage("sending");
+        return await send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
+      } finally {
+        setReplyStage(undefined);
+      }
     }, ["club-replies", "club-posts"]),
     remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log"]),
     report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies"], "Reported. Thank you."),

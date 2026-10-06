@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { Address, Hex } from "viem";
 import { useConfig, useConnection } from "wagmi";
 import { getConnection, signTypedData, switchChain } from "wagmi/actions";
@@ -14,6 +14,9 @@ import { followTypedData, signingTime, type FollowMessage, type postTypedData, t
 
 // Signed social records (ADR 0023): posts and follows are signed by the wallet, so they can be
 // carried elsewhere and checked by anyone. Signing costs no gas and moves nothing.
+
+/** Where a signed write is: waiting on the wallet, or on the server once it is signed. */
+export type SocialStage = "signing" | "sending";
 
 type Typed = ReturnType<typeof postTypedData> | ReturnType<typeof followTypedData> | ReturnType<typeof replyTypedData>;
 
@@ -51,6 +54,7 @@ export function useFollows() {
   const toast = useToast();
   const sign = useSocialSign();
   const key = ["follows", address?.toLowerCase()];
+  const [stage, setStage] = useState<SocialStage>();
 
   const query = useQuery({
     queryKey: key,
@@ -68,8 +72,14 @@ export function useFollows() {
     mutationFn: async ({ target, follow }: { target: string; follow: boolean }) => {
       if (!address) throw new Error("Connect a wallet first.");
       const message: FollowMessage = { follower: address, target: target as Address, following: follow, at: signingTime() };
-      const { signature } = await sign(followTypedData(message));
-      return call(getToken!, "POST", "/api/follows", { message, signature });
+      try {
+        setStage("signing");
+        const { signature } = await sign(followTypedData(message));
+        setStage("sending");
+        return await call(getToken!, "POST", "/api/follows", { message, signature });
+      } finally {
+        setStage(undefined);
+      }
     },
     onSuccess: (_, { follow }) => {
       void queryClient.invalidateQueries({ queryKey: key });
@@ -86,5 +96,7 @@ export function useFollows() {
     following,
     toggle: (target: string) => change.mutate({ target, follow: !following.has(target.toLowerCase()) }),
     pending: change.isPending ? change.variables?.target.toLowerCase() : undefined,
+    /** Which step the pending follow is on. */
+    stage,
   };
 }

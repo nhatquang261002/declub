@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/Spinner";
 import { useFollows } from "@/hooks/useSocial";
 
 /**
@@ -16,10 +17,12 @@ export function FollowButton({ target, follows }: { target: string; follows: Ret
       type="button"
       className={`chip px-2 py-0.5 text-[0.7rem] ${on ? "chip-dark" : "hover:bg-white"}`}
       aria-pressed={on}
+      aria-busy={busy}
       disabled={busy}
       onClick={() => follows.toggle(target)}
     >
-      {busy ? "Signing…" : on ? "Following" : "Follow"}
+      {busy && <Spinner />}
+      {busy ? (follows.stage === "sending" ? "Saving…" : "Sign in wallet…") : on ? "Following" : "Follow"}
     </button>
   );
 }

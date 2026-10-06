@@ -284,7 +284,13 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={!!askError || !!offerError || fee === undefined} onClick={create}>
+          <TxButton
+            state={tx.state}
+            // Confirmed means the deal exists and its page is opening, so don't offer to create another.
+            busyLabel={tx.state.status === "confirmed" ? "Opening your deal…" : undefined}
+            disabled={!!askError || !!offerError || fee === undefined}
+            onClick={create}
+          >
             {isOpen ? "Post open offer" : "Create deal"}
           </TxButton>
         )}

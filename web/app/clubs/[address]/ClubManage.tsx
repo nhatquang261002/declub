@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatUnits, parseUnits, type Address } from "viem";
 import { Alert } from "@/components/Alert";
+import { Spinner } from "@/components/Spinner";
 import { ExternalIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -100,7 +101,8 @@ function PageEditor({ token }: { token: string }) {
         </span>
       </label>
       <div className="flex items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={profile.isPending || draft === null}>
+        <button type="submit" className="btn-primary" aria-busy={profile.isPending} disabled={profile.isPending || draft === null}>
+          {profile.isPending && <Spinner />}
           {profile.isPending ? "Saving…" : "Save changes"}
         </button>
         {draft !== null && !profile.isPending && (
@@ -259,7 +261,8 @@ function XEditor({ token }: { token: string }) {
               }}
             >
               <input className={`${field} min-w-48 flex-1`} value={url} inputMode="url" placeholder="https://x.com/…/status/…" onChange={(e) => setUrl(e.target.value)} />
-              <button type="submit" className="btn-primary btn-sm" disabled={xVerify.isPending || url.trim().length === 0}>
+              <button type="submit" className="btn-primary btn-sm" aria-busy={xVerify.isPending} disabled={xVerify.isPending || url.trim().length === 0}>
+                {xVerify.isPending && <Spinner />}
                 {xVerify.isPending ? "Checking…" : "Check and link"}
               </button>
               <button type="button" className="text-xs font-bold text-muted hover:text-[#111318]" onClick={() => setProof(null)}>

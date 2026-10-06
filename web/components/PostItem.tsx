@@ -8,6 +8,7 @@ import { BadgeCheckIcon, BanIcon, ChatIcon, HeartIcon, ExternalIcon, EyeIcon, Ey
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
+import { Spinner } from "@/components/Spinner";
 import { useClubActions, useClubReplies } from "@/hooks/useClubBoard";
 import { POST_MAX, type PostLink, type PublicPost, type StoredXCard } from "@/lib/clubPosts";
 import { isXImage } from "@/lib/xPosts";
@@ -72,6 +73,8 @@ export type PostActions = {
   hide: (id: string, hidden: boolean) => void;
   pin: (id: string, pinned: boolean) => void;
   ban: (id: string) => void;
+  /** The post whose like is on its way to the server, if any. */
+  liking?: string;
 };
 
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
@@ -205,7 +208,8 @@ export function PostItem({
               className={`post-like ${post.liked ? "post-like-on" : ""}`}
               aria-pressed={post.liked}
               aria-label={post.liked ? "Take back your like" : "Like this post"}
-              disabled={post.mine}
+              aria-busy={actions.liking === post.id}
+              disabled={post.mine || actions.liking === post.id}
               onClick={() => actions.like(post.id, !post.liked)}
             >
               <HeartIcon className="size-4" filled={post.liked} />
@@ -253,7 +257,7 @@ function ReplyToggle({ count, open, onToggle }: { count: number; open: boolean; 
  */
 function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
   const { replies, isLoading } = useClubReplies(context.token, parent, true);
-  const { reply, report, like, remove, hide, ban } = useClubActions(context.token);
+  const { reply, replyStage, report, like, remove, hide, ban } = useClubActions(context.token);
   const [text, setText] = useState("");
   const actions: PostActions = {
     report: (id) => report.mutate(id),
@@ -262,6 +266,7 @@ function Thread({ parent, context, role, now }: { parent: string; context: Threa
     hide: (id, hidden) => hide.mutate({ id, hidden }),
     pin: () => {},
     ban: (id) => ban.mutate({ post: id }),
+    liking: like.isPending ? like.variables?.id : undefined,
   };
   const length = [...text].length;
 
@@ -296,10 +301,12 @@ function Thread({ parent, context, role, now }: { parent: string; context: Threa
             value={text}
             maxLength={POST_MAX * 2}
             placeholder="Write a reply"
+            readOnly={reply.isPending}
             onChange={(event) => setText(event.target.value)}
           />
-          <button type="submit" className="btn-primary px-3 py-2 text-sm" disabled={reply.isPending || length === 0 || length > POST_MAX}>
-            {reply.isPending ? "Signing…" : "Reply"}
+          <button type="submit" className="btn-primary px-3 py-2 text-sm" aria-busy={reply.isPending} disabled={reply.isPending || length === 0 || length > POST_MAX}>
+            {reply.isPending && <Spinner />}
+            {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Sign in wallet…") : "Reply"}
           </button>
         </form>
       )}
