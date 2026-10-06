@@ -1,6 +1,6 @@
 # ADR 0016: Clubs, a community per verified asset, and Momentum
 
-**Status:** Accepted · 2026-10-02 · Web and matcher only. No contract change. Builds on [ADR 0011](0011-verified-profiles.md), [0012](0012-server-side-saves.md), [0014](0014-verified-collections-list.md) and [0015](0015-protocol-fee.md). The full spec is [09 · Clubs](../09-clubs.md).
+**Status:** Accepted · 2026-10-02 · Web and matcher only. No contract change. Builds on [ADR 0011](0011-verified-profiles.md), [0012](0012-server-side-saves.md), [0014](0014-verified-collections-list.md) and [0015](0015-protocol-fee.md). The full spec is [09 · Clubs](../09-clubs.md). Amended by [ADR 0024](0024-x-posts-and-the-holder-bonus.md): a Holder's own X post about the Club, shared on its Board, now counts in Momentum.
 
 ## Context
 

@@ -100,9 +100,9 @@ Three views, switched with pills:
 - For trade and Wanted show only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCardV2`.
 - Says when more than 50 locked deals name the asset ("showing the newest 50 deals; browse Deals and search to see the rest") and when the signed-swap pool isn't answering.
 
-**Board tab**: member posts, pinned ones on top, in the order of the reader's lens (Newest, Top traders, Holders, Following), filtered to All or Looking for. Each post shows **Signed** and a **Follow** button beside its author.
+**Board tab**: member posts, pinned ones on top, in the order of the reader's lens (Newest, Most active, Holders, Following), filtered to All or Looking for. Each post shows **Signed** and a **Follow** button beside its author.
 
-- *Note*: plain text, 280 characters at most.
+- *Note*: plain text, 280 characters at most, plus an optional X post, shown as a card ([X posts](#x-posts)). Under the field, the composer says what makes an X post count for this Club.
 - *Looking for*: text, plus an optional deal id or intent hash, shown as its card. For example "WTB any Chog with a crown, 2 MON over floor".
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
@@ -119,9 +119,10 @@ Pure functions in `web/lib/momentum.ts`, computed from the Club's activity log o
 |---|---|---|
 | Completed swap containing the asset (V2 fill, accepted proposal, settled intent) | 10 per side | Each side pays the flat protocol fee ([ADR 0015](adr/0015-protocol-fee.md)), so faking it costs real money |
 | New deal, open offer or intent naming the asset | 2, at most 3 per wallet per day | Cheap to make, so capped |
-| Board post | 0 | Engagement isn't trading, and giving posts no weight means spam doesn't pay |
+| A Holder's own X post about the Club, shared on its Board ([X posts](#x-posts)) | 3 (1.5 if it only matches a tag), at most one a day per member per Club | Attention is part of a Club's life; capped low and limited to Holders so it can't outweigh trading |
+| Any other Board post | 0 | Giving plain posts no weight means spam doesn't pay |
 
-- **Club Momentum** = decayed sum × `(1 + log2(unique wallets in 30 days)) / 4`. Breadth counts, so one wallet trading with itself barely moves it. The trend compares it with the same score as of 7 days ago.
+- **Club Momentum** = decayed sum × `(1 + log2(unique wallets in 30 days)) / 4`. Breadth counts, so one wallet trading with itself barely moves it; X shares don't add to the breadth (or to "Traders · 30 days"). The trend compares it with the same score as of 7 days ago.
 - **Member Momentum** = the decayed weights of events where one of the member's linked wallets is a party. A completed swap with a counterparty already traded with in this Club in the last 7 days counts half (wash damping).
 - All constants live in one exported object, so they can be tuned without touching logic.
 - Results are cached per Club in the store for 60 seconds.
@@ -156,13 +157,13 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 This is the first user-written content in the app. Every post is signed by its author's wallet ([ADR 0023](adr/0023-signed-posts-and-lenses.md)).
 
 - **Signing:** the composer cleans the text and puts the link in canonical form (`draftPost` in `web/lib/social.ts`), then the member's **Club wallet** signs the EIP-712 `Post { club, kind, text, link, at }` under the domain `("DeClub Social", "1", chainId)`. The server refuses a post that isn't signed (`unsigned`), names another Club (`wrong_club`), differs from what it would store (`not_clean`), was signed more than 5 minutes from its clock (`stale`), or isn't signed by the member's Club wallet (`bad_signature`). The id is the message's struct hash; sending the same signed post again returns it.
-- **Lenses:** `GET .../posts?lens=newest|momentum|holders|following&as=<reader's wallet>` (`web/lib/lenses.ts`). Top traders weighs each post by its author's Momentum and halves it every 24 hours; Holders keeps posts by members holding the asset; Following keeps posts by wallets the reader (`as`) follows, and drops the pins.
+- **Lenses:** `GET .../posts?lens=newest|momentum|holders|following&as=<reader's wallet>` (`web/lib/lenses.ts`). Most active weighs each post by its author's Momentum and halves it every 24 hours; Holders keeps posts by members holding the asset; Following keeps posts by wallets the reader (`as`) follows, and drops the pins.
 - **Export:** `GET /api/clubs/[token]/feed` serves every signed post as its message and signature, with the domain and types; posts hidden by moderation are left out until restored. `GET /api/wallets/[address]/posts` serves a wallet's posts across Clubs.
 - **Follows:** a signed `Follow { follower, target, following, at }` from one of the caller's linked wallets (`POST /api/follows`), newest record wins, at most 1,000 per wallet and 120 changes an hour. `GET /api/wallets/[address]/follows` serves them.
 
 - **Who can post:** members with a **shared verified profile** (ADR 0011), not banned in that Club, in a Club that isn't archived. If "holders only can post" is on, holders only, except the Owner, Moderators and admins. The post shows the member's Club wallet.
 - **Text:** at most 280 characters (counted as characters, so an emoji is one). Control characters, line breaks, zero-width and bidirectional-override characters become spaces, runs of spaces collapse, the ends are trimmed. It is shown as plain text: React escapes it, there is no markdown, and URLs aren't linked.
-- **Links:** only a "Looking for" post can carry one, a deal id or a signed-swap hash. The server checks that it exists and names the Club's token (`link_not_found`, `link_mismatch`; `link_unavailable` when the lookup itself fails).
+- **Links:** a "Looking for" post can carry a deal id or a signed-swap hash; the server checks that it exists and names the Club's token (`link_not_found`, `link_mismatch`; `link_unavailable` when the lookup itself fails). A note can carry an X post link (`x_not_found` when it isn't public, `x_unavailable` when X can't be read); see [X posts](#x-posts). Either way, one link per post (`bad_link` for the wrong kind).
 - **Rate limits** (`withinLimit`), applied after the checks above so a post the server refuses doesn't use one up: a 30-second cooldown and 5 posts an hour, per user per Club; 20 reports a day per user.
 - **Reports:** a member can report a post once (a set per post, so the same member twice adds nothing) and not their own. Every report is recorded and shown to staff, but only reports from Holders and staff count toward hiding, so a handful of free accounts can't hide a post. At 3 counted reports it is hidden: others see "hidden after reports" (and not as pinned), the author still sees it, and staff see it with the report count. It keeps its pin, so restoring it brings the pin back. Posts by the Owner, Moderators or admins are never hidden by reports. Hidden-by-reports is logged as `auto_hide`.
 - **Moderators and above** hide and restore posts (restoring clears the reports, so old reports don't re-hide it), delete posts, and ban, all subject to the permission matrix above. Hiding or deleting a post unpins it. **Authors** can delete their own posts, which isn't logged.
@@ -172,21 +173,62 @@ This is the first user-written content in the app. Every post is signed by its a
 - **Club page:** the Owner or an admin edits a description (500 characters), up to 3 `https://` links (they become anchors with `rel="noopener noreferrer nofollow"`, so nothing else is accepted) and "holders only can post". **A banner image is not built yet.**
 - **The log:** every role change, ban, hide, restore, staff delete, pin, claim and profile edit, as wallets rather than user ids, newest first, capped at 1000. Staff read it.
 
+## X posts
+
+[ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md). Pure parts in `web/lib/xPosts.ts` (links, signals, matching), the server in `web/lib/server/xPosts.ts` (oEmbed, X shares, linking the project's account), `xApi.ts` (the paid X API) and `xReach.ts` (reach, once per epoch).
+
+- **Sharing:** a note's link may be any x.com or twitter.com post link; it is signed as `https://x.com/i/status/<id>`. The server reads the post through X's free oEmbed endpoint (`publish.x.com/oembed`) and keeps a card: author, text (plain, at most 400 characters), and the time, read from the post id. The card is not part of the signed message, and is hidden with the post's text.
+- **An X share** is a shared X post that counts. It needs all of:
+  - the author is the member's own X account, as Privy verified it (`twitter_oauth`);
+  - the member holds the Club's asset (the Holder badge);
+  - the post is at most 48 hours old;
+  - it is about the Club (below);
+  - it never counted before (in any Club);
+  - it is the member's first in this Club this UTC day.
+
+  Otherwise it is a card only, and the author is told why (`not_own`, `not_holder`, `too_old`, `no_signal`, `daily_limit`, `already_counted`). Hiding the Board post (by staff or reports) stops its X share counting until it is restored; deleting the post ends it.
+- **About the Club**, by `matchSignals`, yes or no per post:
+
+  | Strength | When | Counts |
+  |---|---|---|
+  | Strong | It names the Club's token address or links its Club page; mentions a linked project account; quotes or replies to one of its posts | In full |
+  | Weak | It only matches a tag: `$SYMBOL` of each Club asset (always), or one of the Owner's up to 10 hashtags, cashtags or words, as a whole word | Half |
+  | None | Nothing matched | Not counted |
+
+- **The project's X account** (up to 3 per Club), linked by the Owner or an admin in **Manage → The Club on X**:
+  1. `POST .../x {action: "start", handle}` gives a one-time code, good for 24 hours, and the text to post.
+  2. The Owner posts that text from the account.
+  3. `{action: "verify", handle, url}` reads that post through oEmbed and links the account if the author matches and the code is in it.
+
+  With the X API configured, the account's numeric id is saved too, so a rename doesn't break it. `DELETE .../x {handle}` unlinks. The Club page shows linked accounts as "@handle ✓". Refusals: `bad_handle`, `already_linked`, `too_many_accounts`, `xlink_expired`, `xlink_mismatch`, `xlink_unavailable`.
+- **Counting only, by default.** With no `X_BEARER_TOKEN`, every counted X share adds the same points, and nothing is read again at the epoch: a post deleted on X after sharing still counts (hiding or deleting the Board post stops it). Quotes and replies of the project account and `t.co`-shortened Club links aren't detected; plain @-mentions, the address in the text and tags are.
+- **Reach, with the X API:** with `X_BEARER_TOKEN` set, `npm run rewards:epoch` reads every X share of the epoch before building it (`GET /2/tweets`, 100 per call). It checks each share again:
+  - the author by X's numeric id (Privy's `subject`);
+  - the signals, with the full links and the authors of quoted and replied-to posts, so a post can turn strong, or drop out if edited or deleted.
+
+  It records engagement = likes + reposts + quotes + replies (impressions are left out). The read is saved (`rewards:{chain}:reach:{n}`) and published in the epoch. About $0.005 a post. `GET /api/clubs/[token]/rewards` says which mode is on (`xReach`), and the Rewards tab words itself to match.
+
 ## Rewards
 
 [ADR 0022](adr/0022-club-rewards.md). Pure parts in `web/lib/rewards.ts` (`REWARDS`, `epochWindow`, `rewardLeaf`, `splitClub`, `leavesOf`), the builder in `web/lib/server/rewards.ts`, the contract `DeClubRewards`.
 
 | Share of a Club's swap fees | Goes to |
 |---|---|
-| 40% | The Club's Holders, by shares: one per NFT, one per `minHolding` (or whole token, without one) of the memecoin, summed over a member's linked wallets, read when the epoch is built. Joined members only, paid at their Club wallet. |
+| 40% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT, one per `minHolding` (or whole token, without one) of the memecoin, summed over a member's linked wallets, read when the epoch is built. Joined members only, paid at their Club wallet. |
 | 20% | The Club fund, paid to the Owner's Club wallet. |
 | 40% | Stays with the protocol. |
 
 - **Epochs:** a week by default (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS`), numbered from `NEXT_PUBLIC_REWARDS_GENESIS` (default 2026-10-05 00:00 UTC). An epoch is built after it ends, in order (`out_of_order` otherwise), once (`exists` after), under a lock.
 - **Fees:** each completed swap's `fee` (both sides together): from the escrow fill's `FeeCharged` in the activity log, or the settlement's `FeeCharged` for a signed swap. A swap in k Clubs gives each 1/k.
+- **The activity bonus** ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md)): a Holder's shares count up to 50% more (`REWARDS.maxBonusBps`) for their activity in the Club during the epoch, counted in full with no decay (`activityPoints`):
+  - trading points as Momentum weighs them (10 a swap side, wash halved; 2 a new deal, 3 a day);
+  - per X share, 3, halved for a weak one;
+  - with reach on, `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
+
+  `bonus = 50% × min(1, points / 50)`. Without reach, X shares alone give at most 21 points a week (about +21%). Each holder payout in the record carries `shares`, `bonusBps` and `points`. Splitting holdings across accounts gains nothing but rounding.
 - **Carry:** a Club with no Holder members keeps its Holder pool, one with no Owner keeps its fund, and rounding dust stays too, all rolling into the next epoch (`declub:rewards:{chain}:carry:{club}`).
 - **Leaves:** one per account per epoch, the sum across Clubs, with a per-Club breakdown; sorted by address, so a rebuild gives the same tree. The leaf is the contract's: `keccak256(keccak256(abi.encode(chainid, rewards, epoch, account, amount)))`.
-- **Building and funding:** `npm run rewards:epoch` (in `web/`) builds the next finished epoch and prints its root, total and per-Club lines; `--publish` sends `publish(epoch, root)` with the total from `REWARDS_OPERATOR_KEY`. On mainnet the operator is a Safe: build, then publish from it.
+- **Building and funding:** `npm run rewards:epoch` (in `web/`) reads the epoch's X reach (with `X_BEARER_TOKEN`), then builds the next finished epoch and prints its root, total and per-Club lines; `--publish` sends `publish(epoch, root)` with the total from `REWARDS_OPERATOR_KEY`. On mainnet the operator is a Safe: build, then publish from it.
 - **Claiming:** the screens read each leaf's epoch and `isClaimed` on chain and show it as on its way (not published or not open yet), ready, claimed or expired; **Claim** sends `claimMany` for every ready leaf. Anyone may claim for an account; the MON goes to the account.
 - **Reads:** `GET /api/rewards/epochs/[n]` (the whole epoch, cacheable for ever), `GET /api/rewards/me?account=` (an account's leaves with proofs), `GET /api/clubs/[token]/rewards` (the Club's line in the latest epochs, its carry and top earners).
 
@@ -203,11 +245,11 @@ All keys start with `declub:` and are per chain.
 | `user-clubs:{userId}` | set of tokens |
 | `activity:{chain}:{token}` | zset: event JSON → block time, capped at 5000 |
 | `club-posts:{chain}:{token}` | zset: postId → time, capped at 500 |
-| `club-post:{chain}:{token}:{id}` | `{id, userId, wallet, kind, text, link?, at, hidden?, signed?: {signature, at}}` (never sent as it is) |
+| `club-post:{chain}:{token}:{id}` | `{id, userId, wallet, kind, text, link?, at, hidden?, signed?: {signature, at}, x?: {id, author, text, postedAt, own, counted}}` (never sent as it is) |
 | `club-reports:{chain}:{token}:{id}` | set of the userIds that reported the post |
 | `club-ban:{chain}:{token}` / `club-ban:all` | `{userId: {wallet, at, by}}`, one document each |
 | `club-roles:{chain}:{token}` | `{owner?, moderators[]}`: user ids, one small document rewritten whole (staff-only, rare) |
-| `club-profile:{chain}:{token}` | `{description, links[], holdersOnlyPosts, pinned[], ownerClaim?}` (a banner is not built yet) |
+| `club-profile:{chain}:{token}` | `{description, links[], holdersOnlyPosts, pinned[], ownerClaim?, x?: {accounts[{handle, proof, linkedAt, xUserId?}], tags[]}}` (a banner is not built yet) |
 | `club-log:{chain}:{token}` | zset of log lines as JSON, scored by time (made strictly increasing), capped at 1000 |
 | `momentum:{chain}:{token}` | cache |
 | `wallet-posts:{chain}:{wallet}` | zset of `token:postId`, a wallet's signed posts across Clubs |
@@ -217,6 +259,10 @@ All keys start with `declub:` and are per chain.
 | `rewards:{chain}:epochs` / `rewards:{chain}:account:{wallet}` | zsets of epoch numbers: all built, and those that pay a wallet |
 | `rewards:{chain}:carry:{club}` | `{holders, fund}` rolling into the next epoch |
 | `rewards:{chain}:last` | the last epoch built |
+| `rewards:{chain}:reach:{n}` | the X reach read for epoch `n`, by X post id: `{club, wallet, ok, strength, engagement, reason?}` |
+| `xshares:{chain}:{club}` / `xshare:{chain}:{club}:{tweet}` | zset of counted X shares by time, capped at 5,000 / each share `{tweet, club, userId, wallet, postId, at, strength, hidden?}` |
+| `xshare-seen:{chain}:{tweet}` | an X post that has counted, kept a year, so it never counts twice |
+| `xlink:{chain}:{club}:{handle}` | a pending proof code `{code, by, until}` |
 
 The store needed only three new operations over the whole feature (set add, remove and count). The activity log, the post ranking and the moderation log use the existing `rank` and `ranked`; roles, profile and bans are single documents. So a deleted post stays in the ranking until it falls off, and reads skip it; the cap of 500 includes such ids.
 
@@ -234,9 +280,10 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `GET` / `POST` / `DELETE /api/clubs/[token]/membership` | Your membership `{member, wallet?, holder?, joinedAt?, role}` / join / leave (gated). A `GET` also re-syncs your wallets. Built. |
 | `GET /api/me/clubs` | `{clubs}`: the Clubs you belong to, leaving out ones that no longer exist (gated). Built. |
 | `GET /api/clubs/[token]/posts` | `{enabled, posts, role}`: pinned first, then newest; hidden posts redacted. Public and cacheable for readers without a token; a reader who sends one gets a private answer that includes their own hidden posts (and, for staff, all of them with report counts). Built. |
-| `POST /api/clubs/[token]/posts` | `{message, signature}`: a `Post` signed by the member's Club wallet (gated; 201). Built. |
+| `POST /api/clubs/[token]/posts` | `{message, signature}`: a `Post` signed by the member's Club wallet (gated; 201). With an X link, the answer's `xShare` says whether it counted and, if not, why. Built. |
+| `POST` / `DELETE /api/clubs/[token]/x` | Link the project's X account: `{action: "start", handle}` → `{code, text, until}`; `{action: "verify", handle, url}` → the profile; `DELETE {handle}` unlinks (Owner or admin). Built. |
 | `GET /api/clubs/[token]/feed` | `{enabled, club, domain, types, posts}`: every signed post as message and signature (public). Built. |
-| `GET /api/clubs/[token]/rewards` | `{enabled, contract, epoch, endsAt, epochs, carry, earners}` (public). Built. |
+| `GET /api/clubs/[token]/rewards` | `{enabled, contract, epoch, endsAt, xReach, epochs, carry, earners}` (public); `xReach` says whether X engagement counts. Built. |
 | `GET /api/rewards/epochs/[n]` | A built epoch with every leaf and proof (public, immutable). Built. |
 | `GET /api/rewards/me?account=` | `{enabled, contract, epoch, endsAt, leaves}` (public). Built. |
 | `GET /api/wallets/[address]/posts` / `.../follows` | A wallet's signed posts across Clubs / its signed follows and follower count (public). Built. |
@@ -248,7 +295,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `GET` / `POST` / `DELETE /api/clubs/[token]/bans` | List (staff) / ban `{wallet \| post, everywhere?}` / unban `{wallet, everywhere?}`. Built. |
 | `POST /api/clubs/[token]/claim` | Claim ownership through `owner()` (gated). Built. |
 | `PUT /api/clubs/[token]/roles` | `{wallet, role: "owner"\|"moderator"\|null}`: roles are set by the member's wallet, since the public list never shows user ids. The Owner appoints Moderators (at most 10) and hands the Club over; an admin also assigns or removes the Owner. Built. |
-| `GET` / `PATCH /api/clubs/[token]/profile` | Public description, links and "holders only"; edit (Owner or admin). Built. |
+| `GET` / `PATCH /api/clubs/[token]/profile` | Public description, links, "holders only" and `x: {accounts, tags, hint}`; edit, including `xTags` (Owner or admin). Built. |
 | `GET /api/clubs/[token]/log` | `{log, ownership}`: the moderation log (staff); `ownership` is the on-chain check, for admins only. Built. |
 | `DELETE /api/clubs/[token]` | Purge a Club that is hidden from the list (admin). A live Club is refused (`not_hidden`). Deletes members, posts, roles, profile, bans, the log and the activity log. Built. |
 | `POST /api/activity` | `{hash}`, receipt-verified, rate-limited per IP. Built. |
@@ -263,6 +310,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's side column is `ClubSidebar.tsx`.
 - **Rewards:** `web/lib/rewards.ts` (the split, epochs, leaves), `web/lib/server/rewards.ts` (the builder and its reads), `rewardRoutes.ts`, `web/scripts/rewards-epoch.ts` (`npm run rewards:epoch`), `hooks/useRewards.ts`, `components/RewardsClaim.tsx` (Club tab and Account) and `app/clubs/[address]/ClubRewards.tsx`.
 - **Signed posts and follows:** `web/lib/social.ts` (typed data, drafts, parsing), `web/lib/lenses.ts`, `web/lib/server/follows.ts`, `socialRoutes.ts`, `createSignedPost` / `exportPosts` / `walletPosts` in `board.ts`, `hooks/useSocial.ts` (`useSocialSign`, `useFollows`) and `components/FollowButton.tsx`.
+- **X posts:** `web/lib/xPosts.ts`, `web/lib/server/xPosts.ts`, `xApi.ts`, `xReach.ts`, the card in `components/PostItem.tsx`, the Owner's panel in `ClubManage.tsx`.
 - **Reused:** `featuredCollections` and `useCollectionInfos` for names, `useTokenInfo` for ERC-20s, `loadMetadata` for art.
 
 ## Build order
@@ -285,6 +333,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - The matcher's `token=` filter, in `matcher/test/server.test.ts`.
 - Rewards (`test/rewards.test.ts`): the Merkle tree, epochs, the leaf against the contract's encoding (and a root the contract verifies, `DeClubRewards.leafFixture.t.sol`), the split and carry, the builder (fees per Club, shares by holdings, a swap in two Clubs, signed-swap fees, order and idempotency, unreadable balances) and the routes.
 - Signed posts, follows and lenses (`test/social.test.ts`), with real signatures: what is refused and why, replay, the exports verifying, follow and unfollow, each lens alone and on the Board.
+- X posts (`test/xPosts.test.ts`): link parsing and the canonical form, signals and their strength, the oEmbed and X API readers, each X-share rule, hide and delete, Momentum, linking the project's account by proof, the reach read and the Holder bonus (bounds, the cap, splitting accounts, the builder).
 
 By hand, with two wallets on Monad testnet:
 
@@ -293,5 +342,6 @@ By hand, with two wallets on Monad testnet:
 3. Check "Recent swaps", Club Momentum going up, and both members on the leaderboard.
 4. After the epoch ends (set `NEXT_PUBLIC_REWARDS_EPOCH_SECONDS` short), run `npm run rewards:epoch -- --publish`; the Holder and the Owner each see their share on the Rewards tab and claim it.
 5. Post a signed note, follow the other member, switch the Board's lens, and fetch `/api/clubs/<address>/feed`.
-6. Post a "Looking for" linked to a deal, report it from 3 accounts and see it hidden, then delete it as admin.
-7. Turn Privy off and see the not-configured state.
+6. As the Owner, link an X account you control by its proof post; then, as a Holder, share your own X post that mentions it: the card says it counts, and Momentum rises.
+7. Post a "Looking for" linked to a deal, report it from 3 accounts and see it hidden, then delete it as admin.
+8. Turn Privy off and see the not-configured state.

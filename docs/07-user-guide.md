@@ -110,13 +110,21 @@ A **Club** is the community for one verified NFT collection or memecoin, such as
 
 **Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection, or the minimum amount of a token; in a shared Club, either one). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
 
-**Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet. Posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
+**Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet; so does a Holder's own X post about the Club shared on its Board (see below), one a day. Other posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
 
-**Posting.** You need to be a member and to have shared a verified X or Discord profile (Account page). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+**Posting.** You need to be a member and to have shared a verified X or Discord profile (Account page). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. A *Note* can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+
+**Sharing your X posts.** Any public X post can be shared as a card. Your **own** post (from the X account linked to your profile) counts for the Club, adding to your Momentum and your Holder bonus, when:
+
+- you hold the Club's asset;
+- you posted it on X in the last 48 hours;
+- it is about the Club: it links the Club or its token, mentions, quotes or replies to the project's X account (shown as "@handle ✓" on the Club page), or uses one of the Club's tags (a tag alone counts half). The composer lists them.
+
+One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. Where the app is connected to the X API (the Club's **Rewards** tab says so), likes, reposts, quotes and replies add to it, and an X post you delete counts for nothing when the week is paid.
 
 **Your posts are signed.** When you press **Sign & post**, your Club wallet (the one the Members list shows for you) signs the post. It costs no gas and moves nothing. If another wallet is connected, the app asks you to switch first. Because each post is signed, it's your own record: anyone can check it, and each Club's posts are public with their signatures at `/api/clubs/<address>/feed`, yours across Clubs at `/api/wallets/<your wallet>/posts`.
 
-**Choosing the order.** Above the Board, pick a lens: **Newest**; **Top traders**, where posts from members who trade the asset most rise and older ones sink; **Holders**, only posts from members who hold it; or **Following**, only posts from wallets you follow (connect a wallet to see it). Pinned posts stay on top, except under Following.
+**Choosing the order.** Above the Board, pick a lens: **Newest**; **Most active**, where posts from the members most active in the Club (trading, and their X posts about it) rise and older ones sink; **Holders**, only posts from members who hold it; or **Following**, only posts from wallets you follow (connect a wallet to see it). Pinned posts stay on top, except under Following.
 
 **Following.** Press **Follow** beside a member's name, on a post or in the Members list. Your connected wallet signs the follow, which must be one of the wallets linked to your account. Press again to unfollow. Your follows are public at `/api/wallets/<your wallet>/follows`.
 
@@ -127,6 +135,7 @@ A **Club** is the community for one verified NFT collection or memecoin, such as
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
 - **40%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the asset when the epoch is worked out. Each NFT is one share, and so is each set amount of the memecoin (its minimum holding, or one whole token). Your share goes to your Club wallet.
+  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Where the app reads X engagement, well-received posts earn up to 30 more points a week. A Holder who does nothing still gets their base share.
 - **20%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.
 
