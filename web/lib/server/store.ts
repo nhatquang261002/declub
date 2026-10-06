@@ -77,7 +77,11 @@ function upstash(redis: Redis): Store {
         .zremrangebyrank(key, 0, -(cap + 1))
         .exec();
     },
-    ranked: (key, limit) => redis.zrange<string[]>(key, 0, limit - 1, { rev: true }),
+    // The client parses JSON members back into objects; callers get the strings they stored.
+    async ranked(key, limit) {
+      const rows = await redis.zrange<unknown[]>(key, 0, limit - 1, { rev: true });
+      return rows.map((row) => (typeof row === "string" ? row : JSON.stringify(row)));
+    },
     async hit(key, windowSec) {
       const count = await redis.incr(key);
       if (count === 1) await redis.expire(key, windowSec);

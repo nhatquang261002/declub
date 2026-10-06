@@ -121,7 +121,9 @@ async function main() {
 
   /** Sends one transaction and waits for it, failing loudly on a revert. */
   const send = async (key: Hex, request: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }) => {
-    const hash = await clientOf(key).writeContract(request as never);
+    // The estimate can come in a hair under what a fill really uses, and Monad bills the limit: triple the estimate, since Monad prices cold storage reads above the estimate.
+    const gas = await pub.estimateContractGas({ ...request, account: privateKeyToAccount(key).address } as never);
+    const hash = await clientOf(key).writeContract({ ...request, gas: gas * 3n } as never);
     const receipt = await pub.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error(`${request.functionName} reverted: ${hash}`);
     return receipt;
@@ -170,9 +172,9 @@ async function main() {
     // 2. Gas, fees and prices for each persona's swaps, topped up to what they need.
     if (!DECLUB_ESCROW_ADDRESS) throw new Error("Set NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS.");
     const fee = await pub.readContract({ address: DECLUB_ESCROW_ADDRESS, abi: deClubEscrowAbi, functionName: "fee" });
-    // Monad charges the gas limit, at about 100 gwei on testnet: an approval stays under 0.01 MON, a create or fill under 0.04.
+    // Monad charges the gas limit, at about 100 gwei on testnet: an approval stays under 0.01 MON, a create or fill under 0.15 with the headroom.
     const approval = parseEther("0.01");
-    const call = parseEther("0.04");
+    const call = parseEther("0.15");
     const need = new Map<PersonaKey, bigint>();
     const add = (k: PersonaKey, v: bigint) => need.set(k, (need.get(k) ?? 0n) + v);
     for (const t of TRADES) {
