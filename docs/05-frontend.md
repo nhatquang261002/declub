@@ -181,7 +181,7 @@ Choices worth knowing:
 
 An NFT row is no longer a collection address plus a typed id. **+ NFT** (and **Change** on a row) opens `components/NftPicker.tsx`:
 
-1. **Collection.** A search box over the collections the app can know about without an indexer: the Chog collection and `NEXT_PUBLIC_KNOWN_COLLECTIONS` (*Featured*), the ones this browser used before (*Recent*, localStorage), and the ones open deals and signed swaps use (*In open deals*, from `useMarketCollections`). Search matches name, symbol or address. **Pasting a contract address** reads it on-chain first (`supportsInterface` for ERC-721, then name, symbol, supply) and refuses anything that isn't an NFT collection.
+1. **Collection.** A search box (`components/AssetSearch.tsx`, over `GET /api/search`, [ADR 0027](adr/0027-on-chain-asset-search.md)): the wallet's holdings first, then verified collections, then the rest. Where the wallet is giving, it starts on **My holdings** with an **All** switch. Beside the server's results it shows the collections the app already knows without an indexer: the Chog collection and `NEXT_PUBLIC_KNOWN_COLLECTIONS` (*Featured*), the ones this browser used before (*Recent*, localStorage), and the ones open deals and signed swaps use (*In open deals*, from `useMarketCollections`). Search matches name, symbol or address. **Pasting a contract address** reads it on-chain first (`supportsInterface` for ERC-721, then name, symbol, supply) and refuses anything that isn't an NFT collection.
 2. **Tokens.** On the side the wallet is giving (the editor gets `owner`), the wallet's own NFTs in a grid with art, via `tokenOfOwnerByIndex` (first 100). On the side it is asking for, the collection is browsed a page at a time via `tokenByIndex`, with the holder under each token. Tick several and add them in one go.
 3. **Typed id.** Below the grid, for collections that can't list tokens or ids the grid doesn't show. The id is checked with `ownerOf`: it must exist, and on the giving side must be the wallet's.
 
@@ -191,13 +191,16 @@ An NFT row is no longer a collection address plus a typed id. **+ NFT** (and **C
 | `hooks/useCollection.ts` | `useCollectionInfos`, `useOwnedTokenIds`, `useBrowseTokenIds`, `useTokenViews` (art and name from `tokenURI`), `useTokenOwner` |
 | `hooks/useMarketCollections.ts` | Collections used by open deals and signed swaps, most used first |
 | `components/NftPicker.tsx` | The dialog |
+| `components/AssetSearch.tsx`, `components/TokenPicker.tsx` | The shared search box and result list, and the ERC-20 dialog |
+| `hooks/useAssetSearch.ts` | `GET /api/search`, debounced, last answer kept while the next loads |
+| `lib/search.ts`, `lib/server/chainSearch.ts` | The hit shape, ranking and provider parsing; the Moralis adapter, chain fallback and `runSearch` |
 
 Choices worth knowing:
 
-- **No indexer, so no "all collections" and no "everything I own".** A collection that isn't enumerable can't list a wallet's tokens, so the picker falls back to the typed, checked id. Finding a collection you hold means pasting its address, unless it's featured, recent or already in a deal.
+- **Holdings come from a provider where one covers the chain.** With `MORALIS_API_KEY` on Monad mainnet, "everything I own" is the wallet's collections and tokens, and tokens are searched by name. On testnet, or if the provider fails, only the assets the app knows are checked (`balanceOf`). A collection Moralis can't find by name (unheld, unverified, not featured, recent or in a deal) is still found by pasting its address. A collection that isn't enumerable still can't list a wallet's tokens, so the picker falls back to the typed, checked id.
 - **Names are the contract's own words.** Any contract can call itself "Chog", so every collection is shown with its short address, and only the configured ones are tagged *Featured*.
 - **Token art is an image URL from metadata**, so only `http(s)` and inline `data:image/` are shown (`safeImage`), in a plain `<img>` with no referrer.
-- Draft rows are unchanged (`token`, `value`), so `assetDraft`, approvals and the contracts see nothing new. Not done: the same search for ERC-20 tokens (a pasted address still shows its on-chain symbol and decimals).
+- Draft rows are unchanged (`token`, `value`), so `assetDraft`, approvals and the contracts see nothing new. ERC-20 rows have the same search: **Search** beside the address field opens `components/TokenPicker.tsx` (holdings first, a pasted address read from its contract), and the address field still works.
 
 ### Intents in the frontend (Phase 4)
 

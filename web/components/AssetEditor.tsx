@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { isAddress, type Address } from "viem";
 import { NftPicker } from "@/components/NftPicker";
+import { TokenPicker } from "@/components/TokenPicker";
 import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
 import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
 import { newRow, type DraftRow } from "@/lib/assetDraft";
@@ -35,6 +36,8 @@ type Props = {
 export function AssetEditor({ title, hint, rows, onChange, info, allowNative = true, amountIsMinimum = false, owner }: Props) {
   // `replace` is the row being changed; `collection` starts the picker inside one collection.
   const [picker, setPicker] = useState<{ replace?: string; collection?: Address } | null>(null);
+  // The ERC-20 row whose token is being searched for.
+  const [tokenRow, setTokenRow] = useState<string | null>(null);
   const rememberCollection = useRememberCollection();
   const update = (key: string, patch: Partial<DraftRow>) =>
     onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -89,13 +92,18 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
                 ) : (
                   <>
                     {row.kind !== "native" && (
-                      <input
-                        aria-label={`Row ${i + 1} token address`}
-                        className="input min-w-0 flex-1 basis-56 font-mono"
-                        placeholder="Token address 0x…"
-                        value={row.token}
-                        onChange={(e) => update(row.key, { token: e.target.value })}
-                      />
+                      <>
+                        <input
+                          aria-label={`Row ${i + 1} token address`}
+                          className="input min-w-0 flex-1 basis-56 font-mono"
+                          placeholder="Token address 0x…"
+                          value={row.token}
+                          onChange={(e) => update(row.key, { token: e.target.value })}
+                        />
+                        <button type="button" className="btn-secondary btn-sm shrink-0" onClick={() => setTokenRow(row.key)}>
+                          Search
+                        </button>
+                      </>
                     )}
                     <input
                       aria-label={`Row ${i + 1} amount`}
@@ -147,6 +155,17 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
           + Chog
         </button>
       </div>
+
+      {tokenRow && (
+        <TokenPicker
+          owner={owner}
+          onSelect={(token) => {
+            update(tokenRow, { token });
+            setTokenRow(null);
+          }}
+          onClose={() => setTokenRow(null)}
+        />
+      )}
 
       {picker && (
         <NftPicker

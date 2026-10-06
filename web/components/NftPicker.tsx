@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getAddress, isAddress, type Address } from "viem";
+import { getAddress, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedTokenIds, useTokenOwner, useTokenViews } from "@/hooks/useCollection";
 import { useMarketCollections } from "@/hooks/useMarketCollections";
 import { collectionLabel, featuredCollections, isFeatured, type CollectionInfo } from "@/lib/collections";
 import { useRecentCollections } from "@/hooks/useRecentCollections";
 import { CopyAddress } from "@/components/CopyAddress";
+import { AssetSearch } from "@/components/AssetSearch";
+import type { SearchHit } from "@/lib/search";
+import { registry } from "@/lib/verifiedAssets";
 
 const PAGE = 12;
 const OWNED_STEP = 24;
-const MAX_SUGGESTIONS = 12;
 
 export type NftPickerProps = {
   /** The wallet whose NFTs are offered. Omit to browse a collection (the "you want" side). */
@@ -93,7 +95,7 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
             onConfirm={() => onConfirm(collection, selected)}
           />
         ) : (
-          <CollectionStep onSelect={setCollection} />
+          <CollectionStep owner={owner} onSelect={setCollection} />
         )}
       </div>
     </div>
@@ -102,14 +104,11 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
 
 // ─────────────────────────────────────────────────────────────── Step 1: the collection
 
-function CollectionStep({ onSelect }: { onSelect: (address: Address) => void }) {
-  const [query, setQuery] = useState("");
+function CollectionStep({ owner, onSelect }: { owner?: Address; onSelect: (address: Address) => void }) {
   const market = useMarketCollections();
   const recents = useRecentCollections();
-  const text = query.trim();
-  const pasted = isAddress(text) ? getAddress(text) : null;
 
-  // Featured first, then what you used lately, then what open deals use. One list, no repeats.
+  // What this browser already knows: featured, then what you used lately, then what open deals use.
   const sources = useMemo(() => {
     const out = new Map<string, "Featured" | "Recent" | "In open deals">();
     featuredCollections().forEach((a) => out.set(a.toLowerCase(), "Featured"));
@@ -118,53 +117,41 @@ function CollectionStep({ onSelect }: { onSelect: (address: Address) => void }) 
     return out;
   }, [market, recents]);
   const candidates = useMemo(() => [...sources.keys()].map((a) => getAddress(a)), [sources]);
-  const { infos, isLoading } = useCollectionInfos(candidates);
+  const { infos } = useCollectionInfos(candidates);
 
-  const q = text.toLowerCase();
-  const matches = candidates
-    .filter((a) => {
-      const info = infos.get(a.toLowerCase());
-      // Contracts that don't answer as an ERC-721 (an ERC-20 seen in a deal, say) aren't collections.
-      if (info && !info.isErc721) return false;
-      return !q || a.toLowerCase().includes(q) || `${info?.name ?? ""} ${info?.symbol ?? ""}`.toLowerCase().includes(q);
-    })
-    .slice(0, MAX_SUGGESTIONS);
+  // Contracts that don't answer as an ERC-721 (an ERC-20 seen in a deal, say) aren't collections.
+  const extra = useMemo(
+    () =>
+      candidates.flatMap((address): SearchHit[] => {
+        const info = infos.get(address.toLowerCase());
+        if (info && !info.isErc721) return [];
+        return [
+          {
+            kind: "erc721",
+            address,
+            name: info?.name ?? "",
+            symbol: info?.symbol ?? "",
+            logo: null,
+            tier: registry.tier(address) === "verified" ? "verified" : "unverified",
+            held: false,
+            spam: false,
+            tag: sources.get(address.toLowerCase()),
+          },
+        ];
+      }),
+    [candidates, infos, sources],
+  );
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="label" htmlFor="collection-search">Search collections, or paste a contract address</label>
-        <input
-          id="collection-search"
-          autoFocus
-          className="input"
-          placeholder="Name, symbol or 0x…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </div>
-
-      {pasted ? (
-        <PastedCollection address={pasted} onSelect={onSelect} />
-      ) : (
-        <>
-          {text.startsWith("0x") && <p className="text-sm text-muted">Keep typing: a contract address is 42 characters.</p>}
-          {isLoading && matches.length === 0 ? (
-            <p className="text-sm text-muted">Loading collections…</p>
-          ) : matches.length === 0 ? (
-            <p className="text-sm text-muted">
-              {text ? "No collection matches. Paste its contract address to look it up." : "No collections to suggest yet. Paste a contract address."}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {matches.map((a) => (
-                <CollectionRow key={a} address={a} info={infos.get(a.toLowerCase())} tag={sources.get(a.toLowerCase())} onSelect={() => onSelect(a)} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-    </div>
+    <AssetSearch
+      kind="erc721"
+      owner={owner}
+      extra={extra}
+      label="Search collections, or paste a contract address"
+      placeholder="Name, symbol or 0x…"
+      onSelect={(hit) => onSelect(hit.address)}
+      renderPasted={(address) => <PastedCollection address={address} onSelect={onSelect} />}
+    />
   );
 }
 
