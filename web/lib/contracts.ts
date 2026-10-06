@@ -1,6 +1,6 @@
 import { erc20Abi, parseAbi, type Abi } from "viem";
-import { onDealIntentsAbi, onDealV2Abi, mockChogAbi } from "./abi";
-import { CHAIN_ID, CHOG_ADDRESS, ON_DEAL_INTENTS_ADDRESS, ON_DEAL_V2_ADDRESS } from "./config";
+import { deClubEscrowAbi, deClubIntentsAbi, deClubRewardsAbi, mockChogAbi } from "./abi";
+import { CHAIN_ID, CHOG_ADDRESS, DECLUB_ESCROW_ADDRESS, DECLUB_INTENTS_ADDRESS, DECLUB_REWARDS_ADDRESS } from "./config";
 
 export const chog = { address: CHOG_ADDRESS, abi: mockChogAbi, chainId: CHAIN_ID } as const;
 
@@ -13,24 +13,29 @@ const erc20Errors = [
   { type: "error", name: "ERC20InsufficientAllowance", inputs: [{ name: "spender", type: "address" }, { name: "allowance", type: "uint256" }, { name: "needed", type: "uint256" }] },
   { type: "error", name: "SafeERC20FailedOperation", inputs: [{ name: "token", type: "address" }] },
 ] as const satisfies Abi;
-export const swapV2Abi = [...onDealV2Abi, ...chogErrors, ...erc20Errors] as const;
+export const swapV2Abi = [...deClubEscrowAbi, ...chogErrors, ...erc20Errors] as const;
 
-/** Spread into read/write calls: `{ ...swapV2, functionName, args }`. Undefined until NEXT_PUBLIC_ON_DEAL_V2_ADDRESS is set. */
-export const swapV2 = ON_DEAL_V2_ADDRESS
-  ? ({ address: ON_DEAL_V2_ADDRESS, abi: swapV2Abi, chainId: CHAIN_ID } as const)
+/** Spread into read/write calls: `{ ...swapV2, functionName, args }`. Undefined until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set. */
+export const swapV2 = DECLUB_ESCROW_ADDRESS
+  ? ({ address: DECLUB_ESCROW_ADDRESS, abi: swapV2Abi, chainId: CHAIN_ID } as const)
   : undefined;
 
 /**
- * OnDealIntents (ADR 0008). It holds no assets, so the only call the app makes is
+ * DeClubIntents (ADR 0008). It holds no assets, so the only call the app makes is
  * `invalidateNonces`; everything else it does is signed off-chain and sent by the matcher.
- * Undefined until NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is set.
+ * Undefined until NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS is set.
  */
-export const swapIntents = ON_DEAL_INTENTS_ADDRESS
-  ? ({ address: ON_DEAL_INTENTS_ADDRESS, abi: onDealIntentsAbi, chainId: CHAIN_ID } as const)
+export const swapIntents = DECLUB_INTENTS_ADDRESS
+  ? ({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, chainId: CHAIN_ID } as const)
+  : undefined;
+
+/** The Club rewards distributor (ADR 0022), when configured. */
+export const clubRewards = DECLUB_REWARDS_ADDRESS
+  ? ({ address: DECLUB_REWARDS_ADDRESS, abi: deClubRewardsAbi, chainId: CHAIN_ID } as const)
   : undefined;
 
 /**
- * Wrapped MON, the fee token of OnDealIntents (ADR 0015). `deposit` wraps native MON one to
+ * Wrapped MON, the fee token of DeClubIntents (ADR 0015). `deposit` wraps native MON one to
  * one (the WETH9 interface), which is how a wallet holding only MON can pay the fee.
  */
 export const wmonAbi = parseAbi([

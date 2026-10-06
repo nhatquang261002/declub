@@ -23,7 +23,7 @@ const pendingOf = (amount: bigint | undefined, at: bigint | undefined): PendingF
   amount !== undefined && at !== undefined && at !== 0n ? { amount, at } : undefined;
 
 /**
- * What each side of a new OnDealV2 deal sends, in MON, on top of the native amount in its assets.
+ * What each side of a new DeClubEscrow deal sends, in MON, on top of the native amount in its assets.
  * The contract holds it with that side's escrow, pays it out only when the deal completes and
  * hands it back otherwise.
  */
@@ -49,7 +49,7 @@ export function useEscrowFee() {
 export type IntentFee = { token: Address; amount: bigint };
 
 /**
- * What each maker in a settled OnDealIntents cycle pays right now, in the wrapped-MON token, from
+ * What each maker in a settled DeClubIntents cycle pays right now, in the wrapped-MON token, from
  * their wallet. A new intent signs it as its `maxFee`.
  */
 export function useIntentFee() {

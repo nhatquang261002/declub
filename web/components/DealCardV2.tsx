@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { formatUnits } from "viem";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { CHOG_ADDRESS } from "@/lib/config";
-import { shortAddress } from "@/lib/format";
 import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
 import { ChogThumb } from "./Chog";
 import { MonPill, DealCardFrame } from "./DealParts";
+import { CopyAddress } from "@/components/CopyAddress";
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
@@ -23,7 +23,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
       <span className={chip}>
         <span className="text-[10px] font-black tracking-wider text-[#a9282f] uppercase">NFT</span>
         <span className="text-[11px] font-semibold">#{asset.id.toString()}</span>
-        <span className="font-mono text-[9px] text-[#4e5968]">{shortAddress(asset.token)}</span>
+        <CopyAddress address={asset.token} inLink className="text-[9px] text-[#4e5968]" />
       </span>
     );
   }
@@ -33,7 +33,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
       <span className={chip}>
         <span className="text-[10px] font-black tracking-wider text-[#a9282f] uppercase">By trait</span>
         <span className="text-[11px] font-semibold">Any {asset.amount.toString()}</span>
-        <span className="font-mono text-[9px] text-[#4e5968]">{shortAddress(asset.token)}</span>
+        <CopyAddress address={asset.token} inLink className="text-[9px] text-[#4e5968]" />
       </span>
     );
   }
@@ -44,7 +44,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
         {token ? formatUnits(asset.amount, token.decimals) : asset.amount.toString()}
       </span>
       <span className="max-w-full truncate text-[10px] font-black tracking-wider text-[#a9282f] uppercase">
-        {token?.symbol ?? shortAddress(asset.token)}
+        {token?.symbol ?? <CopyAddress address={asset.token} inLink />}
       </span>
     </span>
   );

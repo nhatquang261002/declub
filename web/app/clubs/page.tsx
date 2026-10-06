@@ -49,7 +49,7 @@ const ACTIVE = 0.5;
 const FEATURED = 3;
 const BOARD = 5;
 const PAGE = 12;
-const VIEW_KEY = "ondeal:clubs-view";
+const VIEW_KEY = "declub:clubs-view";
 
 // List or cards is a per-browser preference. Where storage is missing or blocked, the choice
 // lasts until the page is closed.
@@ -139,7 +139,7 @@ export default function ClubsPage() {
         <div>
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Clubs</h1>
           <p className="mt-1 text-sm text-muted">
-            One for each verified NFT collection and memecoin.{" "}
+            One for each verified NFT collection and memecoin. Members trade, post and share in its fees.{" "}
             <Link href="/#clubs" className="font-bold underline">
               How Clubs work
             </Link>

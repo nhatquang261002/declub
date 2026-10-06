@@ -57,6 +57,7 @@ export const FlameIcon = (p: P) => (<Icon {...p}><path d="M12 21c-3.9 0-6.5-2.6-
 export const ListIcon = (p: P) => (<Icon {...p}><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r=".9" fill="currentColor" /><circle cx="4.5" cy="12" r=".9" fill="currentColor" /><circle cx="4.5" cy="18" r=".9" fill="currentColor" /></Icon>);
 export const GridIcon = (p: P) => (<Icon {...p}><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></Icon>);
 export const TrendUpIcon = (p: P) => (<Icon {...p}><path d="m3.5 17 6-6 4 4 7-7.5" /><path d="M15 7.5h5.5V13" /></Icon>);
+export const CoinIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5" /><path d="M14.8 9.2c-.5-.9-1.6-1.4-2.8-1.4-1.6 0-2.8.8-2.8 2s1.2 1.7 2.8 2.1c1.6.3 2.8.9 2.8 2.1s-1.2 2-2.8 2c-1.2 0-2.3-.5-2.8-1.4" /><path d="M12 6v1.8M12 16.2V18" /></Icon>);
 export const BadgeCheckIcon = (p: P) => (<Icon {...p}><path d="M12 2.8l2.2 1.6 2.7-.1.8 2.6 2.2 1.6-.8 2.6.8 2.6-2.2 1.6-.8 2.6-2.7-.1L12 21.2l-2.2-1.6-2.7.1-.8-2.6-2.2-1.6.8-2.6-.8-2.6 2.2-1.6.8-2.6 2.7.1L12 2.8Z" /><path d="m8.8 12.2 2.2 2.2 4.3-4.6" /></Icon>);
 
 /** The X logo. Filled rather than stroked, so it doesn't use the shared stroke icon frame. */

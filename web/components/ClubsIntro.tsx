@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { ChatIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { ChatIcon, CoinIcon, TagIcon, UsersIcon } from "@/components/Icons";
 import { HeatBars } from "@/components/MomentumBadge";
 import { HEAT } from "@/lib/clubs";
 import { MOMENTUM } from "@/lib/momentum";
+import { REWARDS, percent } from "@/lib/rewards";
 import { ClubsTeaser } from "./ClubsTeaser";
 
 const WHAT = [
   { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
-  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after and attach your deal so holders can take it." },
-  { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges." },
+  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, signed by your wallet, and pick how the feed is ordered." },
+  { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges. Follow who you trust." },
+  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its Holders each week, ${percent(REWARDS.fundBps)} to the Club fund.` },
 ];
 
 const HOW = [
@@ -25,13 +27,13 @@ export function ClubsIntro() {
         <div>
           <p className="kicker text-[#a9282f]!">Clubs</p>
           <h2 id="clubs-title" className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-            Every collection gets a clubhouse.
+            Every collection gets a Club, and the Club shares in its market.
           </h2>
           <p className="mt-3 max-w-xl leading-7 text-muted">
             Each verified NFT collection and memecoin has a Club: one place to find what’s up for trade, post what you’re after,
             and see who really trades it. A memecoin made for a collection shares that collection’s Club.
           </p>
-          <ul className="mt-6 grid gap-4 sm:grid-cols-3">
+          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
             {WHAT.map((item) => (
               <li key={item.title}>
                 <span className="grid size-10 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735] shadow-[0.15rem_0.15rem_0_#111318]">

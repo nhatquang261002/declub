@@ -1,6 +1,5 @@
 import { getAddress, isAddress, type Address } from "viem";
 import { CHAIN_ID } from "./config";
-import { DEMO_ASSETS } from "./demoClubs";
 import raw from "../data/assets.json" with { type: "json" };
 
 /**
@@ -162,5 +161,4 @@ export function makeRegistry(entries: AssetEntry[]): Registry {
 }
 
 export const ASSETS = parseAssets(raw);
-/** The list plus, in development, the mock Clubs (lib/demoClubs.ts), so screens can be tried with many. */
-export const registry = makeRegistry([...ASSETS, ...DEMO_ASSETS]);
+export const registry = makeRegistry(ASSETS);

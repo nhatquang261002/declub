@@ -9,8 +9,9 @@ import { useClubActions, useClubPage, useClubStaff } from "@/hooks/useClubBoard"
 import type { ViewerRole } from "@/hooks/useClubMembership";
 import { MAX_DESCRIPTION, MAX_LINKS } from "@/lib/clubPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
-import { ago, shortAddress } from "@/lib/format";
+import { ago } from "@/lib/format";
 import { Panel } from "./parts";
+import { CopyAddress } from "@/components/CopyAddress";
 
 /** What a log line says, in words. */
 const ACTIONS: Record<string, string> = {
@@ -118,8 +119,8 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
     <div className="flex flex-col gap-5">
       {ownership?.changed && (
         <Alert tone="warn" title="Ownership changed on-chain">
-          The Owner claimed this Club as <span className="font-mono">{shortAddress(ownership.claimed)}</span>, but the contract’s owner() is now{" "}
-          <span className="font-mono">{ownership.onchain ? shortAddress(ownership.onchain) : "unreadable or removed"}</span>. Review who should hold the Club.
+          The Owner claimed this Club as <CopyAddress address={ownership.claimed} />, but the contract’s owner() is now{" "}
+          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold the Club.
         </Alert>
       )}
 
@@ -163,9 +164,9 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
               <li key={entry.id} className="relative">
                 <span className="absolute top-1.5 -left-[1.4rem] size-2.5 rounded-full border-2 border-[#111318] bg-[#f0b735]" aria-hidden />
                 <p className="flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="font-mono text-xs font-bold">{shortAddress(entry.actor)}</span>
+                  <CopyAddress address={entry.actor} className="text-xs font-bold" />
                   <span>{ACTIONS[entry.action] ?? entry.action}</span>
-                  {entry.target && <span className="font-mono text-xs break-all">{entry.target.length > 20 ? shortAddress(entry.target) : entry.target}</span>}
+                  {entry.target && (entry.target.length > 20 ? <CopyAddress address={entry.target} className="text-xs" /> : <span className="font-mono text-xs break-all">{entry.target}</span>)}
                   {entry.detail && <span className="text-xs text-muted">({entry.detail})</span>}
                 </p>
                 <p className="text-xs text-muted">{ago(Math.floor(entry.at / 1000), now)}</p>

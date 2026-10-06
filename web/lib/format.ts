@@ -41,6 +41,12 @@ export function ago(unixSec: number, nowSec: number): string {
   return delta < 30 ? "just now" : `${duration(delta)} ago`;
 }
 
+/** "in 3d", "in 5m"; "now" once the time has come. */
+export function untilLabel(unixSec: number, nowSec: number): string {
+  const delta = unixSec - nowSec;
+  return delta <= 0 ? "now" : `in ${duration(delta)}`;
+}
+
 /** "expires in 3h", "expired 2m ago", "no expiry". */
 export function expiryLabel(expiry: bigint, nowSec: number): string {
   if (expiry === 0n) return "no expiry";

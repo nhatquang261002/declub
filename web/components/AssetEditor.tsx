@@ -9,7 +9,7 @@ import { newRow, type DraftRow } from "@/lib/assetDraft";
 import type { TokenInfo } from "@/lib/assets";
 import { collectionLabel } from "@/lib/collections";
 import { useRememberCollection } from "@/hooks/useRecentCollections";
-import { shortAddress } from "@/lib/format";
+import { CopyAddress } from "@/components/CopyAddress";
 
 const KIND_LABEL = { native: "MON", erc20: "Token", erc721: "NFT" } as const;
 
@@ -191,7 +191,7 @@ function NftSummary({ row, onChoose }: { row: DraftRow; onChoose: () => void }) 
       <span className="min-w-0 flex-1 text-sm">
         <span className="block truncate font-semibold">{view?.name ?? `#${id}`}</span>
         <span className="block truncate text-xs text-muted">
-          {collectionLabel(info, "Collection")} · <span className="font-mono">{shortAddress(collection)}</span>
+          {collectionLabel(info, "Collection")} · <CopyAddress address={collection} />
         </span>
       </span>
       <button type="button" className="btn-secondary btn-sm shrink-0" onClick={onChoose}>

@@ -47,6 +47,8 @@ export interface WorldConfig extends Addresses {
   poolUrl?: string;
   /** Local only: move the chain's clock. Testnet waits instead. */
   canWarp: boolean;
+  /** DeClubRewards, when deployed; its operator is the relayer actor. */
+  rewards?: Address;
   stop?: () => void;
 }
 
@@ -91,8 +93,8 @@ export const INTENT_TYPES = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
-export const DOMAIN_NAME = "OnDealIntents";
-export const DOMAIN_VERSION = "3";
+export const DOMAIN_NAME = "DeClubIntents";
+export const DOMAIN_VERSION = "1";
 
 export type World = Awaited<ReturnType<typeof makeWorld>>;
 
@@ -326,7 +328,7 @@ export async function makeWorld(cfg: WorldConfig) {
   };
 }
 
-/** OnDealV2 `Status` values. */
+/** DeClubEscrow `Status` values. */
 export const Status = { None: 0, Open: 1, Filled: 2, Cancelled: 3 } as const;
-/** OnDealV2 `ProposalStatus` values. */
+/** DeClubEscrow `ProposalStatus` values. */
 export const ProposalStatus = { None: 0, Active: 1, Accepted: 2, Withdrawn: 3, Rejected: 4 } as const;

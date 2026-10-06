@@ -4,7 +4,7 @@ import type { Settlement } from "./createFlow";
  * The six things to know about how a deal settles, in one place. The create screen shows `tip` in
  * a tooltip on each chip; the Guide page shows `detail` under the same `id`, so a tooltip's
  * "Learn more" lands on its own explanation. Edit the words here and both stay in step.
- * The facts come from ADR 0008 (signed swaps) and OnDealV2 (locked deals).
+ * The facts come from ADR 0008 (signed swaps) and DeClubEscrow (locked deals).
  */
 export type SettlementTerm = {
   /** The Guide anchor: /guide#<id>. */

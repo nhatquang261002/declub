@@ -2,7 +2,7 @@ export type DealStatus = "open" | "filled" | "cancelled";
 /** What the UI shows. "expired" is derived from `expiry`, the contract still stores Open. */
 export type DisplayStatus = DealStatus | "expired";
 
-/** Mirrors OnDealV2.isExpired: expired strictly after `expiry`. */
+/** Mirrors DeClubEscrow.isExpired: expired strictly after `expiry`. */
 export function isExpired(deal: { expiry: bigint }, nowSec: number): boolean {
   return deal.expiry !== 0n && BigInt(nowSec) > deal.expiry;
 }

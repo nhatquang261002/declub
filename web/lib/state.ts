@@ -1,5 +1,5 @@
 import { isAddress } from "viem";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS } from "./config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS } from "./config";
 
 /**
  * Per-user saved state (ADR 0012): what the app used to keep only in one browser's localStorage,
@@ -25,7 +25,7 @@ export const isAddressString = (value: unknown): value is string => typeof value
 
 // Notification keys name deal ids, so read markers are kept per deal contract.
 const scope = (userId: string, account: string) =>
-  `${userId}:${CHAIN_ID}:${(ON_DEAL_V2_ADDRESS ?? "none").toLowerCase()}:${account.toLowerCase()}`;
-export const seenKey = (userId: string, account: string) => `ondeal:seen:${scope(userId, account)}`;
-export const seenInitKey = (userId: string, account: string) => `ondeal:seen-init:${scope(userId, account)}`;
-export const recentsKey = (userId: string) => `ondeal:recents:${userId}`;
+  `${userId}:${CHAIN_ID}:${(DECLUB_ESCROW_ADDRESS ?? "none").toLowerCase()}:${account.toLowerCase()}`;
+export const seenKey = (userId: string, account: string) => `declub:seen:${scope(userId, account)}`;
+export const seenInitKey = (userId: string, account: string) => `declub:seen-init:${scope(userId, account)}`;
+export const recentsKey = (userId: string) => `declub:recents:${userId}`;

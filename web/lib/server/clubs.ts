@@ -2,7 +2,7 @@ import type { Address } from "viem";
 import { completedSwaps, mergeEvents, settlementEvents, summarize, toClubInfo, type ActivityEvent, type ClubDetail, type ClubSummary } from "../clubs";
 import type { Settlement } from "../intents";
 import { listSettlements } from "../pool";
-import { ON_DEAL_INTENTS_ADDRESS } from "../config";
+import { DECLUB_INTENTS_ADDRESS } from "../config";
 import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { readActivity } from "./activity";
 import { holderCount, memberCount } from "./members";
@@ -28,7 +28,7 @@ const POOL_TTL_MS = 30_000;
 const pooled = new Map<string, { at: number; events: ActivityEvent[] }>();
 
 async function poolEvents(token: Address, deps: Deps): Promise<ActivityEvent[]> {
-  if (!ON_DEAL_INTENTS_ADDRESS && !deps.settlements) return [];
+  if (!DECLUB_INTENTS_ADDRESS && !deps.settlements) return [];
   const key = token.toLowerCase();
   const hit = pooled.get(key);
   if (!deps.settlements && hit && Date.now() - hit.at < POOL_TTL_MS) return hit.events;

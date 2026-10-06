@@ -1,5 +1,5 @@
 import type { Hash } from "viem";
-import { ON_DEAL_V2_ADDRESS } from "./config";
+import { DECLUB_ESCROW_ADDRESS } from "./config";
 
 /** The writes that emit `TradeFilled` (an accepted proposal fills the deal for its proposer). */
 const FILL_FUNCTIONS = new Set(["fillTrade", "fillTraitTrade", "acceptProposal"]);
@@ -8,17 +8,17 @@ const CREATE_FUNCTIONS = new Set(["createTrade", "createTraitTrade", "createOpen
 
 /** True for a contract call whose receipt can hold a fill that History should know about. */
 export function mayFill(call: { address: string; functionName: unknown }): boolean {
-  return call.address.toLowerCase() === ON_DEAL_V2_ADDRESS?.toLowerCase() && FILL_FUNCTIONS.has(String(call.functionName));
+  return call.address.toLowerCase() === DECLUB_ESCROW_ADDRESS?.toLowerCase() && FILL_FUNCTIONS.has(String(call.functionName));
 }
 
 /**
  * True for a contract call whose receipt the server should read: a fill (see `mayFill`), or a
- * OnDealV2 call that starts a deal and so feeds a Club's activity (ADR 0016).
+ * DeClubEscrow call that starts a deal and so feeds a Club's activity (ADR 0016).
  */
 export function mayReport(call: { address: string; functionName: unknown }): boolean {
   const target = call.address.toLowerCase();
   const name = String(call.functionName);
-  return target === ON_DEAL_V2_ADDRESS?.toLowerCase() && (FILL_FUNCTIONS.has(name) || CREATE_FUNCTIONS.has(name));
+  return target === DECLUB_ESCROW_ADDRESS?.toLowerCase() && (FILL_FUNCTIONS.has(name) || CREATE_FUNCTIONS.has(name));
 }
 
 const RETRY_AFTER_MS = [0, 1_000, 2_000, 4_000];

@@ -4,7 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call, type ViewerRole } from "@/hooks/useClubMembership";
+import { useSocialSign } from "@/hooks/useSocial";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
+import type { LensId } from "@/lib/lenses";
+import { draftPost, postTypedData, signingTime } from "@/lib/social";
 import type { LogEntry, Ban } from "@/lib/server/clubState";
 
 // The board, the Club's page text and the staff tools (docs/09-clubs.md). Reads are public; a
@@ -23,13 +26,17 @@ async function read<T>(path: string, getToken?: () => Promise<string | null>): P
   return body as T;
 }
 
-/** The Club's board. */
-export function useClubPosts(token: string) {
+/**
+ * The Club's board, through the reader's lens (ADR 0023). `as` is the reader's wallet, which the
+ * `following` lens needs.
+ */
+export function useClubPosts(token: string, lens: LensId = "newest", as?: string) {
   const getToken = useAccessToken();
   const key = token.toLowerCase();
+  const params = new URLSearchParams(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }).toString();
   const query = useQuery({
-    queryKey: ["club-posts", key, !!getToken],
-    queryFn: () => read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null }>(`/api/clubs/${token}/posts`, getToken),
+    queryKey: ["club-posts", key, !!getToken, lens, as?.toLowerCase()],
+    queryFn: () => read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null }>(`/api/clubs/${token}/posts${params ? `?${params}` : ""}`, getToken),
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
@@ -54,6 +61,7 @@ export function useClubActions(token: string) {
   const getToken = useAccessToken();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const sign = useSocialSign();
   const key = token.toLowerCase();
   const base = `/api/clubs/${token}`;
 
@@ -72,7 +80,13 @@ export function useClubActions(token: string) {
   const send = <T,>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
 
   return {
-    post: useAct((v: { kind: PostKind; text: string; link?: string }) => send("POST", "/posts", v), ["club-posts"]),
+    // A post is signed by the member's Club wallet before it's sent (ADR 0023).
+    post: useAct(async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
+      const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
+      if (!draft.ok) throw new Error(draft.reason === "bad_link" ? "Link a deal id or a signed-swap hash." : "Write something first, at most 280 characters.");
+      const { signature } = await sign(postTypedData(draft.message), v.wallet);
+      return send("POST", "/posts", { message: draft.message, signature });
+    }, ["club-posts"]),
     remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-log"]),
     report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts"], "Reported. Thank you."),
     hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-log"]),

@@ -28,7 +28,7 @@ const KIND_OPTIONS: Array<SelectOption<BookKind>> = [
 ];
 
 /**
- * The deal book: OnDealV2 deals (locked) and, when the intents contract is configured, signed swaps
+ * The deal book: DeClubEscrow deals (locked) and, when the intents contract is configured, signed swaps
  * from the pool, in one list. Any mix of ERC-721 and ERC-20 on each side, plus MON on locked deals.
  * The server searches, filters and pages the whole book (ADR 0020); this page only shows a page.
  */

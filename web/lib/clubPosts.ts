@@ -33,6 +33,11 @@ export type StoredPost = {
   hidden?: HiddenBy;
   /** Someone has reported it since it was posted or last restored (so staff are shown the count). */
   reported?: true;
+  /**
+   * The author's EIP-712 signature over the post (lib/social.ts), and the `at` they signed (unix
+   * seconds). Every post made through the route is signed; the id is then the message's struct hash.
+   */
+  signed?: { signature: `0x${string}`; at: number };
 };
 
 /** A post as one viewer sees it. */
@@ -49,6 +54,8 @@ export type PublicPost = {
   mine: boolean;
   /** Moderators only, on a reported post: how many members reported it. */
   reports?: number;
+  /** The author signed it with their wallet, so it can be checked anywhere (the Club's feed export). */
+  signed: boolean;
 };
 
 // Control characters, line breaks, zero-width and bidirectional overrides: none belongs in a short
@@ -94,6 +101,7 @@ export function viewPost(
     hidden: post.hidden ?? null,
     pinned,
     mine,
+    signed: !!post.signed,
     ...(viewer.staff && reports !== undefined ? { reports } : {}),
   };
 }

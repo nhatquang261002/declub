@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { Providers } from "@/components/Providers";
-import { explorerAddress, ON_DEAL_V2_ADDRESS } from "@/lib/config";
+import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -12,8 +12,8 @@ const brand = Bricolage_Grotesque({ variable: "--font-brand", subsets: ["latin"]
 
 // The favicon is app/icon.svg, picked up by Next automatically.
 export const metadata: Metadata = {
-  title: "On Deal",
-  description: "Trustless peer-to-peer deals and escrow for digital assets on Monad.",
+  title: "De(al) Club",
+  description: "Clubs for Monad's collections and memecoins, where Holders share in the fees their Club's market makes.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -25,15 +25,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <footer className="border-t border-line/70 px-4 py-5 text-center text-xs text-muted">
             Monad testnet ·{" "}
-            {ON_DEAL_V2_ADDRESS && (
+            {DECLUB_ESCROW_ADDRESS && (
               <>
                 <a
-                  href={explorerAddress(ON_DEAL_V2_ADDRESS)}
+                  href={explorerAddress(DECLUB_ESCROW_ADDRESS)}
                   target="_blank"
                   rel="noreferrer"
                   className="font-mono underline hover:text-white"
                 >
-                  On Deal contract
+                  DeClub escrow contract
                 </a>{" "}
                 ·{" "}
               </>

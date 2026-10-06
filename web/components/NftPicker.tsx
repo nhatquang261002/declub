@@ -7,7 +7,7 @@ import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedToken
 import { useMarketCollections } from "@/hooks/useMarketCollections";
 import { collectionLabel, featuredCollections, isFeatured, type CollectionInfo } from "@/lib/collections";
 import { useRecentCollections } from "@/hooks/useRecentCollections";
-import { shortAddress } from "@/lib/format";
+import { CopyAddress } from "@/components/CopyAddress";
 
 const PAGE = 12;
 const OWNED_STEP = 24;
@@ -178,7 +178,7 @@ function CollectionRow({ address, info, tag, onSelect }: { address: Address; inf
       >
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Unnamed collection")}</span>
-          <span className="block font-mono text-xs text-muted">{shortAddress(address)}</span>
+          <CopyAddress address={address} inLink className="block text-xs text-muted" />
         </span>
         <span className="flex items-center gap-2 text-xs text-muted">
           {info?.totalSupply != null && <span>{info.totalSupply.toString()} items</span>}
@@ -196,7 +196,7 @@ function PastedCollection({ address, onSelect }: { address: Address; onSelect: (
   if (!info.isErc721) {
     return (
       <Alert tone="danger" title="Not an NFT collection">
-        {shortAddress(address)} doesn&apos;t answer as an ERC-721 collection. Check the address and the network.
+        <CopyAddress address={address} /> doesn&apos;t answer as an ERC-721 collection. Check the address and the network.
       </Alert>
     );
   }
@@ -237,7 +237,7 @@ function TokenStep({
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border-[1.5px] border-[#111318]/15 bg-white/70 px-3 py-2">
         <span className="min-w-0">
           <span className="block truncate font-semibold">{collectionLabel(info, "Collection")}</span>
-          <span className="block font-mono text-xs text-muted">{shortAddress(collection)}</span>
+          <CopyAddress address={collection} className="block text-xs text-muted" />
         </span>
         <button type="button" className="btn-secondary btn-sm" onClick={onChangeCollection}>
           Change collection
@@ -328,7 +328,7 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
             key={id.toString()}
             id={id}
             view={views.get(id.toString())}
-            caption={views.get(id.toString())?.owner ? `held by ${shortAddress(views.get(id.toString())!.owner!)}` : undefined}
+            caption={views.get(id.toString())?.owner ? <>held by <CopyAddress address={views.get(id.toString())!.owner!} inLink /></> : undefined}
             taken={taken.has(tokenKey(collection, id))}
             selected={selected.includes(id)}
             full={selected.length >= room}
@@ -366,7 +366,7 @@ function Tile({
 }: {
   id: bigint;
   view?: { name: string | null; image: string | null };
-  caption?: string;
+  caption?: React.ReactNode;
   taken: boolean;
   selected: boolean;
   full: boolean;
@@ -468,7 +468,7 @@ function ManualId({
         {ok && (
           <span className="text-xs text-mint">
             {view?.name ?? `#${id}`}
-            {!owner && check.owner && ` · held by ${shortAddress(check.owner)}`}
+            {!owner && check.owner && <> · held by <CopyAddress address={check.owner} /></>}
           </span>
         )}
         {id !== null && problem && <span className={`text-xs ${problem === "Checking…" ? "text-muted" : "text-warn"}`}>{problem}</span>}

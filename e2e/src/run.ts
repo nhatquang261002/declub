@@ -17,6 +17,7 @@ import { finish, runCases } from "./lib/report.ts";
 import { type WorldConfig, makeWorld } from "./lib/world.ts";
 import { feeCases } from "./scenarios/fee.ts";
 import { intentCases } from "./scenarios/intents.ts";
+import { rewardCases } from "./scenarios/rewards.ts";
 import { v2Cases } from "./scenarios/v2.ts";
 
 /** The original testnet MockChog, which anyone can mint from. */
@@ -41,8 +42,8 @@ function testnetConfig(): WorldConfig {
     target: "testnet",
     chainId,
     rpcUrl: str("E2E_RPC_URL", str("NEXT_PUBLIC_RPC_URL", "https://testnet-rpc.monad.xyz")),
-    v2: needAddr("NEXT_PUBLIC_ON_DEAL_V2_ADDRESS"),
-    intents: needAddr("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS"),
+    v2: needAddr("NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
+    intents: needAddr("NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS"),
     usd: needAddr("E2E_ERC20_ADDRESS", "NEXT_PUBLIC_MOCK_ERC20_ADDRESS"),
     nft: addr("E2E_NFT_ADDRESS") ?? TESTNET_MOCK_CHOG,
     actors,
@@ -62,7 +63,7 @@ async function main() {
     const matcherReady = existsSync(resolve(REPO, "matcher/node_modules/viem"));
     const wantMatcher = arg("no-matcher") === undefined;
     if (wantMatcher && !matcherReady) console.log("matcher/node_modules missing (npm install in matcher/): IN-08 will skip");
-    console.log("starting anvil and deploying with DeployV2.s.sol and DeployIntents.s.sol…");
+    console.log("starting anvil and deploying with DeployEscrow.s.sol, DeployIntents.s.sol and DeployRewards.s.sol…");
     const local = await startLocal({ matcher: wantMatcher && matcherReady });
     for (const [k, v] of Object.entries(local.deployed)) console.log(`  ${k}=${v}`);
     cfg = local;
@@ -75,7 +76,7 @@ async function main() {
   const w = await makeWorld(cfg);
   try {
     Object.assign(meta, { chainId: String(w.chainId), v2: w.v2, intents: w.intents, nft: w.nft, erc20: w.usd, feeToken: w.feeToken, pool: w.poolUrl ?? "none" });
-    for (const [label, a] of [["OnDealV2", w.v2], ["OnDealIntents", w.intents], ["NFT", w.nft], ["ERC-20", w.usd]] as const) {
+    for (const [label, a] of [["DeClubEscrow", w.v2], ["DeClubIntents", w.intents], ["NFT", w.nft], ["ERC-20", w.usd]] as const) {
       const code = await w.pub.getCode({ address: a });
       if (!code || code === "0x") throw new Error(`${label} ${a} has no code on chain ${w.chainId}`);
     }
@@ -87,10 +88,10 @@ async function main() {
         console.log(`  ${who.name.padEnd(8)} ${who.address} ${w.fmt(await w.monOf(who.address))} MON`);
       }
     }
-    console.log(`fees: OnDealV2 ${w.fmt(await w.v2Fee())} MON, OnDealIntents ${w.fmt(await w.intentsFee())} WMON per side\n`);
+    console.log(`fees: DeClubEscrow ${w.fmt(await w.v2Fee())} MON, DeClubIntents ${w.fmt(await w.intentsFee())} WMON per side\n`);
 
     // Fee cases go last: FA-04 moves a local chain's clock a week ahead.
-    const results = await runCases([...v2Cases, ...intentCases, ...feeCases], w, only);
+    const results = await runCases([...v2Cases, ...intentCases, ...rewardCases, ...feeCases], w, only);
     process.exitCode = finish(`e2e-${target}`, results, meta);
   } finally {
     w.stop();

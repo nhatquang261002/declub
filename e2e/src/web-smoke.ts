@@ -99,7 +99,7 @@ const cases: Case<Ctx>[] = [
       const r = await get(c, "/api/deals");
       assert.equal(r.status, 200, `GET /api/deals: ${r.status} ${r.text.slice(0, 200)}`);
       assert.ok(r.json, "not JSON");
-      if (r.json.enabled === false) off(c, "the deal book (NEXT_PUBLIC_ON_DEAL_V2_ADDRESS)");
+      if (r.json.enabled === false) off(c, "the deal book (NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS)");
       assert.ok(Array.isArray(r.json.items), "no items array");
       note(`${(r.json.items as unknown[]).length} items, total ${String(r.json.total)}${r.json.signedError ? `, signed swaps: ${String(r.json.signedError)}` : ""}`);
       if (r.json.signedError) throw new Warning(`the book couldn't read signed swaps from the pool: ${String(r.json.signedError)}`);
@@ -205,7 +205,7 @@ async function main() {
     url: arg("url") ?? str("E2E_WEB_URL", "http://localhost:3000"),
     live: arg("expect-live") !== undefined,
     poolUrl: str("E2E_POOL_URL", str("NEXT_PUBLIC_POOL_URL")) || undefined,
-    intents: str("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS") || undefined,
+    intents: str("NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS") || undefined,
   };
   try {
     await fetch(ctx.url, { signal: AbortSignal.timeout(10_000) });

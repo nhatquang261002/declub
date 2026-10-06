@@ -69,7 +69,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
   // Monad's block gas limit is far above anvil's default; give the 4-ring room.
   const anvil = spawn("anvil", ["--port", String(port), "--silent", "--gas-limit", "150000000"], { stdio: "ignore" });
   const children: ChildProcess[] = [anvil];
-  const tmp = mkdtempSync(join(tmpdir(), "ondeal-e2e-"));
+  const tmp = mkdtempSync(join(tmpdir(), "declub-e2e-"));
   const stop = () => {
     for (const c of children) c.kill();
     rmSync(tmp, { recursive: true, force: true });
@@ -88,19 +88,27 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       FEE_RECIPIENT: feeRecipient,
       FEE_ADMIN: feeAdmin.address,
     };
-    const v2Out = forgeScript("DeployV2.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
+    const v2Out = forgeScript("DeployEscrow.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
     const intentsOut = forgeScript("DeployIntents.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_WMON: "true" });
+    // The relayer (account 5) runs reward epochs; a short delay and the shortest window, so the
+    // scenarios can warp past both.
+    const rewardsOut = forgeScript("DeployRewards.s.sol", rpcUrl, {
+      REWARDS_OPERATOR: account(5).address,
+      REWARDS_CLAIM_DELAY: "3600",
+      REWARDS_CLAIM_WINDOW: "86400",
+    });
 
-    // The Chog collection comes from the legacy Deploy.s.sol, which also deploys v1; deploy only the mock.
+    // A bare MockChog is enough here; DeployChog.s.sol also mints demo wallets, which the scenarios don't need.
     const deployer = createWalletClient({ account: account(0), chain: foundry, transport: http(rpcUrl) });
     const chog = MOCK_CHOG();
     const hash = await deployer.deployContract({ abi: chog.abi, bytecode: chog.bytecode, args: [] });
     const nft = getAddress((await pub.waitForTransactionReceipt({ hash })).contractAddress!);
 
-    const v2 = v2Out.NEXT_PUBLIC_ON_DEAL_V2_ADDRESS;
+    const v2 = v2Out.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS;
     const usd = v2Out.NEXT_PUBLIC_MOCK_ERC20_ADDRESS;
-    const intents = intentsOut.NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS;
-    if (!v2 || !usd || !intents) throw new Error("a deploy script didn't print the expected addresses");
+    const intents = intentsOut.NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS;
+    const rewards = rewardsOut.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS;
+    if (!v2 || !usd || !intents || !rewards) throw new Error("a deploy script didn't print the expected addresses");
 
     let poolUrl: string | undefined;
     if (opts.matcher) {
@@ -111,7 +119,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
           MATCHER_ENV_FILE: join(tmp, "none.env"),
           NEXT_PUBLIC_CHAIN_ID: "31337",
           MATCHER_RPC_URL: rpcUrl,
-          NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS: intents,
+          NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS: intents,
           MATCHER_PRIVATE_KEY: keyOf(9),
           MATCHER_PORT: String(mport),
           MATCHER_DB_PATH: join(tmp, "pool.sqlite"),
@@ -132,13 +140,13 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       target: "local",
       chainId: 31337,
       rpcUrl,
-      v2, intents, nft, usd,
+      v2, intents, nft, usd, rewards,
       actors: [1, 2, 3, 4, 5].map(account),
       feeAdmin,
       poolUrl,
       canWarp: true,
       stop,
-      deployed: { ...v2Out, ...intentsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
+      deployed: { ...v2Out, ...intentsOut, ...rewardsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
     };
   } catch (e) {
     stop();

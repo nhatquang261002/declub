@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
-import { BanIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon } from "@/components/Icons";
+import { FollowButton } from "@/components/FollowButton";
+import { BadgeCheckIcon, BanIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon } from "@/components/Icons";
+import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import type { PostLink, PublicPost } from "@/lib/clubPosts";
 import { isOwnerOrAdmin, isStaff } from "@/lib/clubRoles";
 import { ago, shortAddress } from "@/lib/format";
 import type { ViewerRole } from "@/hooks/useClubMembership";
+import type { useFollows } from "@/hooks/useSocial";
 
 /** Where a linked deal or signed swap lives in the app. */
 const linkHref = (link: PostLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
@@ -35,8 +38,11 @@ export function PostItem({
   role,
   actions,
   now,
+  follows,
 }: {
   post: PublicPost;
+  /** The reader's follows, for the Follow button beside the author. */
+  follows?: ReturnType<typeof useFollows>;
   /** The viewer's role, or undefined when they aren't a member. */
   role: ViewerRole | undefined;
   actions: PostActions;
@@ -79,7 +85,16 @@ export function PostItem({
         <div className="flex items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <Who address={post.wallet} mine={post.mine} />
+            {follows && <FollowButton target={post.wallet} follows={follows} />}
             <span className="text-xs text-muted">· {ago(Math.floor(post.at / 1000), now)}</span>
+            {post.signed && (
+              <Tooltip content="Signed by this wallet: the post is the author’s own record, and anyone can check it in the Club’s feed export.">
+                <span className="chip">
+                  <BadgeCheckIcon />
+                  Signed
+                </span>
+              </Tooltip>
+            )}
             {post.pinned && (
               <span className="chip">
                 <PinIcon />

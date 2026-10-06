@@ -24,7 +24,9 @@ let current = "m1";
 const gate = async (): Promise<UserGate> =>
   ({ store, user: { id: current, linked_accounts: [account(users[current] ?? 50)] } }) as unknown as UserGate;
 const viewer = async (request: Request) => (request.headers.get("authorization") === "Bearer none" ? null : { id: current });
-const deps = { gate, viewer, admins: new Set(["adm"]), ownerOf: async () => wallet(1), now: () => 1_000_000 };
+// The test wallets have no keys, so signatures are taken as valid here; test/social.test.ts checks
+// real ones.
+const deps = { gate, viewer, admins: new Set(["adm"]), ownerOf: async () => wallet(1), now: () => 1_000_000, verifyPost: async () => true };
 const as = (id: string) => void (current = id);
 
 const ctx = (token = NFT) => ({ params: Promise.resolve({ token }) });
@@ -33,9 +35,14 @@ const req = (method: string, body?: unknown, headers: Record<string, string> = {
   new Request("http://x/api", { method, headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.5", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
 
 const posts = postsHandlers(reg, deps);
-const post = async (text: string, extra: Record<string, unknown> = {}) => {
-  await store.del(`ondeal:rl:club-post-cd:${NFT.toLowerCase()}:${current}`, `ondeal:rl:club-post-hr:${NFT.toLowerCase()}:${current}`);
-  return posts.POST(req("POST", { kind: "note", text, ...extra }), ctx());
+/** A post as the client sends it: the message to sign, at the test clock's time, and a signature. */
+const signed = (text: string, extra: { kind?: "note" | "looking"; link?: string } = {}) => ({
+  message: { club: NFT, kind: extra.kind ?? "note", text, link: extra.link ?? "", at: 1_000 },
+  signature: `0x${"11".repeat(65)}`,
+});
+const post = async (text: string, extra: { kind?: "note" | "looking"; link?: string } = {}) => {
+  await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:${current}`, `declub:rl:club-post-hr:${NFT.toLowerCase()}:${current}`);
+  return posts.POST(req("POST", signed(text, extra)), ctx());
 };
 
 describe("setup", () => {
@@ -93,15 +100,24 @@ describe("claim, roles and the Owner", () => {
 describe("posting and reading", () => {
   it("creates a post (201) and answers refusals with the right status", async () => {
     as("m1");
-    const ok = await post("  hello   club ");
+    const ok = await post("hello club");
     assert.equal(ok.status, 201);
-    assert.equal((await ok.json()).post.text, "hello club");
+    const created = (await ok.json()).post;
+    assert.equal(created.text, "hello club");
+    assert.equal(created.signed, true);
+    assert.match(created.id, /^[0-9a-f]{64}$/, "a signed post's id is its struct hash");
     assert.equal((await post("")).status, 400);
     assert.equal((await post("x".repeat(281))).status, 400);
     assert.equal((await post("x", { link: "5" })).status, 400);
+    // What was signed must be what is stored: untrimmed text is refused, not cleaned.
+    assert.equal((await (await post("  hello   club ")).json()).error, "not_clean");
+    // An unsigned post (the old form) is refused.
+    assert.equal((await (await posts.POST(req("POST", { kind: "note", text: "plain" }), ctx())).json()).error, "unsigned");
+    // A signature from long ago is refused.
+    assert.equal((await (await posts.POST(req("POST", { ...signed("old"), message: { ...signed("old").message, at: 1 } }), ctx())).json()).error, "stale");
     // Refused posts used up no cooldown, so one more goes through; the one right after waits.
-    assert.equal((await posts.POST(req("POST", { kind: "note", text: "again" }), ctx())).status, 201);
-    assert.equal((await posts.POST(req("POST", { kind: "note", text: "too soon" }), ctx())).status, 429, "the cooldown");
+    assert.equal((await posts.POST(req("POST", signed("again")), ctx())).status, 201);
+    assert.equal((await posts.POST(req("POST", signed("too soon")), ctx())).status, 429, "the cooldown");
     as("stranger");
     assert.equal((await post("hi")).status, 403);
   });
@@ -131,7 +147,7 @@ describe("reports, hiding, pinning, deleting", () => {
   let id = "";
   it("hides after three reports", async () => {
     as("m1");
-    await store.del(`ondeal:rl:club-post-cd:${NFT.toLowerCase()}:m1`);
+    await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:m1`);
     id = (await (await post("report me")).json()).post.id;
     const report = reportHandler(reg, deps);
     as("m1");

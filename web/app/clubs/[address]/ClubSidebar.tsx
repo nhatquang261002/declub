@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { getAddress } from "viem";
 import { CheckIcon, CopyIcon, ExternalIcon } from "@/components/Icons";
 import { formatMomentum, HeatBars, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
@@ -12,6 +11,7 @@ import { HEAT, heat, infoAssets, type ClubInfo, type ClubStats } from "@/lib/clu
 import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { Panel } from "./parts";
+import { useCopy } from "@/components/CopyAddress";
 
 /** Where this Club sits on the heat scale, every step shown so the word has something to compare to. */
 function HeatPanel({ stats }: { stats?: ClubStats }) {
@@ -84,19 +84,14 @@ function TopTraders({ token, onSeeAll }: { token: string; onSeeAll: () => void }
 
 /** Copies text, and says so for a moment. */
 function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
+  const [copied, copy] = useCopy();
   return (
     <button
       type="button"
       className="icon-btn size-7"
       aria-label={copied ? "Copied" : label}
       title={copied ? "Copied" : label}
-      onClick={() => navigator.clipboard?.writeText(text).then(() => setCopied(true), () => {})}
+      onClick={() => copy(text)}
     >
       {copied ? <CheckIcon className="size-4 text-[#1f7a55]" /> : <CopyIcon className="size-4" />}
     </button>

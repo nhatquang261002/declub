@@ -1,6 +1,6 @@
 import { createPublicClient, decodeEventLog, getAddress, http, parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import type { ReceiptLike } from "./activity";
 import type { Store } from "./store";
 
@@ -16,14 +16,14 @@ import type { Store } from "./store";
  */
 const abi = parseAbi(["event TradeFilled(uint256 indexed tradeId, address indexed maker, address indexed taker)"]);
 
-/** The swap contracts whose fills are kept: OnDealV2, when configured (see lib/config.ts). */
-export const FILL_CONTRACTS: Address[] = ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [];
+/** The swap contracts whose fills are kept: DeClubEscrow, when configured (see lib/config.ts). */
+export const FILL_CONTRACTS: Address[] = DECLUB_ESCROW_ADDRESS ? [DECLUB_ESCROW_ADDRESS] : [];
 
 /** A wallet can't have filled more than this many deals; the oldest records age out past it. */
 const MAX_FILLS_PER_ACCOUNT = 2_000;
 
 export const fillsKey = (contract: string, account: string) =>
-  `ondeal:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
+  `declub:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
 
 export const isFillContract = (address: string) => FILL_CONTRACTS.some((c) => c.toLowerCase() === address.toLowerCase());
 

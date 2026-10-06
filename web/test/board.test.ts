@@ -37,7 +37,7 @@ async function member(store: Store, userId: string, n: number, opts: { profile?:
   return { userId, wallet: w } satisfies Actor;
 }
 /** The cooldown and hourly limits use the real clock; tests that post more than once clear them. */
-const reset = (store: Store, userId: string) => store.del(`ondeal:rl:club-post-cd:${token}:${userId}`, `ondeal:rl:club-post-hr:${token}:${userId}`);
+const reset = (store: Store, userId: string) => store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
 const say = async (store: Store, userId: string, text = "hello", kind = "note", deps: Deps = {}) => {
   await reset(store, userId);
   return createPost(store, club, userId, { kind, text }, deps);
@@ -80,7 +80,7 @@ describe("createPost", () => {
     const { store, deps, mod } = await club1();
     await banUser(store, club, mod, { wallet: wallet(3) }, false, deps);
     // Put the row back, as a race between a ban and a join would.
-    await store.set(`ondeal:club-member:10143:${token}:m1`, { userId: "m1", wallets: [wallet(3)], displayWallet: wallet(3), holder: false, holderCheckedAt: 1, joinedAt: 1 });
+    await store.set(`declub:club-member:10143:${token}:m1`, { userId: "m1", wallets: [wallet(3)], displayWallet: wallet(3), holder: false, holderCheckedAt: 1, joinedAt: 1 });
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "hi" }), { ok: false, reason: "banned" });
   });
 
@@ -128,11 +128,11 @@ describe("createPost", () => {
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "2" }), { ok: false, reason: "cooldown" });
     // Take the cooldown away each time: only the hourly cap is left.
     for (let i = 1; i < POSTS_PER_HOUR; i++) {
-      await store.del(`ondeal:rl:club-post-cd:${token}:m1`);
+      await store.del(`declub:rl:club-post-cd:${token}:m1`);
       const r = await createPost(store, club, "m1", { kind: "note", text: `n${i}` });
       assert.ok(r.ok, `post ${i + 1}: ${JSON.stringify(r)}`);
     }
-    await store.del(`ondeal:rl:club-post-cd:${token}:m1`);
+    await store.del(`declub:rl:club-post-cd:${token}:m1`);
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "one too many" }), { ok: false, reason: "rate_limited" });
     assert.ok((await say(store, "m2")).ok, "another member is unaffected");
   });
@@ -436,7 +436,7 @@ describe("bans", () => {
     assert.ok((await unbanUser(store, club, mod, wallet(3), false, deps)).ok, "a Moderator lifts a Moderator's ban");
 
     // A ban stored before the role was recorded.
-    await store.set(`ondeal:club-ban:10143:${token}`, { m2: { wallet: wallet(4), at: 1, by: wallet(2) } });
+    await store.set(`declub:club-ban:10143:${token}`, { m2: { wallet: wallet(4), at: 1, by: wallet(2) } });
     assert.deepEqual(await unbanUser(store, club, mod, wallet(4), false, deps), { ok: false, reason: "forbidden" });
     assert.ok((await unbanUser(store, club, own, wallet(4), false, deps)).ok);
   });

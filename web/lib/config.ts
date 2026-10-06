@@ -6,9 +6,12 @@ const env = {
   chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
   chog: process.env.NEXT_PUBLIC_CHOG_ADDRESS,
-  swapV2: process.env.NEXT_PUBLIC_ON_DEAL_V2_ADDRESS,
+  swapV2: process.env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS,
   mockErc20: process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS,
-  intents: process.env.NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS,
+  intents: process.env.NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS,
+  rewards: process.env.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS,
+  rewardsEpochSeconds: process.env.NEXT_PUBLIC_REWARDS_EPOCH_SECONDS,
+  rewardsGenesis: process.env.NEXT_PUBLIC_REWARDS_GENESIS,
   poolUrl: process.env.NEXT_PUBLIC_POOL_URL,
   chogMintable: process.env.NEXT_PUBLIC_CHOG_MINTABLE,
   knownCollections: process.env.NEXT_PUBLIC_KNOWN_COLLECTIONS,
@@ -21,16 +24,21 @@ function address(value: string | undefined, fallback: Address): Address {
 }
 
 export const CHAIN_ID = Number(env.chainId || 10143);
+// On mainnet nothing may fall back to a testnet default (the RPC, the testnet MockChog).
+if (CHAIN_ID === 143 && (!env.rpcUrl?.trim() || !env.chog?.trim())) {
+  throw new Error("Mainnet (NEXT_PUBLIC_CHAIN_ID=143) needs NEXT_PUBLIC_RPC_URL and NEXT_PUBLIC_CHOG_ADDRESS set");
+}
 export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
-export const EXPLORER_URL = "https://testnet.monadvision.com";
+export const EXPLORER_URL =
+  CHAIN_ID === 143 ? "https://monadvision.com" : "https://testnet.monadvision.com";
 
 export const CHOG_ADDRESS = address(env.chog, "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
 
 /**
- * OnDealV2, the deal contract (ADR 0005): any ERC-721, ERC-20 and MON. The app has no deals
- * without it, so the deal screens stay off until NEXT_PUBLIC_ON_DEAL_V2_ADDRESS is set (or mocked).
+ * DeClubEscrow, the deal contract (ADR 0005): any ERC-721, ERC-20 and MON. The app has no deals
+ * without it, so the deal screens stay off until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set (or mocked).
  */
-export const ON_DEAL_V2_ADDRESS: Address | undefined = env.swapV2?.trim()
+export const DECLUB_ESCROW_ADDRESS: Address | undefined = env.swapV2?.trim()
   ? getAddress(env.swapV2.trim())
   : undefined;
 /** Test ERC-20 with an open mint, for demoing V2 on testnet. */
@@ -39,12 +47,24 @@ export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
   : undefined;
 
 /**
- * OnDealIntents (ADR 0008): signed swap intents settled by an off-chain matcher. Optional:
- * the intent screens stay off until NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is set.
+ * DeClubIntents (ADR 0008): signed swap intents settled by an off-chain matcher. Optional:
+ * the intent screens stay off until NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS is set.
  */
-export const ON_DEAL_INTENTS_ADDRESS: Address | undefined = env.intents?.trim()
+export const DECLUB_INTENTS_ADDRESS: Address | undefined = env.intents?.trim()
   ? getAddress(env.intents.trim())
   : undefined;
+/**
+ * DeClubRewards (ADR 0022): each epoch's Club payouts, claimed against a Merkle root. Optional:
+ * the Rewards screens show the pools but no claim button until NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS
+ * is set.
+ */
+export const DECLUB_REWARDS_ADDRESS: Address | undefined = env.rewards?.trim()
+  ? getAddress(env.rewards.trim())
+  : undefined;
+/** Length of a rewards epoch in seconds: a week, or shorter for a demo. */
+export const REWARDS_EPOCH_SECONDS = Math.max(60, Number(env.rewardsEpochSeconds || 7 * 86_400));
+/** Unix seconds when epoch 0 starts: Monday 2026-10-05 00:00 UTC unless set. */
+export const REWARDS_GENESIS = Number(env.rewardsGenesis || 1_791_158_400);
 /** The intent pool's HTTP API (matcher/). The matcher binds to loopback by default. */
 export const POOL_URL = (env.poolUrl?.trim() || "http://127.0.0.1:8787").replace(/\/+$/, "");
 /** The pool refuses intents that end sooner or later than this (matcher/src/pool.ts). */
@@ -64,14 +84,9 @@ export const KNOWN_COLLECTIONS: Address[] = (env.knownCollections ?? "")
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";
-/** Mock deals stand in for the live ones (lib/demoDeals.ts). On outside production unless `=false`. */
-export const DEMO_DEALS =
-  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_DEALS !== "false";
-/** Whether multi-asset deals and signed swaps are shown: configured, or mocked. Writes still need the contract. */
-export const SHOW_V2 = !!ON_DEAL_V2_ADDRESS || DEMO_DEALS;
-export const SHOW_INTENTS = !!ON_DEAL_INTENTS_ADDRESS || DEMO_DEALS;
-export const DEMO_CREATE =
-  process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_CREATE === "true";
+/** Whether multi-asset deals and signed swaps are shown: only when their contracts are configured. */
+export const SHOW_V2 = !!DECLUB_ESCROW_ADDRESS;
+export const SHOW_INTENTS = !!DECLUB_INTENTS_ADDRESS;
 
 /**
  * Privy app id (ADR 0010). Optional: blank keeps the plain injected-wallet connect, so the app
@@ -87,9 +102,9 @@ export const PRIVY_APP_ID = env.privyAppId?.trim() || undefined;
 export const PRIVY_EMBEDDED_WALLETS = env.privyEmbedded === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
-/** OnDealV2.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
+/** DeClubEscrow.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
 export const MAX_NOTE_BYTES = 280;
-/** OnDealV2.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */
+/** DeClubEscrow.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */
 export const MAX_SPEC_BYTES = 1024;
 
 export const explorerTx = (hash: string) => `${EXPLORER_URL}/tx/${hash}`;

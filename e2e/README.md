@@ -4,7 +4,7 @@ Three tools. The unit, fuzz and invariant suites in `contracts/`, `matcher/` and
 
 | Command | What | Sends transactions |
 |---|---|---|
-| `npm run local` | Every chain scenario on a fresh anvil, deployed by the real `DeployV2.s.sol` and `DeployIntents.s.sol` with a fee and a fee admin, with the matcher process running | Local only |
+| `npm run local` | Every chain scenario on a fresh anvil, deployed by the real `DeployEscrow.s.sol` and `DeployIntents.s.sol` with a fee and a fee admin, with the matcher process running | Local only |
 | `npm run testnet` | The same scenarios against the addresses in the root `.env` | Yes, testnet only (refuses any other chain) |
 | `npm run verify` | Read-only checks of a deployment (DEP) | **No.** Safe on mainnet |
 | `npm run web -- --url <app>` | HTTP smoke tests of a running app (WEB) | No |
@@ -44,6 +44,9 @@ Needs Node 24+, and `anvil` for the local run.
 | IN-06 | Refused: expired, `maxFee` below the fee, wrong fee token, bad signature, want not met, same maker twice, cycle of one |
 | IN-07 | ERC-1271 contract wallet as a maker (and its refusal) |
 | IN-08 | Matcher over HTTP: post a pair, it settles, `/settlements`; cancel by signature, signature withheld after |
+| RW-01 | A real swap's fee goes through the app's activity log and epoch builder: 40% to Holders by holdings, 20% to the Owner (local only) |
+| RW-02 | The relayer publishes the epoch on `DeClubRewards`; claims wait for the delay, pay each leaf once, and anyone can send them (local only) |
+| RW-03 | A wrong root is revoked before claims open; an underfunded one can't overpay; the rest is swept after the window (local only) |
 | FA-01 | Only the admin sets the fee, never above the ceiling; both contracts charge the same |
 | FA-02 | A raise is queued for 7 days, can't apply early, `setFee(fee())` cancels it (needs the admin key) |
 | FA-03 | A cut applies at once; an open deal keeps its listed fee (local only) |
@@ -52,7 +55,7 @@ Needs Node 24+, and `anvil` for the local run.
 
 Assertions use events and the parties that didn't send the transaction, since Monad charges the gas limit and a sender's MON balance says little. On a local chain the contract's own balance is checked too.
 
-The fee cases run last: FA-04 moves a local chain's clock a week ahead.
+The fee cases run last: FA-04 moves a local chain's clock a week ahead. The local run also deploys `DeClubRewards` with `DeployRewards.s.sol` (the relayer is its operator, a one-hour claim delay and a one-day window); the RW cases load the web app's own server code (`web/lib/server/rewards.ts` and friends) through `web/test/register.mjs`.
 
 ### Local
 
@@ -72,7 +75,7 @@ Run it on a fresh redeploy of the current source (the deployed contracts in the 
 |---|---|
 | `E2E_MNEMONIC` or `E2E_PRIVATE_KEYS` | **Testnet-only** wallets: accounts 0 to 4 of the mnemonic, or 5 comma-separated keys. Account 0 needs MON and tops the others up |
 | `E2E_MIN_MON` | Top-up target per wallet, default 1 |
-| `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` | The deployment under test |
+| `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS`, `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` | The deployment under test |
 | `NEXT_PUBLIC_MOCK_ERC20_ADDRESS` (or `E2E_ERC20_ADDRESS`) | An ERC-20 with an open `mint` (mUSD) |
 | `E2E_NFT_ADDRESS` | An ERC-721 with an open `mint(to, quantity)`; default the testnet MockChog `0x220a…26e4` |
 | `NEXT_PUBLIC_POOL_URL` (or `E2E_POOL_URL`) | A running matcher for IN-08; without it IN-08 skips |
@@ -95,11 +98,11 @@ npm run verify -- --mainnet        # mainnet rules: warnings become failures, ev
 | DEP-02 | Runtime code equals this checkout's build, with immutables masked |
 | DEP-03 | Fee within the ceiling and as expected; recipient ≠ admin; admin and recipient are contracts (Safes); nothing pending; 7-day raise delay |
 | DEP-04 | The fee token is 18 decimals, wraps MON and refuses an unbacked unwrap (simulated, nothing sent); equals `EXPECT_FEE_TOKEN` |
-| DEP-05 | The intents EIP-712 domain is `("OnDealIntents", "3")`, as the app and matcher sign |
+| DEP-05 | The intents EIP-712 domain is `("DeClubIntents", "1")`, as the app and matcher sign |
 | DEP-06 | Both contracts have the same fee, ceiling, recipient and admin |
 | DEP-07 | The matcher's `/info` agrees with the chain; its gas wallet holds at least `E2E_MATCHER_MIN_MON` (default 1) |
 | DEP-08 | Assets per side 10, max cycle 4 |
-| DEP-09 | App env: no demo flags, `NEXT_PUBLIC_CHOG_ADDRESS` set and deployed, `FILL_WATCHER_START_BLOCK` set |
+| DEP-09 | App env: `NEXT_PUBLIC_CHOG_ADDRESS` set and deployed, `FILL_WATCHER_START_BLOCK` set |
 
 Expectations, all optional except under `--mainnet`: `EXPECT_FEE_WEI`, `EXPECT_MAX_FEE_WEI`, `EXPECT_FEE_RECIPIENT`, `EXPECT_FEE_ADMIN`, `EXPECT_FEE_TOKEN`. Override the addresses with `VERIFY_V2_ADDRESS`, `VERIFY_INTENTS_ADDRESS` and `VERIFY_RPC_URL`.
 

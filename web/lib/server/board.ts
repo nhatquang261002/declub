@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { createPublicClient, http, parseAbi, type Address, type PublicClient } from "viem";
+import { createPublicClient, getAddress, http, parseAbi, verifyTypedData, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import {
   MAX_PINNED,
   POSTS_KEPT,
@@ -24,8 +24,14 @@ import {
 import { applyRole, atLeast, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type ClubRole, type RoleChange } from "../clubRoles";
 import { toAsset } from "../assets";
 import { getIntent } from "../pool";
+import { lensOf, type LensContext, type LensId } from "../lenses";
+import { memberScore, score } from "../momentum";
+import { toScored } from "../clubs";
+import { SIGNED_SKEW_SEC, linkString, postId, postTypedData, type PostMessage, type SignedPost } from "../social";
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
 import { activityKey, viemReader } from "./activity";
+import { clubEvents } from "./clubs";
+import { followingOf } from "./follows";
 import {
   ALL,
   adminIds,
@@ -62,6 +68,11 @@ export type Deps = {
   ownerOf?: (token: Address) => Promise<string | null>;
   /** The tokens a deal or intent names, `null` when it doesn't exist. Throws when the lookup fails. */
   resolveLink?: (link: PostLink) => Promise<string[] | null>;
+  /**
+   * Whether `signature` is `signer`'s over the post. viem's check in production, which also asks a
+   * smart wallet (ERC-1271); tests use a local signer.
+   */
+  verifyPost?: (signer: Address, message: PostMessage, signature: Hex) => Promise<boolean>;
 };
 
 /** Who is acting: their Privy user id and a wallet to name them by in the log. */
@@ -70,11 +81,13 @@ export type Actor = { userId: string; wallet: string };
 const nowOf = (deps: Deps) => deps.now?.() ?? Date.now();
 const isAdmin = (deps: Deps, userId: string) => (deps.admins ?? adminIds()).has(userId);
 
-export const postsKey = (token: string) => `ondeal:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
-export const postKey = (token: string, id: string) => `ondeal:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
-export const reportsKey = (token: string, id: string) => `ondeal:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const postsKey = (token: string) => `declub:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
+export const postKey = (token: string, id: string) => `declub:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const reportsKey = (token: string, id: string) => `declub:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+/** Every signed post a wallet wrote, across Clubs, as `club:id`, newest first. */
+export const walletPostsKey = (wallet: string) => `declub:wallet-posts:${CHAIN_ID}:${wallet.toLowerCase()}`;
 /** The reports that count toward hiding a post: those filed by Holders and staff. */
-export const countedReportsKey = (token: string, id: string) => `ondeal:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
 /** The user's role in the Club, an app admin's outranking everything. */
 export async function roleIn(store: Store, token: string, userId: string, deps: Deps = {}): Promise<ClubRole> {
@@ -96,9 +109,9 @@ export async function resolveLink(link: PostLink): Promise<string[] | null> {
     const found = await getIntent(link.hash as `0x${string}`);
     return found ? tokensOf([...found.intent.give, ...found.intent.want]) : null;
   }
-  if (!ON_DEAL_V2_ADDRESS) return null;
+  if (!DECLUB_ESCROW_ADDRESS) return null;
   try {
-    const trade = await viemReader().trade(ON_DEAL_V2_ADDRESS, BigInt(link.id));
+    const trade = await viemReader().trade(DECLUB_ESCROW_ADDRESS, BigInt(link.id));
     const assets = [...trade.offered, ...trade.requested];
     if (assets.length === 0) return null;
     return tokensOf(assets.map(toAsset).filter((a) => a !== null));
@@ -115,7 +128,13 @@ export type PostRefusal =
   | "archived" | "not_member" | "banned" | "no_profile" | "holders_only" | "bad_kind" | "empty" | "too_long"
   | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "cooldown" | "rate_limited";
 
-export type PostInput = { kind: unknown; text: unknown; link?: unknown };
+export type PostInput = {
+  kind: unknown;
+  text: unknown;
+  link?: unknown;
+  /** A post `createSignedPost` checked: it takes the message's id and keeps the signature. */
+  signed?: { message: PostMessage; signature: Hex };
+};
 
 export async function createPost(
   store: Store,
@@ -162,21 +181,122 @@ export async function createPost(
   if (!(await withinLimit(store, `club-post-hr:${token}`, userId, POSTS_PER_HOUR, 3600))) return { ok: false, reason: "rate_limited" };
 
   const post: StoredPost = {
-    id: randomUUID().replaceAll("-", ""),
+    id: input.signed ? postId(input.signed.message) : randomUUID().replaceAll("-", ""),
     userId,
     wallet: row.displayWallet,
     kind,
     text: text.text,
     ...(link ? { link } : {}),
     at: nowOf(deps),
+    ...(input.signed ? { signed: { signature: input.signed.signature, at: input.signed.message.at } } : {}),
   };
   await store.set(postKey(token, post.id), post);
   await store.rank(postsKey(token), [{ member: post.id, score: post.at }], POSTS_KEPT);
+  if (post.signed) {
+    await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
+  }
   return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false) };
 }
 
+export type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
+
+let verifier: PublicClient | undefined;
+/** viem's check: an EOA's signature, or a smart wallet's through ERC-1271. */
+async function viemVerifyPost(signer: Address, message: PostMessage, signature: Hex): Promise<boolean> {
+  // A plain wallet's signature is checked here; only a smart wallet costs a call (ERC-1271).
+  if (await verifyTypedData({ address: signer, signature, ...postTypedData(message) }).catch(() => false)) return true;
+  verifier ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
+  try {
+    if (!(await verifier.getCode({ address: signer }))) return false;
+    return await verifier.verifyTypedData({ address: signer, signature, ...postTypedData(message) });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A post the author signed (ADR 0023). The message must be exactly what `createPost` would store,
+ * for this Club, signed within a few minutes, by the member's Club wallet; then every Board rule
+ * applies as for any post. Sending the same signed post twice gives back the first.
+ */
+export async function createSignedPost(
+  store: Store,
+  entry: ClubEntry,
+  userId: string,
+  body: { message: PostMessage | null; signature: unknown },
+  deps: Deps = {},
+): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: SignedPostRefusal }> {
+  const { message, signature } = body;
+  if (!message || typeof signature !== "string" || !/^0x[0-9a-fA-F]+$/.test(signature)) return { ok: false, reason: "unsigned" };
+  const token = entry.address.toLowerCase();
+  if (message.club.toLowerCase() !== token) return { ok: false, reason: "wrong_club" };
+  // What was signed must be what is stored: the cleaned text, and the link in canonical form.
+  const text = cleanText(message.text);
+  if (!text.ok) return { ok: false, reason: text.reason };
+  if (text.text !== message.text) return { ok: false, reason: "not_clean" };
+  if (message.link !== "") {
+    const parsed = message.kind === "looking" ? parseLink(message.link) : null;
+    if (!parsed) return { ok: false, reason: "bad_link" };
+    if (linkString(parsed) !== message.link) return { ok: false, reason: "not_clean" };
+  }
+  if (Math.abs(message.at - Math.floor(nowOf(deps) / 1000)) > SIGNED_SKEW_SEC) return { ok: false, reason: "stale" };
+
+  const row = await getMember(store, token, userId);
+  if (!row) return { ok: false, reason: "not_member" };
+  // Signed by the wallet the post is shown under, so the record says who wrote it and nothing more.
+  const signer = getAddress(row.displayWallet);
+  if (!(await (deps.verifyPost ?? viemVerifyPost)(signer, message, signature as Hex))) return { ok: false, reason: "bad_signature" };
+
+  const existing = await getPost(store, token, postId(message));
+  if (existing) {
+    if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" };
+    return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) };
+  }
+  return createPost(store, entry, userId, { kind: message.kind, text: message.text, link: message.link || undefined, signed: { message, signature: signature as Hex } }, deps);
+}
+
+/**
+ * A stored signed post as the export serves it: the exact message and signature. Posts hidden by
+ * moderation are left out, so the export can't carry what reports or a moderator took down;
+ * restoring a post brings it back.
+ */
+function toSigned(token: string, post: StoredPost): SignedPost | null {
+  if (!post.signed || post.hidden) return null;
+  return {
+    id: post.id,
+    signer: getAddress(post.wallet),
+    message: { club: getAddress(token), kind: post.kind, text: post.text, link: linkString(post.link), at: post.signed.at },
+    signature: post.signed.signature,
+  };
+}
+
+/** A Club's signed posts, newest first, for the public export. Hidden posts are left out. */
+export async function exportPosts(store: Store, entry: AssetEntry, limit = POSTS_KEPT): Promise<SignedPost[]> {
+  const token = entry.address.toLowerCase();
+  const ids = await store.ranked(postsKey(token), limit);
+  const rows = await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)));
+  return rows.flatMap((row) => {
+    const signed = row ? toSigned(token, row) : null;
+    return signed ? [signed] : [];
+  });
+}
+
+/** Every signed post `wallet` wrote, across Clubs, newest first. */
+export async function walletPosts(store: Store, wallet: string, limit = POSTS_KEPT): Promise<SignedPost[]> {
+  const refs = await store.ranked(walletPostsKey(wallet), limit);
+  const rows = await store.getMany<StoredPost>(refs.map((ref) => {
+    const [token, id] = ref.split(":");
+    return postKey(token!, id!);
+  }));
+  return rows.flatMap((row, i) => {
+    const signed = row ? toSigned(refs[i]!.split(":")[0]!, row) : null;
+    return signed ? [signed] : [];
+  });
+}
+
+// Unsigned posts have a random 32-hex id; signed ones their 64-hex struct hash.
 const getPost = (store: Store, token: string, id: string) =>
-  /^[0-9a-f]{32}$/.test(id) ? store.get<StoredPost>(postKey(token, id)) : Promise.resolve(null);
+  /^(?:[0-9a-f]{32}|[0-9a-f]{64})$/.test(id) ? store.get<StoredPost>(postKey(token, id)) : Promise.resolve(null);
 
 /**
  * The Club's posts as `viewer` sees them: pinned first, then newest first. Hidden posts show only
@@ -185,7 +305,7 @@ const getPost = (store: Store, token: string, id: string) =>
 export async function listPosts(
   store: Store,
   entry: AssetEntry,
-  viewer: { userId?: string },
+  viewer: { userId?: string; lens?: LensId; as?: string },
   deps: Deps = {},
 ): Promise<{ posts: PublicPost[]; role: ClubRole | null }> {
   const token = entry.address.toLowerCase();
@@ -202,8 +322,12 @@ export async function listPosts(
   // Reports may hide a pinned post without unpinning it (so a restore puts it back). Until then it
   // isn't shown as pinned, except to staff, who need to see what they'd be restoring.
   const pinned = staff ? profile.pinned : profile.pinned.filter((id) => !live.get(id)?.hidden);
-  const older = pinned.flatMap((id) => (live.has(id) && !recent.some((p) => p.id === id) ? [live.get(id)!] : []));
-  const ordered = pinnedFirst([...recent, ...older], pinned);
+  // The reader's lens orders the rest (ADR 0023). Pins stay on top whatever it filters, unless the
+  // lens drops them: an Owner's pin is the Club speaking.
+  const lens = lensOf(viewer.lens);
+  const ranked = lens.rank(recent.filter((p) => !lens.pins || !pinned.includes(p.id)), await lensContext(store, entry, lens.id, viewer.as, deps));
+  const pinnedPosts = lens.pins ? pinned.flatMap((id) => (live.has(id) ? [live.get(id)!] : [])) : [];
+  const ordered = pinnedFirst([...pinnedPosts, ...ranked], lens.pins ? pinned : []);
 
   // Staff see the report count of every reported post, hidden or not: reports that don't count
   // toward hiding (from members who aren't Holders) still reach them for review.
@@ -214,6 +338,22 @@ export async function listPosts(
     );
   }
   return { posts: ordered.map((p) => viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id))), role };
+}
+
+/** What a lens needs, read only when it needs it. */
+async function lensContext(store: Store, entry: AssetEntry, lens: LensId, as: string | undefined, deps: Deps): Promise<LensContext> {
+  const now = nowOf(deps);
+  const ctx = { now, follows: new Set<string>(), holders: new Set<string>(), momentum: new Map<string, number>() };
+  if (lens === "following" && as) ctx.follows = await followingOf(store, as);
+  if (lens === "holders" || lens === "momentum") {
+    const rows = await allRows(store, entry.address.toLowerCase());
+    for (const row of rows) if (row.holder && row.displayWallet) ctx.holders.add(row.displayWallet.toLowerCase());
+    if (lens === "momentum") {
+      const scores = score((await clubEvents(store, entry as ClubEntry)).map(toScored), Math.floor(now / 1000));
+      for (const row of rows) if (row.displayWallet) ctx.momentum.set(row.displayWallet.toLowerCase(), memberScore(scores, row.wallets));
+    }
+  }
+  return ctx;
 }
 
 export type Refusal = "archived" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden";

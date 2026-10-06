@@ -11,6 +11,8 @@ import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions } from "@/hooks/useClubBoard";
 import { useClubMembers, useClubMembership, type ViewerRole } from "@/hooks/useClubMembership";
+import { useFollows } from "@/hooks/useSocial";
+import { FollowButton } from "@/components/FollowButton";
 import { isOwnerOrAdmin, mayActOn } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
 import type { MemberSort, PublicMember } from "@/lib/members";
@@ -125,6 +127,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
   const { view, isLoading, error } = useClubMembers(token, sort);
   const me = useClubMembership(token);
   const actions = useClubActions(token);
+  const follows = useFollows();
   const staff = me.role !== undefined && me.role !== "member";
 
   if (error && !view) return <LoadError title="Couldn’t load the members" error={error} />;
@@ -170,6 +173,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                         <Who address={m.wallet} mine={mine} />
+                        <FollowButton target={m.wallet} follows={follows} />
                         <RoleChip role={m.role} />
                         {m.holder && <HolderBadge symbol={symbol} />}
                       </div>

@@ -21,6 +21,7 @@ import { linkedRows, signedInAs } from "@/lib/accounts";
 import { explorerAddress, PRIVY_APP_ID, PRIVY_EMBEDDED_WALLETS } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { chain } from "@/lib/wagmi";
+import { useCopy } from "@/components/CopyAddress";
 
 /**
  * PRIVY_APP_ID is fixed at build time, so exactly one of these renders for the life of the app and
@@ -50,17 +51,12 @@ function MenuItem({
 
 /** Copies text, and says so for a moment. */
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
+  const [copied, copy] = useCopy();
   return (
     <button
       type="button"
       className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/20 px-2 py-1 text-[0.7rem] font-bold text-white/80 hover:bg-white/10 hover:text-white"
-      onClick={() => navigator.clipboard?.writeText(text).then(() => setCopied(true), () => {})}
+      onClick={() => copy(text)}
     >
       {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
       {copied ? "Copied" : "Copy"}

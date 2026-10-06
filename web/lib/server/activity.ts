@@ -6,10 +6,10 @@ import {
   type Hex,
   type PublicClient,
 } from "viem";
-import { onDealV2Abi } from "../abi";
+import { deClubEscrowAbi } from "../abi";
 import { toAsset, type Asset, type RawAsset } from "../assets";
 import { chain } from "../chain";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import type { ActivityEvent } from "../clubs";
 import type { ActivityKind } from "../momentum";
 import { registry } from "../verifiedAssets";
@@ -48,7 +48,7 @@ export type { ActivityEvent };
 /** The oldest events age out past this, per Club. */
 export const MAX_EVENTS_PER_CLUB = 5_000;
 
-export const activityKey = (token: string) => `ondeal:activity:${CHAIN_ID}:${token.toLowerCase()}`;
+export const activityKey = (token: string) => `declub:activity:${CHAIN_ID}:${token.toLowerCase()}`;
 
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
@@ -67,12 +67,12 @@ export function viemReader(): Reader {
       return Number((await client().getBlock({ blockNumber: block })).timestamp);
     },
     async trade(contract, id) {
-      return client().readContract({ address: contract, abi: onDealV2Abi, functionName: "getTrade", args: [id] });
+      return client().readContract({ address: contract, abi: deClubEscrowAbi, functionName: "getTrade", args: [id] });
     },
     async proposalAssets(contract, tradeId, proposalId) {
       const proposal = await client().readContract({
         address: contract,
-        abi: onDealV2Abi,
+        abi: deClubEscrowAbi,
         functionName: "getProposal",
         args: [tradeId, proposalId],
       });
@@ -81,8 +81,8 @@ export function viemReader(): Reader {
   };
 }
 
-/** The OnDealV2 contracts whose events count. V2 is optional (see lib/config.ts). */
-export const ACTIVITY_CONTRACTS: Address[] = ON_DEAL_V2_ADDRESS ? [ON_DEAL_V2_ADDRESS] : [];
+/** The DeClubEscrow contracts whose events count. V2 is optional (see lib/config.ts). */
+export const ACTIVITY_CONTRACTS: Address[] = DECLUB_ESCROW_ADDRESS ? [DECLUB_ESCROW_ADDRESS] : [];
 
 export type IngestOptions = {
   reader?: Reader;
@@ -121,12 +121,12 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   const clubOf = options.clubOf ?? ((token: string) => registry.clubFor(token)?.address ?? null);
   const clubsOf = (tokens: readonly string[]) => distinct(tokens.map(clubOf).filter((c): c is string => c !== null).map((c) => c.toLowerCase()));
 
-  type Decoded = ReturnType<typeof decodeEventLog<typeof onDealV2Abi>>;
+  type Decoded = ReturnType<typeof decodeEventLog<typeof deClubEscrowAbi>>;
   const decoded: { log: ReceiptLike["logs"][number]; event: Decoded }[] = [];
   for (const log of receipt.logs) {
     if (!watched.includes(log.address.toLowerCase())) continue;
     try {
-      decoded.push({ log, event: decodeEventLog({ abi: onDealV2Abi, data: log.data, topics: log.topics as [Hex, ...Hex[]] }) });
+      decoded.push({ log, event: decodeEventLog({ abi: deClubEscrowAbi, data: log.data, topics: log.topics as [Hex, ...Hex[]] }) });
     } catch {
       // Not an event of this contract's ABI.
     }
@@ -134,11 +134,19 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
 
   // An accepted proposal fills the deal for its proposer: the proposal's assets are the other side.
   const accepted = new Map<string, bigint>();
+  // What a fill paid in protocol fees, both sides together: the rewards epoch splits it (ADR 0022).
+  const fees = new Map<string, bigint>();
   for (const { log, event } of decoded) {
-    if (event.eventName === "ProposalAccepted") accepted.set(`${log.address.toLowerCase()}:${event.args.tradeId}`, event.args.proposalId);
+    const contract = log.address.toLowerCase();
+    if (event.eventName === "ProposalAccepted") {
+      accepted.set(`${contract}:${event.args.tradeId}`, event.args.proposalId);
+    } else if (event.eventName === "FeeCharged") {
+      const key = `${contract}:${event.args.tradeId}`;
+      fees.set(key, (fees.get(key) ?? 0n) + event.args.amount);
+    }
   }
 
-  const found: { id: string; kind: ActivityKind; contract: string; deal: bigint; parties: string[]; tokens: string[] }[] = [];
+  const found: { id: string; kind: ActivityKind; contract: string; deal: bigint; parties: string[]; tokens: string[]; fee?: bigint }[] = [];
   for (const { log, event } of decoded) {
     const contract = log.address.toLowerCase();
     const id = `${hash.toLowerCase()}:${log.logIndex}`;
@@ -157,6 +165,7 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
         deal: event.args.tradeId,
         parties: [event.args.maker.toLowerCase(), event.args.taker.toLowerCase()],
         tokens,
+        fee: fees.get(`${contract}:${event.args.tradeId}`),
       });
     }
   }
@@ -168,6 +177,7 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   const block = Number(receipt.blockNumber);
   for (const f of relevant) {
     const event: ActivityEvent = { id: f.id, kind: f.kind, contract: f.contract, deal: f.deal.toString(), block, at, parties: f.parties, tokens: f.tokens };
+    if (f.fee) event.fee = f.fee.toString();
     const member = JSON.stringify(event);
     // A deal naming both assets of one Club is logged for it once.
     for (const club of clubsOf(f.tokens)) {

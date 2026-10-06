@@ -11,6 +11,16 @@
   },
   {
     "chainId": 10143,
+    "address": "0x32A325b0640594377D0708Ca9081c93da95e1908",
+    "kind": "erc721",
+    "name": "Chog Genesis",
+    "symbol": "CHOG",
+    "status": "verified",
+    "note": "The Chog Genesis collection on Monad testnet, the one this app's NEXT_PUBLIC_CHOG_ADDRESS points at (ERC-721, 1,969 minted).",
+    "image": "/art/chogs/chog-02.png"
+  },
+  {
+    "chainId": 10143,
     "address": "0xd300f095f456D59AAc122B0100833fE195136F6c",
     "kind": "erc20",
     "category": "stablecoin",

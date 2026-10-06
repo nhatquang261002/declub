@@ -1448,6 +1448,30 @@ a.chip:hover { border-color: #111318; background: white; }
   outline-offset: 1px;
 }
 
+/* An address that copies itself on click (components/CopyAddress.tsx). */
+.copy-address {
+  display: inline-flex;
+  max-width: 100%;
+  cursor: copy;
+  align-items: baseline;
+  gap: 0.3em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-align: left;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 140ms ease;
+}
+
+.copy-address:hover { text-decoration-color: currentColor; }
+
+.copy-address:focus-visible {
+  outline: 3px solid var(--chog-pink-500);
+  outline-offset: 1px;
+  border-radius: 0.25rem;
+}
+
+.copy-address > svg { align-self: center; }
+
 .menu {
   position: absolute;
   top: calc(100% + 0.35rem);

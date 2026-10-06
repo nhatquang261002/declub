@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { ChatIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon } from "@/components/Icons";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR, REPORTS_TO_HIDE } from "@/lib/clubPosts";
 import { PRIVY_APP_ID } from "@/lib/config";
+import { LENSES } from "@/lib/lenses";
 import { MOMENTUM } from "@/lib/momentum";
+import { REWARDS, percent } from "@/lib/rewards";
 import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "../parts";
 
 // The Clubs guide, beside the Deals guide at /guide. The numbers come from the same constants the server enforces, so the
@@ -13,6 +15,7 @@ const SECTIONS: GuideSection[] = [
   { id: "what", label: "What a Club is" },
   { id: "join", label: "Join a Club" },
   { id: "badges", label: "Badges" },
+  { id: "rewards", label: "Rewards" },
   { id: "post", label: "Post and report" },
   { id: "roles", label: "Who runs a Club" },
   { id: "safety", label: "Stay safe" },
@@ -22,7 +25,8 @@ const SECTIONS: GuideSection[] = [
 const TABS = [
   { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals and signed swaps for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
   { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
-  { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by how much they trade it.</> },
+  { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by how much they trade it. <b>Follow</b> the ones you trust.</> },
+  { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim.</> },
   { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>Only for the Club&apos;s staff: the description, links, pinned posts, moderators and bans.</> },
 ];
 
@@ -40,6 +44,7 @@ const MOMENTUM_RULES = [
 
 const POST_RULES = [
   "Be a member, and share a verified X or Discord profile on the Account page.",
+  "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
   `Plain text, up to ${POST_MAX} characters. No formatting, and links aren't clickable.`,
   `One post every ${POST_COOLDOWN_SEC} seconds, and ${POSTS_PER_HOUR} an hour in each Club.`,
   "Delete your own posts whenever you like.",
@@ -74,14 +79,17 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
 
 const SAFETY = [
   "Joining shows your wallet on the Members list. Join with one you're happy to show.",
-  "A post or a profile link is written by a member, not checked by On Deal.",
+  "A post or a profile link is written by a member, not checked by DeClub.",
   "A Holder badge or a high Momentum is not an endorsement of the person or the asset.",
   "A deal linked from a post is still just a deal: check every asset before you sign.",
 ];
 
 const FAQ: ReadonlyArray<[string, string]> = [
-  ["Does a Club change how my deals work?", "No. Clubs are community pages run by the app's server. Nothing in a deal, a fee or a settlement depends on one, and leaving a Club doesn't touch your deals."],
-  ["Which assets get a Club?", "Only NFT collections and memecoins on On Deal's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club."],
+  ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
+  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between members who hold the asset when the epoch is built, one share per NFT or per set amount of the coin; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member holding the asset when the epoch is built. Your share waits under Rewards until you claim it."],
+  ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
+  ["Which assets get a Club?", "Only NFT collections and memecoins on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club."],
   ["Why can't I post?", "You need to be a member and to have shared a verified X or Discord profile. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
   ["How does someone become the Owner?", "The wallet that the token contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
@@ -94,13 +102,13 @@ export default function ClubsGuidePage() {
         base="clubs"
         title="How Clubs work,"
         accent="in three minutes."
-        lead="Every verified collection and memecoin has a Club: its market, a board for posts, and the people who trade it."
+        lead="Every verified collection and memecoin has a Club: its market, a board for posts, the people who trade it, and a share of the fees its swaps pay."
         actions={
           <Link href="/clubs" className="btn-primary">
             Explore Clubs <span aria-hidden>→</span>
           </Link>
         }
-        summary={["Anyone signed in can join.", "Badges and Momentum show activity, not trust.", "Clubs never touch your deals."]}
+        summary={["Anyone signed in can join.", `Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
         sections={SECTIONS}
       />
 
@@ -109,7 +117,7 @@ export default function ClubsGuidePage() {
           sections={SECTIONS}
           id="what"
           title="A home for each asset"
-          intro={<>Open <b>Clubs</b> in the header to see them all, busiest first. Each Club has four tabs.</>}
+          intro={<>Open <b>Clubs</b> in the header to see them all, busiest first. Each Club has these tabs.</>}
         >
           <CardGrid cols={2} items={TABS} />
         </Section>
@@ -178,6 +186,44 @@ export default function ClubsGuidePage() {
           </p>
         </Section>
 
+        <Section sections={SECTIONS} id="rewards" title="Rewards: the Club shares in its market">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className={`${CARD} p-5 sm:p-6`}>
+              <span className="grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-mint">
+                <CoinIcon className="size-4" />
+              </span>
+              <h3 className="mt-4 text-lg font-black">Where the fee goes</h3>
+              <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
+                Every completed swap pays a small flat fee per side. Each week, for each Club whose asset was traded:
+              </p>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s Holders, by how much they hold</li>
+                <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
+                <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
+              </ul>
+              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A swap that names two Clubs&apos; assets splits its fee between them.</p>
+            </div>
+            <div className={`${CARD} p-5 sm:p-6`}>
+              <span className="grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">
+                <CrownIcon className="size-4" />
+              </span>
+              <h3 className="mt-4 text-lg font-black">Claiming</h3>
+              <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
+                Your share is paid to your Club wallet in MON. After an epoch is published, claims open a day later; then press
+                <b className="text-[#111318]"> Claim</b> on a Club&apos;s <b className="text-[#111318]">Rewards</b> tab or on
+                your Account page. One claim collects every open epoch.
+              </p>
+              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
+                Every epoch&apos;s numbers and proofs are public, so anyone can check who was paid what.
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-muted">
+            Faking volume to earn rewards loses money: each side of a swap pays the full fee, and only part of it comes back,
+            shared with every other Holder.
+          </p>
+        </Section>
+
         <Section sections={SECTIONS} id="post" title="Post and report">
           <div className="grid gap-4 md:grid-cols-2">
             <div className={`${CARD} p-5 sm:p-6`}>
@@ -204,6 +250,22 @@ export default function ClubsGuidePage() {
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A moderator then restores it or deletes it.</p>
             </div>
+          </div>
+          <div className={`${CARD} mt-4 p-5 sm:p-6`}>
+            <h3 className="flex items-center gap-2 font-black">
+              <BadgeCheckIcon className="size-4" /> Choose how the Board is ordered
+            </h3>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+              {LENSES.map((lens) => (
+                <div key={lens.id}>
+                  <dt className="text-sm font-black">{lens.name}</dt>
+                  <dd className={`text-sm leading-6 ${MUTED}`}>{lens.description}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
+              Because posts and follows are public and signed, any other app can order the same Board its own way.
+            </p>
           </div>
         </Section>
 

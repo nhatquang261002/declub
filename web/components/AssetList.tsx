@@ -9,6 +9,7 @@ import { CHOG_ADDRESS, explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { ChogImage } from "./Chog";
 import { ExternalIcon } from "./Icons";
+import { CopyAddress } from "@/components/CopyAddress";
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
@@ -29,16 +30,19 @@ export function AssetList({ assets, info }: { assets: readonly Asset[]; info: In
 
 function ExplorerLink({ token }: { token: string }) {
   return (
-    <a
-      href={explorerAddress(token)}
-      target="_blank"
-      rel="noreferrer"
-      title={`View ${token} on the explorer`}
-      className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-xs text-muted underline-offset-2 hover:underline"
-    >
-      {shortAddress(token)}
-      <ExternalIcon className="size-3" />
-    </a>
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-mono text-xs text-muted">
+      <a
+        href={explorerAddress(token)}
+        target="_blank"
+        rel="noreferrer"
+        title={`View ${token} on the explorer`}
+        className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+      >
+        {shortAddress(token)}
+        <ExternalIcon className="size-3" />
+      </a>
+      <CopyAddress address={token} iconOnly label={`Copy ${token}`} />
+    </span>
   );
 }
 

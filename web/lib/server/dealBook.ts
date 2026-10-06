@@ -1,12 +1,11 @@
 import { createPublicClient, erc20Abi, http, type Address, type PublicClient } from "viem";
-import { onDealV2Abi } from "../abi";
+import { deClubEscrowAbi } from "../abi";
 import type { TokenInfo } from "../assets";
 import { chain } from "../chain";
-import { ON_DEAL_INTENTS_ADDRESS, ON_DEAL_V2_ADDRESS, RPC_URL } from "../config";
+import { DECLUB_INTENTS_ADDRESS, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import type { BookSource } from "../dealBook";
 import { toDealV2, type DealV2 } from "../dealsV2";
-import { demoDealsV2, demoIntents, demoTokenInfo } from "../demoDeals";
-import { intentAsListing, isLive, type PoolIntent } from "../intents";
+import { intentAsListing, type PoolIntent } from "../intents";
 import { listIntents } from "../pool";
 
 /**
@@ -188,10 +187,10 @@ const client = () => (cachedClient ??= createPublicClient({ chain, transport: ht
 
 export function viemBookReader(contract: Address): BookReader {
   return {
-    tradeCount: () => client().readContract({ address: contract, abi: onDealV2Abi, functionName: "tradeCount" }),
+    tradeCount: () => client().readContract({ address: contract, abi: deClubEscrowAbi, functionName: "tradeCount" }),
     async trades(ids) {
       const results = await client().multicall({
-        contracts: ids.map((id) => ({ address: contract, abi: onDealV2Abi, functionName: "getTrade", args: [id] }) as const),
+        contracts: ids.map((id) => ({ address: contract, abi: deClubEscrowAbi, functionName: "getTrade", args: [id] }) as const),
         allowFailure: true,
       });
       return results.map((r, i) => (r.status === "success" ? toDealV2(ids[i], r.result) : null));
@@ -217,29 +216,14 @@ export function viemBookReader(contract: Address): BookReader {
   };
 }
 
-/** The mock deals (lib/demoDeals.ts), cast for `viewer` the way the browser casts them. */
-export function demoSource(viewer: Address | undefined, tab: "open" | "all"): BookSource & { signedError: null } {
-  const rows = demoIntents(viewer);
-  const info = new Map<string, TokenInfo>();
-  const deals = demoDealsV2(viewer);
-  for (const deal of deals) {
-    for (const a of [...deal.offered, ...deal.requested]) {
-      const known = a.kind === "erc20" && demoTokenInfo(a.token);
-      if (known) info.set(a.token.toLowerCase(), known);
-    }
-  }
-  const open = rows.filter((r) => isLive(r.status)).map(intentAsListing);
-  return { deals, openSigned: open, allSigned: tab === "all" ? rows.map(intentAsListing) : open, info, signedError: null };
-}
-
 // Kept on globalThis so a dev server's hot reloads don't drop the book.
-const g = globalThis as typeof globalThis & { __ondealBook?: Book | null };
+const g = globalThis as typeof globalThis & { __declubBook?: Book | null };
 
-/** The live book, or null when there is no deal contract to read (and no mock deals). */
+/** The live book, or null when there is no deal contract to read. */
 export function getBook(): Book | null {
-  if (g.__ondealBook !== undefined) return g.__ondealBook;
-  g.__ondealBook = ON_DEAL_V2_ADDRESS
-    ? createBook(viemBookReader(ON_DEAL_V2_ADDRESS), ON_DEAL_INTENTS_ADDRESS ? (status) => listIntents({ status }) : null)
+  if (g.__declubBook !== undefined) return g.__declubBook;
+  g.__declubBook = DECLUB_ESCROW_ADDRESS
+    ? createBook(viemBookReader(DECLUB_ESCROW_ADDRESS), DECLUB_INTENTS_ADDRESS ? (status) => listIntents({ status }) : null)
     : null;
-  return g.__ondealBook;
+  return g.__declubBook;
 }

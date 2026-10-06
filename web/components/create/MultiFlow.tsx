@@ -25,7 +25,6 @@ import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
 import { ConfirmCard, NextButton, ReviewStage, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
 import { DealStageSide } from "@/components/DealSheet";
 import { LockIcon } from "@/components/Icons";
-import { PREVIEW_TRAIT_CATALOG } from "./previewData";
 import { TraitRequests } from "./TraitRequests";
 
 type Props = {
@@ -34,15 +33,14 @@ type Props = {
   onStep: (step: Step) => void;
   terms: Terms;
   onTerms: (terms: Terms) => void;
-  preview: boolean;
 };
 
 /**
- * Open offers, exact requests and trait requests on OnDealV2: any mix of MON, ERC-20s and NFTs
+ * Open offers, exact requests and trait requests on DeClubEscrow: any mix of MON, ERC-20s and NFTs
  * on each side (ADR 0005, 0006, 0007).
  * Owns the asset rows, so going back a step or switching between the two kinds keeps them.
  */
-export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props) {
+export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
   const { address } = useConnection();
   const router = useRouter();
   const approval = useTxFlow();
@@ -73,10 +71,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
 
   // Trait requests: each draft's collection is scanned server-side (once), then its set is
   // rebuilt here so the root, the count and the proofs are never typed by anyone.
-  const statuses = useCollectionCatalogs(
-    isTrait ? traitDrafts.map((d) => d.collection) : [],
-    preview ? PREVIEW_TRAIT_CATALOG : undefined,
-  );
+  const statuses = useCollectionCatalogs(isTrait ? traitDrafts.map((d) => d.collection) : []);
   const resolved = useMemo(
     () => resolveDrafts(traitDrafts, (collection) => statusOf(statuses, collection)),
     [traitDrafts, statuses],
@@ -274,7 +269,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
         note={
           fee === undefined && !feeLoading
             ? "Couldn't read the protocol fee from the contract, so the deal can't be created right now."
-            : "On Deal locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
+            : "DeClub locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
         }
         status={
           <>
@@ -284,12 +279,12 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms, preview }: Props
         }
       >
         {nextApproval ? (
-          <TxButton state={approval.state} disabled={preview} onClick={() => approval.run(nextApproval.call)}>
+          <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>
             {nextApproval.label}
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={preview || !!askError || !!offerError || fee === undefined} onClick={create}>
+          <TxButton state={tx.state} disabled={!!askError || !!offerError || fee === undefined} onClick={create}>
             {isOpen ? "Post open offer" : "Create deal"}
           </TxButton>
         )}

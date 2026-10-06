@@ -264,7 +264,7 @@ export const v2Cases: Case<World>[] = [
       // No receive(): MON sent straight to the contract bounces instead of getting stuck.
       await assert.rejects(
         w.pub.call({ account: w.bob.account, to: w.v2, value: 1n }),
-        "plain MON transfer to OnDealV2 should revert",
+        "plain MON transfer to DeClubEscrow should revert",
       );
       await w.send(w.alice, w.v2, w.abi.v2, "cancelTrade", [id]);
     },

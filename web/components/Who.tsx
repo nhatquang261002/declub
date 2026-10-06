@@ -2,8 +2,8 @@
 
 import { XLogoIcon } from "@/components/Icons";
 import { useProfile } from "@/hooks/useProfiles";
-import { shortAddress } from "@/lib/format";
 import { PROFILE_LABEL, profileUrl } from "@/lib/profiles";
+import { CopyAddress } from "@/components/CopyAddress";
 
 /**
  * A wallet as another trader sees it: "you", or the X / Discord account its owner chose to link
@@ -24,9 +24,9 @@ export function Who({
   full?: boolean;
 }) {
   const profile = useProfile(mine ? undefined : address);
-  const text = full ? address : shortAddress(address);
+  const text = <CopyAddress address={address} full={full} inLink={plain} />;
   if (mine) return <span className="font-mono">you</span>;
-  if (!profile) return <span className="font-mono break-all">{text}</span>;
+  if (!profile) return <span className="font-mono">{text}</span>;
 
   const url = plain ? undefined : profileUrl(profile);
   const label = (
@@ -49,7 +49,7 @@ export function Who({
       ) : (
         <span className="inline-flex items-center gap-1">{label}</span>
       )}
-      <span className="font-mono text-[0.7rem] break-all opacity-70">{text}</span>
+      <span className="font-mono text-[0.7rem] opacity-70">{text}</span>
     </span>
   );
 }

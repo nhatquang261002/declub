@@ -4,8 +4,8 @@ import { concat, encodeAbiParameters, getAddress, hashTypedData, keccak256, toHe
 import { erc20Asset, nftAsset } from "../lib/assets";
 import { type Intent, intentFromWire, intentHash, intentToWire, intentTypedData } from "../lib/intents";
 
-// The app must sign exactly what OnDealIntents verifies. These are the contract's own type strings
-// (src/OnDealIntents.sol), hashed by hand the way its Foundry test does, so a drift in
+// The app must sign exactly what DeClubIntents verifies. These are the contract's own type strings
+// (src/DeClubIntents.sol), hashed by hand the way its Foundry test does, so a drift in
 // lib/intents.ts breaks here instead of in every wallet.
 const ASSET_TYPE = "Asset(uint8 assetType,address token,uint256 id,uint256 amount)";
 const INTENT_TYPE =
@@ -73,8 +73,8 @@ describe("signed intents (ADR 0008, 0018)", () => {
         [{ type: "bytes32" }, { type: "bytes32" }, { type: "bytes32" }, { type: "uint256" }, { type: "address" }],
         [
           keccak256(toHex("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")),
-          keccak256(toHex("OnDealIntents")),
-          keccak256(toHex("3")),
+          keccak256(toHex("DeClubIntents")),
+          keccak256(toHex("1")),
           BigInt(intentTypedData(SWAP, intent).domain.chainId),
           SWAP,
         ],

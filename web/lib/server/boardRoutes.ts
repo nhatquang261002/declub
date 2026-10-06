@@ -4,8 +4,9 @@ import type { Registry } from "../verifiedAssets";
 import {
   banUser,
   claimOwner,
-  createPost,
+  createSignedPost,
   deletePost,
+  exportPosts,
   hidePost,
   listBans,
   listPosts,
@@ -27,6 +28,8 @@ import { clubOf, type Ctx } from "./memberRoutes";
 import { authenticate } from "./privy";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 import { isStaff } from "../clubRoles";
+import { lensOf } from "../lenses";
+import { parsePostMessage, socialDomain, SOCIAL_TYPES } from "../social";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -57,6 +60,12 @@ const REFUSALS: Record<string, [number, string]> = {
   link_unavailable: [503, "Couldn’t check that link right now. Try again."],
   cooldown: [429, "Wait a few seconds between posts."],
   rate_limited: [429, "You’ve reached the limit for now. Try again later."],
+  unsigned: [400, "Sign the post with your wallet first."],
+  wrong_club: [400, "That post was signed for another Club."],
+  not_clean: [400, "The signed text or link isn’t in the form the Board stores. Sign it again."],
+  stale: [400, "That signature is too old, or your clock is off. Sign it again."],
+  bad_signature: [401, "The signature doesn’t match your Club wallet. Sign with the wallet the Members list shows for you."],
+  wrong_signer: [409, "That signed post belongs to someone else."],
   not_found: [404, "Not found."],
   forbidden: [403, "You can’t do that."],
   own_post: [409, "You can’t report your own post."],
@@ -115,7 +124,10 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
       const viewer = await softViewer(request, deps);
-      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id }, deps);
+      const url = new URL(request.url);
+      const lens = lensOf(url.searchParams.get("lens")).id;
+      const as = url.searchParams.get("as") ?? undefined;
+      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined }, deps);
       // Anonymous readers share one cached answer; a signed-in reader's depends on who they are.
       const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
       return Response.json({ enabled: true, posts, role }, { headers: { "Cache-Control": cache } });
@@ -125,9 +137,30 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-post");
       if (f instanceof Response) return f;
       const body = await bodyOf(request);
-      const result = await createPost(f.store, f.entry, f.user.id, { kind: body.kind, text: body.text, link: body.link }, deps);
+      // Every post is signed by its author's Club wallet (ADR 0023), so it can be exported and checked.
+      const result = await createSignedPost(f.store, f.entry, f.user.id, { message: parsePostMessage(body.message), signature: body.signature }, deps);
       return result.ok ? json({ enabled: true, post: result.post }, 201) : refuse(result.reason);
     },
+  };
+}
+
+/**
+ * GET /api/clubs/[token]/feed: every signed post on the Club's Board, newest first, as the exact
+ * EIP-712 message and signature, with the typed-data domain to check them against. Public, so any
+ * app can carry a Club's conversation or rank it its own way. Posts hidden by moderation are left out.
+ */
+export function feedHandler(registry: Registry) {
+  return async function GET(request: Request, ctx: Ctx) {
+    const entry = await clubOf(registry, ctx);
+    if (entry instanceof Response) return entry;
+    const store = getStore();
+    if (!store) return Response.json({ enabled: false, posts: [] }, { headers: { "Cache-Control": "no-store" } });
+    if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const posts = await exportPosts(store, entry);
+    return Response.json(
+      { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post }, posts },
+      { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
+    );
   };
 }
 

@@ -1,6 +1,6 @@
 import type { Settlement } from "./intents";
 import type { AssetEntry, ClubEntry } from "./verifiedAssets";
-import { ON_DEAL_INTENTS_ADDRESS } from "./config";
+import { DECLUB_INTENTS_ADDRESS } from "./config";
 import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
 /**
@@ -15,7 +15,7 @@ export type ActivityEvent = {
   kind: ActivityKind;
   /** The contract that emitted it, lowercase. */
   contract: string;
-  /** The OnDealV2 trade id; for a signed swap, the settlement's transaction hash. */
+  /** The DeClubEscrow trade id; for a signed swap, the settlement's transaction hash. */
   deal: string;
   block: number;
   /** Unix seconds (the block's timestamp). */
@@ -24,6 +24,12 @@ export type ActivityEvent = {
   parties: string[];
   /** Every non-native token the deal names, lowercase. */
   tokens: string[];
+  /**
+   * A completed swap's protocol fee, every side together, in wei (a decimal string). Escrow swaps
+   * carry it from the receipt's `FeeCharged`; signed swaps get it when an epoch is built
+   * (lib/server/rewards.ts). Absent when there was no fee or it isn't known yet.
+   */
+  fee?: string;
 };
 
 export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties });
@@ -72,7 +78,7 @@ export function settlementEvents(settlements: readonly Settlement[]): ActivityEv
     return {
       id: `${s.txHash.toLowerCase()}:settled`,
       kind: "swapped" as const,
-      contract: (ON_DEAL_INTENTS_ADDRESS ?? "").toLowerCase(),
+      contract: (DECLUB_INTENTS_ADDRESS ?? "").toLowerCase(),
       deal: s.txHash.toLowerCase(),
       block: s.blockNumber,
       at: Math.floor(s.at / 1000),

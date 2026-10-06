@@ -40,18 +40,13 @@ async function load(address: Address): Promise<Reply> {
 /**
  * The traits of each collection in `addresses`, keyed by lowercase address. The server scans a
  * collection once and caches it, so this just polls until the scan is `ready` or `unsupported`.
- * `preview` swaps in a fixed catalog so the create screens can be shown without a server scan.
  */
-export function useCollectionCatalogs(
-  addresses: readonly string[],
-  preview?: TraitCatalog,
-): ReadonlyMap<string, CatalogStatus> {
+export function useCollectionCatalogs(addresses: readonly string[]): ReadonlyMap<string, CatalogStatus> {
   const valid = useMemo(() => [...new Set(addresses.map((a) => a.trim()).filter((a) => isAddress(a)).map((a) => a.toLowerCase() as Address))], [addresses]);
   const queries = useQueries({
     queries: valid.map((address) => ({
       queryKey: ["collectionTraits", address],
       queryFn: () => load(address),
-      enabled: !preview,
       staleTime: 60_000,
       retry: 1,
       refetchInterval: (query: { state: { data?: Reply } }) => {
@@ -66,7 +61,6 @@ export function useCollectionCatalogs(
   return useMemo(() => {
     const out = new Map<string, CatalogStatus>();
     valid.forEach((address, i) => {
-      if (preview) return out.set(address, { state: "ready", catalog: preview, failed: 0 });
       const q = queries[i];
       const data = q.data;
       if (!data) {
@@ -76,7 +70,7 @@ export function useCollectionCatalogs(
     });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valid, preview, stamp]);
+  }, [valid, stamp]);
 }
 
 export const statusOf = (statuses: ReadonlyMap<string, CatalogStatus>, address: string): CatalogStatus =>

@@ -32,10 +32,11 @@ export function artifact(file: string, name = file.replace(/\..*$/, "")): Artifa
   };
 }
 
-export const V2 = () => artifact("OnDealV2.sol");
-export const INTENTS = () => artifact("OnDealIntents.sol");
+export const V2 = () => artifact("DeClubEscrow.sol");
+export const INTENTS = () => artifact("DeClubIntents.sol");
+export const REWARDS = () => artifact("DeClubRewards.sol");
 export const MOCK_CHOG = () => artifact("MockChog.sol");
 export const MOCK_ERC20 = () => artifact("MockERC20.sol");
 export const MOCK_WMON = () => artifact("MockWMON.sol");
 /** Test-only ERC-1271 wallet: its owner signs for it, and it has no `receive()`. */
-export const WALLET_1271 = () => artifact("OnDealIntents.signatures.t.sol", "Mock1271Wallet");
+export const WALLET_1271 = () => artifact("DeClubIntents.signatures.t.sol", "Mock1271Wallet");

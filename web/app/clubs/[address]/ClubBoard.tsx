@@ -10,8 +10,10 @@ import { PostItem } from "@/components/PostItem";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
+import { useFollows } from "@/hooks/useSocial";
 import { POST_MAX, REPORTS_TO_HIDE, type PostKind } from "@/lib/clubPosts";
 import { isStaff } from "@/lib/clubRoles";
+import { LENSES, type LensId } from "@/lib/lenses";
 import { Empty, Loading } from "./parts";
 
 const KINDS: { value: PostKind; label: string; hint: string }[] = [
@@ -53,7 +55,7 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         post.mutate(
-          { kind, text, ...(kind === "looking" && link.trim() ? { link: link.trim() } : {}) },
+          { kind, text, wallet, ...(kind === "looking" && link.trim() ? { link: link.trim() } : {}) },
           { onSuccess: () => (setText(""), setLink("")) },
         );
       }}
@@ -100,11 +102,11 @@ function Composer({ token, wallet }: { token: string; wallet?: string }) {
             </label>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted">Plain text. Links in a post aren’t clickable.</p>
+            <p className="text-xs text-muted">Plain text. Your Club wallet signs each post, so it’s yours to take anywhere.</p>
             <div className="flex items-center gap-3">
               <CharRing length={length} />
               <button type="submit" className="btn-primary btn-sm px-5" disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}>
-                {post.isPending ? "Posting…" : "Post"}
+                {post.isPending ? "Signing…" : "Sign & post"}
               </button>
             </div>
           </div>
@@ -133,7 +135,12 @@ function CantPost({ token, symbol, reason }: { token: string; symbol: string; re
 
 /** The Club's board: member posts, newest first, pinned ones on top. */
 export function ClubBoard({ token, symbol, archived, now }: { token: string; symbol: string; archived: boolean; now: number }) {
-  const { enabled, posts, isLoading, error } = useClubPosts(token);
+  const follows = useFollows();
+  const [lens, setLens] = useState<LensId>("newest");
+  // Following needs to know who's reading; without a wallet it falls back to everything.
+  const lenses = LENSES.filter((l) => l.id !== "following" || follows.me);
+  const active = lenses.find((l) => l.id === lens) ?? lenses[0]!;
+  const { enabled, posts, isLoading, error } = useClubPosts(token, active.id, follows.me);
   const me = useClubMembership(token);
   const page = useClubPage(token);
   const { report, remove, hide, pin, ban } = useClubActions(token);
@@ -159,8 +166,12 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         <CantPost token={token} symbol={symbol} reason="join" />
       )}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <Pills value={active.id} options={lenses.map((l) => ({ value: l.id, label: l.name }))} onChange={setLens} label="Order posts by" />
         <Pills value={filter} options={FILTERS} onChange={setFilter} label="Show posts" />
+      </div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted">{active.description}</p>
         {me.member && !archived && (
           <p className="text-xs text-muted">
             Posting needs a verified X or Discord profile on your{" "}
@@ -175,8 +186,12 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
       {isLoading ? (
         <Loading label="Loading the board" />
       ) : shown.length === 0 ? (
-        <Empty title={filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}>
-          {me.member && !archived ? "Start it off: say hello, or post what you’re looking for." : "Posts from members will show up here."}
+        <Empty title={active.id === "following" ? "Nobody you follow has posted here" : filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}>
+          {active.id === "following"
+            ? "Follow members from their posts or the Members list to see them here."
+            : me.member && !archived
+              ? "Start it off: say hello, or post what you’re looking for."
+              : "Posts from members will show up here."}
         </Empty>
       ) : (
         <ul className="club-panel overflow-hidden">
@@ -186,6 +201,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
               post={post}
               role={me.role}
               now={now}
+              follows={follows}
               actions={{
                 report: (id) => report.mutate(id),
                 remove: (id) => remove.mutate(id),

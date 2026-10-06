@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConnection } from "wagmi";
-import { CHAIN_ID, ON_DEAL_V2_ADDRESS } from "@/lib/config";
+import { CHAIN_ID, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import {
   deriveIntentNotifications,
   deriveNotifications,
@@ -24,11 +24,11 @@ import { useIntents } from "./usePool";
 // copies are merged by union and neither can lose a mark. Whether to show browser alerts stays
 // per browser: it is that browser's own permission.
 
-const EVENT = "ondeal:notifications";
+const EVENT = "declub:notifications";
 // Keys name deal ids, so read markers are kept per deal contract.
-const scope = `${CHAIN_ID}:${ON_DEAL_V2_ADDRESS ?? "none"}`;
-const readKey = (account: string) => `ondeal:notifications:${scope}:${account.toLowerCase()}`;
-const ALERTS_KEY = "ondeal:notification-alerts";
+const scope = `${CHAIN_ID}:${DECLUB_ESCROW_ADDRESS ?? "none"}`;
+const readKey = (account: string) => `declub:notifications:${scope}:${account.toLowerCase()}`;
+const ALERTS_KEY = "declub:notification-alerts";
 
 function readStore(key: string | null): string {
   if (!key) return "";

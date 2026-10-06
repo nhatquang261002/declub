@@ -41,11 +41,12 @@ import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
-import { ON_DEAL_V2_ADDRESS, SHOW_V2 } from "@/lib/config";
+import { DECLUB_ESCROW_ADDRESS, SHOW_V2 } from "@/lib/config";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
 import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
+import { CopyAddress } from "@/components/CopyAddress";
 
 const NO_ASSETS: readonly Asset[] = [];
 
@@ -65,7 +66,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   // Both sides pay the fee this deal was listed with, not the contract's current one (ADR 0018).
   const fee = deal?.fee;
   // History needs to know which public deals this wallet filled (hooks/useFills.ts).
-  const { record } = useFills(address, ON_DEAL_V2_ADDRESS);
+  const { record } = useFills(address, DECLUB_ESCROW_ADDRESS);
 
   // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
   const openOffer = !!deal && isOpenOffer(deal);
@@ -211,7 +212,7 @@ function DealDetailV2({ id }: { id: bigint }) {
               },
               { label: "Expires", value: deal.expiry === 0n ? "Never" : formatDate(deal.expiry) },
               // The whole address, where people are meant to check it against their counterparty.
-              { label: "Maker's wallet", value: <span className="font-mono text-xs font-semibold">{deal.maker}</span> },
+              { label: "Maker's wallet", value: <CopyAddress address={deal.maker} full className="text-xs font-semibold" /> },
             ]}
           />
         </DealSheet>
@@ -410,7 +411,7 @@ function Dock({
   );
 }
 
-/** Amounts OnDealV2 is holding for `account` from this deal's assets (rejected payouts). */
+/** Amounts DeClubEscrow is holding for `account` from this deal's assets (rejected payouts). */
 function useCredits(account: `0x${string}` | undefined, assets: readonly Asset[]) {
   const unique = useMemo(() => {
     const out: Asset[] = [];

@@ -95,7 +95,7 @@ const cases: Case<Ctx>[] = [
     title: "Deployed code is this checkout's build (immutables masked)",
     async run(c, note) {
       const problems: string[] = [];
-      for (const [name, address, art] of [["OnDealV2", c.v2, c.v2Art], ["OnDealIntents", c.intents, c.intentsArt]] as const) {
+      for (const [name, address, art] of [["DeClubEscrow", c.v2, c.v2Art], ["DeClubIntents", c.intents, c.intentsArt]] as const) {
         const code = await c.pub.getCode({ address });
         if (!code || code === "0x") {
           problems.push(`${name} ${address}: no code`);
@@ -114,7 +114,7 @@ const cases: Case<Ctx>[] = [
     async run(c, note) {
       const fails: string[] = [];
       const warns: string[] = [];
-      for (const [name, address, abi] of [["OnDealV2", c.v2, c.v2Art.abi], ["OnDealIntents", c.intents, c.intentsArt.abi]] as const) {
+      for (const [name, address, abi] of [["DeClubEscrow", c.v2, c.v2Art.abi], ["DeClubIntents", c.intents, c.intentsArt.abi]] as const) {
         const f = await feeConfig(c, address, abi);
         note(`${name}: fee ${formatEther(f.fee)}, ceiling ${formatEther(f.max)}, recipient ${f.recipient}, admin ${f.admin}`);
         if (f.fee > f.max) fails.push(`${name}: fee above the ceiling`);
@@ -204,7 +204,7 @@ const cases: Case<Ctx>[] = [
     async run(c) {
       const [a, b] = await Promise.all([feeConfig(c, c.v2, c.v2Art.abi), feeConfig(c, c.intents, c.intentsArt.abi)]);
       const diff = (["fee", "max", "recipient", "admin", "pending"] as const).filter((k) => String(a[k]).toLowerCase() !== String(b[k]).toLowerCase());
-      if (diff.length) strict(`OnDealV2 and OnDealIntents differ in: ${diff.map((k) => `${k} (${a[k]} vs ${b[k]})`).join(", ")}`);
+      if (diff.length) strict(`DeClubEscrow and DeClubIntents differ in: ${diff.map((k) => `${k} (${a[k]} vs ${b[k]})`).join(", ")}`);
     },
   },
   {
@@ -251,13 +251,9 @@ const cases: Case<Ctx>[] = [
   },
   {
     id: "DEP-09",
-    title: "App environment: no demo data, a real Chog collection, the watcher's start block",
+    title: "App environment: a real Chog collection, the watcher's start block",
     async run(c, note) {
       const problems: string[] = [];
-      for (const k of ["NEXT_PUBLIC_DEMO_DEALS", "NEXT_PUBLIC_DEMO_CREATE", "NEXT_PUBLIC_DEMO_CLUBS"]) {
-        // The demo flags only act in development builds, but a production env should say false.
-        if (str(k).toLowerCase() === "true") problems.push(`${k}=true`);
-      }
       const chog = addr("NEXT_PUBLIC_CHOG_ADDRESS");
       if (!chog) problems.push("NEXT_PUBLIC_CHOG_ADDRESS is blank, so the app falls back to the testnet MockChog");
       else if (!(await isContract(c, chog))) problems.push(`NEXT_PUBLIC_CHOG_ADDRESS ${chog} has no code on this chain`);
@@ -275,13 +271,13 @@ async function main() {
   const ctx: Ctx = {
     pub,
     chainId: await pub.getChainId(),
-    v2: needAddr("VERIFY_V2_ADDRESS", "NEXT_PUBLIC_ON_DEAL_V2_ADDRESS"),
-    intents: needAddr("VERIFY_INTENTS_ADDRESS", "NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS"),
+    v2: needAddr("VERIFY_V2_ADDRESS", "NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
+    intents: needAddr("VERIFY_INTENTS_ADDRESS", "NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS"),
     poolUrl: str("E2E_POOL_URL", str("NEXT_PUBLIC_POOL_URL")) || undefined,
     v2Art: V2(),
     intentsArt: INTENTS(),
   };
-  console.log(`verifying chain ${ctx.chainId} via ${rpcUrl}${mainnet ? " (mainnet rules)" : ""}\n  OnDealV2 ${ctx.v2}\n  OnDealIntents ${ctx.intents}\n`);
+  console.log(`verifying chain ${ctx.chainId} via ${rpcUrl}${mainnet ? " (mainnet rules)" : ""}\n  DeClubEscrow ${ctx.v2}\n  DeClubIntents ${ctx.intents}\n`);
   const results = await runCases(cases, ctx, arg("only"));
   process.exitCode = finish("verify", results, { chainId: String(ctx.chainId), rpc: rpcUrl, v2: ctx.v2, intents: ctx.intents, mode: mainnet ? "mainnet" : "default" });
 }

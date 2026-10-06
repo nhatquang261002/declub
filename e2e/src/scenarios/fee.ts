@@ -7,8 +7,8 @@ const RAISE_DELAY = 7 * 24 * 3600;
 
 /** Both contracts share FeeAdmin; each check runs against both. */
 const both = (w: World): [string, Address, World["abi"]["v2"]][] => [
-  ["OnDealV2", w.v2, w.abi.v2],
-  ["OnDealIntents", w.intents, w.abi.intents],
+  ["DeClubEscrow", w.v2, w.abi.v2],
+  ["DeClubIntents", w.intents, w.abi.intents],
 ];
 
 const localOnly = (w: World) => (w.target === "local" ? null : "moves the live fee or its admin: local only");

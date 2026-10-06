@@ -9,8 +9,8 @@ import { CreateDealButton } from "@/components/CreateDealButton";
 
 // Create is a button beside the wallet, not a tab: it starts an action rather than showing a list.
 const NAV = [
-  { href: "/deals", label: "Deals" },
   { href: "/clubs", label: "Clubs" },
+  { href: "/deals", label: "Deals" },
   { href: "/history", label: "History" },
   { href: "/guide", label: "Guide" },
 ];
@@ -27,7 +27,7 @@ export function Header() {
       style={{ background: "var(--surface-overlay)" }}
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3 sm:px-6">
-        <Link href="/" aria-label="On Deal home">
+        <Link href="/" aria-label="De(al) Club home">
           <Logo />
         </Link>
         <nav className="order-3 flex w-full gap-1 overflow-x-auto sm:order-none sm:w-auto">

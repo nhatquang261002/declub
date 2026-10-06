@@ -98,5 +98,5 @@ export function linkedEthereumWallets(accounts: readonly LinkedAccount[]): `0x${
   return [...out];
 }
 
-export const profileKey = (address: string) => `ondeal:profile:${address.toLowerCase()}`;
-export const userWalletsKey = (userId: string) => `ondeal:profile-user:${userId}`;
+export const profileKey = (address: string) => `declub:profile:${address.toLowerCase()}`;
+export const userWalletsKey = (userId: string) => `declub:profile-user:${userId}`;
