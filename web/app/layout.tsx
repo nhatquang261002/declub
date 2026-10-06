@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { Providers } from "@/components/Providers";
-import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
+import { explorerAddress, DECLUB_ESCROW_ADDRESS, SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -12,6 +12,7 @@ const brand = Bricolage_Grotesque({ variable: "--font-brand", subsets: ["latin"]
 
 // The favicon is app/icon.svg, picked up by Next automatically.
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "De(al) Club",
   description: "Clubs for Monad's NFT collections, where Holders share in the fees their Club's market makes.",
 };

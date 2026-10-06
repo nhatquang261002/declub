@@ -18,6 +18,7 @@ const env = {
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   privyEmbedded: process.env.NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS,
   ipfsGateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY,
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
 };
 
 function address(value: string | undefined, fallback: Address): Address {
@@ -29,6 +30,14 @@ export const CHAIN_ID = Number(env.chainId || 10143);
 if (CHAIN_ID === 143 && (!env.rpcUrl?.trim() || !env.chog?.trim())) {
   throw new Error("Mainnet (NEXT_PUBLIC_CHAIN_ID=143) needs NEXT_PUBLIC_RPC_URL and NEXT_PUBLIC_CHOG_ADDRESS set");
 }
+/**
+ * Where the app is served, for the absolute links in a shared deal's preview. NEXT_PUBLIC_SITE_URL,
+ * else the host Vercel gives the deployment, else the local dev server.
+ */
+export const SITE_URL = (
+  env.siteUrl?.trim() ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+).replace(/\/+$/, "");
 export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
 export const EXPLORER_URL =
   CHAIN_ID === 143 ? "https://monadvision.com" : "https://testnet.monadvision.com";

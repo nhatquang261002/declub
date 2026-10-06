@@ -47,6 +47,7 @@ import { formatDate } from "@/lib/format";
 import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 import { CopyAddress } from "@/components/CopyAddress";
+import { ShareDeal } from "@/components/ShareDeal";
 
 const NO_ASSETS: readonly Asset[] = [];
 
@@ -279,6 +280,7 @@ function DealDetailV2({ id }: { id: bigint }) {
             </div>
           ) : null}
           <TxStatus state={action.state} success={status === "filled" ? "Swapped. The assets are in your wallet." : undefined} />
+          <ShareDeal deal={deal} info={info} now={now} />
         </Dock>
 
         {credits.length > 0 && (
