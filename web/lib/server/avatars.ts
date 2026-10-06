@@ -1,6 +1,6 @@
 import { createPublicClient, getAddress, http, parseAbi, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { RPC_URL } from "../config";
+import { IPFS_GATEWAY, RPC_URL } from "../config";
 import {
   AVATAR_IMAGE_TYPES,
   MAX_IMAGE_BYTES,
@@ -57,7 +57,6 @@ export const viemAvatarChain: AvatarChain = {
 
 // ─────────────────────────────────────────────────────────────── Pictures
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 const MAX_URL = 2048;
 
 const startsWith = (bytes: Uint8Array, ...head: number[]) => head.every((b, i) => bytes[i] === b);

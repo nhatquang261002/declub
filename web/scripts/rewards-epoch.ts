@@ -19,14 +19,10 @@
  * you build, in order.
  */
 import path from "node:path";
-import nextEnv from "@next/env";
-
-// A CommonJS package: Node only gives ESM a default export for it.
-const { loadEnvConfig } = nextEnv;
+import { loadEnv } from "./env";
 
 const web = path.resolve(import.meta.dirname, "..");
-loadEnvConfig(path.resolve(web, ".."), false, { info: () => {}, error: console.error }, true);
-loadEnvConfig(web, false, { info: () => {}, error: console.error }, true);
+loadEnv(web);
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);

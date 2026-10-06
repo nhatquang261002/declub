@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { createPublicClient, getAddress, http, parseAbi, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
-import { RPC_URL } from "../config";
+import { IPFS_GATEWAY, RPC_URL } from "../config";
 
 /**
  * Reads every token's traits from any ERC-721: `totalSupply` (and `tokenByIndex` when the
@@ -209,7 +209,6 @@ async function sequential(rpc: PublicClient, address: Address, total: number): P
 
 // ── Metadata ───────────────────────────────────────────────────────────────────────────────────
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 
 /**
  * Addresses a metadata fetch must never reach: loopback, private (RFC 1918), CGNAT, link-local

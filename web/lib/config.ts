@@ -17,6 +17,7 @@ const env = {
   knownCollections: process.env.NEXT_PUBLIC_KNOWN_COLLECTIONS,
   privyAppId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
   privyEmbedded: process.env.NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS,
+  ipfsGateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY,
 };
 
 function address(value: string | undefined, fallback: Address): Address {
@@ -33,6 +34,12 @@ export const EXPLORER_URL =
   CHAIN_ID === 143 ? "https://monadvision.com" : "https://testnet.monadvision.com";
 
 export const CHOG_ADDRESS = address(env.chog, "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
+
+/**
+ * The path gateway `ipfs://` URIs are read through, ending in `/ipfs/`. ipfs.io unless
+ * NEXT_PUBLIC_IPFS_GATEWAY says otherwise: it can stall for hours on a CID it hasn't cached.
+ */
+export const IPFS_GATEWAY = (env.ipfsGateway?.trim() || "https://ipfs.io/ipfs/").replace(/\/*$/, "/");
 
 /**
  * DeClubEscrow, the deal contract (ADR 0005): any ERC-721, ERC-20 and MON. The app has no deals
