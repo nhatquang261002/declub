@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, BanIcon, ExternalIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon, XLogoIcon } from "@/components/Icons";
+import { BadgeCheckIcon, BanIcon, ChatIcon, HeartIcon, ExternalIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon, XLogoIcon } from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
-import type { PostLink, PublicPost, StoredXCard } from "@/lib/clubPosts";
+import { useClubActions, useClubReplies } from "@/hooks/useClubBoard";
+import { POST_MAX, type PostLink, type PublicPost, type StoredXCard } from "@/lib/clubPosts";
 import { isOwnerOrAdmin, isStaff } from "@/lib/clubRoles";
 import { ago, shortAddress } from "@/lib/format";
 import type { ViewerRole } from "@/hooks/useClubMembership";
@@ -58,6 +60,7 @@ function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: num
 
 export type PostActions = {
   report: (id: string) => void;
+  like: (id: string, like: boolean) => void;
   remove: (id: string) => void;
   hide: (id: string, hidden: boolean) => void;
   pin: (id: string, pinned: boolean) => void;
@@ -65,6 +68,9 @@ export type PostActions = {
 };
 
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
+
+/** What a post needs to open its thread (ADR 0032): the Club, and the reader's Club wallet to sign replies with. */
+export type ThreadContext = { token: string; wallet?: string; canReply: boolean };
 
 /**
  * One post. The text is plain text: React escapes it and nothing here turns it into a link, so
@@ -78,8 +84,11 @@ export function PostItem({
   actions,
   now,
   follows,
+  thread,
 }: {
   post: PublicPost;
+  /** Set on a top-level post to offer its replies; left out on a reply. */
+  thread?: ThreadContext;
   /** The reader's follows, for the Follow button beside the author. */
   follows?: ReturnType<typeof useFollows>;
   /** The viewer's role, or undefined when they aren't a member. */
@@ -95,11 +104,17 @@ export function PostItem({
     own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post to the Club’s moderators?", onSelect: () => actions.report(post.id) });
   }
   if (role !== undefined && (post.mine || staff)) {
-    own.push({ label: "Delete", icon: <TrashIcon />, danger: true, confirm: "Delete this post?", onSelect: () => actions.remove(post.id) });
+    own.push({
+      label: "Delete",
+      icon: <TrashIcon />,
+      danger: true,
+      confirm: post.parent ? "Delete this reply?" : post.replies ? "Delete this post and its replies?" : "Delete this post?",
+      onSelect: () => actions.remove(post.id),
+    });
   }
   const moderate: MenuAction[] = [];
   // A post hidden by reports keeps its pin (a restore puts it back); the Owner may still take it off.
-  if (owner && (!post.hidden || post.pinned)) {
+  if (owner && !post.parent && (!post.hidden || post.pinned)) {
     moderate.push({ label: post.pinned ? "Unpin" : "Pin to top", icon: <PinIcon />, onSelect: () => actions.pin(post.id, !post.pinned) });
   }
   if (staff && !post.mine) {
@@ -117,9 +132,12 @@ export function PostItem({
     });
   }
 
+  const [open, setOpen] = useState(false);
+  const offersThread = thread !== undefined && !post.hidden && (thread.canReply || (post.replies ?? 0) > 0);
+
   return (
-    <li className={`post ${post.pinned ? "post-pinned" : ""} ${post.hidden ? "post-hidden" : ""}`}>
-      <WalletAvatar seed={post.wallet} size="2.5rem" />
+    <li className={`post ${post.parent ? "post-reply" : ""} ${post.pinned ? "post-pinned" : ""} ${post.hidden ? "post-hidden" : ""}`}>
+      <WalletAvatar seed={post.wallet} size={post.parent ? "2rem" : "2.5rem"} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -167,6 +185,33 @@ export function PostItem({
         )}
         {post.text !== null && <p className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap">{post.text}</p>}
         {post.link?.kind === "x" && <XPostCard id={post.link.id} card={post.x} now={now} />}
+        {role !== undefined && !post.hidden && (
+          <div className="mt-1 flex gap-2">
+            <button
+              type="button"
+              className={`post-like ${post.liked ? "post-like-on" : ""}`}
+              aria-pressed={post.liked}
+              aria-label={post.liked ? "Take back your like" : "Like this post"}
+              disabled={post.mine}
+              onClick={() => actions.like(post.id, !post.liked)}
+            >
+              <HeartIcon className="size-4" filled={post.liked} />
+              {post.likes > 0 && post.likes}
+            </button>
+            {offersThread && <ReplyToggle count={post.replies ?? 0} open={open} onToggle={() => setOpen(!open)} />}
+          </div>
+        )}
+        {role === undefined && !post.hidden && (post.likes > 0 || (offersThread && (post.replies ?? 0) > 0)) && (
+          <div className="mt-1 flex gap-2">
+            {post.likes > 0 && (
+              <span className="post-like w-fit">
+                <HeartIcon className="size-4" />
+                {post.likes}
+              </span>
+            )}
+            {offersThread && <ReplyToggle count={post.replies ?? 0} open={open} onToggle={() => setOpen(!open)} />}
+          </div>
+        )}
         {post.link && post.link.kind !== "x" && (
           <Link href={linkHref(post.link)} className="post-link mt-1">
             <SwapIcon className="size-4" />
@@ -174,7 +219,77 @@ export function PostItem({
             <span aria-hidden>→</span>
           </Link>
         )}
+        {open && thread && <Thread parent={post.id} context={thread} role={role} now={now} />}
       </div>
     </li>
+  );
+}
+
+function ReplyToggle({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" className={`post-like ${open ? "post-like-on" : ""}`} aria-expanded={open} onClick={onToggle}>
+      <ChatIcon className="size-4" />
+      {count > 0 ? count : "Reply"}
+    </button>
+  );
+}
+
+/**
+ * A post's replies, one level deep (ADR 0032), and a box to add one. Replies use the same menu as
+ * posts (like, report, delete, hide, ban) and are signed the same way. They earn nothing.
+ */
+function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
+  const { replies, isLoading } = useClubReplies(context.token, parent, true);
+  const { reply, report, like, remove, hide, ban } = useClubActions(context.token);
+  const [text, setText] = useState("");
+  const actions: PostActions = {
+    report: (id) => report.mutate(id),
+    like: (id, on) => like.mutate({ id, like: on }),
+    remove: (id) => remove.mutate(id),
+    hide: (id, hidden) => hide.mutate({ id, hidden }),
+    pin: () => {},
+    ban: (id) => ban.mutate({ post: id }),
+  };
+  const length = [...text].length;
+
+  return (
+    <div className="mt-2 rounded-xl border-2 border-[#111318]/15 bg-white/60">
+      {isLoading ? (
+        <p className="p-3 text-xs text-muted">Loading replies…</p>
+      ) : (
+        replies.length > 0 && (
+          <ul>
+            {replies.map((r) => (
+              <PostItem key={r.id} post={r} role={role} actions={actions} now={now} />
+            ))}
+          </ul>
+        )
+      )}
+      {context.canReply && (
+        <form
+          className="flex items-end gap-2 border-t border-[#111318]/10 p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            reply.mutate({ parent, text, wallet: context.wallet }, { onSuccess: () => setText("") });
+          }}
+        >
+          <label className="sr-only" htmlFor={`reply-${parent}`}>
+            Your reply
+          </label>
+          <textarea
+            id={`reply-${parent}`}
+            className="input min-h-10 flex-1 resize-y border-2 border-[#111318]/25 bg-white text-sm focus:border-[#111318]"
+            rows={1}
+            value={text}
+            maxLength={POST_MAX * 2}
+            placeholder="Write a reply"
+            onChange={(event) => setText(event.target.value)}
+          />
+          <button type="submit" className="btn-primary px-3 py-2 text-sm" disabled={reply.isPending || length === 0 || length > POST_MAX}>
+            {reply.isPending ? "Signing…" : "Reply"}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }

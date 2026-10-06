@@ -3,6 +3,7 @@ import { DECLUB_REWARDS_ADDRESS } from "../config";
 import { epochAt, epochWindow } from "../rewards";
 import type { Registry } from "../verifiedAssets";
 import { claimableFor, clubRewards, readEpoch } from "./rewards";
+import { clubStandings, standingsView } from "./standings";
 import { xApiConfigured } from "./xApi";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 
@@ -73,5 +74,29 @@ export function clubRewardsHandler(registry: Registry, deps: RouteDeps = {}) {
     if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
     const view = await clubRewards(store, entry.address);
     return Response.json({ enabled: true, ...base, ...view }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
+  };
+}
+
+/**
+ * GET /api/clubs/[token]/rewards/standings?wallet=0x…: the running epoch as if it closed now
+ * (ADR 0032), with the reader's own place when they give their Club wallet. An estimate, a few
+ * minutes old at most.
+ */
+export function standingsHandler(registry: Registry, deps: RouteDeps & { standings?: typeof clubStandings } = {}) {
+  return async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+    const { token } = await params;
+    if (!isAddress(token, { strict: false })) return fail(400, "bad_request", "Give a token address.");
+    const entry = registry.clubFor(token);
+    if (!entry) return fail(404, "not_found", "No Club for this asset.");
+    const wallet = new URL(request.url).searchParams.get("wallet");
+    if (wallet && !isAddress(wallet, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
+    const store = storeOf(deps);
+    if (!store) return Response.json({ enabled: false, standings: null }, { headers: NO_STORE });
+    if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
+    const standings = await (deps.standings ?? clubStandings)(store, entry, deps.now ? { now: deps.now } : {});
+    const view = standings ? standingsView(standings, wallet ?? undefined) : null;
+    // The reader's own place depends on the wallet they asked for, so only the plain view is shared.
+    const cache = wallet ? "private, max-age=30" : "public, s-maxage=60, stale-while-revalidate=120";
+    return Response.json({ enabled: true, standings: view }, { headers: { "Cache-Control": cache } });
   };
 }

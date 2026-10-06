@@ -42,6 +42,9 @@ export const MoreIcon = (p: P) => (<Icon {...p}><circle cx="5.5" cy="12" r="1" f
 export const ArrowLeftIcon = (p: P) => (<Icon {...p}><path d="M19 12H5" /><path d="m11 6-6 6 6 6" /></Icon>);
 export const SearchIcon = (p: P) => (<Icon {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></Icon>);
 export const PinIcon = (p: P) => (<Icon {...p}><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" /><path d="M12 14v6" /></Icon>);
+export const HeartIcon = ({ filled, ...p }: P & { filled?: boolean }) => (
+  <Icon {...p}><path fill={filled ? "currentColor" : "none"} d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10Z" /></Icon>
+);
 export const FlagIcon = (p: P) => (<Icon {...p}><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></Icon>);
 export const TrashIcon = (p: P) => (<Icon {...p}><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6.5 7l1 12.5h9l1-12.5" /></Icon>);
 export const EyeIcon = (p: P) => (<Icon {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" /></Icon>);

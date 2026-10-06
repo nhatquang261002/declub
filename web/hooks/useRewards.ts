@@ -8,6 +8,7 @@ import { useNow } from "@/hooks/useNow";
 import { clubRewards as rewardsContract } from "@/lib/contracts";
 import type { ClaimableLeaf } from "@/lib/rewards";
 import type { ClubRewardsView } from "@/lib/server/rewards";
+import type { StandingsView } from "@/lib/server/standings";
 
 // Club Rewards (ADR 0022). The server knows what each epoch pays whom; the chain knows which
 // epochs are published, open and claimed. Both are read here and joined per leaf.
@@ -33,6 +34,17 @@ export function useClubRewards(token: string) {
     retry: 1,
   });
   return { data: query.data, isLoading: query.isLoading, error: query.error };
+}
+
+/** The running epoch as if it closed now (ADR 0032), with `wallet`'s own place. */
+export function useClubStandings(token: string, wallet: string | undefined) {
+  const query = useQuery({
+    queryKey: ["club-standings", token.toLowerCase(), wallet?.toLowerCase() ?? ""],
+    queryFn: () => getJson<{ enabled: boolean; standings: StandingsView | null }>(`/api/clubs/${token}/rewards/standings${wallet ? `?wallet=${wallet}` : ""}`),
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  return { standings: query.data?.standings ?? null, isLoading: query.isLoading, error: query.error };
 }
 
 /** Where one leaf stands. */

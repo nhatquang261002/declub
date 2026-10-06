@@ -5,7 +5,7 @@ import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pills } from "@/components/Pills";
 import { HolderBadge } from "@/components/HolderBadge";
-import { BanIcon, CrownIcon, ShieldIcon } from "@/components/Icons";
+import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -44,6 +44,17 @@ export function RoleChip({ role }: { role?: PublicMember["role"] }) {
     );
   }
   return null;
+}
+
+/** Epochs in a row of posting on the Board (ADR 0032); shown from the second. */
+export function StreakChip({ streak }: { streak?: number }) {
+  if (!streak || streak < 2) return null;
+  return (
+    <span className="chip chip-peach" title={`Active on the Board ${streak} epochs in a row`}>
+      <FlameIcon />
+      {streak} wk
+    </span>
+  );
 }
 
 /** What the viewer's role lets them do to this member, by the rule the server applies too. */
@@ -110,6 +121,7 @@ function Podium({
             <span className="flex flex-wrap justify-center gap-1.5">
               <RoleChip role={m.role} />
               {m.holder && <HolderBadge symbol={symbol} />}
+              <StreakChip streak={m.streak} />
             </span>
             <span className="text-xs text-muted">
               {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}
@@ -176,6 +188,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                         <FollowButton target={m.wallet} follows={follows} />
                         <RoleChip role={m.role} />
                         {m.holder && <HolderBadge symbol={symbol} />}
+                        <StreakChip streak={m.streak} />
                       </div>
                       <p className="text-xs text-muted">
                         Joined {ago(Math.floor(m.joinedAt / 1000), now)} · {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}

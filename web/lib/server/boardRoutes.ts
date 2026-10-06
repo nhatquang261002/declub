@@ -5,6 +5,9 @@ import {
   banUser,
   claimOwner,
   createSignedPost,
+  createSignedReply,
+  exportReplies,
+  listReplies,
   deletePost,
   exportPosts,
   hidePost,
@@ -17,6 +20,7 @@ import {
   roleIn,
   setRole,
   unbanUser,
+  likePost,
   updateProfile,
   type Actor,
   type Deps as BoardDeps,
@@ -34,7 +38,7 @@ import { authenticate } from "./privy";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
-import { parsePostMessage, socialDomain, SOCIAL_TYPES } from "../social";
+import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -82,8 +86,10 @@ const REFUSALS: Record<string, [number, string]> = {
   not_found: [404, "Not found."],
   forbidden: [403, "You can’t do that."],
   own_post: [409, "You can’t report your own post."],
+  own_like: [409, "You can’t like your own post."],
   too_many_pinned: [409, "At most 3 posts can be pinned."],
   hidden: [409, "A hidden post can’t be pinned."],
+  thread_full: [409, "This post has as many replies as it can take."],
   too_many_moderators: [409, "A Club has at most 10 Moderators."],
   already_owner: [409, "They are already the Owner."],
   no_change: [409, "Nothing to change."],
@@ -158,6 +164,35 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
+/** GET (public) and POST (members) /api/clubs/[token]/posts/[id]/replies (ADR 0032). */
+export function repliesHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: ItemCtx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false, replies: [] }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const viewer = await softViewer(request, deps);
+      const result = await listReplies(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
+      if (!result.ok) return refuse(result.reason);
+      const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
+      return Response.json({ enabled: true, replies: result.replies }, { headers: { "Cache-Control": cache } });
+    },
+
+    async POST(request: Request, ctx: ItemCtx) {
+      const f = await front(registry, ctx, request, deps, "club-reply");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const result = await createSignedReply(f.store, f.entry, f.user.id, (await ctx.params).id, { message: parseReplyMessage(body.message), signature: body.signature }, deps);
+      if (result.ok) return json({ enabled: true, post: result.post }, 201);
+      if (result.reason === "hidden") return refuse("hidden", "A hidden post can’t take replies.");
+      if (result.reason === "not_found") return refuse("not_found", "That post wasn’t found, or it’s a reply: replies go under the post.");
+      return refuse(result.reason);
+    },
+  };
+}
+
 /**
  * GET /api/clubs/[token]/feed: every signed post on the Club's Board, newest first, as the exact
  * EIP-712 message and signature, with the typed-data domain to check them against. Public, so any
@@ -170,9 +205,9 @@ export function feedHandler(registry: Registry) {
     const store = getStore();
     if (!store) return Response.json({ enabled: false, posts: [] }, { headers: { "Cache-Control": "no-store" } });
     if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-    const posts = await exportPosts(store, entry);
+    const [posts, replies] = await Promise.all([exportPosts(store, entry), exportReplies(store, entry)]);
     return Response.json(
-      { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post }, posts },
+      { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post, Reply: SOCIAL_TYPES.Reply }, posts, replies },
       { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
     );
   };
@@ -196,6 +231,18 @@ export function reportHandler(registry: Registry, deps: RouteDeps = {}) {
     const result = await reportPost(f.store, f.entry, f.user.id, (await ctx.params).id, deps);
     return result.ok ? json({ enabled: true, hidden: result.hidden }) : refuse(result.reason);
   };
+}
+
+/** POST (like) and DELETE (take it back) /api/clubs/[token]/posts/[id]/like */
+export function likeHandlers(registry: Registry, deps: RouteDeps = {}) {
+  const act = (like: boolean) =>
+    async function (request: Request, ctx: ItemCtx) {
+      const f = await front(registry, ctx, request, deps, "club-like", 240);
+      if (f instanceof Response) return f;
+      const result = await likePost(f.store, f.entry, f.user.id, (await ctx.params).id, like);
+      return result.ok ? json({ enabled: true, likes: result.likes }) : refuse(result.reason);
+    };
+  return { POST: act(true), DELETE: act(false) };
 }
 
 /** POST /api/clubs/[token]/posts/[id]/hide  { hidden: boolean } */

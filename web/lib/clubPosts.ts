@@ -15,8 +15,14 @@ export const REPORTS_TO_HIDE = 3;
 export const MAX_PINNED = 3;
 /** How many posts a Club keeps. Older ones fall off the list. */
 export const POSTS_KEPT = 500;
+/** A member likes at most this many posts an hour, so one account can't blanket a Club. */
+export const LIKES_PER_HOUR = 120;
 /** How many posts one read returns. */
 export const POSTS_SHOWN = 100;
+/** Replies (ADR 0032): one level deep, at most this many per post. */
+export const REPLIES_KEPT = 50;
+export const REPLIES_PER_HOUR = 20;
+export const REPLY_COOLDOWN_SEC = 10;
 
 export type PostKind = "note" | "looking";
 /** A deal or a signed swap a "Looking for" post points at, or an X post a note shares. */
@@ -44,6 +50,8 @@ export type StoredPost = {
   signed?: { signature: `0x${string}`; at: number };
   /** A shared X post's card, read when it was posted. Not part of what was signed. */
   x?: StoredXCard;
+  /** On a reply: the top-level post it answers. Replies have no link and aren't on the Board list. */
+  parent?: string;
 };
 
 /**
@@ -64,12 +72,18 @@ export type PublicPost = {
   hidden: HiddenBy | null;
   pinned: boolean;
   mine: boolean;
+  /** Members who liked it (0 for a hidden post), and whether the viewer is one. */
+  likes: number;
+  liked: boolean;
   /** Moderators only, on a reported post: how many members reported it. */
   reports?: number;
   /** The author signed it with their wallet, so it can be checked anywhere (the Club's feed export). */
   signed: boolean;
   /** A shared X post's card; hidden with the text. */
   x?: StoredXCard;
+  /** How many replies a top-level post has; on a reply, the post it answers. */
+  replies?: number;
+  parent?: string;
 };
 
 // Control characters, line breaks, zero-width and bidirectional overrides: none belongs in a short
@@ -115,6 +129,8 @@ export function viewPost(
   viewer: { userId?: string; staff: boolean },
   pinned: boolean,
   reports?: number,
+  likes: { count: number; liked: boolean } = { count: 0, liked: false },
+  replies?: number,
 ): PublicPost {
   const mine = viewer.userId !== undefined && viewer.userId === post.userId;
   const seeText = !post.hidden || mine || viewer.staff;
@@ -129,8 +145,11 @@ export function viewPost(
     hidden: post.hidden ?? null,
     pinned,
     mine,
+    likes: post.hidden ? 0 : likes.count,
+    liked: !post.hidden && likes.liked,
     signed: !!post.signed,
     ...(viewer.staff && reports !== undefined ? { reports } : {}),
+    ...(post.parent ? { parent: post.parent } : replies !== undefined ? { replies } : {}),
   };
 }
 

@@ -3,11 +3,15 @@ import { createPublicClient, getAddress, http, parseAbi, verifyTypedData, type A
 import { chain } from "../chain";
 import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import {
+  LIKES_PER_HOUR,
   MAX_PINNED,
   POSTS_KEPT,
   POSTS_PER_HOUR,
   POSTS_SHOWN,
   POST_COOLDOWN_SEC,
+  REPLIES_KEPT,
+  REPLIES_PER_HOUR,
+  REPLY_COOLDOWN_SEC,
   REPORTS_PER_DAY,
   REPORTS_TO_HIDE,
   checkProfileEdit,
@@ -29,8 +33,20 @@ import { lensOf, type LensContext, type LensId } from "../lenses";
 import { coinRule } from "../members";
 import { memberScore, score } from "../momentum";
 import { toScored } from "../clubs";
-import { SIGNED_SKEW_SEC, linkString, postId, postTypedData, type PostMessage, type SignedPost } from "../social";
+import {
+  SIGNED_SKEW_SEC,
+  linkString,
+  postId,
+  postTypedData,
+  replyId,
+  replyTypedData,
+  type PostMessage,
+  type ReplyMessage,
+  type SignedPost,
+  type SignedReply,
+} from "../social";
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
+import { activeKey, recordActive } from "./activeDays";
 import { activityKey, viemReader } from "./activity";
 import { clubEvents } from "./clubs";
 import { followingOf } from "./follows";
@@ -54,6 +70,8 @@ import {
 } from "./clubState";
 import { allRows, getMember, leaveClub, memberKey, membersKey, sharedWallets, userClubsKey } from "./members";
 import { withinLimit, type Store } from "./store";
+import { standingsKey, streaksKey } from "./streaks";
+import { epochAt } from "../rewards";
 import { oembedLookup, purgeXShares, recordXShare, removeXShare, setXShareHidden, type XDeps, type XShareVerdict } from "./xPosts";
 import type { XCard } from "../xPosts";
 
@@ -77,6 +95,10 @@ export type Deps = XDeps & {
    * smart wallet (ERC-1271); tests use a local signer.
    */
   verifyPost?: (signer: Address, message: PostMessage, signature: Hex) => Promise<boolean>;
+  /** The same check for a reply. */
+  verifyReply?: (signer: Address, message: ReplyMessage, signature: Hex) => Promise<boolean>;
+  /** The rewards epochs a post's active day is recorded against; the configured ones by default. */
+  epochs?: { genesis: number; length: number };
 };
 
 /** Who is acting: their Privy user id and a wallet to name them by in the log. */
@@ -89,6 +111,13 @@ export const postsKey = (token: string) => `declub:club-posts:${CHAIN_ID}:${toke
 export const postKey = (token: string, id: string) => `declub:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 export const reportsKey = (token: string, id: string) => `declub:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 /** Every signed post a wallet wrote, across Clubs, as `club:id`, newest first. */
+/** The members who liked a post, and the posts a member liked in a Club (to mark them on a read). */
+export const likesKey = (token: string, id: string) => `declub:club-likes:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+export const likedKey = (token: string, userId: string) => `declub:club-liked:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
+
+/** The replies to a post (ADR 0032), by id. */
+export const repliesKey = (token: string, id: string) => `declub:club-replies:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+
 export const walletPostsKey = (wallet: string) => `declub:wallet-posts:${CHAIN_ID}:${wallet.toLowerCase()}`;
 /** The reports that count toward hiding a post: those filed by Holders and staff. */
 export const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
@@ -215,27 +244,30 @@ export async function createPost(
   };
   await store.set(postKey(token, post.id), post);
   await store.rank(postsKey(token), [{ member: post.id, score: post.at }], POSTS_KEPT);
-  if (post.signed) {
-    await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
-  }
-  return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false), ...(xShare ? { xShare } : {}) };
+  // Every post is indexed by its author's wallet (the export reads only the signed ones; the inbox, all).
+  await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
+  // A post makes its author's day active for Club Rewards (ADR 0032).
+  await recordActive(store, token, post, deps.epochs?.genesis, deps.epochs?.length);
+  return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false, undefined, undefined, 0), ...(xShare ? { xShare } : {}) };
 }
 
 export type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
 
 let verifier: PublicClient | undefined;
 /** viem's check: an EOA's signature, or a smart wallet's through ERC-1271. */
-async function viemVerifyPost(signer: Address, message: PostMessage, signature: Hex): Promise<boolean> {
+async function viemVerifyTyped(signer: Address, typed: ReturnType<typeof postTypedData> | ReturnType<typeof replyTypedData>, signature: Hex): Promise<boolean> {
   // A plain wallet's signature is checked here; only a smart wallet costs a call (ERC-1271).
-  if (await verifyTypedData({ address: signer, signature, ...postTypedData(message) }).catch(() => false)) return true;
+  if (await verifyTypedData({ address: signer, signature, ...typed }).catch(() => false)) return true;
   verifier ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
   try {
     if (!(await verifier.getCode({ address: signer }))) return false;
-    return await verifier.verifyTypedData({ address: signer, signature, ...postTypedData(message) });
+    return await verifier.verifyTypedData({ address: signer, signature, ...typed });
   } catch {
     return false;
   }
 }
+const viemVerifyPost = (signer: Address, message: PostMessage, signature: Hex) => viemVerifyTyped(signer, postTypedData(message), signature);
+const viemVerifyReply = (signer: Address, message: ReplyMessage, signature: Hex) => viemVerifyTyped(signer, replyTypedData(message), signature);
 
 /**
  * A post the author signed (ADR 0023). The message must be exactly what `createPost` would store,
@@ -284,7 +316,7 @@ export async function createSignedPost(
  * restoring a post brings it back.
  */
 function toSigned(token: string, post: StoredPost): SignedPost | null {
-  if (!post.signed || post.hidden) return null;
+  if (!post.signed || post.hidden || post.parent) return null;
   return {
     id: post.id,
     signer: getAddress(post.wallet),
@@ -360,7 +392,24 @@ export async function listPosts(
       ordered.filter((p) => p.hidden || p.reported).map(async (p) => counts.set(p.id, await store.countMembers(reportsKey(token, p.id)))),
     );
   }
-  return { posts: ordered.map((p) => viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id))), role };
+  const liked = new Set(viewer.userId ? await store.members(likedKey(token, viewer.userId)) : []);
+  const likes = new Map<string, number>();
+  const replies = new Map<string, number>();
+  await Promise.all(
+    ordered
+      .filter((p) => !p.hidden)
+      .map(async (p) => {
+        const [likeCount, replyCount] = await Promise.all([store.countMembers(likesKey(token, p.id)), store.countMembers(repliesKey(token, p.id))]);
+        likes.set(p.id, likeCount);
+        replies.set(p.id, replyCount);
+      }),
+  );
+  return {
+    posts: ordered.map((p) =>
+      viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id), { count: likes.get(p.id) ?? 0, liked: liked.has(p.id) }, replies.get(p.id) ?? 0),
+    ),
+    role,
+  };
 }
 
 /** What a lens needs, read only when it needs it. */
@@ -379,7 +428,146 @@ async function lensContext(store: Store, entry: AssetEntry, lens: LensId, as: st
   return ctx;
 }
 
-export type Refusal = "archived" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden";
+
+// ---------------------------------------------------------------------------------------------
+// Replies (ADR 0032): one level under a top-level post, signed like posts. A reply is stored as a
+// post with a `parent`, so likes, reports, hiding, deleting and bans work on it unchanged; it isn't
+// on the Board list or in the lenses, and it earns nothing toward Club Rewards.
+
+export type ReplyRefusal = Exclude<PostRefusal, "bad_kind" | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable"> | "not_found" | "hidden" | "thread_full";
+
+export type ReplyInput = { text: unknown; signed?: { message: ReplyMessage; signature: Hex } };
+
+export async function createReply(
+  store: Store,
+  entry: ClubEntry,
+  userId: string,
+  parentId: string,
+  input: ReplyInput,
+  deps: Deps = {},
+): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: ReplyRefusal }> {
+  const token = entry.address.toLowerCase();
+  if (entry.club === "archived") return { ok: false, reason: "archived" };
+  const row = await getMember(store, token, userId);
+  if (!row) return { ok: false, reason: "not_member" };
+  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
+  const role = await roleIn(store, token, userId, deps);
+  const profile = await loadProfile(store, token);
+  if (profile.holdersOnlyPosts && !row.holder && !isStaff(role)) return { ok: false, reason: "holders_only" };
+  if ((await sharedWallets(store, userId)).size === 0) return { ok: false, reason: "no_profile" };
+
+  const parent = await getPost(store, token, parentId);
+  // One level: a reply answers a post, never another reply.
+  if (!parent || parent.parent) return { ok: false, reason: "not_found" };
+  if (parent.hidden) return { ok: false, reason: "hidden" };
+  const text = cleanText(input.text);
+  if (!text.ok) return { ok: false, reason: text.reason };
+  if ((await store.countMembers(repliesKey(token, parent.id))) >= REPLIES_KEPT) return { ok: false, reason: "thread_full" };
+
+  if (!(await withinLimit(store, `club-reply-cd:${token}`, userId, 1, REPLY_COOLDOWN_SEC))) return { ok: false, reason: "cooldown" };
+  if (!(await withinLimit(store, `club-reply-hr:${token}`, userId, REPLIES_PER_HOUR, 3600))) return { ok: false, reason: "rate_limited" };
+
+  const id = input.signed ? replyId(input.signed.message) : randomUUID().replaceAll("-", "");
+  const reply: StoredPost = {
+    id,
+    userId,
+    wallet: row.displayWallet,
+    kind: "note",
+    text: text.text,
+    at: nowOf(deps),
+    parent: parent.id,
+    ...(input.signed ? { signed: { signature: input.signed.signature, at: input.signed.message.at } } : {}),
+  };
+  await store.set(postKey(token, id), reply);
+  await store.addMember(repliesKey(token, parent.id), id);
+  // Indexed by wallet for the author's inbox; the wallet export leaves replies out.
+  await store.rank(walletPostsKey(reply.wallet), [{ member: `${token}:${id}`, score: reply.at }], POSTS_KEPT);
+  return { ok: true, post: viewPost(reply, { userId, staff: isStaff(role) }, false) };
+}
+
+export type SignedReplyRefusal = ReplyRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
+
+/** A reply the author signed: the message must be exactly what `createReply` stores, as for posts. */
+export async function createSignedReply(
+  store: Store,
+  entry: ClubEntry,
+  userId: string,
+  parentId: string,
+  body: { message: ReplyMessage | null; signature: unknown },
+  deps: Deps = {},
+): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: SignedReplyRefusal }> {
+  const { message, signature } = body;
+  if (!message || typeof signature !== "string" || !/^0x[0-9a-fA-F]+$/.test(signature)) return { ok: false, reason: "unsigned" };
+  const token = entry.address.toLowerCase();
+  if (message.club.toLowerCase() !== token) return { ok: false, reason: "wrong_club" };
+  if (message.parent !== parentId.toLowerCase()) return { ok: false, reason: "not_clean" };
+  const text = cleanText(message.text);
+  if (!text.ok) return { ok: false, reason: text.reason };
+  if (text.text !== message.text) return { ok: false, reason: "not_clean" };
+  if (Math.abs(message.at - Math.floor(nowOf(deps) / 1000)) > SIGNED_SKEW_SEC) return { ok: false, reason: "stale" };
+
+  const row = await getMember(store, token, userId);
+  if (!row) return { ok: false, reason: "not_member" };
+  const signer = getAddress(row.displayWallet);
+  if (!(await (deps.verifyReply ?? viemVerifyReply)(signer, message, signature as Hex))) return { ok: false, reason: "bad_signature" };
+
+  const existing = await getPost(store, token, replyId(message));
+  if (existing) {
+    if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" };
+    return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) };
+  }
+  return createReply(store, entry, userId, message.parent, { text: message.text, signed: { message, signature: signature as Hex } }, deps);
+}
+
+/**
+ * A post's replies as `viewer` sees them, oldest first. A hidden post's thread is shown only to
+ * staff; a hidden reply shows a placeholder, as on the Board.
+ */
+export async function listReplies(
+  store: Store,
+  entry: AssetEntry,
+  parentId: string,
+  viewer: { userId?: string },
+  deps: Deps = {},
+): Promise<{ ok: true; replies: PublicPost[] } | { ok: false; reason: "not_found" }> {
+  const token = entry.address.toLowerCase();
+  const parent = await getPost(store, token, parentId);
+  if (!parent || parent.parent) return { ok: false, reason: "not_found" };
+  const role = viewer.userId ? await roleIn(store, token, viewer.userId, deps) : null;
+  const staff = role !== null && isStaff(role);
+  if (parent.hidden && !staff && parent.userId !== viewer.userId) return { ok: true, replies: [] };
+  const ids = await store.members(repliesKey(token, parent.id));
+  const rows = (await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)))).filter((r): r is StoredPost => r !== null).sort((a, b) => a.at - b.at);
+  const liked = new Set(viewer.userId ? await store.members(likedKey(token, viewer.userId)) : []);
+  const likes = await Promise.all(rows.map((r) => (r.hidden ? 0 : store.countMembers(likesKey(token, r.id)))));
+  return { ok: true, replies: rows.map((r, i) => viewPost(r, { userId: viewer.userId, staff }, false, undefined, { count: likes[i]!, liked: liked.has(r.id) })) };
+}
+
+/** A Club's signed replies to its listed posts, for the public export. Hidden ones are left out. */
+export async function exportReplies(store: Store, entry: AssetEntry, limit = POSTS_KEPT): Promise<SignedReply[]> {
+  const token = entry.address.toLowerCase();
+  const parents = await store.ranked(postsKey(token), limit);
+  const ids = (await Promise.all(parents.map((id) => store.members(repliesKey(token, id))))).flat();
+  const rows = await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)));
+  return rows
+    .filter((r): r is StoredPost => !!r && !!r.signed && !r.hidden && !!r.parent)
+    .sort((a, b) => b.at - a.at)
+    .map((r) => ({
+      id: r.id,
+      signer: getAddress(r.wallet),
+      message: { club: getAddress(token), parent: r.parent!, text: r.text, at: r.signed!.at },
+      signature: r.signed!.signature,
+    }));
+}
+
+/** Every key a post and its thread keep, for a delete or a purge. */
+async function threadKeys(store: Store, token: string, id: string): Promise<string[]> {
+  const replies = await store.members(repliesKey(token, id));
+  const keysOf = (pid: string) => [postKey(token, pid), reportsKey(token, pid), countedReportsKey(token, pid), likesKey(token, pid)];
+  return [...keysOf(id), ...replies.flatMap(keysOf), repliesKey(token, id)];
+}
+
+export type Refusal = "archived" | "own_like" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden";
 
 /** Author, or staff who may act on the author's role. */
 export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, id: string, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
@@ -392,11 +580,44 @@ export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, 
     const mine = roleOf(roles, actor.userId, isAdmin(deps, actor.userId));
     if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
   }
-  await store.del(postKey(token, id), reportsKey(token, id), countedReportsKey(token, id));
+  // Deleting a post takes its thread with it; deleting a reply takes it out of its thread.
+  await store.del(...(await threadKeys(store, token, id)));
+  if (post.parent) await store.removeMember(repliesKey(token, post.parent), id);
   if (post.link?.kind === "x") await removeXShare(store, token, post.link.id, id);
   await unpin(store, token, id);
   if (!own) await log(store, entry, actor, "delete_post", id);
   return { ok: true };
+}
+
+/**
+ * A member likes a post, or takes the like back. Likes are a signal of attention, not a score: they
+ * feed the author's notifications and nothing else, so there is nothing to farm. A member can't like
+ * their own post or a hidden one, and must be in the Club.
+ */
+export async function likePost(
+  store: Store,
+  entry: AssetEntry,
+  userId: string,
+  id: string,
+  like: boolean,
+): Promise<{ ok: true; likes: number } | { ok: false; reason: Refusal }> {
+  const token = entry.address.toLowerCase();
+  if (entry.club === "archived") return { ok: false, reason: "archived" };
+  if (!(await getMember(store, token, userId))) return { ok: false, reason: "not_member" };
+  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
+  const post = await getPost(store, token, id);
+  if (!post) return { ok: false, reason: "not_found" };
+  if (post.hidden) return { ok: false, reason: "hidden" };
+  if (post.userId === userId) return { ok: false, reason: "own_like" };
+  if (like) {
+    if (!(await withinLimit(store, "club-like", userId, LIKES_PER_HOUR, 3_600))) return { ok: false, reason: "rate_limited" };
+    await store.addMember(likesKey(token, id), userId);
+    await store.addMember(likedKey(token, userId), id);
+  } else {
+    await store.removeMember(likesKey(token, id), userId);
+    await store.removeMember(likedKey(token, userId), id);
+  }
+  return { ok: true, likes: await store.countMembers(likesKey(token, id)) };
 }
 
 /**
@@ -480,7 +701,7 @@ export async function pinPost(store: Store, entry: AssetEntry, actor: Actor, id:
   const profile = await loadProfile(store, token);
   if (pin) {
     const post = await getPost(store, token, id);
-    if (!post) return { ok: false, reason: "not_found" };
+    if (!post || post.parent) return { ok: false, reason: "not_found" };
     if (post.hidden) return { ok: false, reason: "hidden" };
     if (!profile.pinned.includes(id)) {
       if (profile.pinned.length >= MAX_PINNED) return { ok: false, reason: "too_many_pinned" };
@@ -688,15 +909,19 @@ export type PurgeCounts = { members: number; posts: number };
  * profile, bans of that Club, the log and the activity log. For hidden Clubs, admin only; nothing
  * calls it by itself.
  */
-export async function purgeClub(store: Store, token: string): Promise<PurgeCounts> {
+export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "now"> = {}): Promise<PurgeCounts> {
   const lower = token.toLowerCase();
   const ids = await store.members(membersKey(lower));
   await Promise.all(ids.map((id) => store.removeMember(userClubsKey(id), lower)));
   await store.del(...ids.map((id) => memberKey(lower, id)), membersKey(lower));
 
   const postIds = await store.ranked(postsKey(lower), POSTS_KEPT);
-  await store.del(...postIds.flatMap((id) => [postKey(lower, id), reportsKey(lower, id), countedReportsKey(lower, id)]), postsKey(lower));
+  const keys = (await Promise.all(postIds.map((id) => threadKeys(store, lower, id)))).flat();
+  await store.del(...keys, postsKey(lower), ...ids.map((id) => likedKey(lower, id)));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
   await purgeXShares(store, lower);
+  // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days.
+  const epochs = Math.max(0, epochAt(Math.floor(nowOf(deps) / 1000)) + 1);
+  await store.del(streaksKey(lower), standingsKey(lower), ...Array.from({ length: epochs }, (_, n) => activeKey(lower, n)));
   return { members: ids.length, posts: postIds.length };
 }

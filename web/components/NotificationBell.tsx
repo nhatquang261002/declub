@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellIcon, CheckIcon, ClockIcon, CrossIcon, InboxIcon, PauseIcon, SwapIcon } from "@/components/Icons";
+import { BellIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrossIcon, FlameIcon, HeartIcon, InboxIcon, PauseIcon, PinIcon, SwapIcon, TrendUpIcon, XLogoIcon } from "@/components/Icons";
 import { usePopover } from "@/components/Popover";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification, NotificationKind } from "@/lib/notifications";
@@ -15,6 +15,13 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   "intent-settled": "Settled",
   "intent-paused": "Paused",
   "intent-dropped": "Dropped",
+  "club-like": "Liked",
+  "club-pinned": "Pinned",
+  "club-reward": "Rewards",
+  "club-reply": "Replied",
+  "club-xshare": "Counted",
+  "club-rank": "This epoch",
+  "club-closing": "Ending soon",
 };
 
 // One icon and tint per kind: the colour says good news, needs you, or gone.
@@ -26,6 +33,13 @@ const KIND_LOOK: Record<NotificationKind, { icon: ReactNode; tone: string }> = {
   "intent-settled": { icon: <SwapIcon />, tone: "bg-mint/15 text-mint" },
   "intent-paused": { icon: <PauseIcon />, tone: "bg-warn/15 text-warn" },
   "intent-dropped": { icon: <CrossIcon />, tone: "bg-danger/15 text-danger" },
+  "club-like": { icon: <HeartIcon />, tone: "bg-peach/20 text-peach" },
+  "club-pinned": { icon: <PinIcon />, tone: "bg-mint/15 text-mint" },
+  "club-reward": { icon: <CoinIcon />, tone: "bg-mint/15 text-mint" },
+  "club-reply": { icon: <ChatIcon />, tone: "bg-peach/20 text-peach" },
+  "club-xshare": { icon: <XLogoIcon />, tone: "bg-mint/15 text-mint" },
+  "club-rank": { icon: <TrendUpIcon />, tone: "bg-mint/15 text-mint" },
+  "club-closing": { icon: <FlameIcon />, tone: "bg-warn/15 text-warn" },
 };
 
 const MAX_SHOWN = 20;

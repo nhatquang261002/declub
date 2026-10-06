@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { CHAIN_ID, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import {
+  clubNotifications,
   deriveIntentNotifications,
   deriveNotifications,
   NEWS_KINDS,
   sortNotifications,
   type AppNotification,
+  type ClubInboxItem,
 } from "@/lib/notifications";
 import { loadState, saveState } from "@/lib/userState";
 import { useAccessToken } from "./useAccessToken";
@@ -75,15 +78,32 @@ export function useNotifications() {
 
   // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
   const intents = useIntents({ status: "all", maker: address, enabled: !!address });
-  const isLoading = dealsLoading || intents.isLoading;
+
+  // What the Clubs say (likes, pins, rewards) needs the server's read of the member's posts, so it
+  // only exists signed in. Without it the bell shows deals alone.
+  const inboxToken = useAccessToken();
+  const inbox = useQuery({
+    queryKey: ["club-inbox", address?.toLowerCase()],
+    enabled: !!address && !!inboxToken,
+    refetchInterval: 60_000,
+    retry: 1,
+    queryFn: async () => {
+      const token = await inboxToken?.();
+      const res = await fetch("/api/me/club-inbox", { headers: token ? { authorization: `Bearer ${token}` } : undefined });
+      const body = (await res.json().catch(() => null)) as { enabled?: boolean; items?: ClubInboxItem[] } | null;
+      return res.ok && body?.enabled && Array.isArray(body.items) ? body.items : [];
+    },
+  });
+  const isLoading = dealsLoading || intents.isLoading || (!!inboxToken && inbox.isLoading);
 
   const notifications = useMemo(
     () =>
       sortNotifications([
         ...deriveNotifications(deals, address, now),
         ...deriveIntentNotifications(intents.intents, address, now),
+        ...clubNotifications(inbox.data ?? []),
       ]),
-    [deals, intents.intents, address, now],
+    [deals, intents.intents, inbox.data, address, now],
   );
 
   // The snapshot is the raw string so React can compare it by value. "" = never opened.

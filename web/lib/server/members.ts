@@ -1,7 +1,7 @@
 import { createPublicClient, erc20Abi, http, type Address, type PublicClient } from "viem";
 import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
-import type { ActivityEvent } from "../clubs";
+import { toScored, type ActivityEvent } from "../clubs";
 import {
   MAX_MEMBERS,
   RECHECK_PER_READ,
@@ -20,7 +20,9 @@ import { score } from "../momentum";
 import { profileKey, userWalletsKey, type StoredProfile } from "../profiles";
 import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { withoutUser } from "../clubRoles";
+import { epochAt } from "../rewards";
 import { isBanned, loadProfile, loadRoles, saveRoles } from "./clubState";
+import { liveStreak, readStreaks } from "./streaks";
 import type { Store } from "./store";
 
 /**
@@ -204,11 +206,12 @@ export async function listMembers(
     );
     rows = rows.map((row) => fresh.get(row.userId) ?? row);
   }
-  const scores = score(
-    events.map((e) => ({ kind: e.kind, at: e.at, parties: e.parties })),
-    nowSec,
-  );
-  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address));
+  // `toScored` keeps an X share's weight, so a weak one counts half here too, as in the lenses.
+  const scores = score(events.map(toScored), nowSec);
+  const current = epochAt(nowSec);
+  const recorded = await readStreaks(store, entry.address);
+  const streaks = new Map(rows.map((row) => [row.userId, liveStreak(recorded[row.userId], current)]));
+  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks);
 }
 
 /** How many members hold the asset, as of their last check. Reads every row. */

@@ -442,12 +442,17 @@ const swapEvent = (at: number, parties: string[], seq = 0): ActivityEvent => ({
 const xEvent = (at: number, w: string, tweet: string, weight = 1): ActivityEvent => ({ id: `x:${tweet}`, kind: "xshare", contract: "", deal: tweet, block: 0, at, parties: [w], tokens: [token], weight });
 
 describe("the Holder bonus", () => {
-  const end = 2_000;
-  it("counts trading as Momentum does, with no decay", () => {
-    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(3)], 2)];
-    const a = activityPoints(events, null, [wallet(1)], end);
-    assert.equal(a.trading, 2 * MOMENTUM.swapWeight);
-    assert.equal(a.bonusBps, bonusBps(20));
+  it("ignores trading, so wash trading earns nothing", () => {
+    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2)];
+    const a = activityPoints(events, null, [wallet(1)]);
+    assert.deepEqual(a, { x: 0, days: 0, points: 0, bonusBps: 0 });
+  });
+
+  it("adds active days, at most 7, and a daily poster who shares on X each day earns the whole bonus", () => {
+    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
+    assert.equal(activityPoints([], null, [wallet(1)], 12).days, 7);
+    const week = Array.from({ length: 7 }, (_, i) => xEvent(100 + i, wallet(1), `t${i}`));
+    assert.equal(activityPoints(week, null, [wallet(1)], 7).bonusBps, REWARDS.maxBonusBps);
   });
 
   it("adds X shares: base points, reach on a log scale, capped per epoch", () => {
@@ -455,12 +460,12 @@ describe("the Holder bonus", () => {
     const reach = (posts: ReachRecord["posts"]): ReachRecord => ({ n: 0, collectedAt: 1, available: true, posts });
     const entry = (engagement: number, strength: "strong" | "weak" = "strong") => ({ club: token, wallet: wallet(1), ok: true, strength, engagement });
 
-    assert.equal(activityPoints(events, null, [wallet(1)], end).x, REWARDS.xShareBase * 1.5, "no reach read: base only, a weak share half");
-    const some = activityPoints(events, reach({ a: entry(7), b: entry(3, "weak") }), [wallet(1)], end);
+    assert.equal(activityPoints(events, null, [wallet(1)]).x, REWARDS.xShareBase * 1.5, "no reach read: base only, a weak share half");
+    const some = activityPoints(events, reach({ a: entry(7), b: entry(3, "weak") }), [wallet(1)]);
     assert.equal(some.x, REWARDS.xShareBase * 1.5 + REWARDS.reachWeight * (3 + 0.5 * 2));
-    const viral = activityPoints(events, reach({ a: entry(10 ** 12), b: entry(0, "weak") }), [wallet(1)], end);
+    const viral = activityPoints(events, reach({ a: entry(10 ** 12), b: entry(0, "weak") }), [wallet(1)]);
     assert.equal(viral.x, REWARDS.xShareBase * 1.5 + REWARDS.reachCapPerEpoch);
-    const gone = activityPoints(events, reach({ a: { ...entry(0), ok: false, strength: null }, b: entry(0, "weak") }), [wallet(1)], end);
+    const gone = activityPoints(events, reach({ a: { ...entry(0), ok: false, strength: null }, b: entry(0, "weak") }), [wallet(1)]);
     assert.equal(gone.x, REWARDS.xShareBase * 0.5, "a post the reach read refused counts nothing");
   });
 
@@ -526,7 +531,7 @@ describe("the Holder bonus", () => {
     assert.equal(result.status, "built");
     const record = result.status === "built" ? result.record : null;
     const holder = (w: string) => record!.leaves.find((l) => l.account === getAddress(w))!.breakdown.find((b) => b.kind === "holder")!;
-    assert.equal(holder(wallet(1)).bonusBps, bonusBps(MOMENTUM.swapWeight));
+    assert.equal(holder(wallet(1)).bonusBps, 0, "a swap earns no bonus");
     assert.equal(holder(wallet(2)).bonusBps, bonusBps(REWARDS.xShareBase + REWARDS.reachWeight * 4));
     assert.equal(holder(wallet(1)).shares, "1");
     assert.deepEqual(record!.reach, reach, "the reach is published with the epoch");

@@ -84,6 +84,8 @@ async function main() {
 
   const bonused = record.leaves.flatMap((l) => l.breakdown).filter((b) => (b.bonusBps ?? 0) > 0);
   if (bonused.length > 0) console.log(`  Holder bonus: ${bonused.length} Holder payouts got an activity bonus`);
+  const streaking = record.leaves.flatMap((l) => l.breakdown).filter((b) => (b.streak ?? 0) >= 2);
+  if (streaking.length > 0) console.log(`  Streaks: ${streaking.length} Holder payouts had a streak bonus`);
 
   if (!flag("publish")) {
     console.log("\nNot published. Run again with --publish, or send publish(epoch, root) with `total` as value from the operator.");

@@ -24,7 +24,7 @@ const SECTIONS: GuideSection[] = [
 
 const TABS = [
   { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals and signed swaps for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
-  { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
+  { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies under them. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
   { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by how much they trade it. <b>Follow</b> the ones you trust.</> },
   { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim.</> },
   { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>Only for the Club&apos;s staff: the description, links, pinned posts, moderators and bans.</> },
@@ -91,8 +91,8 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between members who hold the collection when the epoch is built, one share per NFT; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member holding the asset when the epoch is built. Your share waits under Rewards until you claim it."],
+  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} members who hold the most of the collection when the epoch is built, one share per NFT (a tie goes to whoever joined first); ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it."],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
@@ -202,7 +202,7 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small flat fee per side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s Holders, by how much they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
+                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} biggest Holders, by how much they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
                 <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
                 <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
               </ul>
@@ -230,11 +230,22 @@ export default function ClubsGuidePage() {
             </h3>
             <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
               Holding is the base: one share per NFT of the collection. A Holder&apos;s shares then count up to{" "}
-              <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for what they did in the Club that epoch: trading there, and sharing
-              their own X posts about the Club on its Board. Each counted post earns {REWARDS.xShareBase} points and a swap{" "}
-              {MOMENTUM.swapWeight}; {REWARDS.fullBonusPoints} points earn the full bonus. A Holder who does nothing still gets their base share.
+              <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for their activity on its Board: each day they post earns{" "}
+              {REWARDS.dayPoints} points, and each of their own X posts about the Club shared there earns {REWARDS.xShareBase}.{" "}
+              {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Trading
+              and replies earn nothing here, so they can&apos;t be farmed, and the bonus can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
+              who does nothing still gets their base share.
             </p>
             <ul className={`mt-3 space-y-1.5 text-sm leading-6 ${MUTED}`}>
+              <li>
+                <b className="text-[#111318]">Active days:</b> a day (UTC) with at least one post of yours on the Board that is still up. At most 7 an
+                epoch; a deleted or hidden post doesn&apos;t count.
+              </li>
+              <li>
+                <b className="text-[#111318]">Streaks:</b> {REWARDS.streakMinDays} or more active days in an epoch keep a streak going. From the second
+                epoch in a row it adds {percent(REWARDS.streakStepBps)} a week, up to {percent(REWARDS.maxStreakBps)}, on top of the bonus. The Rewards tab
+                shows where you stand while the epoch runs.
+              </li>
               <li>
                 <b className="text-[#111318]">What counts as about the Club:</b> a link to the Club or its token, a mention, quote or reply of the
                 project&apos;s X account (the Owner links it), or one of the Club&apos;s tags (half).

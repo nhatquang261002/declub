@@ -163,7 +163,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const { enabled, posts, isLoading, error } = useClubPosts(token, active.id, follows.me);
   const me = useClubMembership(token);
   const page = useClubPage(token);
-  const { report, remove, hide, pin, ban } = useClubActions(token);
+  const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
   const shown = useMemo(() => (filter === "all" ? posts : posts.filter((p) => p.kind === "looking")), [posts, filter]);
 
@@ -222,8 +222,10 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
               role={me.role}
               now={now}
               follows={follows}
+              thread={{ token, wallet: me.wallet, canReply: !!me.member && !archived && !holdersOnly }}
               actions={{
                 report: (id) => report.mutate(id),
+                like: (id, on) => like.mutate({ id, like: on }),
                 remove: (id) => remove.mutate(id),
                 hide: (id, hidden) => hide.mutate({ id, hidden }),
                 pin: (id, pinned) => pin.mutate({ id, pinned }),

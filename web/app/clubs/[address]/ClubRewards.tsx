@@ -2,13 +2,15 @@
 
 import type { Address } from "viem";
 import { LoadError } from "@/components/ErrorPanel";
-import { CrownIcon } from "@/components/Icons";
+import { CrownIcon, XLogoIcon } from "@/components/Icons";
 import { RewardsClaim } from "@/components/RewardsClaim";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubRewards } from "@/hooks/useRewards";
 import { formatMon, untilLabel } from "@/lib/format";
+import { recapLink } from "@/lib/recap";
 import { REWARDS, percent } from "@/lib/rewards";
+import { LiveStandings } from "./LiveStandings";
 import { Empty, Loading, Panel } from "./parts";
 
 const wei = (s: string | undefined) => BigInt(s ?? "0");
@@ -31,16 +33,17 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
       <Panel title="How this Club earns">
         <p className="text-sm">
           Every completed swap of {symbol} pays a small protocol fee. Each epoch,{" "}
-          <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s Holders, split by the NFTs they hold, and{" "}
-          <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as a member who holds {symbol}{" "}
+          <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s {REWARDS.maxHolders} biggest Holders, split by the NFTs they hold, and{" "}
+          <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as one of the {REWARDS.maxHolders} members holding the most {symbol}{" "}
           when the epoch closes: one share per NFT. A Club’s memecoin can make you a Holder, if the Owner allows it, but earns no share.
         </p>
         <p className="mt-2 text-sm">
-          Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for what you did in the Club that
-          epoch: trading here, and sharing your own X posts about the Club on its Board (one a day counts).{" "}
+          Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for posting on the Board (each day you post counts) and
+          sharing your own X posts about the Club there (one a day counts). Post on {REWARDS.streakMinDays} or more days, epoch after epoch, for a streak worth up to{" "}
+          <strong>{percent(REWARDS.maxStreakBps)} more</strong>. Trading and replies don’t count, and the bonus can’t buy a place in the {REWARDS.maxHolders}.{" "}
           {data?.xReach
-            ? "Posts that people liked, reposted, quoted or replied to count for more."
-            : "Each counted post adds the same, however it did on X."}
+            ? "X posts that people liked, reposted, quoted or replied to count for more."
+            : "Each counted X post adds the same, however it did on X."}
         </p>
         {data && data.epoch >= 0 && (
           <p className="mt-3 text-xs text-muted">
@@ -48,6 +51,8 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
           </p>
         )}
       </Panel>
+
+      <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} />
 
       <Panel title={wallet ? "Your share" : "Your share (join to earn)"}>
         <RewardsClaim account={wallet as Address | undefined} club={token} />
@@ -75,6 +80,24 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
             </dl>
           </Panel>
 
+          <Panel title="Share the week">
+            <p className="text-sm">
+              Post this week’s numbers on X. A post that links the Club counts as yours: share it on the Board too, and as a Holder it adds to your bonus.
+            </p>
+            <a
+              className="btn-secondary mt-3 inline-flex items-center gap-2"
+              href={recapLink(
+                { symbol, epoch: latest!.n, fees: wei(latest!.fees), paidHolders: wei(latest!.paidHolders), holderCount: latest!.holderCount },
+                typeof window === "undefined" ? "" : `${window.location.origin}/clubs/${token}`,
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <XLogoIcon className="size-3.5" />
+              Post the recap
+            </a>
+          </Panel>
+
           {data.earners.length > 0 && (
             <Panel title="Who earned">
               <ul className="divide-y divide-[#111318]/10">
@@ -84,7 +107,7 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
                     <span className="min-w-0 flex-1">
                       <Who address={e.account} />
                     </span>
-                    {e.kind === "holder" && e.bonusBps !== undefined && e.bonusBps > 0 && <span className="chip chip-peach">+{percent(e.bonusBps)} active</span>}
+                    {e.kind === "holder" && e.bonusBps !== undefined && e.bonusBps > 0 && <span className="chip chip-peach">+{percent(e.bonusBps)} bonus</span>}
                     {e.kind === "fund" && (
                       <span className="chip chip-dark">
                         <CrownIcon />

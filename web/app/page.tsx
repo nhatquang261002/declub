@@ -21,7 +21,7 @@ const STEPS = [
   {
     number: "03",
     title: "Own a share of the market",
-    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
+    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s biggest Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
   },
 ];
 
@@ -62,7 +62,7 @@ export default function HomePage() {
           <DeClubArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>{percent(REWARDS.holderBps)} to Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
+          <div className="hero-stat"><strong>{percent(REWARDS.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
           <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
           <div className="hero-stat"><strong>Non-custodial</strong><span>Assets move only in swaps you approve</span></div>
         </div>

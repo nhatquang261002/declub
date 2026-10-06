@@ -7,7 +7,7 @@ import { call, type ViewerRole } from "@/hooks/useClubMembership";
 import { useSocialSign } from "@/hooks/useSocial";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
-import { draftPost, postTypedData, signingTime } from "@/lib/social";
+import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
 import type { LogEntry, Ban } from "@/lib/server/clubState";
 import type { XShareVerdict } from "@/lib/server/xPosts";
 
@@ -42,6 +42,19 @@ export function useClubPosts(token: string, lens: LensId = "newest", as?: string
     retry: 1,
   });
   return { enabled: query.data?.enabled !== false, posts: query.data?.posts ?? [], isLoading: query.isLoading, error: query.error };
+}
+
+/** A post's replies (ADR 0032), oldest first; read only while the thread is open. */
+export function useClubReplies(token: string, postId: string, enabled: boolean) {
+  const getToken = useAccessToken();
+  const query = useQuery({
+    queryKey: ["club-replies", token.toLowerCase(), postId, !!getToken],
+    queryFn: () => read<{ enabled: boolean; replies: PublicPost[] }>(`/api/clubs/${token}/posts/${postId}/replies`, getToken),
+    enabled,
+    refetchInterval: REFRESH_MS,
+    retry: 1,
+  });
+  return { replies: query.data?.replies ?? [], isLoading: query.isLoading, error: query.error };
 }
 
 /** The Club's X signals (ADR 0024): its linked project accounts, its tags, and "what counts" in words. */
@@ -120,9 +133,17 @@ export function useClubActions(token: string) {
       }
       return result;
     }, ["club-posts", "clubs", "club-members"]),
-    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-log"]),
-    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts"], "Reported. Thank you."),
-    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-log"]),
+    // A reply is signed too, with its own type (ADR 0032).
+    reply: useAct(async (v: { parent: string; text: string; wallet?: string }) => {
+      const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
+      if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
+      const { signature } = await sign(replyTypedData(draft.message), v.wallet);
+      return send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
+    }, ["club-replies", "club-posts"]),
+    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log"]),
+    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies"], "Reported. Thank you."),
+    like: useAct((v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`), ["club-posts", "club-replies"]),
+    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log"]),
     pin: useAct((v: { id: string; pinned: boolean }) => send("POST", `/posts/${v.id}/pin`, { pinned: v.pinned }), ["club-posts", "club-log"]),
     ban: useAct((v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v), ["club-posts", "club-bans", "club-log", "club-members", "clubs"], "Banned."),
     unban: useAct((v: { wallet: string; everywhere?: boolean }) => send("DELETE", "/bans", v), ["club-bans", "club-log"], "Ban lifted."),

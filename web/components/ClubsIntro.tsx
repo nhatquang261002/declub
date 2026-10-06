@@ -8,9 +8,9 @@ import { ClubsTeaser } from "./ClubsTeaser";
 
 const WHAT = [
   { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
-  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after or share your X posts, signed by your wallet, and pick how the feed is ordered." },
+  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, reply, or share your X posts, signed by your wallet, and pick how the feed is ordered." },
   { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges. Follow who you trust." },
-  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its Holders each week, more to the active ones, and ${percent(REWARDS.fundBps)} to the Club fund.` },
+  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its ${REWARDS.maxHolders} biggest Holders each week, more to the ones who post, and ${percent(REWARDS.fundBps)} to the Club fund.` },
 ];
 
 const HOW = [

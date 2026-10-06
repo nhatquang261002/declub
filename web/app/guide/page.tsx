@@ -147,7 +147,7 @@ const FEES = [
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
-  `Most of it goes back to the community: ${percent(REWARDS.holderBps)} to the traded asset's Club Holders and ${percent(REWARDS.fundBps)} to its Club fund, each week.`,
+  `Most of it goes back to the community: ${percent(REWARDS.holderBps)} to the traded asset's Club top Holders and ${percent(REWARDS.fundBps)} to its Club fund, each week.`,
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [

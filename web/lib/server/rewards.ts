@@ -8,14 +8,18 @@ import {
   activityPoints,
   epochWindow,
   leavesOf,
+  qualifies,
   rewardLeaf,
   splitClub,
   type ClaimableLeaf,
   type ClubInput,
   type EpochRecord,
+  type Holder,
   type ReachRecord,
 } from "../rewards";
 import { registry, type ClubEntry } from "../verifiedAssets";
+import { activeDays } from "./activeDays";
+import { nextStreaks, readStreaks, streakAt, streaksKey, type Streaks } from "./streaks";
 import { clubEvents } from "./clubs";
 import { loadRoles } from "./clubState";
 import { allRows, getMember, viemHoldings, type Holdings } from "./members";
@@ -40,6 +44,8 @@ export const carryKey = (club: string) => `${base}:carry:${club.toLowerCase()}`;
 export const lastKey = () => `${base}:last`;
 /** The X reach read for epoch `n` before it's built (lib/server/xReach.ts). */
 export const reachKey = (n: number) => `${base}:reach:${n}`;
+/** A signed swap's settlement fee, read once from its receipt. */
+export const feeKey = (txHash: string) => `${base}:fee:${txHash.toLowerCase()}`;
 const lockKey = () => `${base}:lock`;
 
 /** Epochs and per-account indexes kept. A year of weekly epochs fits many times over. */
@@ -111,7 +117,7 @@ export async function buildEpoch(store: Store, n: number, deps: RewardsDeps = {}
 
   if ((await store.hit(lockKey(), 600)) > 1) return { status: "busy" };
   try {
-    const record = await compute(store, n, window, contract, deps, now);
+    const { record, streaks } = await compute(store, n, window, contract, deps, now);
     await store.set(epochKey(n), record);
     await store.rank(epochsKey(), [{ member: String(n), score: n }], EPOCHS_KEPT);
     for (const leaf of record.leaves) {
@@ -120,11 +126,57 @@ export async function buildEpoch(store: Store, n: number, deps: RewardsDeps = {}
     for (const club of record.clubs) {
       await store.set(carryKey(club.club), club.carry);
     }
+    for (const [club, next] of streaks) {
+      await store.set(streaksKey(club), next);
+    }
     await store.set(lastKey(), n);
     return { status: "built", record };
   } finally {
     await store.del(lockKey());
   }
+}
+
+/** `settlementFee`, remembered per transaction: a settled swap's fee never changes. */
+export function cachedSettlementFee(store: Store, read: (txHash: Hex) => Promise<bigint>) {
+  return async (txHash: Hex): Promise<bigint> => {
+    const known = await store.get<string>(feeKey(txHash));
+    if (known !== null) return BigInt(known);
+    const fee = await read(txHash);
+    await store.set(feeKey(txHash), fee.toString());
+    return fee;
+  };
+}
+
+/** A completed swap's fee: carried by the event, or read from its settlement for a signed swap. */
+export async function swapFee(event: ActivityEvent, intents: string, settlementFee: (txHash: Hex) => Promise<bigint>): Promise<bigint> {
+  if (event.fee) return BigInt(event.fee);
+  return intents && event.contract === intents ? settlementFee(event.deal as Hex) : 0n;
+}
+
+/** A Holder as the builder and the standings see them: who they are, and their streak record. */
+export type HolderInput = Holder & { userId: string; wallets: string[]; joinedAt: number; days: number; streak: number; points: number; bonusBps: number };
+
+/**
+ * One Club's Holders for epoch `n`: shares from a fresh balance read, the activity bonus from the
+ * epoch's events, their active days, and the streak those days make. Also gives every member's
+ * active days, so the builder can move streaks along for members without shares too.
+ */
+export async function holderInputs(
+  store: Store,
+  club: ClubEntry,
+  n: number,
+  events: readonly ActivityEvent[],
+  reach: ReachRecord | null,
+  holdings: Holdings,
+  streaks: Streaks,
+): Promise<{ holders: HolderInput[]; days: Map<string, number> }> {
+  const days = await activeDays(store, club.address, n);
+  const holders = (await holderShares(store, club, holdings)).map(({ userId, wallet, wallets, shares, joinedAt }) => {
+    const mine = days.get(userId) ?? 0;
+    const { points, bonusBps } = activityPoints(events, reach, wallets, mine);
+    return { userId, wallet, wallets, shares, bonusBps, points, days: mine, streak: streakAt(streaks[userId], n, qualifies(mine)), joinedAt };
+  });
+  return { holders, days };
 }
 
 async function compute(
@@ -134,11 +186,11 @@ async function compute(
   contract: Address,
   deps: RewardsDeps,
   now: number,
-): Promise<EpochRecord> {
+): Promise<{ record: EpochRecord; streaks: Map<string, Streaks> }> {
   const clubs = deps.clubs ?? registry.clubs();
   const eventsOf = deps.events ?? ((club: ClubEntry) => clubEvents(store, club));
   const holdings = deps.holdings ?? viemHoldings;
-  const settlementFee = deps.settlementFee ?? viemSettlementFee;
+  const settlementFee = cachedSettlementFee(store, deps.settlementFee ?? viemSettlementFee);
   const intents = (deps.intents ?? DECLUB_INTENTS_ADDRESS ?? "").toLowerCase();
 
   // Every completed swap in the window, with the Clubs it counts for; and each Club's activity in
@@ -159,26 +211,26 @@ async function compute(
   // A swap's fee is split evenly between the Clubs it names; the dust stays with the protocol.
   const fees = new Map<string, bigint>();
   for (const { event, clubs: named } of swaps.values()) {
-    let fee = event.fee ? BigInt(event.fee) : 0n;
-    if (!event.fee && intents && event.contract === intents) fee = await settlementFee(event.deal as Hex);
+    const fee = await swapFee(event, intents, settlementFee);
     const each = fee / BigInt(named.size);
     for (const club of named) fees.set(club, (fees.get(club) ?? 0n) + each);
   }
 
   const reach = await (deps.reach ?? ((k: number) => store.get<ReachRecord>(reachKey(k))))(n);
   const inputs: ClubInput[] = [];
+  const streaks = new Map<string, Streaks>();
   for (const club of clubs) {
     const key = club.address.toLowerCase();
     const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
-    const events = activity.get(key) ?? [];
+    const prev = await readStreaks(store, key);
+    const { holders, days } = await holderInputs(store, club, n, activity.get(key) ?? [], reach, holdings, prev);
+    // Every member's streak moves along, Holder or not: the badge is for posting, the bonus for Holders.
+    streaks.set(key, nextStreaks(prev, n, [...days].filter(([, d]) => qualifies(d)).map(([userId]) => userId)));
     inputs.push({
       club: key,
       fees: fees.get(key) ?? 0n,
       carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
-      holders: (await holderShares(store, club, holdings)).map(({ wallet, wallets, shares }) => {
-        const { points, bonusBps } = activityPoints(events, reach, wallets, window.end);
-        return { wallet, shares, bonusBps, points };
-      }),
+      holders: holders.map(({ wallet, shares, bonusBps, points, days, streak, joinedAt }) => ({ wallet, shares, bonusBps, points, days, streak, joinedAt })),
       owner: await ownerWallet(store, club),
     });
   }
@@ -188,7 +240,7 @@ async function compute(
   const chainId = deps.chainId ?? CHAIN_ID;
   const tree = buildMerkleTree(leaves.map((l) => rewardLeaf(chainId, contract, n, l.account, l.amount)));
   const str = (x: bigint) => x.toString();
-  return {
+  const record: EpochRecord = {
     n,
     chainId,
     contract,
@@ -217,10 +269,13 @@ async function compute(
         amount: str(b.amount),
         ...(b.shares !== undefined ? { shares: str(b.shares), bonusBps: b.bonusBps ?? 0 } : {}),
         ...(b.points !== undefined ? { points: b.points } : {}),
+        ...(b.days !== undefined ? { days: b.days } : {}),
+        ...(b.streak !== undefined ? { streak: b.streak } : {}),
       })),
     })),
     reach,
   };
+  return { record, streaks };
 }
 
 /**
@@ -228,7 +283,7 @@ async function compute(
  * collection. A Club's memecoin earns the Holder badge but no shares (ADR 0025). Throws when the
  * chain can't be read, so an epoch is never built on missing balances.
  */
-async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ wallet: string; wallets: string[]; shares: bigint }[]> {
+async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ userId: string; wallet: string; wallets: string[]; shares: bigint; joinedAt: number }[]> {
   const rows = (await allRows(store, club.address)).filter((r) => r.displayWallet && r.wallets.length > 0);
   if (rows.length === 0) return [];
   const balances = await holdings(club.address, rows.flatMap((r) => r.wallets as Address[]));
@@ -239,11 +294,11 @@ async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): 
     at += row.wallets.length;
     return held;
   });
-  return rows.map((row, i) => ({ wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]! })).filter((h) => h.shares > 0n);
+  return rows.map((row, i) => ({ userId: row.userId, wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]!, joinedAt: row.joinedAt })).filter((h) => h.shares > 0n);
 }
 
 /** The Owner's display wallet, from the roles and their member row (not the claim, which can go stale). */
-async function ownerWallet(store: Store, club: ClubEntry): Promise<string | null> {
+export async function ownerWallet(store: Store, club: ClubEntry): Promise<string | null> {
   const { owner } = await loadRoles(store, club.address);
   if (!owner) return null;
   return (await getMember(store, club.address, owner))?.displayWallet ?? null;

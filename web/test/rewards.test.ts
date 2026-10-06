@@ -4,7 +4,11 @@ import { encodeAbiParameters, getAddress, keccak256, type Address, type Hex } fr
 import type { ActivityEvent } from "../lib/clubs";
 import { buildMerkleSet, buildMerkleTree } from "../lib/merkle";
 import type { MemberRow } from "../lib/members";
-import { REWARDS, epochAt, epochWindow, leavesOf, pools, rewardLeaf, splitClub, type ClubInput } from "../lib/rewards";
+import { recapLink, recapText } from "../lib/recap";
+import { REWARDS, entryGap, epochAt, epochWindow, leavesOf, pools, rankHolders, rewardLeaf, splitClub, streakBps, type ClubInput } from "../lib/rewards";
+import { activeDays, activeKey, recordActive } from "../lib/server/activeDays";
+import { liveStreak, readStreaks, streakAt } from "../lib/server/streaks";
+import { postKey } from "../lib/server/board";
 import { rolesKey } from "../lib/server/clubState";
 import { memberKey, membersKey, type Holdings } from "../lib/server/members";
 import { buildEpoch, carryKey, claimableFor, clubRewards, epochKey, lastKey, type RewardsDeps } from "../lib/server/rewards";
@@ -130,6 +134,113 @@ describe("splitClub", () => {
   });
 });
 
+describe("the top Holders", () => {
+  const club = NFT.toLowerCase();
+  const w = (i: number) => `0x${i.toString(16).padStart(40, "0")}`;
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ wallet: w(i + 1), shares: BigInt(100 - i), joinedAt: i }));
+  const base = { club, fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, owner: null };
+
+  it("pays only the biggest REWARDS.maxHolders, by shares", () => {
+    const split = splitClub({ ...base, holders: many(15).reverse() });
+    const paid = split.payouts.map((p) => p.wallet);
+    assert.equal(split.holderCount, REWARDS.maxHolders);
+    assert.deepEqual(new Set(paid), new Set(many(REWARDS.maxHolders).map((h) => h.wallet)));
+    assert.equal(split.paidHolders + split.carry.holders, split.holderPool);
+  });
+
+  it("breaks a tie at the cutoff for the earlier member, then the lower wallet", () => {
+    const tied = [...many(9), { wallet: w(50), shares: 1n, joinedAt: 5 }, { wallet: w(51), shares: 1n, joinedAt: 3 }, { wallet: w(40), shares: 1n, joinedAt: 3 }].map((h, i) => (i < 9 ? h : { ...h, shares: 1n }));
+    const split = splitClub({ ...base, holders: tied });
+    assert.ok(split.payouts.some((p) => p.wallet === w(40)), "earlier join, lower wallet wins the last place");
+    assert.ok(!split.payouts.some((p) => p.wallet === w(51) || p.wallet === w(50)));
+  });
+
+  it("lets the bonus change the split, never who is in", () => {
+    const holders = [...many(10), { wallet: w(99), shares: 1n, bonusBps: REWARDS.maxBonusBps, joinedAt: 0 }];
+    const split = splitClub({ ...base, holders });
+    assert.ok(!split.payouts.some((p) => p.wallet === w(99)));
+  });
+
+  it("ranks Holders the way the split pays them", () => {
+    const holders = many(15).reverse();
+    const paid = new Set(splitClub({ ...base, holders }).payouts.map((p) => p.wallet));
+    assert.deepEqual(new Set(rankHolders(holders).slice(0, REWARDS.maxHolders).map((h) => h.wallet)), paid);
+  });
+
+  it("says how many more shares get a Holder into the paid places, with the tie rule", () => {
+    const ranked = rankHolders([...many(10), { wallet: w(70), shares: 88n, joinedAt: 20 }, { wallet: w(71), shares: 80n, joinedAt: 0 }]);
+    // The 10th place holds 91 (joined 9). w(70) joined later, so it needs one more than a tie.
+    assert.equal(entryGap(ranked, w(70)), 91n - 88n + 1n);
+    // w(71) joined earlier, so a tie is enough.
+    assert.equal(entryGap(ranked, w(71)), 91n - 80n);
+    assert.equal(entryGap(ranked, w(1)), 0n);
+    assert.equal(entryGap(ranked, w(123)), null);
+  });
+
+  it("adds the streak bonus on top of the activity bonus, each capped", () => {
+    assert.deepEqual([0, 1, 2, 3, 5, 40].map(streakBps), [0, 0, 250, 500, 1_000, 1_000]);
+    const holders = [
+      { wallet: w(1), shares: 1n, bonusBps: 99_999, streak: 99 },
+      { wallet: w(2), shares: 1n },
+    ];
+    const split = splitClub({ ...base, holders });
+    const top = split.payouts.find((p) => p.wallet === w(1))!;
+    assert.equal(top.bonusBps, REWARDS.maxBonusBps + REWARDS.maxStreakBps);
+    assert.equal(top.streak, 99);
+    // Weights 1.6 : 1 of a 5 MON pool.
+    assert.equal(top.amount, (5n * ETH * 16_000n) / 26_000n);
+  });
+});
+
+describe("active days and streaks", () => {
+  const club = NFT.toLowerCase();
+  const post = (id: string, userId: string, at: number, over: object = {}) => ({ id, userId, wallet: alice, kind: "note", text: "gm", at: at * 1000, ...over });
+
+  it("count a member's distinct days with a post still shown", async () => {
+    const store = memoryStore();
+    const day = 86_400;
+    const epochs = [GENESIS, WEEK] as const;
+    const posts = [post("a1", "ua", GENESIS + 10), post("a2", "ua", GENESIS + 20), post("a3", "ua", GENESIS + day + 5), post("a4", "ua", GENESIS + 2 * day, { hidden: "moderator" }), post("b1", "ub", GENESIS + 3 * day)];
+    for (const p of posts) {
+      await store.set(postKey(club, p.id), p);
+      await recordActive(store, club, p, ...epochs);
+    }
+    // A deleted post earns nothing either.
+    await recordActive(store, club, post("gone", "ub", GENESIS + 4 * day), ...epochs);
+    assert.deepEqual(Object.fromEntries(await activeDays(store, club, 0)), { ua: 2, ub: 1 });
+    // Before genesis nothing is recorded.
+    await recordActive(store, club, post("early", "ua", GENESIS - 10), ...epochs);
+    assert.equal((await store.members(activeKey(club, -1))).length, 0);
+  });
+
+  it("run on qualifying epochs in a row, and lapse after a gap", () => {
+    assert.equal(streakAt(undefined, 4, true), 1);
+    assert.equal(streakAt({ n: 3, count: 2 }, 4, true), 3);
+    assert.equal(streakAt({ n: 2, count: 2 }, 4, true), 1);
+    assert.equal(streakAt({ n: 3, count: 2 }, 4, false), 0);
+    assert.equal(liveStreak({ n: 3, count: 2 }, 4), 2, "still alive while epoch 4 runs");
+    assert.equal(liveStreak({ n: 3, count: 2 }, 5), 0);
+  });
+});
+
+describe("the weekly recap", () => {
+  const recap = { symbol: "CHOG", epoch: 3, fees: 12n * ETH, paidHolders: 6n * ETH, holderCount: 10 };
+
+  it("says the week's fees and who was paid, and fits a post", () => {
+    const text = recapText(recap);
+    assert.match(text, /^CHOG Club, epoch 3: /);
+    assert.match(text, /10 biggest Holders/);
+    assert.ok(text.length + 24 <= 280, "with a link, within X's limit");
+  });
+
+  it("leaves out the payout line when nobody was paid, and links the Club's page", () => {
+    assert.ok(!recapText({ ...recap, paidHolders: 0n, holderCount: 0 }).includes("biggest"));
+    const link = new URL(recapLink(recap, "https://declub.app/clubs/0xabc"));
+    assert.equal(link.origin + link.pathname, "https://x.com/intent/post");
+    assert.equal(link.searchParams.get("url"), "https://declub.app/clubs/0xabc");
+  });
+});
+
 describe("leavesOf", () => {
   it("sums one wallet across Clubs, keeps the breakdown, and orders by address", () => {
     const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n }], owner: alice });
@@ -236,6 +347,31 @@ describe("buildEpoch", () => {
     for (const leaf of record.leaves) {
       assert.ok(verify(leaf.proof, record.root, rewardLeaf(10143, REWARDS_AT, 0, leaf.account, BigInt(leaf.amount))));
     }
+  });
+
+  it("counts active days in the bonus, and moves streaks along for every member", async () => {
+    events.set(NFT, [swap()]);
+    const club = NFT.toLowerCase();
+    const day = 86_400;
+    // Alice posts on 4 days (a streak from last epoch too); Carol, with no shares, on 3.
+    await store.set(`declub:rewards:10143:streaks:${club}`, { ua: { n: -1, count: 2 } });
+    for (let d = 0; d < 4; d++) {
+      const p = { id: `a${d}`, userId: "ua", wallet: alice, kind: "note", text: "gm", at: (GENESIS + d * day + 60) * 1000 };
+      await store.set(postKey(club, p.id), p);
+      await recordActive(store, club, p, GENESIS, WEEK);
+    }
+    for (let d = 0; d < 3; d++) {
+      const p = { id: `c${d}`, userId: "ub", wallet: carol, kind: "note", text: "gm", at: (GENESIS + d * day + 60) * 1000 };
+      await store.set(postKey(club, p.id), p);
+      await recordActive(store, club, p, GENESIS, WEEK);
+    }
+    const result = await buildEpoch(store, 0, deps);
+    const record = result.status === "built" ? result.record : undefined!;
+    const holder = record.leaves.find((l) => l.account.toLowerCase() === alice)!.breakdown.find((b) => b.kind === "holder")!;
+    assert.equal(holder.days, 4);
+    assert.equal(holder.streak, 3);
+    assert.equal(holder.points, 4 * REWARDS.dayPoints);
+    assert.deepEqual(await readStreaks(store, club), { ua: { n: 0, count: 3 }, ub: { n: 0, count: 1 } });
   });
 
   it("splits a swap that names two Clubs evenly between them", async () => {

@@ -59,7 +59,7 @@ Kept per Club, by Privy user id, in `club-roles:{chain}:{token}`. The app admin 
 | **App admin** | `CLUB_ADMIN_USER_IDS` environment variable | Everything below, in every Club. Assign or remove Owners. Ban someone from every Club. Purge a hidden Club. |
 | **Owner** (at most one) | **Claim:** a member whose linked wallet is the contract's `owner()`, read on chain by the server. **Or** an admin assigns one after checking the project another way. | Edit the Club profile: description (500 characters), up to 3 links (a banner image is not built yet). Pin up to 3 posts. Appoint and remove Moderators (at most 10). Hand ownership to another member. Set "holders only can post". |
 | **Moderator** | Appointed by the Owner or an admin | Hide, restore and delete posts. Work through the report queue. Ban and unban members from this Club, but can't lift a ban the Owner or an admin made. Can't act on the Owner or on other Moderators. |
-| **Member** | Joins | Post (needs a shared verified profile), report posts, appear on the leaderboard. |
+| **Member** | Joins | Post (needs a shared verified profile), like and report posts, appear on the leaderboard. |
 | **Visitor** | Not joined, or not signed in | Read only. |
 
 Rules:
@@ -109,7 +109,7 @@ Three views, switched with pills:
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
 
-**Rewards tab**: how the Club earns (the split from `REWARDS`), the epoch running and when it closes, **Your share** (ready to claim, on its way, earned here, and one **Claim** button for every open epoch), the latest epoch's fees, Holder pool, Club fund and what rolls over, who earned, and earlier epochs.
+**Rewards tab**: how the Club earns (the split from `REWARDS`), the epoch running and when it closes, **Your share** (ready to claim, on its way, earned here, and one **Claim** button for every open epoch), the latest epoch's fees, Holder pool, Club fund and what rolls over, who earned, **Share the week** (an X compose link with the epoch's fees and what the biggest Holders were paid, linking the Club page; `web/lib/recap.ts`), and earlier epochs.
 
 **Deep links**: not built yet. An asset row on a deal page doesn't link to its Club.
 
@@ -168,6 +168,8 @@ This is the first user-written content in the app. Every post is signed by its a
 - **Links:** a "Looking for" post can carry a deal id or a signed-swap hash; the server checks that it exists and names the Club's token (`link_not_found`, `link_mismatch`; `link_unavailable` when the lookup itself fails). A note can carry an X post link (`x_not_found` when it isn't public, `x_unavailable` when X can't be read); see [X posts](#x-posts). Either way, one link per post (`bad_link` for the wrong kind).
 - **Rate limits** (`withinLimit`), applied after the checks above so a post the server refuses doesn't use one up: a 30-second cooldown and 5 posts an hour, per user per Club; 20 reports a day per user.
 - **Reports:** a member can report a post once (a set per post, so the same member twice adds nothing) and not their own. Every report is recorded and shown to staff, but only reports from Holders and staff count toward hiding, so a handful of free accounts can't hide a post. At 3 counted reports it is hidden: others see "hidden after reports" (and not as pinned), the author still sees it, and staff see it with the report count. It keeps its pin, so restoring it brings the pin back. Posts by the Owner, Moderators or admins are never hidden by reports. Hidden-by-reports is logged as `auto_hide`.
+- **Replies** ([ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): one level under a top-level post, signed as `Reply { club, parent, text, at }` (`draftReply`), so posts' ids don't change. Stored as a post with `parent`, so likes, reports, hiding, deleting and bans apply unchanged; not on the Board list or in the lenses, not pinnable, no link. Every Board rule for posting applies, plus `not_found` (no such post, or it's a reply), `hidden` (the post is hidden) and `thread_full` (50 replies). A 10-second cooldown and 20 an hour. Deleting a post deletes its thread; a hidden post's thread is shown only to staff and the author. Replies earn nothing.
+- **Likes** ([ADR 0030](adr/0030-likes-club-inbox-and-recap.md)): a member likes a post once (a set per post, plus the member's own set so a read can mark theirs) and can take it back. Not their own post, not a hidden one, 120 an hour. A like is attention and nothing more: it counts for no Momentum, no Holder bonus and no reward, so there is nothing to farm. It reaches the author through the Club inbox.
 - **Moderators and above** hide and restore posts (restoring clears the reports, so old reports don't re-hide it), delete posts, and ban, all subject to the permission matrix above. Hiding or deleting a post unpins it. **Authors** can delete their own posts, which isn't logged.
 - **Bans:** by wallet (a member) or by post (that post's author, which reaches a spammer who already left). A banned user leaves the Club, loses any role, and can't rejoin or post. Only an admin can ban the Owner, or ban everywhere (which removes the user from every Club). Lifting a ban doesn't put anyone back. Nobody can ban themselves.
 - **Archived Clubs** refuse joining, posting and reporting. Staff can still delete, hide and ban, and the Owner can still pin.
@@ -216,18 +218,20 @@ This is the first user-written content in the app. Every post is signed by its a
 
 | Share of a Club's swap fees | Goes to |
 |---|---|
-| 50% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT of the collection, summed over a member's linked wallets, read when the epoch is built. A Club's memecoin earns the Holder badge, not shares ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Joined members only, paid at their Club wallet. |
+| 50% | The Club's `REWARDS.maxHolders` (10) biggest Holders, by shares × (1 + activity bonus): one share per NFT of the collection, summed over a member's linked wallets, read when the epoch is built. A tie at the cutoff goes to the earlier member, then the lower wallet; the bonus never changes who is in ([ADR 0029](adr/0029-top-holders-and-posts-only-bonus.md)). A Club's memecoin earns the Holder badge, not shares ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Joined members only, paid at their Club wallet. |
 | 25% | The Club fund, paid to the Owner's Club wallet. |
 | 25% | Stays with the protocol. |
 
 - **Epochs:** a week by default (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS`), numbered from `NEXT_PUBLIC_REWARDS_GENESIS` (default 2026-10-05 00:00 UTC). An epoch is built after it ends, in order (`out_of_order` otherwise), once (`exists` after), under a lock.
 - **Fees:** each completed swap's `fee` (both sides together): from the escrow fill's `FeeCharged` in the activity log, or the settlement's `FeeCharged` for a signed swap. A swap in k Clubs gives each 1/k.
-- **The activity bonus** ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md)): a Holder's shares count up to 50% more (`REWARDS.maxBonusBps`) for their activity in the Club during the epoch, counted in full with no decay (`activityPoints`):
-  - trading points as Momentum weighs them (10 a swap side, wash halved; 2 a new deal, 3 a day);
-  - per X share, 3, halved for a weak one;
+- **The activity bonus** ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md), [ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): a Holder's shares count up to 50% more (`REWARDS.maxBonusBps`) for their activity in the Club during the epoch, counted in full with no decay (`activityPoints`):
+  - per **active day**, 2 (`dayPoints`): a UTC day with at least one visible top-level Board post by the member in the Club, at most 7 an epoch. Recorded when posted (`web/lib/server/activeDays.ts`, the first 3 posts a day); a deleted or hidden post counts for nothing. Replies don't count;
+  - per X share, 3, halved for a weak one. Trading earns nothing: a member can wash trade against themselves ([ADR 0029](adr/0029-top-holders-and-posts-only-bonus.md));
   - with reach on (in development, off for now), `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
 
-  `bonus = 50% × min(1, points / 50)`. Without reach, X shares alone give at most 21 points a week (about +21%). Each holder payout in the record carries `shares`, `bonusBps` and `points`. Splitting holdings across accounts gains nothing but rounding.
+  `bonus = 50% × min(1, points / 35)`: posting every day and sharing an own X post each day earns all of it without reach. Each holder payout in the record carries `shares`, `bonusBps` (activity plus streak), `points`, `days` and `streak`. Splitting holdings across accounts gains nothing but rounding.
+- **Streaks** ([ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): an epoch with at least 3 active days (`streakMinDays`) keeps a member's streak going; from the second epoch in a row it adds `250 × (streak − 1)` basis points, up to 10% (`maxStreakBps`), on top of the activity bonus. Only the epoch builder writes streaks (`rewards:{chain}:streaks:{club}`, by user id), so a rebuild agrees. Members who aren't Holders keep streaks too; the Members list shows a flame from the second week.
+- **Live standings** ([ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): `clubStandings` in `web/lib/server/standings.ts` runs the open epoch through the same inputs and `splitClub` as if it closed now: each Holder's rank (`rankHolders`), bonus and estimate, and the reader's `gap` (`entryGap`: the NFTs that would get them in, with the tie rule). Cached per Club for 5 minutes, one rebuild at a time, the last copy served when balances can't be read. An estimate: a swap's fee is split between the Clubs its tokens belong to, and reach isn't read until the epoch is built.
 - **Carry:** a Club with no Holder members keeps its Holder pool, one with no Owner keeps its fund, and rounding dust stays too, all rolling into the next epoch (`declub:rewards:{chain}:carry:{club}`).
 - **Leaves:** one per account per epoch, the sum across Clubs, with a per-Club breakdown; sorted by address, so a rebuild gives the same tree. The leaf is the contract's: `keccak256(keccak256(abi.encode(chainid, rewards, epoch, account, amount)))`.
 - **Building and funding:** `npm run rewards:epoch` (in `web/`) reads the epoch's X reach (with `X_BEARER_TOKEN`), then builds the next finished epoch and prints its root, total and per-Club lines; `--publish` sends `publish(epoch, root)` with the total from `REWARDS_OPERATOR_KEY`. On mainnet the operator is a Safe: build, then publish from it.
@@ -249,6 +253,9 @@ All keys start with `declub:` and are per chain.
 | `club-posts:{chain}:{token}` | zset: postId → time, capped at 500 |
 | `club-post:{chain}:{token}:{id}` | `{id, userId, wallet, kind, text, link?, at, hidden?, signed?: {signature, at}, x?: {id, author, text, postedAt, own, counted}}` (never sent as it is) |
 | `club-reports:{chain}:{token}:{id}` | set of the userIds that reported the post |
+| `club-likes:{chain}:{token}:{id}` / `club-liked:{chain}:{token}:{userId}` | set of the userIds that liked the post / set of the post ids a member liked in the Club |
+| `club-replies:{chain}:{token}:{id}` | set of a post's reply ids (the replies are `club-post` rows with `parent`), at most 50 |
+| `active:{chain}:{token}:{n}` | set of `userId:day:postId`: posts that can make a member's day active in epoch `n` |
 | `club-ban:{chain}:{token}` / `club-ban:all` | `{userId: {wallet, at, by}}`, one document each |
 | `club-roles:{chain}:{token}` | `{owner?, moderators[]}`: user ids, one small document rewritten whole (staff-only, rare) |
 | `club-profile:{chain}:{token}` | `{description, links[], holdersOnlyPosts, pinned[], ownerClaim?, x?: {accounts[{handle, proof, linkedAt, xUserId?}], tags[]}}` (a banner is not built yet) |
@@ -261,6 +268,9 @@ All keys start with `declub:` and are per chain.
 | `rewards:{chain}:epochs` / `rewards:{chain}:account:{wallet}` | zsets of epoch numbers: all built, and those that pay a wallet |
 | `rewards:{chain}:carry:{club}` | `{holders, fund}` rolling into the next epoch |
 | `rewards:{chain}:last` | the last epoch built |
+| `rewards:{chain}:streaks:{club}` | `{userId: {n, count}}`: each member's streak, written by the epoch builder only |
+| `rewards:{chain}:standings:{club}` | the live standings cache (5 minutes) |
+| `rewards:{chain}:fee:{tx}` | a signed swap's settlement fee, read once |
 | `rewards:{chain}:reach:{n}` | the X reach read for epoch `n`, by X post id: `{club, wallet, ok, strength, engagement, reason?}` |
 | `xshares:{chain}:{club}` / `xshare:{chain}:{club}:{tweet}` | zset of counted X shares by time, capped at 5,000 / each share `{tweet, club, userId, wallet, postId, at, strength, hidden?}` |
 | `xshare-seen:{chain}:{tweet}` | an X post that has counted, kept a year, so it never counts twice |
@@ -280,18 +290,22 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `GET /api/clubs/[token]` | `{logging, club, recent, holders}`: the Club's info, stats, member and holder counts and its latest 20 completed swaps. 400 for a bad address, 404 for an asset with no Club (blocked, unlisted, `club: false`, or a token that isn't a memecoin in a collection's Club). A paired asset's address serves its Club. Archived Clubs are served. Built. |
 | `GET /api/clubs/[token]/members?sort=momentum\|new` | `{enabled, members, total, holders}` (public, cached 15 s). 400 for another `sort`. Built. |
 | `GET` / `POST` / `DELETE /api/clubs/[token]/membership` | Your membership `{member, wallet?, holder?, joinedAt?, role}` / join / leave (gated). A `GET` also re-syncs your wallets. Built. |
+| `GET /api/me/club-inbox` | `{items}`: likes and replies on your posts (the key carries the count, so a new one is new), your pinned posts, your X posts that counted and the rewards you earned, from the last 14 days; and, for up to 5 of your Clubs, your place in the running epoch (`club-rank`, keyed in or out) and a nudge in its last day (`club-closing`) (gated; derived, nothing stored). The bell shows them. Built. |
 | `GET /api/me/clubs` | `{clubs}`: the Clubs you belong to, leaving out ones that no longer exist (gated). Built. |
 | `GET /api/clubs/[token]/posts` | `{enabled, posts, role}`: pinned first, then newest; hidden posts redacted. Public and cacheable for readers without a token; a reader who sends one gets a private answer that includes their own hidden posts (and, for staff, all of them with report counts). Built. |
 | `POST /api/clubs/[token]/posts` | `{message, signature}`: a `Post` signed by the member's Club wallet (gated; 201). With an X link, the answer's `xShare` says whether it counted and, if not, why. Built. |
 | `POST` / `DELETE /api/clubs/[token]/x` | Link the project's X account: `{action: "start", handle}` → `{code, text, until}`; `{action: "verify", handle, url}` → the profile; `DELETE {handle}` unlinks (Owner or admin). Built. |
-| `GET /api/clubs/[token]/feed` | `{enabled, club, domain, types, posts}`: every signed post as message and signature (public). Built. |
+| `GET /api/clubs/[token]/feed` | `{enabled, club, domain, types, posts, replies}`: every signed post and reply as message and signature (public). Built. |
+| `GET` / `POST /api/clubs/[token]/posts/[id]/replies` | A post's replies, oldest first (public; a token adds your own hidden ones) / `{message, signature}`: a `Reply` signed by your Club wallet (gated; 201). Built. |
 | `GET /api/clubs/[token]/rewards` | `{enabled, contract, epoch, endsAt, xReach, epochs, carry, earners}` (public); `xReach` says whether X engagement counts. Built. |
+| `GET /api/clubs/[token]/rewards/standings?wallet=` | `{enabled, standings}`: the running epoch as if it closed now: fees and pools so far, the top 25 Holders with rank, NFTs, days, X shares, bonus, streak and estimate, and `me` with `gap` (public, cached 60 s; private with `wallet`). Built. |
 | `GET /api/rewards/epochs/[n]` | A built epoch with every leaf and proof (public, immutable). Built. |
 | `GET /api/rewards/me?account=` | `{enabled, contract, epoch, endsAt, leaves}` (public). Built. |
 | `GET /api/wallets/[address]/posts` / `.../follows` | A wallet's signed posts across Clubs / its signed follows and follower count (public). Built. |
 | `POST /api/follows` | `{message, signature}`: a signed `Follow` from one of the caller's linked wallets (gated). Built. |
 | `DELETE /api/clubs/[token]/posts/[id]` | Author, or staff who may act on the author. Built. |
 | `POST /api/clubs/[token]/posts/[id]/report` | Report (gated). Built. |
+| `POST` / `DELETE /api/clubs/[token]/posts/[id]/like` | Like a post, or take the like back; answers `{likes}` (gated; 409 for your own post, 409 for a hidden one). Built. |
 | `POST /api/clubs/[token]/posts/[id]/hide` | `{hidden}`: hide or restore (staff). Built. |
 | `POST /api/clubs/[token]/posts/[id]/pin` | `{pinned}`: pin or unpin (Owner or admin; at most 3). Built. |
 | `GET` / `POST` / `DELETE /api/clubs/[token]/bans` | List (staff) / ban `{wallet \| post, everywhere?}` / unban `{wallet, everywhere?}`. Built. |
@@ -299,7 +313,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `PUT /api/clubs/[token]/roles` | `{wallet, role: "owner"\|"moderator"\|null}`: roles are set by the member's wallet, since the public list never shows user ids. The Owner appoints Moderators (at most 10) and hands the Club over; an admin also assigns or removes the Owner. Built. |
 | `GET` / `PATCH /api/clubs/[token]/profile` | Public description, links, "holders only", `x: {accounts, tags, hint}` and `coin: {token, symbol, on, min, set}` (null without a memecoin); edit, including `xTags` and `coinHolders: {on, min?}` (Owner or admin). Built. |
 | `GET /api/clubs/[token]/log` | `{log, ownership}`: the moderation log (staff); `ownership` is the on-chain check, for admins only. Built. |
-| `DELETE /api/clubs/[token]` | Purge a Club that is hidden from the list (admin). A live Club is refused (`not_hidden`). Deletes members, posts, roles, profile, bans, the log and the activity log. Built. |
+| `DELETE /api/clubs/[token]` | Purge a Club that is hidden from the list (admin). A live Club is refused (`not_hidden`). Deletes members, posts and their replies, roles, profile, bans, the log, the activity log, streaks, active days and the standings cache. Built. |
 | `POST /api/activity` | `{hash}`, receipt-verified, rate-limited per IP. Built. |
 
 ## Code map
@@ -323,7 +337,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 4. **Built:** the Board (posts, reports, auto-hide), roles (the `owner()` claim, Moderators, handing over), bans, pins, the Club page, the moderation log and the admin tools (global bans, purge). The banner image is left for later.
 5. **Built:** the user guide ([07](07-user-guide.md#clubs-and-momentum)), the frontend notes ([05](05-frontend.md#clubs)) and this page.
 
-**Not built yet:** bell notifications for a Club's posts and deals, the in-app request queue, moderators chosen by holders, cross-Club reputation on the profile, Clubs for unverified assets.
+**Not built yet:** bell notifications for a Club's new deals (likes, pins and rewards are in the bell), the in-app request queue, moderators chosen by holders, cross-Club reputation on the profile, Clubs for unverified assets.
 
 ## Testing
 

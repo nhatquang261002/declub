@@ -4,11 +4,28 @@ import { hashTypedData, keccak256, toHex, verifyTypedData, type Hex } from "viem
 import { privateKeyToAccount } from "viem/accounts";
 import { LENSES, lensOf, type LensContext } from "../lib/lenses";
 import { profileKey, userWalletsKey } from "../lib/profiles";
-import { createSignedPost, exportPosts, listPosts, postKey, walletPosts, type Deps } from "../lib/server/board";
+import {
+  createReply,
+  createSignedPost,
+  createSignedReply,
+  deletePost,
+  exportPosts,
+  exportReplies,
+  listPosts,
+  listReplies,
+  pinPost,
+  postKey,
+  purgeClub,
+  repliesKey,
+  walletPosts,
+  type Deps,
+} from "../lib/server/board";
+import { saveRoles } from "../lib/server/clubState";
+import { REPLIES_KEPT } from "../lib/clubPosts";
 import { exportFollows, followingOf, recordFollow, type FollowDeps } from "../lib/server/follows";
 import { joinClub } from "../lib/server/members";
 import { memoryStore, type Store } from "../lib/server/store";
-import { SOCIAL_TYPES, draftPost, followTypedData, postId, postTypedData, socialDomain, type FollowMessage, type PostMessage } from "../lib/social";
+import { SOCIAL_TYPES, draftPost, draftReply, followTypedData, postId, postTypedData, replyTypedData, socialDomain, type FollowMessage, type PostMessage, type ReplyMessage } from "../lib/social";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
@@ -24,7 +41,11 @@ const alice = privateKeyToAccount(`0x${"a1".repeat(32)}`);
 const bob = privateKeyToAccount(`0x${"b2".repeat(32)}`);
 const NOW_SEC = 1_800_000_000;
 // Board deps count in ms; follows in seconds.
-const deps: Deps = { now: () => NOW_SEC * 1000, verifyPost: async (signer, message, signature) => verifyTypedData({ address: signer, signature, ...postTypedData(message) }) };
+const deps: Deps = {
+  now: () => NOW_SEC * 1000,
+  verifyPost: async (signer, message, signature) => verifyTypedData({ address: signer, signature, ...postTypedData(message) }),
+  verifyReply: async (signer, message, signature) => verifyTypedData({ address: signer, signature, ...replyTypedData(message) }),
+};
 const followDeps: FollowDeps = { now: () => NOW_SEC, verifyFollow: async (message, signature) => verifyTypedData({ address: message.follower, signature, ...followTypedData(message) }) };
 
 async function member(store: Store, userId: string, wallet: string, holder = false, entry = club) {
@@ -207,5 +228,98 @@ describe("lenses", () => {
     const m: FollowMessage = { follower: alice.address, target: bob.address, following: true, at: NOW_SEC };
     await recordFollow(store, "ua", [alice.address], { message: m, signature: await alice.signTypedData(followTypedData(m)) }, followDeps);
     assert.deepEqual(await read("following", alice.address), ["from Bob"]);
+  });
+});
+
+describe("replies", () => {
+  let store: Store;
+  let parent: string;
+  const reply = (text: string, over: Partial<ReplyMessage> = {}): ReplyMessage => {
+    const d = draftReply(NFT, parent, text, NOW_SEC);
+    assert.ok(d.ok);
+    return { ...d.message, ...over };
+  };
+  const signReply = (account: typeof alice, m: ReplyMessage) => account.signTypedData(replyTypedData(m));
+  const clearReplies = (userId: string) => store.del(`declub:rl:club-reply-cd:${NFT.toLowerCase()}:${userId}`, `declub:rl:club-reply-hr:${NFT.toLowerCase()}:${userId}`);
+  const answer = async (account: typeof alice, userId: string, text: string) => {
+    await clearReplies(userId);
+    const m = reply(text);
+    return createSignedReply(store, club, userId, parent, { message: m, signature: await signReply(account, m) }, deps);
+  };
+
+  beforeEach(async () => {
+    store = memoryStore();
+    await member(store, "ua", alice.address, true);
+    await member(store, "ub", bob.address);
+    await saveRoles(store, NFT.toLowerCase(), { owner: "ua", moderators: [] });
+    const m = message("gm Chogs");
+    const r = await createSignedPost(store, club, "ua", { message: m, signature: await sign(alice, m) }, deps);
+    assert.ok(r.ok);
+    parent = r.post.id;
+  });
+
+  it("are signed with their own type, stay off the Board list, and count on the post", async () => {
+    const r = await answer(bob, "ub", "gm back");
+    assert.ok(r.ok, JSON.stringify(r));
+    assert.equal(r.post.parent, parent);
+    const { posts } = await listPosts(store, club, {}, deps);
+    assert.deepEqual(posts.map((p) => p.id), [parent]);
+    assert.equal(posts[0]!.replies, 1);
+    const thread = await listReplies(store, club, parent, {}, deps);
+    assert.ok(thread.ok);
+    assert.deepEqual(thread.replies.map((p) => p.text), ["gm back"]);
+    // The export carries it, checkable against the Reply type; the wallet export of posts doesn't.
+    const [exported] = await exportReplies(store, club);
+    assert.ok(await verifyTypedData({ address: exported!.signer, signature: exported!.signature, ...replyTypedData(exported!.message) }));
+    assert.equal((await walletPosts(store, bob.address)).length, 0);
+    assert.equal((await exportPosts(store, club)).length, 1);
+  });
+
+  it("are one level deep, and not under a hidden post", async () => {
+    const r = await answer(bob, "ub", "first");
+    assert.ok(r.ok);
+    await clearReplies("ub");
+    assert.deepEqual(await createReply(store, club, "ub", r.post.id, { text: "nested" }, deps), { ok: false, reason: "not_found" });
+    assert.deepEqual(await pinPost(store, club, { userId: "ua", wallet: alice.address }, r.post.id, true, deps), { ok: false, reason: "not_found" }, "a reply can't be pinned");
+    // As reports would: hidden, and still the Owner's.
+    await store.set(postKey(NFT, parent), { ...(await store.get<object>(postKey(NFT, parent)))!, hidden: "reports" });
+    await clearReplies("ub");
+    assert.deepEqual(await createReply(store, club, "ub", parent, { text: "late" }, deps), { ok: false, reason: "hidden" });
+    const thread = await listReplies(store, club, parent, { userId: "ub" }, deps);
+    assert.ok(thread.ok && thread.replies.length === 0, "a hidden post's thread is hidden too");
+  });
+
+  it("must be signed by the member's wallet for this post", async () => {
+    const m = reply("hi");
+    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: m, signature: await signReply(alice, m) }, deps), { ok: false, reason: "bad_signature" });
+    const elsewhere = reply("hi", { parent: "f".repeat(64) });
+    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: elsewhere, signature: await signReply(bob, elsewhere) }, deps), { ok: false, reason: "not_clean" });
+  });
+
+  it("stop at a full thread", async () => {
+    for (let i = 0; i < REPLIES_KEPT; i++) await store.addMember(repliesKey(NFT, parent), `${i}`.padStart(32, "0"));
+    await clearReplies("ub");
+    assert.deepEqual(await createReply(store, club, "ub", parent, { text: "one more" }, deps), { ok: false, reason: "thread_full" });
+  });
+
+  it("go with their post when it's deleted or the Club is purged, and leave the thread when deleted", async () => {
+    const a = await answer(bob, "ub", "one");
+    const b = await answer(bob, "ub", "two");
+    assert.ok(a.ok && b.ok);
+    await deletePost(store, club, { userId: "ub", wallet: bob.address }, a.post.id, deps);
+    assert.deepEqual(await store.members(repliesKey(NFT, parent)), [b.post.id]);
+    await deletePost(store, club, { userId: "ua", wallet: alice.address }, parent, deps);
+    assert.equal(await store.get(postKey(NFT, b.post.id)), null);
+    assert.deepEqual(await store.members(repliesKey(NFT, parent)), []);
+
+    const m = message("again", { at: NOW_SEC + 1 });
+    await clear(store, "ua");
+    const p = await createSignedPost(store, club, "ua", { message: m, signature: await sign(alice, m) }, deps);
+    assert.ok(p.ok);
+    parent = p.post.id;
+    const c = await answer(bob, "ub", "three");
+    assert.ok(c.ok);
+    await purgeClub(store, NFT);
+    assert.equal(await store.get(postKey(NFT, c.post.id)), null);
   });
 });

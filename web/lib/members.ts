@@ -34,6 +34,8 @@ export type PublicMember = {
   swaps: number;
   /** Set for the Club's Owner and Moderators. */
   role?: "owner" | "moderator";
+  /** Epochs in a row with enough active days on the Board (ADR 0032), when still alive. */
+  streak?: number;
 };
 
 export type MemberSort = "momentum" | "new";
@@ -113,6 +115,8 @@ export function rankMembers(
   events: readonly ActivityEvent[],
   sort: MemberSort,
   roles?: Roles,
+  /** Each member's live streak, by user id. */
+  streaks?: ReadonlyMap<string, number>,
 ): MembersView {
   const swaps = events.filter((e) => e.kind === "swapped");
   const all: PublicMember[] = rows.map((row) => {
@@ -124,6 +128,7 @@ export function rankMembers(
       momentum: memberScore(scores, row.wallets),
       swaps: swaps.filter((e) => e.parties.some((p) => own.has(p.toLowerCase()))).length,
       ...(roles?.owner === row.userId ? { role: "owner" as const } : roles?.moderators.includes(row.userId) ? { role: "moderator" as const } : {}),
+      ...(streaks?.get(row.userId) ? { streak: streaks.get(row.userId) } : {}),
     };
   });
   // Ties fall back to the earlier join, so the order is stable between reads.
