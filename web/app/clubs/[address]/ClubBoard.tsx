@@ -214,7 +214,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
               : "Posts from members will show up here."}
         </Empty>
       ) : (
-        <ul className="club-panel overflow-hidden">
+        <ul className="club-panel club-list">
           {shown.map((post) => (
             <PostItem
               key={post.id}

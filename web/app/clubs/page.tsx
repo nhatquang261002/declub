@@ -310,7 +310,7 @@ export default function ClubsPage() {
         ) : view === "list" ? (
           <>
             <ClubListHeader />
-            <ol className="club-panel divide-y divide-[#111318]/10 overflow-hidden">
+            <ol className="club-panel divide-y divide-[#111318]/10 club-list">
               {shown.map((r, i) => (
                 <ClubRow key={r.info.token} row={r} place={sort === "name" ? undefined : i + 1} now={now} joined={mineSet.has(r.info.token)} />
               ))}

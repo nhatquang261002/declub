@@ -1262,6 +1262,11 @@ body {
   box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
 }
 
+/* A list inside a panel. No overflow: hidden, so a row's menu or tooltip can hang past the panel's
+   edge; the first and last rows round the panel's corners themselves. */
+.club-list > :first-child { border-top-left-radius: calc(1rem - 2px); border-top-right-radius: calc(1rem - 2px); }
+.club-list > :last-child { border-bottom-left-radius: calc(1rem - 2px); border-bottom-right-radius: calc(1rem - 2px); }
+
 .club-card {
   display: flex;
   flex-direction: column;

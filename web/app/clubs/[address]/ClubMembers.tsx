@@ -162,7 +162,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
             <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />
           )}
           {rest.length > 0 && (
-            <ol className="club-panel divide-y divide-[#111318]/10 overflow-hidden" start={podium ? PODIUM + 1 : 1}>
+            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={podium ? PODIUM + 1 : 1}>
               {rest.map((m, i) => {
                 const rank = i + 1 + (podium ? PODIUM : 0);
                 const mine = me.wallet === m.wallet;
