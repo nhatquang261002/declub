@@ -5,6 +5,7 @@ import { CreateDealButton } from "@/components/CreateDealButton";
 import { CheckIcon, ShieldIcon, SwapIcon, WalletIcon } from "@/components/Icons";
 import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
+import { NETWORK } from "@/lib/network";
 import { REWARDS, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
 import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "./parts";
@@ -35,8 +36,8 @@ const START = [
   },
   {
     icon: <SwapIcon className="size-4" />,
-    title: "Use Monad testnet",
-    body: <>If the button says <b>Switch to Monad Testnet</b>, press it. Every deal here runs on testnet.</>,
+    title: `Use ${NETWORK.name}`,
+    body: <>If the button says <b>Switch to {NETWORK.walletName}</b>, press it. Every deal here runs on {NETWORK.mainnet ? "mainnet" : "testnet"}.</>,
   },
   {
     icon: <Image src="/brand/mon.svg" alt="" width={20} height={20} className="size-5" />,
@@ -156,7 +157,7 @@ const FEE_MODES: ReadonlyArray<[string, string]> = [
 ];
 
 const SAFETY = [
-  "Check you're on Monad testnet, with the wallet you expect.",
+  `Check you're on ${NETWORK.name}, with the wallet you expect.`,
   "Read every asset, token id and amount on both sides.",
   "Check who can accept and when the deal expires.",
   "Compare a handle and its wallet with your conversation. Lookalikes exist.",
@@ -199,7 +200,9 @@ const FAQ: ReadonlyArray<[string, string]> = [
   ["Where are my assets while a deal is open?", "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it. In a signed swap, they never leave your wallet."],
   ["Why do I need to approve DeClub?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
   ["What is an open offer?", "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders."],
-  ["Is this mainnet?", "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract."],
+  ["Is this mainnet?", NETWORK.mainnet
+    ? "Yes. This is Monad mainnet: deals move real assets and the fee is real. Check every deal twice, and never send valuable assets to an unfamiliar contract."
+    : "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract."],
 ];
 
 const FAQ_ITEMS = [
@@ -226,7 +229,7 @@ export default function GuidePage() {
             </Link>
           </>
         }
-        summary={["Both sides move together, or nothing moves.", "You only pay the fee when a deal completes.", "Testnet only: use test assets."]}
+        summary={["Both sides move together, or nothing moves.", "You only pay the fee when a deal completes.", NETWORK.mainnet ? "Real assets: check every deal." : "Testnet only: use test assets."]}
         sections={SECTIONS}
       />
 

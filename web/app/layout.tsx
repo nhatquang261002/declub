@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { Providers } from "@/components/Providers";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS, SITE_URL } from "@/lib/config";
+import { NETWORK } from "@/lib/network";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Header />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
           <footer className="border-t border-line/70 px-4 py-5 text-center text-xs text-muted">
-            Monad testnet ·{" "}
+            {NETWORK.name} ·{" "}
             {DECLUB_ESCROW_ADDRESS && (
               <>
                 <a

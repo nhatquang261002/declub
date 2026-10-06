@@ -5,6 +5,7 @@ import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
 import { LogoMark, Wordmark } from "@/components/Logo";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
+import { NETWORK } from "@/lib/network";
 import { REWARDS, percent } from "@/lib/rewards";
 
 const STEPS = [
@@ -39,7 +40,7 @@ export default function HomePage() {
                 height={18}
                 className="size-[18px] rounded-full"
               />
-              De(al) Club · Monad testnet
+              De(al) Club · {NETWORK.name}
             </div>
             <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">
               Your community’s market,
@@ -109,7 +110,7 @@ export default function HomePage() {
                 Communities that own their market.
               </p>
               <p className="mt-2 leading-6 text-white/60">
-                Clubs, swaps and rewards for Monad’s NFT collections and their coins, on Monad testnet.
+                Clubs, swaps and rewards for Monad’s NFT collections and their coins, on {NETWORK.name}.
               </p>
             </div>
             <a
@@ -138,14 +139,14 @@ export default function HomePage() {
                     View DeClub contract <span aria-hidden>↗</span>
                   </a>
                 )}
-                <span>Monad testnet</span>
-                <span className="font-mono text-xs text-white/50">Chain ID 10143</span>
+                <span>{NETWORK.name}</span>
+                <span className="font-mono text-xs text-white/50">Chain ID {NETWORK.chainId}</span>
               </nav>
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Stay safe</p>
               <p className="mt-3 leading-6 text-white/70">
-                Testnet only. Never send valuable assets to an unfamiliar contract.
+                {NETWORK.mainnet ? "Real assets move here." : "Testnet only."} Never send valuable assets to an unfamiliar contract.
               </p>
             </div>
           </div>

@@ -82,6 +82,35 @@ npm run dev
 
 Open <http://localhost:3000>. The app uses Monad testnet by default.
 
+### Flavors: testnet and mainnet
+
+One codebase, two flavors. Each has its own chain, env file, build folder, port and storage, so
+both run side by side.
+
+| | testnet | mainnet |
+|---|---|---|
+| Chain | 10143 | 143 |
+| Env | `.env` (as before), or `.env.testnet` | `.env.mainnet`, from [`.env.mainnet.example`](.env.mainnet.example) |
+| Web | `npm run dev:testnet`, port 3000 (`dev` still works) | `npm run dev:mainnet`, port 3001 |
+| Build and serve | `build:testnet`, `start:testnet` | `build:mainnet`, `start:mainnet` (build folder `web/.next-mainnet`) |
+| Matcher | `npm start`, port 8787 | `npm run start:mainnet` in `matcher/`, port 8788 |
+
+The mainnet flavor reads only `.env.mainnet` (and `web/.env.mainnet.local` for server secrets). Every
+key the testnet `.env` and `web/.env.local` set is blanked, so a testnet RPC, key or database can't
+reach it. It refuses to start with a mock token, `REWARDS_OPERATOR_KEY`, a mintable Chog, a testnet
+RPC, a missing Chog address or an Upstash database shared with testnet. The pages say which network
+they're on (`web/lib/network.ts`).
+
+To host both, make two projects from this repo with the same build command and different
+environments: the testnet one with the testnet values, the mainnet one with `.env.mainnet.example`'s
+keys. Set `NEXT_PUBLIC_CHAIN_ID=143` there; the flavor scripts do it locally. Publish mainnet
+epochs from the Safe: `npm run rewards:epoch:mainnet` builds without `--publish`.
+
+Before mainnet can go live, it needs its contracts deployed (`DeployEscrow`, `DeployIntents`,
+`DeployRewards` with Safes; see [docs/11-test-plan.md](docs/11-test-plan.md#6-mainnet)) and mainnet
+entries in `web/data/assets.json`. The file only lists testnet assets today, so mainnet starts with
+every asset unverified.
+
 ### Run checks
 
 ```bash

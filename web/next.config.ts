@@ -33,6 +33,8 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Each flavor builds into its own folder (scripts/flavorEnv.mjs), so testnet and mainnet can run at once.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: { root: __dirname },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
