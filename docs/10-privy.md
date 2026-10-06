@@ -1,6 +1,6 @@
-# Privy in On Deal
+# Privy in DeClub
 
-Privy is optional identity and account infrastructure for On Deal. The trading contracts do
+Privy is optional identity and account infrastructure for DeClub. The trading contracts do
 not depend on Privy: without `NEXT_PUBLIC_PRIVY_APP_ID`, the app uses the injected-wallet
 wagmi flow. When Privy is configured, it adds sign-in, linked accounts, wallet switching,
 verified profiles, handle-based counterparties, and the identity boundary for server-side
@@ -122,7 +122,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 `UPSTASH_*` is required for persistent profiles, server-side state, and Clubs. The Vercel KV
 names `KV_REST_API_URL` and `KV_REST_API_TOKEN` work too, as fallbacks (`lib/server/store.ts`).
 Without them, production has no store and those features switch off; development uses an
-in-memory store (seeded with mock Clubs), which is lost on restart and is not a production
+in-memory store, which is lost on restart and is not a production
 persistence strategy.
 
 The Privy dashboard must allow the deployed origin and enable the login methods the app is

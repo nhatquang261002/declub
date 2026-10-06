@@ -10,7 +10,7 @@ It closes the unchecked testing items in the [roadmap](06-roadmap.md): the manua
 
 In scope:
 
-- `OnDealV2`, `OnDealIntents` and `FeeAdmin` as deployed from the current source, driven through the app.
+- `DeClubEscrow`, `DeClubIntents` and `FeeAdmin` as deployed from the current source, driven through the app.
 - The matcher (`matcher/`) as a running service: pool, matching, pruning, settlement.
 - The web app (`web/`): every page, Privy sign-in, profiles, deal-by-@handle, webhooks, Clubs, the fill watcher.
 - Operations: deploy, configuration, the fee admin Safe, monitoring and incident response.
@@ -53,8 +53,8 @@ Tester(s):
 Date:
 Commit:         (git rev-parse HEAD)
 Build URL:
-OnDealV2:                       deploy block:
-OnDealIntents:                  deploy block:
+DeClubEscrow:                       deploy block:
+DeClubIntents:                  deploy block:
 Fee token (WMON):               fee():          MAX_FEE():
 Fee recipient:                  fee admin:
 Pool URL:                       matcher /info checked: yes / no
@@ -92,10 +92,11 @@ Also needed: a phone with a wallet app that has an in-app browser (MetaMask Mobi
 
 ### 2.2 Contracts and tokens
 
-1. Redeploy `DeployV2.s.sol` and `DeployIntents.s.sol` from the release candidate commit ([contracts/script/README.md](../contracts/script/README.md)) with `PROTOCOL_FEE_WEI` (non-zero, small enough to run every case many times), `PROTOCOL_FEE_MAX_WEI` (about 4× the fee), `FEE_RECIPIENT`, `FEE_ADMIN` and `DEPLOY_MOCK_WMON=true`. Pass the same fee values to both. Record the addresses and deploy blocks in the run header.
-2. Run `e2e` verify against the new addresses (DEP-01 to DEP-09). All must pass before the manual run starts.
-3. Fund each of A, B, C and D with about 10 MON from the faucet: enough for gas on many transactions, MON in deals, and the fee many times over. The worst-case create is about 2.2M gas ([04](04-security.md#threats-additions-to-the-table-above)), and Monad charges the gas limit.
-4. Mint test assets. All three mocks have an open mint or deposit:
+1. Redeploy `DeployEscrow.s.sol` and `DeployIntents.s.sol` from the release candidate commit ([contracts/script/README.md](../contracts/script/README.md)) with `PROTOCOL_FEE_WEI` (non-zero, small enough to run every case many times), `PROTOCOL_FEE_MAX_WEI` (about 4× the fee), `FEE_RECIPIENT`, `FEE_ADMIN` and `DEPLOY_MOCK_WMON=true`. Pass the same fee values to both. Record the addresses and deploy blocks in the run header.
+2. Deploy `DeployRewards.s.sol` with `REWARDS_OPERATOR` set to a testnet wallet you hold the key for (`REWARDS_OPERATOR_KEY` for `npm run rewards:epoch -- --publish`) and `REWARDS_CLAIM_DELAY=0`, and set `NEXT_PUBLIC_REWARDS_EPOCH_SECONDS=600` and `NEXT_PUBLIC_REWARDS_GENESIS` to a recent time, so an epoch closes every ten minutes during the run.
+3. Run `e2e` verify against the new addresses (DEP-01 to DEP-09). All must pass before the manual run starts.
+4. Fund each of A, B, C and D with about 10 MON from the faucet: enough for gas on many transactions, MON in deals, and the fee many times over. The worst-case create is about 2.2M gas ([04](04-security.md#threats)), and Monad charges the gas limit.
+5. Mint test assets. All three mocks have an open mint or deposit:
 
 ```bash
 cd contracts
@@ -120,13 +121,12 @@ Root `.env` (only `NEXT_PUBLIC_*` reaches the web app):
 | Variable | Value for the testnet run |
 |---|---|
 | `NEXT_PUBLIC_CHAIN_ID`, `NEXT_PUBLIC_RPC_URL` | `10143`, the RPC the team will use (record it) |
-| `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS`, `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` | The redeploy |
+| `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS`, `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` | The redeploy |
 | `NEXT_PUBLIC_POOL_URL` | The matcher's public URL, reachable from the testers' browsers (HTTPS if the app is HTTPS) |
 | `NEXT_PUBLIC_CHOG_ADDRESS` | Set explicitly. Blank falls back to MockChog |
 | `NEXT_PUBLIC_MOCK_ERC20_ADDRESS` | mUSD (enables **+ Test token**) |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | The test Privy app |
 | `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS` | `false`, unless the run covers M-WAL-07 |
-| `NEXT_PUBLIC_DEMO_DEALS`, `NEXT_PUBLIC_DEMO_CLUBS`, `NEXT_PUBLIC_DEMO_CREATE` | `false`. They are forced off in a production build anyway; test on a production build (`npm run build && npm start`, or the deployed host), never `npm run dev` |
 
 `web/.env.local` or the host (server secrets; the root file can't carry them):
 
@@ -135,7 +135,7 @@ Root `.env` (only `NEXT_PUBLIC_*` reaches the web app):
 | `PRIVY_APP_SECRET`, `PRIVY_WEBHOOK_SIGNING_SECRET` | From the test Privy app |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | A testnet-only Upstash database |
 | `CRON_SECRET` | Any long random value |
-| `FILL_WATCHER_START_BLOCK` | The new `OnDealV2` deploy block |
+| `FILL_WATCHER_START_BLOCK` | The new `DeClubEscrow` deploy block |
 | `CLUB_ADMIN_USER_IDS` | C's Privy user id |
 
 Matcher (`matcher/README.md`): `MATCHER_PRIVATE_KEY`, `MATCHER_RPC_URL`, and `MATCHER_TOKEN_ALLOWLIST` set to mUSD, MockChog and the mirror, as mainnet will run with an allowlist. Behind a proxy, set `MATCHER_TRUST_PROXY=true`. Check `GET /info` returns the redeployed contract and the fee before starting.
@@ -153,7 +153,7 @@ Commands live in [`e2e/README.md`](../e2e/README.md) and [`scripts/test-all.sh`]
 | Suite | IDs | Runs against | Mainnet-safe |
 |---|---|---|---|
 | `scripts/test-all.sh` | `forge build` and `forge test` (optional coverage, Slither, Halmos), matcher typecheck and tests, web typecheck, lint, tests and build, optionally the local `e2e` run | Local, CI | n/a |
-| `e2e` chain: OnDealV2 | V2-01 to V2-08 | Local anvil with the real deploy scripts, or testnet addresses | No (sends transactions) |
+| `e2e` chain: DeClubEscrow | V2-01 to V2-08 | Local anvil with the real deploy scripts, or testnet addresses | No (sends transactions) |
 | `e2e` chain: intents | IN-01 to IN-08 | Local anvil, or testnet plus a running matcher (IN-08) | No |
 | `e2e` chain: fee admin | FA-01 anywhere; FA-02 with the admin key (`E2E_FEE_ADMIN_KEY`); FA-03 to FA-05 local only (they move the fee or need time travel) | Local anvil, testnet | No |
 | `e2e` verify | DEP-01 to DEP-09 | Testnet, mainnet | **Yes**, read-only |
@@ -179,6 +179,9 @@ What each ID checks, so the cross-references below make sense:
 | IN-06 | Rejections: expired, `maxFee` below the fee, wrong fee token, bad signature, want not met, the same maker twice, a cycle of one |
 | IN-07 | ERC-1271 contract-wallet maker |
 | IN-08 | Matcher round trip over HTTP: post, settle, `/settlements`, cancel by signature |
+| RW-01 | A real swap's fee through the app's activity log and epoch builder: 40% to Holders by holdings, 20% to the Owner (local) |
+| RW-02 | Publish on `DeClubRewards`; claims wait for the delay, pay each leaf once, anyone can send them (local) |
+| RW-03 | Revoke before claims open, an underfunded root refused past its funding, sweep after the window (local) |
 | FA-01 | Non-admin or above-ceiling `setFee` rejected |
 | FA-02 | Queue a raise, `applyFee` too early fails, cancel it with `setFee(fee())`. Safe on testnet: the fee never changes |
 | FA-03 | A cut applies at once; open deals keep their listed fee |
@@ -188,11 +191,11 @@ What each ID checks, so the cross-references below make sense:
 | DEP-02 | Bytecode matches the build (immutables masked) |
 | DEP-03 | Fee config as expected: recipient ≠ admin, admin is a contract, nothing pending |
 | DEP-04 | The fee token wraps and unwraps like WMON |
-| DEP-05 | Intents domain `("OnDealIntents", "3")` |
+| DEP-05 | Intents domain `("DeClubIntents", "1")` |
 | DEP-06 | Both contracts charge the same fee |
 | DEP-07 | Matcher `/info` agrees with the chain; its gas wallet is funded |
 | DEP-08 | Constants |
-| DEP-09 | App env: no demo flags, a real Chog collection, `FILL_WATCHER_START_BLOCK` set |
+| DEP-09 | App env: a real Chog collection, `FILL_WATCHER_START_BLOCK` set |
 | WEB-01 | Pages render |
 | WEB-02 | Security headers |
 | WEB-03 | `/api/deals` |
@@ -226,8 +229,8 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 
 | ID | P | Case | Preconditions | Steps | Expected | Automated |
 |---|---|---|---|---|---|---|
-| M-CRE-01 | P0 | Exact deal: NFT for mUSD + MON | A holds `#a1` | 1. **Create deal** → **Lock assets now** → **Request exact assets** → **Continue**. 2. **+ Test token** (or **+ Token**, paste mUSD), 50; **+ MON**, 1 → **Continue**. 3. **+ NFT**, pick `#a1` from the wallet grid; expiry **24 hours** → **Continue**. 4. Review → **Approve NFT collection 0x…** → **Create deal**. | The token row reads "mUSD · 18 decimals (read from the token)". Review shows the **Preview** stage, Terms (Exact assets, Anyone, In 24 hours) and a **Protocol fee** line equal to `fee()`. The approval prompt is `setApprovalForAll` for the MockChog collection. The create prompt's value is exactly the fee. "Deal created." then the app opens `/v2/deal/<id>`. On-chain: `ownerOf(#a1)` is `OnDealV2`. | Automated: V2-01 |
-| M-CRE-02 | P0 | Maker gives MON and an ERC-20 | — | 1. Exact deal: A gives 1 MON + 20 mUSD, asks for `#b1`. 2. Approve and create. | The mUSD approval prompt is for exactly 20 mUSD, not unlimited. The create prompt's value is 1 MON + the fee. After create, 20 mUSD and 1 MON + fee sit in `OnDealV2`. | Automated: V2-01 |
+| M-CRE-01 | P0 | Exact deal: NFT for mUSD + MON | A holds `#a1` | 1. **Create deal** → **Lock assets now** → **Request exact assets** → **Continue**. 2. **+ Test token** (or **+ Token**, paste mUSD), 50; **+ MON**, 1 → **Continue**. 3. **+ NFT**, pick `#a1` from the wallet grid; expiry **24 hours** → **Continue**. 4. Review → **Approve NFT collection 0x…** → **Create deal**. | The token row reads "mUSD · 18 decimals (read from the token)". Review shows the **Preview** stage, Terms (Exact assets, Anyone, In 24 hours) and a **Protocol fee** line equal to `fee()`. The approval prompt is `setApprovalForAll` for the MockChog collection. The create prompt's value is exactly the fee. "Deal created." then the app opens `/v2/deal/<id>`. On-chain: `ownerOf(#a1)` is `DeClubEscrow`. | Automated: V2-01 |
+| M-CRE-02 | P0 | Maker gives MON and an ERC-20 | — | 1. Exact deal: A gives 1 MON + 20 mUSD, asks for `#b1`. 2. Approve and create. | The mUSD approval prompt is for exactly 20 mUSD, not unlimited. The create prompt's value is 1 MON + the fee. After create, 20 mUSD and 1 MON + fee sit in `DeClubEscrow`. | Automated: V2-01 |
 | M-CRE-03 | P0 | Open offer | — | 1. **Open offer**. 2. Type a note; then paste text over 280 bytes. 3. Shorten it, **Continue**, give `#a2`, **Post open offer**. | The counter shows bytes / 280 and turns red over the limit, with "The note is N bytes; the limit is 280." blocking **Continue**. Review's want side reads "You're looking for … Not enforced". After posting, the deal page stamp says "taking offers". | Automated: V2-05 |
 | M-CRE-04 | P0 | Private deal by address | — | 1. Exact deal; in **Only this wallet can accept (optional)** type A's own address, then garbage, then B's address. 2. Create. | Own address: "You cannot make a private offer to yourself." Garbage: "Enter a valid wallet address, or leave it empty." B's address: "Only <B>". Review "Who can accept" shows B. `getTrade(id).taker` is B. | Automated: V2-04 |
 | M-CRE-05 | P1 | Form rules | — | Try in turn: an empty side; MON on both sides; the same NFT twice on one side; the same asset on both sides; 11 assets on one side; an amount with more decimals than the token has; a non-token address in a **+ Token** row. | Each blocks **Continue** with a reason, for example "Add at least one asset.", "The same asset is listed twice on one side. Combine the amounts into one row.", "The same asset can't be on both sides. Offer and request different assets.", "Up to 10 assets per side.", "Row N: that address is not a readable token." **+ MON** is disabled once a side has MON. | Automated: V2-08 |
@@ -248,7 +251,7 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 | M-DEAL-07 | P0 | Collect a held payout | Engineer sets up a deal where a payout to A was refused and credited (a maker contract that rejects MON, from `contracts/test/utils`, or a blocklisting token) and gives the tester control of the account | Open the deal page as the credited account; press **Claim**. | Panel "Held for you · Waiting for you to collect" lists each credited asset; after **Claim**, "Claimed." and the panel goes away; `claimable` is 0. | — |
 | M-DEAL-08 | P1 | Multi-asset deal | A: 3 NFTs + 100 mUSD; asks for 2 of B's NFTs + 2 MON | Create, then fill as B. | Approvals step through "(1 of N)"; B's steps read "Approve N assets". Every asset lands where the terms say. Record gas for create and fill. | Automated: V2-07 |
 | M-DEAL-09 | P1 | Cancel races a fill | Open deal by A; B has the accept prompt open in the wallet | A cancels and it confirms; then B confirms. | B's transaction fails or is refused in simulation with "This deal was already filled or cancelled."; B loses only gas; A has everything back. | Automated: V2-08 |
-| M-DEAL-10 | P1 | Bad deal URLs | — | Open `/v2/deal/999999`, `/v2/deal/abc`, `/v2/deal/9101`. | "This deal does not exist." / "Invalid deal id." / does not exist (no mock deal in a production build). | Automated: WEB-01 |
+| M-DEAL-10 | P1 | Bad deal URLs | — | Open `/v2/deal/999999`, `/v2/deal/abc`, `/v2/deal/9101`. | "This deal does not exist." / "Invalid deal id." / does not exist. | Automated: WEB-01 |
 
 ### 4.4 Open offers (OFR)
 
@@ -275,11 +278,11 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 
 | ID | P | Case | Preconditions | Steps | Expected | Automated |
 |---|---|---|---|---|---|---|
-| M-SIG-01 | P0 | Sign and post, with the wrap step | A holds `#a4`, MON, no WMON | 1. **Create deal** → **Sign only**. 2. Want 10 mUSD → **Continue**. 3. Give `#a4`, **Good for** 1 hour → **Continue**. 4. Run each step: **Wrap X MON into WMON**, the WMON approval, **Approve NFT #a4**. 5. **Sign and post**. | **+ MON** is absent. Review shows the fee in WMON and "Signing lets anyone settle this, with anyone". The WMON approval equals the fee; the NFT approval is `approve(id)`. The signing prompt is EIP-712 typed data: domain `OnDealIntents`, version `3`, chain 10143, the configured intents address, with `feeToken` and `maxFee`. The app opens `/intent/<hash>`: "Your swap is in the pool". | Automated: IN-01 |
+| M-SIG-01 | P0 | Sign and post, with the wrap step | A holds `#a4`, MON, no WMON | 1. **Create deal** → **Sign only**. 2. Want 10 mUSD → **Continue**. 3. Give `#a4`, **Good for** 1 hour → **Continue**. 4. Run each step: **Wrap X MON into WMON**, the WMON approval, **Approve NFT #a4**. 5. **Sign and post**. | **+ MON** is absent. Review shows the fee in WMON and "Signing lets anyone settle this, with anyone". The WMON approval equals the fee; the NFT approval is `approve(id)`. The signing prompt is EIP-712 typed data: domain `DeClubIntents`, version `3`, chain 10143, the configured intents address, with `feeToken` and `maxFee`. The app opens `/intent/<hash>`: "Your swap is in the pool". | Automated: IN-01 |
 | M-SIG-02 | P0 | A pair settles | M-SIG-01 open; B holds mUSD and WMON | B signs the mirror swap: gives 10 mUSD, wants `#a4`. | Within a matcher pass (about 5 s) both pages read **Settled**; the cycle reads "Matched and swapped" and "You received". `#a4` with B, 10 mUSD with A, recipient +2 × fee in WMON. The matcher key paid the gas. | Automated: IN-02, IN-08 |
 | M-SIG-03 | P0 | Cancel on-chain | A live swap by A | **Cancel on-chain**, confirm. | "Cancelled on-chain. It can never settle now." `isNonceUsed` is true. Posting a saved copy of the signature is refused (nonce used). | Automated: IN-05 |
 | M-SIG-04 | P1 | Remove from pool | A live swap by A | **Remove from pool**, sign the message. | No gas. Status **Cancelled**, with the line that a copy elsewhere could still settle until the deadline. | Automated: IN-08 |
-| M-SIG-05 | P1 | Paused and back | A live swap giving `#a5` | 1. Revoke `#a5`'s approval in the wallet. 2. Wait about 30 s. 3. Use the approve-again button. | Status **Paused**, "Your swap is on hold", reason "An NFT this intent gives isn't approved for On Deal any more." After approving it returns to **Open**. Same for spending the WMON: "You don't hold enough WMON for the protocol fee any more." | — |
+| M-SIG-05 | P1 | Paused and back | A live swap giving `#a5` | 1. Revoke `#a5`'s approval in the wallet. 2. Wait about 30 s. 3. Use the approve-again button. | Status **Paused**, "Your swap is on hold", reason "An NFT this intent gives isn't approved for DeClub any more." After approving it returns to **Open**. Same for spending the WMON: "You don't hold enough WMON for the protocol fee any more." | — |
 | M-SIG-06 | P1 | Pool rejections | — | 1. Sign a second swap giving the same NFT. 2. Sign swaps whose mUSD gives exceed the balance. 3. Give a token not on `MATCHER_TOKEN_ALLOWLIST`. | "Another of your signed swaps already gives this NFT. Cancel that one first." / "Together with your other signed swaps, this gives more of a token than your wallet holds." / "The pool doesn't match one of these tokens." | Automated: IN-06 |
 | M-SIG-07 | P1 | Whole-collection approval | Give two NFTs of one collection | Tick **Approve whole collections**. | The copy warns the contract may move any NFT in that collection; one `setApprovalForAll` prompt replaces the per-NFT ones. | — |
 | M-SIG-08 | P1 | Surplus | A wants at least 10 mUSD; B gives 15 | Let them settle. | A's "You received" shows 15 mUSD. | Automated: IN-02 |
@@ -316,7 +319,7 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 
 ### 4.10 Protocol fee and fee admin (FEE)
 
-The fee admin's transactions go through the admin Safe (or the dedicated EOA on testnet). Keep both contracts in step: every change is made on `OnDealV2` and `OnDealIntents`.
+The fee admin's transactions go through the admin Safe (or the dedicated EOA on testnet). Keep both contracts in step: every change is made on `DeClubEscrow` and `DeClubIntents`.
 
 | ID | P | Case | Preconditions | Steps | Expected | Automated |
 |---|---|---|---|---|---|---|
@@ -380,7 +383,18 @@ This is the live checklist in [10 · Privy](10-privy.md#what-remains-to-validate
 | M-SEC-03 | P0 | What you sign is what's shown | M-SIG-01 | Compare the wallet's typed-data view with the review screen. | Give, want, fee token, `maxFee` and deadline in the prompt match the review; the domain's `verifyingContract` is the configured intents address. | Automated: IN-01 |
 | M-SEC-04 | P1 | Framing and headers | — | Try to load the app in an iframe on another origin; check response headers. | The frame is refused (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). | Automated: WEB-02 |
 | M-SEC-05 | P1 | User text is inert | — | Put `<img src=x onerror=alert(1)>`, a `javascript:` link and a 2,000-character word in an offer note, a trait spec, a Club post and a Club description. | Rendered as plain text, no script runs, layout doesn't break, links aren't clickable. | — |
-| M-SEC-06 | P1 | Unsolicited transfers | — | Send MON, and an NFT with `safeTransferFrom`, straight to `OnDealV2` and `OnDealIntents`. | All revert (no `receive()`, no `IERC721Receiver`). A plain `transferFrom` can't be refused by any contract; that NFT is lost, which the Guide should say. | Automated: V2-08 (MON) |
+| M-SEC-06 | P1 | Unsolicited transfers | — | Send MON, and an NFT with `safeTransferFrom`, straight to `DeClubEscrow` and `DeClubIntents`. | All revert (no `receive()`, no `IERC721Receiver`). A plain `transferFrom` can't be refused by any contract; that NFT is lost, which the Guide should say. | Automated: V2-08 (MON) |
+
+### 4.16 Rewards and signed social (RWD)
+
+| ID | P | Case | Preconditions | Steps | Expected | Automated |
+|---|---|---|---|---|---|---|
+| M-RWD-01 | P0 | An epoch pays Holders and the Owner | A and B are members holding MockChogs (A more than B); C is the Club's Owner; short epochs (2.2) | 1. B fills a deal from D in MockChog. 2. After the epoch closes, `npm run rewards:epoch -- --publish`. 3. A, B and C open the Club's **Rewards** tab. | The script prints the Club's fees, 40% to Holders split by NFTs held, 20% to the fund. A and B see their shares **Ready to claim**; C sees the Club-fund alert on the Club page. | RW-01, RW-02 (local) |
+| M-RWD-02 | P0 | Claim | M-RWD-01 | A presses **Claim** on the Rewards tab; C presses it on **Account**. | The MON arrives; the share moves to Claimed; a second claim isn't offered. | RW-02 (local) |
+| M-RWD-03 | P1 | What can't be paid rolls over | A Club with a swap and no Holder members, or no Owner | Build the next epoch. | The Club's line shows the pools rolling over; they are paid in the epoch after a Holder joins or an Owner claims. | `web/test/rewards.test.ts` |
+| M-RWD-04 | P1 | Signed posts | A is a member with a shared profile, two wallets linked; the Club wallet is the first | 1. Connect the second wallet, post. 2. Switch to the Club wallet, **Sign & post**. 3. Open `/api/clubs/<MockChog>/feed`. | 1 is refused before the wallet opens ("Switch to your Club wallet"). 2 shows **Signed**. 3 has the post with its signature, which verifies against the domain in the answer. | `web/test/social.test.ts` |
+| M-RWD-05 | P1 | Follows and lenses | A and B have posted | B **Follows** A, then picks **Following**, **Holders** and **Top traders**. | Following shows only A's posts, without pins; Holders only Holders'; `/api/wallets/<B>/follows` has the signed follow. Unfollowing removes it. | `web/test/social.test.ts` |
+| M-RWD-06 | P2 | Public epoch data | M-RWD-01 | Open `/api/rewards/epochs/<n>` and rebuild the root from its leaves. | The root matches `epochs(n).root` on `DeClubRewards`. | `DeClubRewards.leafFixture.t.sol` |
 
 ## 5. Non-functional checks
 
@@ -402,8 +416,8 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 
 **Contracts**
 
-- [ ] External audit of `OnDealV2`, `OnDealIntents` and `FeeAdmin` done; every finding fixed or accepted in writing; the deployed commit is the audited one (or the diff since was reviewed).
-- [ ] A mainnet deploy path exists and was reviewed. Today every script refuses any chain but 10143 and 31337 ("testnet deployment only"), by design; the change that allows mainnet must not also deploy mocks or take defaults.
+- [ ] External audit of `DeClubEscrow`, `DeClubIntents` and `FeeAdmin` done; every finding fixed or accepted in writing; the deployed commit is the audited one (or the diff since was reviewed).
+- [ ] A mainnet deploy path exists and was reviewed. Built: `DeployEscrow` and `DeployIntents` accept chain 143 and, there only, refuse mocks, demo wallets, a zero fee or ceiling, `FEE_FIXED`, a missing or shared recipient/admin, and any `FEE_TOKEN` but the canonical WMON (`script/FeeConfig.sol`, tested). Dry-run against the real mainnet RPC passes; the reviewer still has to sign it off. `Deploy.s.sol` (v1) stays testnet-only.
 - [ ] Canonical WMON address confirmed (`FEE_TOKEN`); the deploy script's wrap/unwrap check passed against it.
 - [ ] Fee recipient Safe and a separate fee admin Safe exist, with signers and threshold recorded.
 - [ ] `PROTOCOL_FEE_WEI` set from the agreed dollar amount ($5 per side, [ADR 0018](adr/0018-adjustable-protocol-fee.md)) at a recorded MON price; `PROTOCOL_FEE_MAX_WEI` about 4× that; both contracts deployed with the same values.
@@ -420,7 +434,7 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 - [ ] `NEXT_PUBLIC_DEMO_*` false; no testnet addresses anywhere in the production env.
 - [ ] Privy production app: allowed origins, login methods, `PRIVY_APP_SECRET`; webhooks need Privy's Enterprise plan, so either that is in place or the fallback (profiles sync on `/account` visits) is accepted.
 - [ ] Upstash production database, separate from testnet.
-- [ ] Cron scheduler calling `/api/cron/fills` every minute with `CRON_SECRET` (not Vercel Hobby's daily cron); `FILL_WATCHER_START_BLOCK` = the mainnet `OnDealV2` deploy block.
+- [ ] Cron scheduler calling `/api/cron/fills` every minute with `CRON_SECRET` (not Vercel Hobby's daily cron); `FILL_WATCHER_START_BLOCK` = the mainnet `DeClubEscrow` deploy block.
 - [ ] Matcher: a mainnet RPC, `MATCHER_TOKEN_ALLOWLIST` set, a dedicated key funded for gas with an alert on low balance, `MATCHER_TRUST_PROXY` right for the proxy, its sqlite file on persistent storage, and log and uptime monitoring.
 - [ ] `npm run verify -- --mainnet` (DEP) dry-run against the deployed addresses passes with every `EXPECT_*` set.
 

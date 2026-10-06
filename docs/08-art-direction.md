@@ -1,6 +1,6 @@
 # 08 · Art Direction
 
-On Deal looks like a pinboard of trading stickers: a cream canvas, thick dark outlines, hard offset
+DeClub looks like a pinboard of trading stickers: a cream canvas, thick dark outlines, hard offset
 shadows and warm Chog-brand colours. The supplied Chog artwork adds an expressive, collectible
 mood, while trade terms, wallet state and transaction actions stay clear.
 
@@ -32,9 +32,9 @@ The tokens are in `web/app/globals.css`: brand primitives (`--chog-*`) feed sema
 ## Artwork
 
 - Supplied NFT examples live under `web/public/art/chogs/`.
-- The home page shows the Angel/Devil swap illustration, `OnDealArt` in
+- The home page shows the Angel/Devil swap illustration, `DeClubArt` in
   `web/components/ChogArt.tsx`: Angel Chog #1159 and Devil Chog #1376 in taped white frames with
-  swap arrows. The same files serve as artwork for a few mock Clubs in development.
+  swap arrows.
 - `PinnedChog` (a pinboard collage) is still in `web/components/` but no page uses it.
 - `ChogImage` (`web/components/Chog.tsx`) is only used for tokens of the configured Chog collection
   (`CHOG_ADDRESS`). It shows the token's `tokenURI` image, with the local artwork as a fallback for

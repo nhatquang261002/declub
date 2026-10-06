@@ -15,9 +15,9 @@ The app also still carried OnDeal (v1): a Chogs / Multi-asset switch on Deals an
 - **`GET /api/deals`** takes the deals page's query (`tab`, `q`, `mon`, `sort`, `kind`), the connected wallet (`viewer`, for private offers and "For you"), up to two `token`s (a Club's market), and `page` / `size` (at most 50). It answers one page plus the totals for the tabs. Public, cached at the edge for 3 s.
 - **The book** (`web/lib/server/dealBook.ts`) reads storage the way the browser did, once for everyone. A filled or cancelled deal never changes, so it is read once and kept. Open deals (expired ones included, until reclaimed) and new ids are read again when the book is more than 5 s old, 100 `getTrade` per multicall, 4 multicalls at a time. Requests during a refresh share it, and a failed refresh serves the last book. Token symbols are read once per token, so a search for a symbol finds every deal that holds it.
 - **Signed swaps** come from the pool on the same refresh, and are merged and filtered with the deals. The pool being down drops only them, and the answer says so. A signed swap travels as the pool's own row, so the browser recomputes its hash as it does for a row from the pool.
-- **The filtering is shared code** (`web/lib/dealBook.ts`): the same tabs, search, MON filter and sort as before, now over every deal. The mock deals of development go through it too.
+- **The filtering is shared code** (`web/lib/dealBook.ts`): the same tabs, search, MON filter and sort as before, now over every deal.
 - **Everything lives in the server's memory.** A cold start reads the book again: one multicall per 100 deals that aren't closed yet, plus one per 100 closed ones the first time.
-- **OnDeal (v1) is gone from the app.** OnDealV2 is the deal contract. Without `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` there are no deals (outside the mock ones), rather than a fallback to a testnet address. The v1 contract and its tests stay in `contracts/`.
+- **OnDeal (v1) is gone from the app.** OnDealV2 is the deal contract. Without `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` there are no deals, rather than a fallback to a testnet address. The v1 contract and its tests stay in `contracts/`.
 
 ## Alternatives
 

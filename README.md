@@ -1,32 +1,44 @@
-# On Deal
+# De(al) Club
 
-> **Trustless OTC trading and programmable escrow on Monad.**
+> **Your community's market, owned by its members.**
 >
-> *Trade what you have for what you actually want, without trusting the other side.*
+> *Every Monad collection and memecoin gets a Club. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.*
 
-On Deal lets two people swap any ERC-721, ERC-20 and MON, in any mix, through an on-chain escrow (`OnDealV2`) that settles atomically:
+DeClub (written De(al) Club) turns the people around an asset into the owners of its market ([ADR 0021](docs/adr/0021-declub-pivot.md)):
+
+| | What |
+|---|---|
+| **Gather** | A Club for each verified collection or memecoin: its Market, a Board, Members ranked by Momentum, Holder badges, an Owner and Moderators ([09 · Clubs](docs/09-clubs.md)). |
+| **Trade** | Members swap inside the Club, through escrow or by signing, with no trust between them. Every completed swap pays a small flat fee per side. |
+| **Own the market** | Each week, 40% of the fees a Club's swaps paid goes to its Holders, by holdings, and 20% to its Club fund, which the Owner collects, claimed on chain from `DeClubRewards` ([ADR 0022](docs/adr/0022-club-rewards.md)). |
+| **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered ([ADR 0023](docs/adr/0023-signed-posts-and-lenses.md)). |
+
+Faking volume to farm rewards loses money: each side of a swap pays the whole fee, and at most 60% of it comes back, shared with every Holder.
+
+Underneath is the trading engine. Two people swap any ERC-721, ERC-20 and MON, in any mix, through an on-chain escrow (`DeClubEscrow`) that settles atomically:
 
 ```text
 Alice: Chog #421           ⇄           Bob: Chog #812 + 50 mUSD
 
-createTrade     → Alice's #421 locked in OnDealV2
+createTrade     → Alice's #421 locked in DeClubEscrow
 fillTrade       → one tx: #812 + 50 mUSD → Alice, #421 → Bob
 cancel / expiry → #421 back to Alice. Nothing is ever stuck.
 ```
 
-A locked deal can ask for exact assets, for any NFT with given traits ("any Chog with a Crown"), or for offers. A **signed swap** locks nothing: each side signs what it gives and wants, and a matcher settles pairs and rings of up to four through `OnDealIntents`. Every side of a completed deal pays a small flat protocol fee, which a fee admin can change within a ceiling fixed at deploy ([ADR 0018](docs/adr/0018-adjustable-protocol-fee.md)). The original `OnDeal` (v1, one Chog collection plus MON) is still in the repo as the legacy contract; the app no longer uses it.
+A locked deal can ask for exact assets, for any NFT with given traits ("any Chog with a Crown"), or for offers. A **signed swap** locks nothing: each side signs what it gives and wants, and a matcher settles pairs and rings of up to four through `DeClubIntents`. The fee admin can change the fee within a ceiling fixed at deploy ([ADR 0018](docs/adr/0018-adjustable-protocol-fee.md)).
 
 ## Status
 
-- **Protocol: built.** `OnDealV2`, `OnDealIntents`, the shared `FeeAdmin`, legacy `OnDeal` and the mocks, with 461 Foundry tests passing in 41 suites (unit, fuzz, invariant, including invariants against hostile NFT collections), a Halmos proof that every pair and 3-ring pays every maker's `want`, and Slither triaged ([04 · Security](docs/04-security.md)). The matcher has 79 tests and the web app 260 unit tests.
-- **App: built.** The Next.js app in [`web/`](web/) has the deal list (searched and filtered on the server), Create (lock or sign), the deal and signed-swap pages, History, Clubs, Account, the Guide, notifications and Privy sign-in. Left: a click-through on testnet with real wallets.
-- **Testnet: needs a redeploy.** The deployed contracts predate the protocol fee and the current intents domain (see below).
+- **Protocol: built.** `DeClubEscrow`, `DeClubIntents`, the shared `FeeAdmin`, `DeClubRewards` and the mocks, with 431 Foundry tests passing in 38 suites (unit, fuzz, invariant, including invariants against hostile NFT collections and underfunded reward roots), a Halmos proof that every pair and 3-ring pays every maker's `want`, 100% coverage of `DeClubRewards`, and Slither triaged on every contract ([04 · Security](docs/04-security.md)).
+- **Rewards and signed social: built.** The epoch builder (`npm run rewards:epoch` in `web/`), the Rewards tab and claims, signed posts and follows with public exports, and feed lenses. The e2e run on anvil takes a real swap's fee through the builder to claims on chain (RW-01 to RW-03).
+- **App: built.** The Next.js app in [`web/`](web/) has Clubs (Market, Board, Members, Rewards, Manage), the deal list, Create (lock or sign), the deal and signed-swap pages, History, Account (with your rewards), the Guide, notifications and Privy sign-in. The matcher has 110 tests and the web app 305 unit tests.
+- **Testnet: to deploy.** Nothing runs under the DeClub names yet: deploy `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` from [`contracts/script/`](contracts/script/README.md). Then a click-through with real wallets.
 
 See the [roadmap](docs/06-roadmap.md).
 
 ## Built with Privy
 
-Privy is On Deal's identity layer for trading with strangers, not just its sign-in:
+Privy is DeClub's identity layer for Clubs and trading with strangers, not just its sign-in:
 
 - **Verified trader profiles:** a maker's X or Discord handle, read from Privy's linked accounts on the server, shows beside their wallet on every deal.
 - **Make a deal for @handle:** type the counterparty's X or Discord handle, and Privy's user lookup finds the wallet to lock the deal to, so nobody pastes an address from a DM.
@@ -38,29 +50,29 @@ Embedded wallets are off by default, because traders bring the wallet that alrea
 
 ## Deployments: Monad testnet (chain 10143)
 
-What the app is configured with today (the root `.env`):
+Nothing is deployed under the DeClub names yet ([ADR 0021](docs/adr/0021-declub-pivot.md)). Deploy with the scripts in [`contracts/script/`](contracts/script/README.md) and put the printed addresses in the root `.env`.
 
-| Contract | Address | Block | Record |
+### Retired deployments
+
+Everything below was deployed before the rename, under the project's earlier names, and is kept as a record. The broadcast records stay under the scripts' old names.
+
+| Contract (as deployed) | Address | Block | Record |
 | -------- | ------- | ----- | ------ |
-| OnDealV2 | [`0x73591F76d7deE66F683A979cEffb4356982EE1bB`](https://testnet.monadvision.com/address/0x73591F76d7deE66F683A979cEffb4356982EE1bB) | 67163690 | [`DeployV2 run-1790829432382.json`](contracts/broadcast/DeployV2.s.sol/10143/run-1790829432382.json) |
-| OnDealIntents | [`0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2`](https://testnet.monadvision.com/address/0x54B6d5d25811fe42607a5a9CeBc8F7Bdd58A0Fd2) | 67194397 | [`DeployIntents run-latest.json`](contracts/broadcast/DeployIntents.s.sol/10143/run-latest.json) |
+| OnDealV2 (now `DeClubEscrow`) | [`0x0d09747285b1370D2D1E296f8AE55c40bc1a89e9`](https://testnet.monadvision.com/address/0x0d09747285b1370D2D1E296f8AE55c40bc1a89e9) | 68422577 | [`DeployV2 run-latest.json`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json) |
+| OnDealIntents (now `DeClubIntents`; signs with the old domain `("OnDealIntents", "3")`) | [`0x2bfe691efC9D3555876E92C48633D2fA41C88AEB`](https://testnet.monadvision.com/address/0x2bfe691efC9D3555876E92C48633D2fA41C88AEB) | 68422663 | [`DeployIntents run-latest.json`](contracts/broadcast/DeployIntents.s.sol/10143/run-latest.json) |
+| MockWMON (fee token) | [`0xB620e96af5B50CB146a8c680BB1dd0965AbdDDe9`](https://testnet.monadvision.com/address/0xB620e96af5B50CB146a8c680BB1dd0965AbdDDe9) | 68422660 | same record as OnDealIntents |
 | MockERC20 (mUSD) | [`0xd300f095f456D59AAc122B0100833fE195136F6c`](https://testnet.monadvision.com/address/0xd300f095f456D59AAc122B0100833fE195136F6c) | 66874652 | [`DeployV2 run-1790742069295.json`](contracts/broadcast/DeployV2.s.sol/10143/run-1790742069295.json) |
 | Chog collection (ChogGenesisMirror) | [`0x32a325b0640594377d0708ca9081c93da95e1908`](https://testnet.monadvision.com/address/0x32a325b0640594377d0708ca9081c93da95e1908) | 66576933 | [`Deploy run-latest.json`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json) |
 
-> **Neither deal contract matches the current source** (nor does any other deployed V2 or intents contract). They predate the protocol fee and `FeeAdmin` (`fee()` and `feeAdmin()` revert on them), and the intents contract signs with the EIP-712 domain `("ChogSwapIntents", "1")`, while the code, the matcher and the app use `("OnDealIntents", "3")` with `feeToken` / `maxFee`. Redeploy `DeployV2.s.sol` and `DeployIntents.s.sol` from the current source ([how](contracts/script/README.md)) and update the addresses before the fee and signed swaps work on testnet.
+The two deal contracts above were deployed on 2026-10-05 with the fee on: 2 MON (WMON for signed swaps) per side, ceiling 8 MON, fee admin `0x7BD8…E920`, recipient `0x06b5…0669` (testnet-only wallets). The mock WMON, mUSD and the Chog mirror can be reused by the DeClub deployment.
 
-Other testnet deployments, not used by the app:
-
-- A later `OnDealV2` at `0x67a4a4ddfab155689ce2ee40c9c2157cea8e68fc` (block 67193827, [`DeployV2 run-latest.json`](contracts/broadcast/DeployV2.s.sol/10143/run-latest.json)), also without the fee. The first V2 at `0x8a05…CC75` (block 66874644, with mUSD) is superseded.
-- Legacy `OnDeal` (v1): the original `0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298` with `MockChog` `0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4` (blocks 66352698 / 66352681, [`Deploy run-1790581370358.json`](contracts/broadcast/Deploy.s.sol/10143/run-1790581370358.json)), and a trait-enabled `0xe42f1c5f13b2c8206624fe106d38738a43cb94ec` beside the Chog mirror ([`Deploy run-latest.json`](contracts/broadcast/Deploy.s.sol/10143/run-latest.json)). `web/lib/config.ts` still defaults the Chog collection to that MockChog when `NEXT_PUBLIC_CHOG_ADDRESS` is blank.
-
-Contracts were deployed under their old names (`ChogSwap`, `ChogSwapV2`, `ChogSwapIntents`) before the rename to On Deal. The V2s at `0x7359…` and `0x67a4…`, the intents contract, mUSD, the original v1 and MockChog are source-verified on Sourcify; the Chog mirror and the second v1 are not. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`. The matcher in [`matcher/`](matcher/README.md) settles through the intents contract.
+Older still, all retired: a later `OnDealV2` at `0x67a4a4ddfab155689ce2ee40c9c2157cea8e68fc` (block 67193827) and the first V2 at `0x8a05…CC75`, without the fee; the deleted v1 escrow, the original `0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298` with `MockChog` `0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4` (blocks 66352698 / 66352681, [`Deploy run-1790581370358.json`](contracts/broadcast/Deploy.s.sol/10143/run-1790581370358.json)) and a trait-enabled `0xe42f1c5f13b2c8206624fe106d38738a43cb94ec`; earlier V2 and intents contracts (`0x7359…`, `0x54B6…`) and stray redeploys without a fee ceiling (`0xb443…`, `0x21c3…`, `0x6300…`, `0xCC2a…`). The first ones were deployed as `ChogSwap`, `ChogSwapV2` and `ChogSwapIntents`. `web/lib/config.ts` still defaults the Chog collection to that MockChog when `NEXT_PUBLIC_CHOG_ADDRESS` is blank. Deployer: `0x503135438bbc176aea22ec9faaf4470da3272af9`.
 
 ## Repo map
 
 | Path                                                       | What                                                                                |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [`docs/01-product-spec.md`](docs/01-product-spec.md)       | What we're building and why, MVP scope, demo script                                 |
+| [`docs/01-product-spec.md`](docs/01-product-spec.md)       | What we're building and why: the Club story, the trading engine, the demo script   |
 | [`docs/02-architecture.md`](docs/02-architecture.md)       | System diagram, components, key flows, network                                      |
 | [`docs/03-contract-design.md`](docs/03-contract-design.md) | State machine, storage, every function's checks and effects, events, errors         |
 | [`docs/04-security.md`](docs/04-security.md)               | Trust model, invariants, threats, test plan                                         |
@@ -68,11 +80,11 @@ Contracts were deployed under their old names (`ChogSwap`, `ChogSwapV2`, `ChogSw
 | [`docs/06-roadmap.md`](docs/06-roadmap.md)                 | Phase checklist and open questions                                                  |
 | [`docs/07-user-guide.md`](docs/07-user-guide.md)           | How to make, take and track deals, fees, Clubs (the in-app Guide's source)          |
 | [`docs/08-art-direction.md`](docs/08-art-direction.md)     | Visual language, logo and artwork                                                   |
-| [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs and Momentum: a community per verified asset (spec, roles, data, API)         |
+| [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs, Momentum, Rewards and signed posts: the spec, roles, data, API             |
 | [`docs/10-privy.md`](docs/10-privy.md)                     | What Privy powers, why embedded wallets are off by default, demo script and setup   |
 | [`docs/11-test-plan.md`](docs/11-test-plan.md)           | Pre-mainnet test plan: automated suites, manual testnet cases, go/no-go and canary   |
 | [`docs/adr/`](docs/adr/README.md)                          | Architecture decision records ([index](docs/adr/README.md))                         |
-| [`contracts/`](contracts/)                                 | Foundry project: `src/OnDealV2.sol`, `src/OnDealIntents.sol`, `src/FeeAdmin.sol`, `src/OnDeal.sol` (legacy v1), `src/mocks/`, tests, three deploy scripts (`Deploy`, `DeployV2`, `DeployIntents`) |
+| [`contracts/`](contracts/)                                 | Foundry project: `src/DeClubEscrow.sol`, `src/DeClubIntents.sol`, `src/FeeAdmin.sol`, `src/mocks/`, tests, deploy scripts (`DeployEscrow`, `DeployIntents`, `DeployChog`) |
 | [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |
 | [`e2e/`](e2e/README.md)                                     | End-to-end scenarios on anvil or testnet, read-only deployment checks, web smoke tests |
 | [`scripts/test-all.sh`](scripts/test-all.sh)               | Every automated check in one command (the pre-mainnet gate)                          |
@@ -94,7 +106,7 @@ curl -L https://foundry.paradigm.xyz | bash && foundryup
 cd contracts
 git submodule update --init --recursive   # forge-std, openzeppelin-contracts
 forge build
-forge test                                # 461 tests incl. fuzz + invariants
+forge test                                # 431 tests incl. fuzz + invariants
 forge coverage --report summary --no-match-coverage "(test|script)"
 ```
 
@@ -115,4 +127,9 @@ scripts/test-all.sh            # --quick, --coverage --slither --halmos; see doc
 cd web && npm install && npm run dev      # http://localhost:3000
 ```
 
-Only the Chog collection, chain and RPC have defaults. Set `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` (and `NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS` for signed swaps) in the root `.env`, or there are no deals outside the development mocks. See [`.env.example`](.env.example) and [`web/README.md`](web/README.md).
+```bash
+# Club Rewards: build the epoch that just ended and, with the operator's testnet key, fund it
+cd web && npm run rewards:epoch -- --publish
+```
+
+Only the Chog collection, chain and RPC have defaults. Set `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS` (and `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` for signed swaps, `NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS` for claims) in the root `.env`, or there are no deals outside the development mocks. See [`.env.example`](.env.example) and [`web/README.md`](web/README.md).

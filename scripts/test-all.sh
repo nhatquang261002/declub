@@ -60,7 +60,7 @@ skip() {
 
 need_modules() { [[ -d "$1/node_modules" ]] || (cd "$1" && npm ci --no-audit --no-fund >/dev/null 2>&1); }
 
-echo "On Deal test gate · $(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null) · logs in ${OUT#$ROOT/}"
+echo "DeClub test gate · $(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null) · logs in ${OUT#$ROOT/}"
 echo
 
 if want contracts; then
@@ -78,7 +78,7 @@ if want contracts; then
     skip contracts:slither "--slither (needs slither-analyzer)"
   fi
   if [[ $HALMOS -eq 1 ]] && command -v halmos >/dev/null; then
-    step contracts:halmos "$ROOT/contracts" env FOUNDRY_DYNAMIC_TEST_LINKING=false halmos --match-contract OnDealIntentsSymbolic --loop 4
+    step contracts:halmos "$ROOT/contracts" env FOUNDRY_DYNAMIC_TEST_LINKING=false halmos --match-contract DeClubIntentsSymbolic --loop 4
   else
     skip contracts:halmos "--halmos (needs halmos)"
   fi
@@ -95,9 +95,8 @@ if want web; then
   step web:typecheck "$ROOT/web" npm run typecheck
   step web:lint "$ROOT/web" npm run lint
   step web:test "$ROOT/web" npm test
-  # A production build must not depend on dev-only demo flags.
   if [[ $QUICK -eq 0 ]]; then
-    step web:build "$ROOT/web" env NEXT_PUBLIC_DEMO_DEALS=false NEXT_PUBLIC_DEMO_CLUBS=false NEXT_PUBLIC_DEMO_CREATE=false npm run build
+    step web:build "$ROOT/web" npm run build
   else
     skip web:build "--quick"
   fi

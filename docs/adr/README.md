@@ -2,6 +2,8 @@
 
 One file per decision. The status line at the top of each record is the source of truth; this index repeats it in short.
 
+The project was On Deal until [ADR 0021](0021-declub-pivot.md) renamed it DeClub: ADRs 0001–0020 keep the names they were written with (`OnDeal` is the deleted v1 escrow, `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents`).
+
 | # | Decision | Status | Summary |
 |---|---|---|---|
 | 0001 | [Atomic fill instead of a two-sided deposit phase](0001-atomic-fill.md) | Accepted | The taker's one transaction pays and receives, so a trade never sits half deposited. |
@@ -24,3 +26,6 @@ One file per decision. The status line at the top of each record is the source o
 | 0018 | [An adjustable protocol fee, capped at deploy, with raises on a delay](0018-adjustable-protocol-fee.md) | Accepted | A fee admin can cut the fee at once or raise it after 7 days, never above a ceiling fixed at deploy. |
 | 0019 | [Fill watcher: follow the chain for fills and Club activity](0019-fill-watcher.md) | Accepted | A cron route scans new blocks for fills and creations and records them through the receipt checks. |
 | 0020 | [Search and filter the whole deal book on the server](0020-server-side-deal-book.md) | Accepted | The server holds every deal in memory and answers searched, filtered pages; OnDeal v1 leaves the app. |
+| 0021 | [De(al) Club: Clubs are the product, swaps fund them](0021-declub-pivot.md) | Accepted | The project becomes De(al) Club; contracts and identifiers are renamed, and the v1 escrow is deleted. |
+| 0022 | [Club Rewards: a share of the fees goes back to the Club](0022-club-rewards.md) | Accepted | Each epoch, 40% of a Club's swap fees goes to its Holders by holdings and 20% to its Owner, claimed against a Merkle root on `DeClubRewards`. |
+| 0023 | [Signed posts, follows and feed lenses](0023-signed-posts-and-lenses.md) | Accepted | Posts and follows are signed by the member's wallet and exported; the reader picks how the Board is ordered. |

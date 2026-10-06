@@ -1,10 +1,31 @@
 # 01 · Product Spec
 
-> **Trustless OTC trading and programmable escrow on Monad.**
+> **De(al) Club: your community's market, owned by its members.**
 >
-> Define the trade. Lock the assets. Let the contract handle the trust.
+> Every Monad collection and memecoin gets a Club. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.
 
-This is the product spec the project started from, tidied up. It began with Chogs only; the app now trades any ERC-721, ERC-20 and MON through `OnDealV2`, plus signed swaps through `OnDealIntents`. Where the engineering design differs from the original text, the change is marked **→ Design** with a link to the reasoning.
+## 0. De(al) Club
+
+**The problem.** Communities around collections and memecoins create the value: they hold, trade, talk and bring others in. The fees their markets generate, and the conversations that drive them, go to whoever runs the venue. The people generating the value and the people capturing it aren't the same.
+
+**What DeClub does.** It makes the community the product and its market the economy ([ADR 0021](adr/0021-declub-pivot.md)):
+
+| | What | How |
+|---|---|---|
+| **Gather** | A Club per verified collection or memecoin: its Market, a Board, its Members ranked by Momentum, Holder badges, an Owner and Moderators | [09 · Clubs](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md) |
+| **Trade** | Members swap inside the Club, wallet to wallet or through escrow, with no trust between them | `DeClubEscrow`, `DeClubIntents` (sections 1–8 below) |
+| **Own the market** | Each week 40% of the fees a Club's swaps pay goes to its Holders, by holdings, and 20% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
+| **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered | [ADR 0023](adr/0023-signed-posts-and-lenses.md) |
+
+**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 60% of it comes back, shared with every Holder of the Club. Rewards follow holdings, which cost something to have, not posting, which costs nothing.
+
+**What it isn't.** A rating of assets, or a promise that a Club is safe. Momentum and rewards say a market is busy; the Club still tells you to check every asset before you sign.
+
+The rest of this page is the spec of the trading engine the Clubs run on: where the project started.
+
+---
+
+This is the product spec the project started from, tidied up. It began with Chogs only; the app now trades any ERC-721, ERC-20 and MON through `DeClubEscrow`, plus signed swaps through `DeClubIntents`. Where the engineering design differs from the original text, the change is marked **→ Design** with a link to the reasoning.
 
 ---
 
@@ -50,7 +71,7 @@ Neither party has to trust the other.
 | 4.2 | Chog #421 + 2 MON | Chog #812 | ✅ |
 | 4.3 | Chog #421 | Chog #812 + 3 MON | ✅ |
 | —   | Chog #421, #500 | Chog #812 | ✅ (up to 10 assets per side, any mix of ERC-721, ERC-20 and MON) |
-| 4.4 | Chog #421 | *Any* Chog with Wizard Hat + Blue Eyes, plus 3 MON | ✅ trait request: `createTraitTrade` / `fillTraitTrade` in `OnDealV2` ([ADR 0006](adr/0006-trait-requests-in-v2.md)) |
+| 4.4 | Chog #421 | *Any* Chog with Wizard Hat + Blue Eyes, plus 3 MON | ✅ trait request: `createTraitTrade` / `fillTraitTrade` in `DeClubEscrow` ([ADR 0006](adr/0006-trait-requests-in-v2.md)) |
 | 4.5 | Chog #421 | "Make me an offer" | ✅ open offer: takers lock proposals, the maker accepts one ([ADR 0007](adr/0007-open-offers.md)) |
 | 4.6 | Chog #421, nothing locked | Bob's NFT, or a ring of up to 4 | ✅ signed swap, settled by a matcher ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) |
 
@@ -62,7 +83,7 @@ Neither party has to trust the other.
 4. **Or cancel.** Alice can cancel any time before a fill and gets her escrow back.
 5. **Or expire.** After the expiry time nobody can fill the trade. Alice, or anyone else, can return the escrow to Alice.
 
-> **→ Design:** the original spec had a separate *accept → both deposit → READY → execute* flow. v1 (and V2 after it) merges accept, deposit and execute into one taker transaction, so the taker's assets are never held in escrow and a trade can't get stuck halfway. See [ADR 0001](adr/0001-atomic-fill.md) and [03 · Contract Design](03-contract-design.md#state-machine).
+> **→ Design:** the original spec had a separate *accept → both deposit → READY → execute* flow. The escrow merges accept, deposit and execute into one taker transaction, so the taker's assets are never held in escrow and a trade can't get stuck halfway. See [ADR 0001](adr/0001-atomic-fill.md) and [03 · Contract Design](03-contract-design.md#declubescrow-locked-deals).
 
 ## 6. Cancellation and expiration
 
@@ -95,7 +116,7 @@ The original "My Chogs" page is gone: the NFT picker in Create lists what a wall
 
 **Nice to have (Phase 3)**, built
 
-- Trait-based trades (in `OnDealV2`)
+- Trait-based trades (in `DeClubEscrow`)
 - Direct-request inbox (the **For you** tab)
 - Notifications (in-app bell and opt-in browser alerts)
 - Search and filters, over the whole book on the server ([ADR 0020](adr/0020-server-side-deal-book.md))
@@ -113,7 +134,18 @@ The original "My Chogs" page is gone: the NFT picker in Create lists what a wall
 
 ## 9. Demo script
 
-Run it on a deployment of the current source (the testnet contracts predate the fee; see the [README](../README.md#deployments-monad-testnet-chain-10143)). The [user guide](07-user-guide.md) has the full walkthrough.
+Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SECONDS` set to a few minutes and `DeClubRewards` deployed with no claim delay. The [user guide](07-user-guide.md) has the full walkthrough.
+
+**The Club story (the hackathon demo):**
+
+1. Alice and Bob sign in. Alice holds two Chogs and joins the Chog Club: she's a **Holder**. Carol owns the Chog contract and **claims** the Club as its Owner.
+2. Alice posts on the Board: *"WTB any Chog with a crown"*. Her wallet signs it; the post shows **Signed**. Bob **follows** her and switches the Board's lens to **Following**.
+3. Bob and Dave swap Chogs in the Club's Market. Each side pays the fee; the Club's Momentum goes up.
+4. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 40% to Holders (Alice), 20% to the Club fund (Carol). The operator funds it on chain.
+5. Alice opens the **Rewards** tab and claims her MON. Carol sees "the Club fund is ready" and collects it.
+6. Open `/api/clubs/<Chog>/feed` and `/api/rewards/epochs/<n>`: every post and every payout is public and verifiable.
+
+**The trading engine:**
 
 1. Alice and Bob sign in (Privy, or an injected wallet). Alice holds Chog #421, Bob holds #812.
 2. Alice opens **Create**, picks **Lock assets now** and **Request exact assets**: #421 for #812 + 2 MON. She can lock it to Bob by typing his @handle. One transaction locks #421 and her side of the fee.
@@ -124,8 +156,8 @@ Run it on a deployment of the current source (the testnet contracts predate the 
 
 ## 10. Pitch
 
-> **On Deal is a trustless OTC marketplace on Monad, powered by programmable escrow and atomic swaps of NFTs, tokens and MON.**
+> **De(al) Club gives every Monad collection and memecoin a Club where members trade, talk in posts they own, and Holders earn a share of the fees their market pays.**
 >
-> *Trade what you have for what you actually want, without trusting the other side.*
+> *The people who make a market should own a piece of it.*
 
-The underlying primitive (**define conditions → lock assets → verify → atomic settlement**) started with Chogs and now covers any ERC-721, ERC-20 and MON.
+Underneath is a trustless trading engine (**define conditions → lock assets → verify → atomic settlement**) for any ERC-721, ERC-20 and MON; on top, the Club decides where the value goes.
