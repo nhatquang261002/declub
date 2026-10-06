@@ -26,9 +26,14 @@ describe("describeAssets", () => {
 
 describe("the deal's post", () => {
   it("invites on a live offer, announces a swap, and names the Club", () => {
-    assert.equal(dealPost(facts(), "Chog"), "Offering Chog #12 for 3 MON in the Chog Club. Take it:");
-    assert.equal(dealPost(facts({ openOffer: true, want: "" })), "Offering Chog #12. Make me an offer:");
-    assert.equal(dealPost(facts({ status: "filled" }), "Chog"), "Swapped Chog #12 for 3 MON in the Chog Club on De(al) Club.");
+    assert.equal(dealPost(facts(), "Chog"), "Offering Chog #12 for 3 MON 🤝\n\nIn the Chog Club on De(al) Club. Escrowed on Monad: both sides or nothing. Take the deal 👇");
+    assert.equal(dealPost(facts({ openOffer: true, want: "" })), "Offering Chog #12, open to offers 🤝\n\nOn De(al) Club. Escrowed on Monad. Make me an offer 👇");
+    assert.equal(dealPost(facts({ status: "filled" }), "Chog"), "Swapped Chog #12 for 3 MON ✅\n\nIn the Chog Club on De(al) Club. Escrowed on Monad, atomic, done.");
+  });
+
+  it("shortens a long list of assets so the post fits with its link", () => {
+    const post = dealPost(facts({ give: "x".repeat(200), want: "y".repeat(200) }), "Chog");
+    assert.ok(post.length + 24 <= 280);
   });
 
   it("titles the preview, and links the deal's page", () => {

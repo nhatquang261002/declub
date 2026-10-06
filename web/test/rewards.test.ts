@@ -226,15 +226,19 @@ describe("active days and streaks", () => {
 describe("the weekly recap", () => {
   const recap = { symbol: "CHOG", epoch: 3, fees: 12n * ETH, paidHolders: 6n * ETH, holderCount: 10 };
 
-  it("says the week's fees and who was paid, and fits a post", () => {
+  it("says who was paid and the week's fees, in a short post", () => {
     const text = recapText(recap);
-    assert.match(text, /^CHOG Club, epoch 3: /);
-    assert.match(text, /10 biggest Holders/);
+    assert.match(text, /^CHOG Club just paid its 10 biggest Holders 6 MON /);
+    assert.match(text, /12 MON in swap fees this week/);
     assert.ok(text.length + 24 <= 280, "with a link, within X's limit");
+    assert.match(recapText({ ...recap, paidHolders: 1234n * 10n ** 14n, holderCount: 1 }), /paid its biggest Holder 0\.12 MON/);
+    assert.match(recapText({ ...recap, paidHolders: 5n * 10n ** 15n }), /paid its 10 biggest Holders <0\.01 MON/);
   });
 
   it("leaves out the payout line when nobody was paid, and links the Club's page", () => {
     assert.ok(!recapText({ ...recap, paidHolders: 0n, holderCount: 0 }).includes("biggest"));
+    assert.match(recapText({ ...recap, paidHolders: 0n, holderCount: 0 }), /^CHOG Club made 12 MON in swap fees/);
+    assert.match(recapText({ ...recap, fees: 0n, paidHolders: 0n, holderCount: 0 }), /^A quiet week for the CHOG Club/);
     const link = new URL(recapLink(recap, "https://declub.app/clubs/0xabc"));
     assert.equal(link.origin + link.pathname, "https://x.com/intent/post");
     assert.equal(link.searchParams.get("url"), "https://declub.app/clubs/0xabc");

@@ -48,16 +48,21 @@ export function dealTitle(f: DealFacts): string {
   return `${f.give} for ${f.want}`;
 }
 
+/** A long list of assets shortens, so the post stays inside X's limit with its link. */
+const clip = (text: string) => (text.length > 70 ? `${text.slice(0, 69)}…` : text);
+
 /**
  * What a member posts about a deal. A swap that went through is news; a live offer is an invitation,
  * and `club` is the Club's name when the deal's asset has one, so the post is about it too.
  */
 export function dealPost(f: DealFacts, club?: string): string {
-  const tail = club ? ` in the ${club} Club` : "";
-  if (f.status === "filled") return `${f.openOffer ? `Swapped ${f.give} for an offer I accepted` : `Swapped ${f.give} for ${f.want}`}${tail} on De(al) Club.`;
-  if (f.status === "open" && f.openOffer) return `Offering ${f.give}${tail}. Make me an offer:`;
-  if (f.status === "open") return `Offering ${f.give} for ${f.want}${tail}. Take it:`;
-  return `Deal #${f.id}${tail} on De(al) Club.`;
+  const give = clip(f.give);
+  const want = clip(f.want);
+  const where = club ? `In the ${club} Club on De(al) Club.` : "On De(al) Club.";
+  if (f.status === "filled") return `Swapped ${give} for ${f.openOffer ? "an offer I accepted" : want} ✅\n\n${where} Escrowed on Monad, atomic, done.`;
+  if (f.status === "open" && f.openOffer) return `Offering ${give}, open to offers 🤝\n\n${where} Escrowed on Monad. Make me an offer 👇`;
+  if (f.status === "open") return `Offering ${give} for ${want} 🤝\n\n${where} Escrowed on Monad: both sides or nothing. Take the deal 👇`;
+  return `Deal #${f.id}\n\n${where}`;
 }
 
 /** The X compose link for a deal post: its text, and the deal's page (whose preview card is the offer). */
