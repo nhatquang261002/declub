@@ -157,13 +157,27 @@ export type ClubProfile = {
    * post (`lib/server/xPosts.ts`), and the Owner's tags.
    */
   x?: { accounts: XAccount[]; tags: string[] };
+  /** Whether holding the Club's memecoin earns the Holder badge, set by the Owner (ADR 0026). */
+  coinHolders?: CoinHolders;
 };
+
+/**
+ * The Owner's rule for the Club's memecoin: `on` counts it toward the Holder badge, from `min` (base
+ * units, a decimal string). `at` (epoch ms) is when it last changed, so older badges are re-checked.
+ */
+export type CoinHolders = { on: boolean; min: string; at: number };
+/** A minimum as base units: a positive integer of at most 78 digits (a uint256). */
+const MIN_UNITS = /^[1-9][0-9]{0,77}$/;
 
 export const MAX_DESCRIPTION = 500;
 export const MAX_LINKS = 3;
 export const NO_PROFILE: ClubProfile = { description: "", links: [], holdersOnlyPosts: false, pinned: [] };
 
-export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & { xTags?: string[] };
+export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & {
+  xTags?: string[];
+  /** Without `min`, the current minimum stays. */
+  coinHolders?: { on: boolean; min?: string };
+};
 export type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
 
 /** Checks an edit to the profile. Links must be plain `https://` addresses: they become anchors. */
@@ -207,6 +221,14 @@ export function checkProfileEdit(input: unknown): ProfileResult {
       if (!tags.includes(tag)) tags.push(tag);
     }
     edit.xTags = tags;
+  }
+  if (body.coinHolders !== undefined) {
+    const coin = body.coinHolders as Record<string, unknown> | null;
+    if (typeof coin !== "object" || coin === null || typeof coin.on !== "boolean") return { ok: false, reason: "coinHolders is { on, min }." };
+    if (coin.min !== undefined && (typeof coin.min !== "string" || !MIN_UNITS.test(coin.min))) {
+      return { ok: false, reason: "The minimum must be a whole number of base units above zero." };
+    }
+    edit.coinHolders = { on: coin.on, ...(coin.min !== undefined ? { min: coin.min as string } : {}) };
   }
   return Object.keys(edit).length === 0 ? { ok: false, reason: "Nothing to change." } : { ok: true, edit };
 }

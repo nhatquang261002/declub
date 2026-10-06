@@ -28,6 +28,7 @@ import type { ClubProfile } from "../clubPosts";
 import type { ClubEntry } from "../verifiedAssets";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { getMember } from "./members";
+import { coinRule } from "../members";
 import { clubOf, type Ctx } from "./memberRoutes";
 import { authenticate } from "./privy";
 import { clientId, getStore, withinLimit, type Store } from "./store";
@@ -274,7 +275,10 @@ export function rolesHandler(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
-/** The profile as the API serves it: what the Owner set, and the Club's X signals (ADR 0024). */
+/**
+ * The profile as the API serves it: what the Owner set, the Club's X signals (ADR 0024), and
+ * whether its memecoin earns the Holder badge (ADR 0026; null without one). `min` is base units.
+ */
 function publicProfile(entry: ClubEntry, profile: ClubProfile) {
   const { description, links, holdersOnlyPosts } = profile;
   const x = {
@@ -282,7 +286,12 @@ function publicProfile(entry: ClubEntry, profile: ClubProfile) {
     tags: profile.x?.tags ?? [],
     hint: signalsHint(signalsOf(entry, profile)),
   };
-  return { description, links, holdersOnlyPosts, x };
+  let coin = null;
+  if (entry.linked) {
+    const rule = coinRule(entry.linked, profile.coinHolders);
+    coin = { token: entry.linked.address.toLowerCase(), symbol: entry.linked.symbol, on: rule.on, min: rule.min.toString(), set: !!profile.coinHolders };
+  }
+  return { description, links, holdersOnlyPosts, x, coin };
 }
 
 /** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */

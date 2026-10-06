@@ -31,7 +31,7 @@ export default function ClubPage() {
   const params = useParams<{ address: string }>();
   const router = useRouter();
   const entry = isAddress(params.address, { strict: false }) ? registry.clubFor(params.address) : null;
-  // A memecoin that shares a collection's Club opens it at the Club's own address, and the other way round.
+  // A memecoin opens its collection's Club, at the collection's address.
   const home = entry && entry.address.toLowerCase() !== params.address.toLowerCase() ? entry.address.toLowerCase() : null;
   useEffect(() => {
     if (home) router.replace(`/clubs/${home}${window.location.search}`);
@@ -40,7 +40,7 @@ export default function ClubPage() {
     return (
       <div className="club-panel mx-auto max-w-md px-6 py-12 text-center">
         <p className="text-lg font-black">No Club here</p>
-        <p className="mt-1 text-sm text-muted">There is no Club for this address. Clubs are for verified NFT collections and memecoins: a stablecoin or wrapped MON has none.</p>
+        <p className="mt-1 text-sm text-muted">There is no Club for this address. Clubs are for verified NFT collections, and a memecoin made for one opens its Club. Other tokens have none.</p>
         <Link href="/clubs" className="btn-primary mt-5">
           See all Clubs
         </Link>

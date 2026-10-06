@@ -11,12 +11,14 @@ import {
   type Holdings,
 } from "../lib/server/members";
 import { handlePrivyEvent } from "../lib/server/privyWebhook";
+import { clubProfileKey } from "../lib/server/clubState";
 import { membershipHandlers, membersHandler, myClubsHandler } from "../lib/server/memberRoutes";
 import { getStore, memoryStore } from "../lib/server/store";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const COIN = "0xd300f095f456D59AAc122B0100833fE195136F6c";
+const PETS = "0x0000000000000000000000000000000000000077";
 const OLD = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
 const NOCLUB = "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298";
 const W1 = "0x00000000000000000000000000000000000000a1";
@@ -24,9 +26,9 @@ const W2 = "0x00000000000000000000000000000000000000b2";
 const entry = (address: string, over: Record<string, unknown> = {}) => ({
   chainId: 10143, address, kind: "erc721", name: "Name", symbol: "SYM", status: "verified", note: "Why.", ...over,
 });
-const reg = makeRegistry(parseAssets([entry(NFT), entry(COIN, { kind: "erc20", category: "memecoin", minHolding: "100" }), entry(OLD, { club: "archived" }), entry(NOCLUB, { club: false })]));
+const reg = makeRegistry(parseAssets([entry(NFT), entry(PETS), entry(OLD, { club: "archived" }), entry(NOCLUB, { club: false })]));
 const club = reg.clubFor(NFT)!;
-const coin = reg.clubFor(COIN)!;
+const pets = reg.clubFor(PETS)!;
 const archived = reg.clubFor(OLD)!;
 
 /** Holdings that answer from a table of balances by wallet, and count the reads made. */
@@ -59,6 +61,33 @@ describe("a paired Club", () => {
     const unsure = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: half(0n), now: () => 7 });
     assert.ok(yes.ok && yes.row.holder && yes.row.holderCheckedAt === 7);
     assert.ok(unsure.ok && !unsure.row.holder && unsure.row.holderCheckedAt === 0, "checked again on the next read");
+  });
+
+  it("follows the Owner's coin rule: their minimum, or no coin at all", async () => {
+    const byToken = (balances: Record<string, bigint>): Holdings => async (token) => [balances[token.toLowerCase()] ?? 0n];
+    const coin500 = byToken({ [COIN.toLowerCase()]: 500n });
+    const ruled = async (coinHolders: { on: boolean; min: string; at: number }) => {
+      const store = memoryStore();
+      await store.set(clubProfileKey(NFT), { coinHolders });
+      return joinClub(store, paired, "u1", [W1], { holdings: coin500 });
+    };
+    const raised = await ruled({ on: true, min: "1000", at: 1 });
+    const lowered = await ruled({ on: true, min: "500", at: 1 });
+    const off = await ruled({ on: false, min: "1", at: 1 });
+    assert.ok(raised.ok && !raised.row.holder);
+    assert.ok(lowered.ok && lowered.row.holder);
+    assert.ok(off.ok && !off.row.holder);
+  });
+
+  it("re-checks badges from before the rule changed", async () => {
+    const store = memoryStore();
+    const nowMs = 10 * HOLDER_RECHECK_MS;
+    const byToken: Holdings = async (token) => [token.toLowerCase() === COIN.toLowerCase() ? 500n : 0n];
+    await joinClub(store, paired, "u1", [W1], { holdings: byToken, now: () => nowMs - 1000 });
+    assert.equal((await getMember(store, NFT, "u1"))?.holder, true);
+    await store.set(clubProfileKey(NFT), { coinHolders: { on: false, min: "100", at: nowMs - 500 } });
+    const view = await listMembers(store, paired, [], "new", Math.floor(nowMs / 1000), { now: () => nowMs, holdings: byToken });
+    assert.equal(view.holders, 0, "a fresh badge is re-read once the rule changes");
   });
 
   it("keeps one membership, under the Club's own asset", async () => {
@@ -101,15 +130,6 @@ describe("joinClub / leaveClub", () => {
     assert.equal(r.row.holderCheckedAt, 0);
   });
 
-  it("applies the ERC-20 minimum", async () => {
-    const store = memoryStore();
-    const few = await joinClub(store, coin, "u1", [W1], { holdings: holdings({ [W1]: 99n }).fn });
-    const enough = await joinClub(store, coin, "u2", [W2], { holdings: holdings({ [W2]: 100n }).fn });
-    assert.ok(few.ok && enough.ok);
-    assert.equal(few.row.holder, false);
-    assert.equal(enough.row.holder, true);
-  });
-
   it("refuses an archived Club, a user with no wallet, and a full Club", async () => {
     const store = memoryStore();
     const deps = { holdings: holdings({}).fn };
@@ -136,12 +156,12 @@ describe("joinClub / leaveClub", () => {
   it("leaves cleanly, and leaving twice is harmless", async () => {
     const store = memoryStore();
     await joinClub(store, club, "u1", [W1], { holdings: holdings({}).fn });
-    await joinClub(store, coin, "u1", [W1], { holdings: holdings({}).fn });
+    await joinClub(store, pets, "u1", [W1], { holdings: holdings({}).fn });
     await leaveClub(store, NFT, "u1");
     await leaveClub(store, NFT, "u1");
     assert.equal(await getMember(store, NFT, "u1"), null);
     assert.deepEqual(await store.members(membersKey(NFT)), []);
-    assert.deepEqual(await clubsOf(store, "u1"), [COIN.toLowerCase()], "other Clubs are untouched");
+    assert.deepEqual(await clubsOf(store, "u1"), [PETS.toLowerCase()], "other Clubs are untouched");
   });
 });
 const userClubsKeyFor = (id: string) => `declub:user-clubs:${id}`;
@@ -149,14 +169,14 @@ const userClubsKeyFor = (id: string) => `declub:user-clubs:${id}`;
 describe("syncMemberships", () => {
   const join = async (store = memoryStore()) => {
     await joinClub(store, club, "u1", [W1], { holdings: holdings({ [W1]: 1n }).fn, now: () => 5_000 });
-    await joinClub(store, coin, "u1", [W1], { holdings: holdings({}).fn, now: () => 5_000 });
+    await joinClub(store, pets, "u1", [W1], { holdings: holdings({}).fn, now: () => 5_000 });
     return store;
   };
 
   it("updates the wallets in every Club and forces a re-check", async () => {
     const store = await join();
     await syncMemberships(store, "u1", [W2]);
-    for (const token of [NFT, COIN]) {
+    for (const token of [NFT, PETS]) {
       const row = await getMember(store, token, "u1");
       assert.deepEqual(row?.wallets, [W2]);
       assert.equal(row?.displayWallet, W2);
@@ -176,7 +196,7 @@ describe("syncMemberships", () => {
     await syncMemberships(store, "u1", []);
     assert.deepEqual(await clubsOf(store, "u1"), []);
     assert.deepEqual(await store.members(membersKey(NFT)), []);
-    assert.equal(await getMember(store, COIN, "u1"), null);
+    assert.equal(await getMember(store, PETS, "u1"), null);
   });
 
   it("does nothing for someone in no Club", async () => {
@@ -312,12 +332,12 @@ describe("the routes", () => {
 
   it("lists the caller's Clubs, leaving out ones that no longer exist", async () => {
     const m = membershipHandlers(reg, { gate: gateAs("route-u4", [account(getAddress(W1))]), holdings: h.fn });
-    await m.POST(req("POST"), ctx(COIN));
+    await m.POST(req("POST"), ctx(PETS));
     await m.POST(req("POST"), ctx(NFT));
     await store.addMember(userClubsKeyFor("route-u4"), "0x00000000000000000000000000000000000000f1");
     await store.addMember(userClubsKeyFor("route-u4"), NOCLUB.toLowerCase());
     const body = await (await myClubsHandler(reg, { gate: gateAs("route-u4", []) })(req())).json();
-    assert.deepEqual(body.clubs, [NFT.toLowerCase(), COIN.toLowerCase()].sort());
+    assert.deepEqual(body.clubs, [NFT.toLowerCase(), PETS.toLowerCase()].sort());
   });
 
   it("serves the leaderboard publicly, validating sort and the Club", async () => {

@@ -1,6 +1,6 @@
 # 09 · Clubs and Momentum
 
-A **Club** is the community for one verified NFT collection or memecoin, and the heart of DeClub ([ADR 0021](adr/0021-declub-pivot.md)) (a memecoin can share its collection's Club; other ERC-20s, like stablecoins and wrapped MON, get none). Signed-in users join it, and it shows the deals that use the asset, a board of short posts, its members, and **Momentum**, an activity score. The decision and its reasoning are in [ADR 0016](adr/0016-clubs-and-momentum.md). This page is the spec.
+A **Club** is the community for one verified NFT collection, and the heart of DeClub ([ADR 0021](adr/0021-declub-pivot.md)). A memecoin made for the collection can join its Club; no ERC-20 has a Club of its own ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Signed-in users join it, and it shows the deals that use the asset, a board of short posts, its members, and **Momentum**, an activity score. The decision and its reasoning are in [ADR 0016](adr/0016-clubs-and-momentum.md). This page is the spec.
 
 ## What a Club gives you
 
@@ -23,26 +23,28 @@ No deal contract, matcher rule or pool rule depends on a Club: a deal settles th
 
 ## Which assets get a Club
 
-Only NFT collections and memecoins marked `verified` in `web/data/assets.json` ([ADR 0014](adr/0014-verified-collections-list.md)). A cloned collection can't get a Club, and moderation stays bounded. A `blocked` entry never has a visible Club.
+Only NFT collections marked `verified` in `web/data/assets.json` ([ADR 0014](adr/0014-verified-collections-list.md)). A cloned collection can't get a Club, and moderation stays bounded. A `blocked` entry never has a visible Club.
 
-Verified isn't the same as having a community. Every ERC-20 entry has a `category`: `memecoin`, `stablecoin`, `wrapped` (WMON) or `other`, and only a memecoin gets a Club. Mock USD is verified, so its deals are trusted, and has none. Setting `club` on a token that can't have one fails the build.
+Verified isn't the same as having a community. Every ERC-20 entry has a `category`: `memecoin`, `stablecoin`, `wrapped` (WMON) or `other`, and only a memecoin can be in a Club, its collection's. Mock USD is verified, so its deals are trusted, and has none. Setting `club` on a token that can't have one fails the build.
 
-**A memecoin and its collection share one Club.** The joining entry's `club` is the other's address:
+A memecoin has no Club of its own ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)): its fees are too small and its holders turn over too fast for Club Rewards. Its `club` must be its collection's address, or `false` to list it verified without a Club; leaving it out, `true` or `"archived"` fails the build.
+
+**A memecoin and its collection share one Club.** The memecoin's `club` is the collection's address:
 
 ```json
 { "address": "0x…CHOG token", "kind": "erc20", "category": "memecoin", "club": "0x…Chogs collection", … }
 ```
 
-- Everything the Club keeps (members, posts, roles, bans, the activity log) is under the address of the asset that has the Club. `/clubs/<either address>` opens it (the other redirects), and every route takes either.
+- Everything the Club keeps (members, posts, roles, bans, the activity log) is under the collection's address. `/clubs/<either address>` opens it (the other redirects), and every route takes either.
 - A deal in either asset counts toward the Club's Momentum, once even when it names both. Its Market lists offers and requests for both, and a "Looking for" post can link a deal in either.
-- Holding either earns the Holder badge (the NFT, or `minHolding` of the coin). The Owner is claimed with the `owner()` of the Club's own asset.
-- One collection and one memecoin at most: two of a kind, a third asset, a chain of joins, or a Club that is off, unlisted or on another chain fails the build (`makeRegistry`).
+- Holding the NFT earns the Holder badge. Holding the coin does too, from `minHolding`, until the Owner sets their own rule in Manage: on or off, and the minimum ([ADR 0026](adr/0026-owner-sets-the-coin-holder-rule.md)). Only the NFTs earn Club Rewards shares (see [Rewards](#rewards)). The Owner is claimed with the collection's `owner()`.
+- One memecoin per collection at most: a collection joining another Club, a second memecoin, a chain of joins, or a collection that is off, unlisted or on another chain fails the build (`parseAssets`, `makeRegistry`).
 
 ### Lifecycle
 
 | Step | How |
 |---|---|
-| **Create** | Add a `verified` collection or memecoin, merge it, deploy the web app. No contract deploy. Club data lives in the store, so it survives web deploys. `club: false` keeps an entry verified without opening a Club; `club: "<address>"` joins another's. |
+| **Create** | Add a `verified` collection, merge it, deploy the web app. No contract deploy. Club data lives in the store, so it survives web deploys. `club: false` keeps an entry verified without opening a Club. A memecoin joins its collection's with `club: "<collection address>"`. |
 | **Archive** | Set `club: "archived"`. The Club becomes read-only: no joins, no posts, board frozen. Members, posts and history are kept, and its deals still show. An Owner asks, the maintainer merges. |
 | **Hide** | Turn the entry to `blocked`. The Club is hidden on the next deploy. Its data stays in the store, unseen. |
 | **Purge** | An app admin calls `DELETE /api/clubs/[token]` on a hidden Club to delete its stored data. Nothing is purged automatically. |
@@ -147,7 +149,7 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
 ## Membership and the Holder badge
 
 - **Join:** needs sign-in and at least one linked wallet (422 `no_wallet` otherwise). The member row snapshots `linkedEthereumWallets(user.linked_accounts)` (`web/lib/profiles.ts`), never anything from the request. The display wallet, the one the Members list shows, is the first with a shared profile, else the first. Joining twice is the same as once; an archived Club refuses (409 `archived`); a Club stops at 2,000 members (409 `full`). **Joining publishes the display wallet**, so the button says so.
-- **Holder:** ERC-721 `balanceOf ≥ 1` across the member's wallets, or ERC-20 `balanceOf ≥ minHolding` (an optional `assets.json` field); in a paired Club, either. If one asset can't be read and the other doesn't make the member a Holder, the old badge stays. Checked on join, then rechecked when the row is over 24 hours old and the members list is read: one `multicall` per member, at most 50 members per read (oldest check first), so the badge is at most a day old. A read that fails keeps the old badge and tries again next time. Without `minHolding`, an ERC-20 Holder holds any amount.
+- **Holder:** ERC-721 `balanceOf ≥ 1` across the member's wallets, or, in a Club with a memecoin that counts it, the coin's `balanceOf ≥` the minimum. The Owner's rule (`coinHolders` in the Club profile: `on`, `min` in base units, `at` when it changed) wins; without one, the coin counts from `minHolding` (an optional `assets.json` field). A row checked before `at` is re-checked like a stale one. If one asset can't be read and the other doesn't make the member a Holder, the old badge stays. Checked on join, then rechecked when the row is over 24 hours old and the members list is read: one `multicall` per member, at most 50 members per read (oldest check first), so the badge is at most a day old. A read that fails keeps the old badge and tries again next time. Without `minHolding`, an ERC-20 Holder holds any amount.
 - **Wallets kept in step:** the Privy webhook handler, the profile route (share or stop sharing) and every signed-in `GET .../membership` re-sync `wallets[]` and the display wallet in every Club the user belongs to (`syncMemberships`). New wallets reset the balance check. Unlinking a wallet drops its Momentum from that member. **A user left with no linked wallet (or deleted) leaves every Club,** since there is nothing to show or score; joining again takes a wallet.
 - **Leave** deletes the row and the set entries, and any role with it. The Owner can't leave without handing the Club over (409 `owner_cannot_leave`).
 - **Public list:** `GET .../members` never includes a user id. A member is their display wallet, with holder flag, join date, Momentum and completed swaps (events the log and pool know of, where one of their wallets was a party). It shows the first 100 of the sort and counts everyone.
@@ -214,7 +216,7 @@ This is the first user-written content in the app. Every post is signed by its a
 
 | Share of a Club's swap fees | Goes to |
 |---|---|
-| 40% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT, one per `minHolding` (or whole token, without one) of the memecoin, summed over a member's linked wallets, read when the epoch is built. Joined members only, paid at their Club wallet. |
+| 40% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT of the collection, summed over a member's linked wallets, read when the epoch is built. A Club's memecoin earns the Holder badge, not shares ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Joined members only, paid at their Club wallet. |
 | 20% | The Club fund, paid to the Owner's Club wallet. |
 | 40% | Stays with the protocol. |
 
@@ -275,7 +277,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | Route | What |
 |---|---|
 | `GET /api/clubs` | `{logging, clubs}`: each Club's info, stats and `members`, busiest first (public, cached 30 s). `logging` is false when this server keeps no activity log, and then only signed swaps count. Built. |
-| `GET /api/clubs/[token]` | `{logging, club, recent, holders}`: the Club's info, stats, member and holder counts and its latest 20 completed swaps. 400 for a bad address, 404 for an asset with no Club (blocked, unlisted, `club: false`, or a token that isn't a memecoin). A paired asset's address serves its Club. Archived Clubs are served. Built. |
+| `GET /api/clubs/[token]` | `{logging, club, recent, holders}`: the Club's info, stats, member and holder counts and its latest 20 completed swaps. 400 for a bad address, 404 for an asset with no Club (blocked, unlisted, `club: false`, or a token that isn't a memecoin in a collection's Club). A paired asset's address serves its Club. Archived Clubs are served. Built. |
 | `GET /api/clubs/[token]/members?sort=momentum\|new` | `{enabled, members, total, holders}` (public, cached 15 s). 400 for another `sort`. Built. |
 | `GET` / `POST` / `DELETE /api/clubs/[token]/membership` | Your membership `{member, wallet?, holder?, joinedAt?, role}` / join / leave (gated). A `GET` also re-syncs your wallets. Built. |
 | `GET /api/me/clubs` | `{clubs}`: the Clubs you belong to, leaving out ones that no longer exist (gated). Built. |
@@ -295,7 +297,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `GET` / `POST` / `DELETE /api/clubs/[token]/bans` | List (staff) / ban `{wallet \| post, everywhere?}` / unban `{wallet, everywhere?}`. Built. |
 | `POST /api/clubs/[token]/claim` | Claim ownership through `owner()` (gated). Built. |
 | `PUT /api/clubs/[token]/roles` | `{wallet, role: "owner"\|"moderator"\|null}`: roles are set by the member's wallet, since the public list never shows user ids. The Owner appoints Moderators (at most 10) and hands the Club over; an admin also assigns or removes the Owner. Built. |
-| `GET` / `PATCH /api/clubs/[token]/profile` | Public description, links, "holders only" and `x: {accounts, tags, hint}`; edit, including `xTags` (Owner or admin). Built. |
+| `GET` / `PATCH /api/clubs/[token]/profile` | Public description, links, "holders only", `x: {accounts, tags, hint}` and `coin: {token, symbol, on, min, set}` (null without a memecoin); edit, including `xTags` and `coinHolders: {on, min?}` (Owner or admin). Built. |
 | `GET /api/clubs/[token]/log` | `{log, ownership}`: the moderation log (staff); `ownership` is the on-chain check, for admins only. Built. |
 | `DELETE /api/clubs/[token]` | Purge a Club that is hidden from the list (admin). A live Club is refused (`not_hidden`). Deletes members, posts, roles, profile, bans, the log and the activity log. Built. |
 | `POST /api/activity` | `{hash}`, receipt-verified, rate-limited per IP. Built. |

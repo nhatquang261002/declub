@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { formatUnits, parseUnits, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { ExternalIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
-import { useClubActions, useClubPage, useClubStaff } from "@/hooks/useClubBoard";
+import { useClubActions, useClubPage, useClubStaff, type ClubCoin } from "@/hooks/useClubBoard";
+import { useTokenInfo } from "@/hooks/useTokenInfo";
 import type { ViewerRole } from "@/hooks/useClubMembership";
 import { MAX_DESCRIPTION, MAX_LINKS } from "@/lib/clubPosts";
 import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
@@ -107,6 +109,70 @@ function PageEditor({ token }: { token: string }) {
           </button>
         )}
       </div>
+    </form>
+  );
+}
+
+/** "1.5" → base units at `decimals`, or null when it isn't an amount above zero with at most that many decimals. */
+function toUnits(input: string, decimals: number): bigint | null {
+  const value = input.trim();
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(value) || (value.split(".")[1]?.length ?? 0) > decimals) return null;
+  const units = parseUnits(value, decimals);
+  return units > 0n ? units : null;
+}
+
+/**
+ * Whether holding the Club's memecoin earns the Holder badge, and from how much (ADR 0026). NFTs
+ * always do. Club Rewards follow the NFTs either way.
+ */
+function CoinEditor({ token, coin }: { token: string; coin: ClubCoin }) {
+  const { profile } = useClubActions(token);
+  const { info } = useTokenInfo([coin.token as Address]);
+  const decimals = info.get(coin.token)?.decimals;
+  const [draft, setDraft] = useState<{ on: boolean; amount: string } | null>(null);
+  const current = draft ?? { on: coin.on, amount: decimals === undefined ? "" : formatUnits(BigInt(coin.min), decimals) };
+  const units = decimals === undefined ? null : toUnits(current.amount, decimals);
+  const bad = current.on && current.amount.trim() !== "" && units === null;
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        profile.mutate({ coinHolders: { on: current.on, ...(units ? { min: units.toString() } : {}) } }, { onSuccess: () => setDraft(null) });
+      }}
+    >
+      <label className="flex items-start gap-3 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
+        <input type="checkbox" className="mt-0.5 size-4 accent-[#d83b45]" checked={current.on} onChange={(e) => setDraft({ ...current, on: e.target.checked })} />
+        <span>
+          <span className="font-bold">Holding {coin.symbol} makes a member a Holder</span>
+          <span className="block text-xs text-muted">
+            Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.
+          </span>
+        </span>
+      </label>
+      {current.on && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-bold">Minimum {coin.symbol}</span>
+          <input
+            className={field}
+            value={current.amount}
+            inputMode="decimal"
+            placeholder={decimals === undefined ? "Reading the token…" : "1000"}
+            disabled={decimals === undefined}
+            onChange={(e) => setDraft({ ...current, amount: e.target.value })}
+          />
+          <span className={`text-xs ${bad ? "text-danger" : "text-muted"}`}>
+            {bad
+              ? `Enter an amount above zero, with up to ${decimals} decimals.`
+              : `Summed over a member’s linked wallets.${coin.set ? "" : " Until you save, the verified list’s minimum applies."}`}
+          </span>
+        </label>
+      )}
+      <span className="text-xs text-muted">Badges catch up as the Members list is read; nobody’s is more than a day out of date.</span>
+      <button type="submit" className="btn-secondary btn-sm w-fit" disabled={profile.isPending || draft === null || bad}>
+        {profile.isPending ? "Saving…" : "Save"}
+      </button>
     </form>
   );
 }
@@ -233,6 +299,7 @@ function XEditor({ token }: { token: string }) {
 export function ClubManage({ token, role, now }: { token: string; role: ViewerRole; now: number }) {
   const { log, ownership, bans, isLoading } = useClubStaff(token, true);
   const { unban } = useClubActions(token);
+  const page = useClubPage(token);
   const owner = isOwnerOrAdmin(role);
   const banned = bans ? [...bans.club.map((b) => ({ ...b, everywhere: false })), ...bans.everywhere.map((b) => ({ ...b, everywhere: true }))] : [];
 
@@ -248,6 +315,12 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
       {owner && (
         <Panel title="Club page">
           <PageEditor token={token} />
+        </Panel>
+      )}
+
+      {owner && page?.coin && (
+        <Panel title={`${page.coin.symbol} holders`}>
+          <CoinEditor token={token} coin={page.coin} />
         </Panel>
       )}
 

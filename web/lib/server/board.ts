@@ -16,6 +16,7 @@ import {
   pinnedFirst,
   viewPost,
   type ClubProfile,
+  type CoinHolders,
   type PostKind,
   type PostLink,
   type PublicPost,
@@ -25,6 +26,7 @@ import { applyRole, atLeast, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type Clu
 import { toAsset } from "../assets";
 import { getIntent } from "../pool";
 import { lensOf, type LensContext, type LensId } from "../lenses";
+import { coinRule } from "../members";
 import { memberScore, score } from "../momentum";
 import { toScored } from "../clubs";
 import { SIGNED_SKEW_SEC, linkString, postId, postTypedData, type PostMessage, type SignedPost } from "../social";
@@ -644,22 +646,35 @@ export async function setRole(store: Store, entry: AssetEntry, actor: Actor, wal
   return { ok: true };
 }
 
-export async function updateProfile(store: Store, entry: AssetEntry, actor: Actor, input: unknown, deps: Deps = {}): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: "forbidden" | "archived" | "invalid"; message?: string }> {
+export async function updateProfile(store: Store, entry: ClubEntry, actor: Actor, input: unknown, deps: Deps = {}): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: "forbidden" | "archived" | "invalid"; message?: string }> {
   const token = entry.address.toLowerCase();
   if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   const checked = checkProfileEdit(input);
   if (!checked.ok) return { ok: false, reason: "invalid", message: checked.reason };
-  const { xTags, ...edit } = checked.edit;
+  const { xTags, coinHolders, ...edit } = checked.edit;
+  if (coinHolders && !entry.linked) return { ok: false, reason: "invalid", message: "This Club has no memecoin." };
   const current = await loadProfile(store, token);
   const profile: ClubProfile = {
     ...current,
     ...edit,
     ...(xTags ? { x: { accounts: current.x?.accounts ?? [], tags: xTags } } : {}),
+    ...(coinHolders && entry.linked ? { coinHolders: nextCoinHolders(entry.linked, current.coinHolders, coinHolders, nowOf(deps)) } : {}),
   };
   await saveProfile(store, token, profile);
   await log(store, entry, actor, "edit_profile", undefined, Object.keys(checked.edit).join(", "));
   return { ok: true, profile };
+}
+
+/**
+ * The Owner's coin rule after an edit (ADR 0026). A missing minimum keeps the current one, or the
+ * list's. `at` moves only when the rule changes, so saving the same rule re-checks no one.
+ */
+function nextCoinHolders(coin: AssetEntry, current: CoinHolders | undefined, edit: { on: boolean; min?: string }, now: number): CoinHolders {
+  const before = coinRule(coin, current);
+  const min = edit.min ?? before.min.toString();
+  const same = current !== undefined && before.on === edit.on && before.min.toString() === min;
+  return { on: edit.on, min, at: same && current ? current.at : now };
 }
 
 // ---------------------------------------------------------------------------------------------

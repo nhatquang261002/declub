@@ -47,7 +47,10 @@ export function useClubPosts(token: string, lens: LensId = "newest", as?: string
 /** The Club's X signals (ADR 0024): its linked project accounts, its tags, and "what counts" in words. */
 export type ClubX = { accounts: { handle: string; proof: string; linkedAt: number }[]; tags: string[]; hint: string };
 
-export type ClubPage = { enabled: boolean; description: string; links: string[]; holdersOnlyPosts: boolean; hasOwner: boolean; x: ClubX };
+/** Whether the Club's memecoin earns the Holder badge (ADR 0026): `min` in base units; `set` once the Owner chose. */
+export type ClubCoin = { token: string; symbol: string; on: boolean; min: string; set: boolean };
+
+export type ClubPage = { enabled: boolean; description: string; links: string[]; holdersOnlyPosts: boolean; hasOwner: boolean; x: ClubX; coin: ClubCoin | null };
 
 /** Why a member's own X post didn't count, in words. */
 const NOT_COUNTED: Record<NonNullable<XShareVerdict["reason"]>, string> = {
@@ -126,8 +129,9 @@ export function useClubActions(token: string) {
     role: useAct((v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v), ["club-members", "club-membership", "club-log", "club-posts"], "Done."),
     claim: useAct(() => send("POST", "/claim"), ["club-members", "club-membership", "club-profile", "club-log"], "You’re the Owner of this Club."),
     profile: useAct(
-      (v: { description?: string; links?: string[]; holdersOnlyPosts?: boolean; xTags?: string[] }) => send("PATCH", "/profile", v),
-      ["club-profile", "club-log"],
+      (v: { description?: string; links?: string[]; holdersOnlyPosts?: boolean; xTags?: string[]; coinHolders?: { on: boolean; min?: string } }) =>
+        send("PATCH", "/profile", v),
+      ["club-profile", "club-log", "club-members"],
       "Saved.",
     ),
     // Linking the project's X account (ADR 0024): a code to post from it, then the post's link.

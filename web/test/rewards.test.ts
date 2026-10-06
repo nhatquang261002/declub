@@ -201,8 +201,8 @@ describe("buildEpoch", () => {
       genesis: GENESIS,
       length: WEEK,
     };
-    // Alice holds 2 Chogs; Bob holds 250 coin (2 shares at minHolding 100) in a second wallet;
-    // Carol is a member with nothing; Dave (1 Chog) isn't a member and earns nothing.
+    // Alice holds 2 Chogs; Bob holds 250 coin in a second wallet, a Holder by the coin but with no
+    // shares (ADR 0025); Carol is a member with nothing; Dave (1 Chog) isn't a member and earns nothing.
     await join(store, NFT, "ua", [alice]);
     await join(store, NFT, "ub", [carol, bob]);
     await store.set(rolesKey(NFT), { owner: "ua", moderators: [] });
@@ -224,12 +224,12 @@ describe("buildEpoch", () => {
     assert.equal(chog.fees, (4n * ETH).toString());
     assert.equal(chog.holderPool, ((16n * ETH) / 10n).toString());
     assert.equal(chog.fundPool, ((8n * ETH) / 10n).toString());
-    assert.equal(chog.holderCount, 2);
+    assert.equal(chog.holderCount, 1);
 
-    // Alice: 2 of 4 shares (0.8) plus the fund (0.8). Bob's display wallet is Carol's address
-    // (the first linked): 2 of 4 shares (0.8).
+    // Alice: the whole Holder pool (1.6) plus the fund (0.8). Bob's coin earns nothing: rewards
+    // follow the collection's NFTs only.
     const byAccount = Object.fromEntries(record.leaves.map((l) => [l.account.toLowerCase(), BigInt(l.amount)]));
-    assert.deepEqual(byAccount, { [alice]: (16n * ETH) / 10n, [carol]: (8n * ETH) / 10n });
+    assert.deepEqual(byAccount, { [alice]: (24n * ETH) / 10n });
     assert.equal(record.total, ((24n * ETH) / 10n).toString());
 
     // Every proof verifies against the root with the contract's leaf.
@@ -298,11 +298,12 @@ describe("buildEpoch", () => {
     assert.equal(mine[0]!.epoch, 0);
     assert.deepEqual(mine[0]!.breakdown.map((b) => b.kind).sort(), ["fund", "holder"]);
     assert.deepEqual(await claimableFor(store, getAddress(dave)), []);
+    assert.deepEqual(await claimableFor(store, getAddress(carol)), [], "Bob holds only the coin");
 
     const view = await clubRewards(store, NFT);
     assert.equal(view.epochs.length, 1);
     assert.equal(view.epochs[0]!.fees, (4n * ETH).toString());
-    assert.equal(view.earners[0]!.amount, ((8n * ETH) / 10n).toString());
+    assert.equal(view.earners[0]!.amount, ((16n * ETH) / 10n).toString());
     assert.deepEqual(view.carry, { holders: "0", fund: "0" });
   });
 });

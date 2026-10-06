@@ -120,7 +120,7 @@ export type ClubInfo = {
   note: string;
   /** The Club's art, a path under `public/`, when the list gives one. */
   image?: string;
-  /** The asset that shares this Club: the memecoin of a collection's Club, or the other way round. */
+  /** The memecoin that shares this collection's Club, if it has one. */
   linked?: ClubAsset;
 };
 

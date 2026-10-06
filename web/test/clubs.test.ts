@@ -196,8 +196,8 @@ describe("Club data", () => {
   it("lists Clubs busiest first, and keeps list order for ties", async () => {
     const entries = parseAssets([
       { chainId: 10143, address: NFT, kind: "erc721", name: "Quiet", symbol: "Q", status: "verified", note: "x" },
-      { chainId: 10143, address: USD, kind: "erc20", category: "memecoin", name: "Busy", symbol: "B", status: "verified", note: "x" },
-      { chainId: 10143, address: OTHER, kind: "erc20", category: "memecoin", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
+      { chainId: 10143, address: USD, kind: "erc721", name: "Busy", symbol: "B", status: "verified", note: "x" },
+      { chainId: 10143, address: OTHER, kind: "erc721", name: "Quiet too", symbol: "Q2", status: "verified", note: "x" },
     ]);
     await store.rank(activityKey(USD), [{ member: JSON.stringify(swap({ id: "u:0", tokens: [USD.toLowerCase()] })), score: NOW }], 10);
     const rows = await clubList(store, entries, { now: () => NOW, settlements: async () => [] });

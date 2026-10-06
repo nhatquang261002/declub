@@ -16,8 +16,6 @@ export const REWARDS = {
   fundBps: 2_000,
   /** What the protocol keeps. The three add up to 10,000. */
   protocolBps: 4_000,
-  /** Shares for an ERC-20 Club without `minHolding`: one per whole token (18 decimals). */
-  defaultCoinUnit: 10n ** 18n,
   /**
    * The Holder bonus (ADR 0024): a Holder's shares count up to this much more (basis points) for
    * their activity in the Club during the epoch. Holding stays the base: a quiet Holder keeps theirs.

@@ -5,7 +5,6 @@ import type { ActivityEvent } from "../clubs";
 import { CHAIN_ID, DECLUB_INTENTS_ADDRESS, DECLUB_REWARDS_ADDRESS, RPC_URL } from "../config";
 import { buildMerkleTree } from "../merkle";
 import {
-  REWARDS,
   activityPoints,
   epochWindow,
   leavesOf,
@@ -16,7 +15,7 @@ import {
   type EpochRecord,
   type ReachRecord,
 } from "../rewards";
-import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
+import { registry, type ClubEntry } from "../verifiedAssets";
 import { clubEvents } from "./clubs";
 import { loadRoles } from "./clubState";
 import { allRows, getMember, viemHoldings, type Holdings } from "./members";
@@ -226,25 +225,20 @@ async function compute(
 
 /**
  * Each member's shares, from a fresh read of every wallet they've linked: one per NFT of the
- * collection, and one per `minHolding` (or whole token) of the memecoin. Throws when the chain
- * can't be read, so an epoch is never built on missing balances.
+ * collection. A Club's memecoin earns the Holder badge but no shares (ADR 0025). Throws when the
+ * chain can't be read, so an epoch is never built on missing balances.
  */
 async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ wallet: string; wallets: string[]; shares: bigint }[]> {
   const rows = (await allRows(store, club.address)).filter((r) => r.displayWallet && r.wallets.length > 0);
   if (rows.length === 0) return [];
-  const shares = rows.map(() => 0n);
-  for (const asset of clubAssets(club)) {
-    const wallets = rows.flatMap((r) => r.wallets as Address[]);
-    const balances = await holdings(asset.address, wallets);
-    if (!balances) throw new Error(`can't read ${asset.symbol} balances`);
-    const unit = asset.kind === "erc721" ? 1n : asset.minHolding ? BigInt(asset.minHolding) : REWARDS.defaultCoinUnit;
-    let at = 0;
-    rows.forEach((row, i) => {
-      const held = balances.slice(at, at + row.wallets.length).reduce((sum, b) => sum + b, 0n);
-      at += row.wallets.length;
-      shares[i] += held / unit;
-    });
-  }
+  const balances = await holdings(club.address, rows.flatMap((r) => r.wallets as Address[]));
+  if (!balances) throw new Error(`can't read ${club.symbol} balances`);
+  let at = 0;
+  const shares = rows.map((row) => {
+    const held = balances.slice(at, at + row.wallets.length).reduce((sum, b) => sum + b, 0n);
+    at += row.wallets.length;
+    return held;
+  });
   return rows.map((row, i) => ({ wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]! })).filter((h) => h.shares > 0n);
 }
 

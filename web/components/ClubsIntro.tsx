@@ -31,8 +31,8 @@ export function ClubsIntro() {
             Every collection gets a Club, and the Club shares in its market.
           </h2>
           <p className="mt-3 max-w-xl leading-7 text-muted">
-            Each verified NFT collection and memecoin has a Club: one place to find what’s up for trade, post what you’re after,
-            and see who really trades it. A memecoin made for a collection shares that collection’s Club.
+            Each verified NFT collection has a Club: one place to find what’s up for trade, post what you’re after,
+            and see who really trades it. A memecoin made for a collection joins that collection’s Club; a memecoin has none of its own.
           </p>
           <ul className="mt-6 grid gap-4 sm:grid-cols-2">
             {WHAT.map((item) => (

@@ -11,7 +11,7 @@ const STEPS = [
   {
     number: "01",
     title: "Join your Club",
-    body: "Every verified Monad collection and memecoin has one. Join with your wallet; holding the asset makes you a Holder.",
+    body: "Every verified Monad NFT collection has one, with its memecoin if it has one. Join with your wallet; holding the NFT makes you a Holder, and the Owner can let the coin count too.",
   },
   {
     number: "02",
@@ -46,7 +46,7 @@ export default function HomePage() {
               <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Every Monad collection and memecoin gets a Club. Members trade inside it, talk in posts they sign and own,
+              Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own,
               and Holders earn a share of the fees their Club’s swaps pay.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -109,7 +109,7 @@ export default function HomePage() {
                 Communities that own their market.
               </p>
               <p className="mt-2 leading-6 text-white/60">
-                Clubs, swaps and rewards for Monad’s collections and memecoins, on Monad testnet.
+                Clubs, swaps and rewards for Monad’s NFT collections and their coins, on Monad testnet.
               </p>
             </div>
             <a

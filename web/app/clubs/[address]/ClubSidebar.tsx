@@ -1,12 +1,14 @@
 "use client";
 
-import { getAddress } from "viem";
+import { formatUnits, getAddress, type Address } from "viem";
 import { CheckIcon, CopyIcon, ExternalIcon } from "@/components/Icons";
 import { formatMomentum, HeatBars, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { KIND_LABEL } from "@/components/ClubCard";
+import { useClubPage } from "@/hooks/useClubBoard";
 import { useClubMembers } from "@/hooks/useClubMembership";
+import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { HEAT, heat, infoAssets, type ClubInfo, type ClubStats } from "@/lib/clubs";
 import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
@@ -99,8 +101,18 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 /** What the Club's assets are, and why they are on the verified list. */
+/** Who earns the Holder badge in a Club with a memecoin: the NFTs always, the coin as the Owner set it (ADR 0026). */
+function holderRule(nft: string, coin: { symbol: string; on: boolean; min: string } | null | undefined, decimals: number | undefined) {
+  if (!coin) return "Deals in either count toward its Momentum.";
+  if (!coin.on) return `Deals in either count toward its Momentum. Only ${nft} NFTs earn the Holder badge.`;
+  const least = decimals === undefined ? "" : ` (at least ${formatUnits(BigInt(coin.min), decimals)})`;
+  return `Deals in either count toward its Momentum. Holding a ${nft} or ${coin.symbol}${least} earns the Holder badge.`;
+}
+
 function Details({ club }: { club: ClubInfo }) {
   const assets = infoAssets(club);
+  const coin = useClubPage(club.token)?.coin;
+  const { info } = useTokenInfo(club.linked ? [club.linked.token as Address] : []);
   return (
     <Panel title="Details">
       <dl className="flex flex-col gap-3 text-sm">
@@ -124,7 +136,7 @@ function Details({ club }: { club: ClubInfo }) {
         {assets.length > 1 ? (
           <div>
             <dt className="text-xs text-muted">Shared Club</dt>
-            <dd className="leading-5">Deals in either count toward its Momentum, and holding either earns the Holder badge.</dd>
+            <dd className="leading-5">{holderRule(club.symbol, coin, club.linked && info.get(club.linked.token)?.decimals)}</dd>
           </div>
         ) : (
           <div>

@@ -16,14 +16,14 @@ import { infoAssets, toClubInfo } from "@/lib/clubs";
 import { registry } from "@/lib/verifiedAssets";
 import { CardSkeleton, ClubListHeader, ClubRow, Leaderboard, type Row } from "./parts";
 
-type Kind = "all" | "erc721" | "erc20";
+/** Every Club is a collection's (ADR 0025); some have a memecoin with it. */
+type Kind = "all" | "coin";
 type Sort = "momentum" | "rising" | "swaps" | "members" | "recent" | "name";
 type View = "list" | "grid";
 
 const KINDS = [
   { value: "all", label: "All" },
-  { value: "erc721", label: "Collections" },
-  { value: "erc20", label: "Memecoins" },
+  { value: "coin", label: "With a memecoin" },
 ] as const;
 
 const SORTS: { value: Sort; label: string }[] = [
@@ -111,7 +111,7 @@ export default function ClubsPage() {
     const kept = rows.filter(({ info }) => {
       const assets = infoAssets(info);
       return (
-        (kind === "all" || assets.some((a) => a.kind === kind)) &&
+        (kind === "all" || info.linked !== undefined) &&
         (!q || assets.some((a) => a.name.toLowerCase().includes(q) || a.symbol.toLowerCase().includes(q) || a.token.startsWith(q)))
       );
     });
@@ -139,7 +139,7 @@ export default function ClubsPage() {
         <div>
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Clubs</h1>
           <p className="mt-1 text-sm text-muted">
-            One for each verified NFT collection and memecoin. Members trade, post and share in its fees.{" "}
+            One for each verified NFT collection, with its memecoin if it has one. Members trade, post and share in its fees.{" "}
             <Link href="/#clubs" className="font-bold underline">
               How Clubs work
             </Link>

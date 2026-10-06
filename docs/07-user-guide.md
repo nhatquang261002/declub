@@ -1,6 +1,6 @@
 # 07 · User Guide
 
-DeClub gives every verified Monad collection and memecoin a Club: a place to trade it, talk about it and share in the fees its market pays. Trading is peer-to-peer and non-custodial: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
+DeClub gives every verified Monad NFT collection a Club, with its memecoin if it has one: a place to trade it, talk about it and share in the fees its market pays. Trading is peer-to-peer and non-custodial: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
 
 The in-app version of this guide has two bases, side by side: **Deals** at `/guide` ([page](../web/app/guide/page.tsx)) and **Clubs** at `/guide/clubs` ([page](../web/app/guide/clubs/page.tsx)).
 
@@ -98,7 +98,7 @@ The **Account** page (signed in with Privy) lets you:
 
 ## Clubs and Momentum
 
-A **Club** is the community for one verified NFT collection or memecoin, such as Chog. A memecoin can share its collection's Club. Open **Clubs** in the header to see them all, busiest first. Each Club has these tabs:
+A **Club** is the community for one verified NFT collection, such as Chog. A memecoin made for the collection shares its Club; a memecoin has no Club of its own. The Club's Owner decides whether holding the coin makes you a Holder, and from how much. Open **Clubs** in the header to see them all, busiest first. Each Club has these tabs:
 
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
@@ -108,7 +108,7 @@ A **Club** is the community for one verified NFT collection or memecoin, such as
 
 **Joining.** Sign in, link a wallet, and press **Join**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. **Leave** takes you off the list again.
 
-**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection, or the minimum amount of a token; in a shared Club, either one). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
+**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection; in a Club with a memecoin, also the coin, if the Owner lets it count, from the minimum they set). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
 
 **Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet; so does a Holder's own X post about the Club shared on its Board (see below), one a day. Other posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
 
@@ -134,7 +134,7 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
-- **40%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the asset when the epoch is worked out. Each NFT is one share, and so is each set amount of the memecoin (its minimum holding, or one whole token). Your share goes to your Club wallet.
+- **40%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
   - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Where the app reads X engagement, well-received posts earn up to 30 more points a week. A Holder who does nothing still gets their base share.
 - **20%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.

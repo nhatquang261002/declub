@@ -2,13 +2,13 @@
 
 > **Your community's market, owned by its members.**
 >
-> *Every Monad collection and memecoin gets a Club. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.*
+> *Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.*
 
 DeClub (written De(al) Club) turns the people around an asset into the owners of its market ([ADR 0021](docs/adr/0021-declub-pivot.md)):
 
 | | What |
 |---|---|
-| **Gather** | A Club for each verified collection or memecoin: its Market, a Board, Members ranked by Momentum, Holder badges, an Owner and Moderators ([09 · Clubs](docs/09-clubs.md)). |
+| **Gather** | A Club for each verified NFT collection (its memecoin joins it): its Market, a Board, Members ranked by Momentum, Holder badges, an Owner and Moderators ([09 · Clubs](docs/09-clubs.md)). |
 | **Trade** | Members swap inside the Club, through escrow or by signing, with no trust between them. Every completed swap pays a small flat fee per side. |
 | **Own the market** | Each week, 40% of the fees a Club's swaps paid goes to its Holders, by holdings, and 20% to its Club fund, which the Owner collects, claimed on chain from `DeClubRewards` ([ADR 0022](docs/adr/0022-club-rewards.md)). |
 | **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered ([ADR 0023](docs/adr/0023-signed-posts-and-lenses.md)). |

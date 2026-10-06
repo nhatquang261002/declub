@@ -5,6 +5,7 @@ import {
   HOLDER_RECHECK_MS,
   MEMBERS_SHOWN,
   RECHECK_PER_READ,
+  coinRule,
   isHolder,
   pickDisplayWallet,
   rankMembers,
@@ -46,6 +47,21 @@ describe("isHolder", () => {
   });
 });
 
+describe("the coin rule", () => {
+  it("follows the list until the Owner sets it", () => {
+    assert.deepEqual(coinRule({ minHolding: "1000" }), { on: true, min: 1000n });
+    assert.deepEqual(coinRule({}), { on: true, min: 1n });
+    assert.deepEqual(coinRule({ minHolding: "1000" }, { on: true, min: "50", at: 1 }), { on: true, min: 50n });
+  });
+
+  it("decides the coin's badge, and never the NFT's", () => {
+    const coin = { kind: "erc20" as const, minHolding: "1000" };
+    assert.equal(isHolder(coin, [60n], { on: true, min: 50n }), true, "the Owner's minimum, not the list's");
+    assert.equal(isHolder(coin, [10_000n], { on: false, min: 1n }), false, "switched off");
+    assert.equal(isHolder({ kind: "erc721" }, [1n], { on: false, min: 5n }), true);
+  });
+});
+
 describe("pickDisplayWallet", () => {
   it("prefers a wallet with a shared profile, else the first, lowercased", () => {
     assert.equal(pickDisplayWallet([A, B], new Set([B])), B);
@@ -81,6 +97,11 @@ describe("staleRows", () => {
       row("never", { holderCheckedAt: 0 }),
     ];
     assert.deepEqual(staleRows(rows, now).map((r) => r.userId), ["never", "old"]);
+  });
+
+  it("also picks rows checked before the Holder rule changed", () => {
+    const rows = [row("before", { holderCheckedAt: now - 1000 }), row("after", { holderCheckedAt: now - 10 })];
+    assert.deepEqual(staleRows(rows, now, RECHECK_PER_READ, now - 500).map((r) => r.userId), ["before"]);
   });
 
   it("caps how many one read re-checks", () => {

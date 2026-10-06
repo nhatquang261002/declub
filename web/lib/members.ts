@@ -1,5 +1,6 @@
 import { memberScore, type Scores } from "./momentum";
 import type { ActivityEvent } from "./clubs";
+import type { CoinHolders } from "./clubPosts";
 import type { Roles } from "./clubRoles";
 import type { AssetEntry } from "./verifiedAssets";
 
@@ -53,14 +54,26 @@ export const MEMBERS_SHOWN = 100;
 /** A Club stops taking members here (the list reads every row, so it is bounded). */
 export const MAX_MEMBERS = 2_000;
 
+/** Whether a Club's memecoin earns the Holder badge, and from how much (base units). */
+export type CoinRule = { on: boolean; min: bigint };
+
 /**
- * Whether these balances (one per linked wallet, base units) earn the Holder badge: any NFT of an
- * ERC-721 Club, or at least `minHolding` of an ERC-20 one (any balance when the entry sets none).
+ * The coin's rule: the Owner's setting (ADR 0026), else the list's `minHolding`, any balance
+ * without one.
  */
-export function isHolder(entry: Pick<AssetEntry, "kind" | "minHolding">, balances: readonly bigint[]): boolean {
+export function coinRule(coin: Pick<AssetEntry, "minHolding">, setting?: CoinHolders): CoinRule {
+  if (setting) return { on: setting.on, min: BigInt(setting.min) };
+  return { on: true, min: coin.minHolding ? BigInt(coin.minHolding) : 1n };
+}
+
+/**
+ * Whether these balances (one per linked wallet, base units) of one Club asset earn the Holder
+ * badge: any NFT of the collection, or the coin's minimum when the Club counts its coin.
+ */
+export function isHolder(entry: Pick<AssetEntry, "kind" | "minHolding">, balances: readonly bigint[], rule = coinRule(entry)): boolean {
   const total = balances.reduce((sum, balance) => sum + balance, 0n);
-  const least = entry.kind === "erc20" && entry.minHolding ? BigInt(entry.minHolding) : 1n;
-  return total >= least;
+  if (entry.kind === "erc721") return total >= 1n;
+  return rule.on && total >= rule.min;
 }
 
 /** The wallet to show for a member: the first one with a shared profile, else the first linked. */
@@ -82,10 +95,13 @@ export function withWallets(row: MemberRow, wallets: readonly string[], display:
   return { ...row, wallets: lower, displayWallet: display, holderCheckedAt: changed ? 0 : row.holderCheckedAt };
 }
 
-/** Rows whose balance is out of date, oldest check first, at most `limit`. */
-export function staleRows(rows: readonly MemberRow[], now: number, limit = RECHECK_PER_READ): MemberRow[] {
+/**
+ * Rows whose balance is out of date, oldest check first, at most `limit`. A row checked before
+ * `since` (epoch ms: when the Holder rule last changed) is out of date too.
+ */
+export function staleRows(rows: readonly MemberRow[], now: number, limit = RECHECK_PER_READ, since = 0): MemberRow[] {
   return rows
-    .filter((row) => now - row.holderCheckedAt >= HOLDER_RECHECK_MS)
+    .filter((row) => now - row.holderCheckedAt >= HOLDER_RECHECK_MS || row.holderCheckedAt < since)
     .sort((a, b) => a.holderCheckedAt - b.holderCheckedAt)
     .slice(0, limit);
 }

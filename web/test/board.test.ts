@@ -573,6 +573,26 @@ describe("updateProfile", () => {
     assert.match((!bad.ok && bad.message) || "", /https/);
     assert.deepEqual(await updateProfile(store, archived, own, { description: "x" }, { admins: new Set(["own"]) }), { ok: false, reason: "archived" });
   });
+
+  it("sets whether the Club's memecoin makes Holders, and moves `at` only when the rule changes", async () => {
+    const { store, own, deps } = await club1();
+    const COIN = "0xd300f095f456D59AAc122B0100833fE195136F6c";
+    const paired = makeRegistry(parseAssets([
+      { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
+      { chainId: 10143, address: COIN, kind: "erc20", category: "memecoin", name: "C", symbol: "C", status: "verified", note: "Why.", club: NFT, minHolding: "100" },
+    ])).clubFor(NFT)!;
+    const at = (t: number) => ({ ...deps, now: () => t });
+
+    const off = await updateProfile(store, paired, own, { coinHolders: { on: false } }, at(10));
+    assert.deepEqual(off.ok && off.profile.coinHolders, { on: false, min: "100", at: 10 }, "keeps the list's minimum");
+    const same = await updateProfile(store, paired, own, { coinHolders: { on: false, min: "100" } }, at(20));
+    assert.equal(same.ok && same.profile.coinHolders?.at, 10, "nothing changed, nobody is re-checked");
+    const raised = await updateProfile(store, paired, own, { coinHolders: { on: true, min: "5000" } }, at(30));
+    assert.deepEqual(raised.ok && raised.profile.coinHolders, { on: true, min: "5000", at: 30 });
+
+    const none = await updateProfile(store, club, own, { coinHolders: { on: true } }, deps);
+    assert.equal(!none.ok && none.message, "This Club has no memecoin.");
+  });
 });
 
 describe("the leaderboard shows roles", () => {

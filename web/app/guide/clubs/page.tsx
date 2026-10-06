@@ -91,10 +91,10 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between members who hold the asset when the epoch is built, one share per NFT or per set amount of the coin; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between members who hold the collection when the epoch is built, one share per NFT; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
   ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member holding the asset when the epoch is built. Your share waits under Rewards until you claim it."],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
-  ["Which assets get a Club?", "Only NFT collections and memecoins on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club."],
+  ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
   ["How does someone become the Owner?", "The wallet that the token contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
@@ -107,7 +107,7 @@ export default function ClubsGuidePage() {
         base="clubs"
         title="How Clubs work,"
         accent="in three minutes."
-        lead="Every verified collection and memecoin has a Club: its market, a board for posts, the people who trade it, and a share of the fees its swaps pay."
+        lead="Every verified NFT collection has a Club: its market, a board for posts, the people who trade it, and a share of the fees its swaps pay."
         actions={
           <Link href="/clubs" className="btn-primary">
             Explore Clubs <span aria-hidden>→</span>
@@ -159,7 +159,7 @@ export default function ClubsGuidePage() {
               <h3 className="mt-4 text-lg font-black">Holder badge</h3>
               <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
                 Members whose linked wallets hold the asset get a <b className="text-[#111318]">Holder</b> badge: any NFT of
-                the collection, or the minimum amount of a token. In a shared Club, either one counts.
+                the collection. When the Club has a memecoin, its Owner can let holders of the coin count too, from a minimum they set.
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
                 It shows what they held at the last check, which runs about once a day. It gives no extra powers, unless
@@ -229,7 +229,7 @@ export default function ClubsGuidePage() {
               The activity bonus
             </h3>
             <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-              Holding is the base: one share per NFT, or per set amount of the coin. A Holder&apos;s shares then count up to{" "}
+              Holding is the base: one share per NFT of the collection. A Holder&apos;s shares then count up to{" "}
               <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for what they did in the Club that epoch: trading there, and sharing
               their own X posts about the Club on its Board. Each counted post earns {REWARDS.xShareBase} points and a swap{" "}
               {MOMENTUM.swapWeight}; {REWARDS.fullBonusPoints} points earn the full bonus. A Holder who does nothing still gets their base share.

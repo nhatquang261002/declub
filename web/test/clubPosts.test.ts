@@ -98,8 +98,16 @@ describe("checkProfileEdit", () => {
     }
   });
 
+  it("takes the coin rule, with or without a minimum", () => {
+    assert.deepEqual(checkProfileEdit({ coinHolders: { on: true, min: "1000" } }), { ok: true, edit: { coinHolders: { on: true, min: "1000" } } });
+    assert.deepEqual(checkProfileEdit({ coinHolders: { on: false } }), { ok: true, edit: { coinHolders: { on: false } } });
+  });
+
   it("rejects wrong types and empty edits", () => {
-    for (const bad of [null, "x", {}, { holdersOnlyPosts: "yes" }, { description: 5 }, { links: "https://a.io" }]) {
+    for (const bad of [
+      null, "x", {}, { holdersOnlyPosts: "yes" }, { description: 5 }, { links: "https://a.io" },
+      { coinHolders: true }, { coinHolders: { min: "5" } }, { coinHolders: { on: true, min: "0" } }, { coinHolders: { on: true, min: "1.5" } }, { coinHolders: { on: true, min: 5 } },
+    ]) {
       assert.equal(checkProfileEdit(bad).ok, false, JSON.stringify(bad));
     }
   });

@@ -31,9 +31,9 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
       <Panel title="How this Club earns">
         <p className="text-sm">
           Every completed swap of {symbol} pays a small protocol fee. Each epoch,{" "}
-          <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s Holders, split by how much they hold, and{" "}
+          <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s Holders, split by the NFTs they hold, and{" "}
           <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as a member who holds {symbol}{" "}
-          when the epoch closes: one share per NFT, or per set amount of the coin.
+          when the epoch closes: one share per NFT. A Club’s memecoin can make you a Holder, if the Owner allows it, but earns no share.
         </p>
         <p className="mt-2 text-sm">
           Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for what you did in the Club that

@@ -7,16 +7,17 @@ import raw from "../data/assets.json" with { type: "json" };
  * which assets get a Club (ADR 0016), never what the contracts allow. One file, reviewed by pull
  * request, bundled into the build.
  *
- * Verified isn't the same as having a community: only NFT collections and memecoins get a Club. A
- * stablecoin or wrapped MON is verified so its deals are trusted, and has no Club.
+ * Verified isn't the same as having a community: only NFT collections get a Club (ADR 0025). A
+ * memecoin can join its collection's Club; a stablecoin or wrapped MON is verified so its deals are
+ * trusted, and has no Club.
  */
 export type AssetStatus = "verified" | "blocked";
-/** What an ERC-20 is for. Only a memecoin gets a Club. */
+/** What an ERC-20 is for. Only a memecoin can be in a Club, and only in its collection's. */
 export type TokenCategory = "memecoin" | "stablecoin" | "wrapped" | "other";
 /**
- * `false` lists an asset as verified without a Club; `"archived"` keeps a Club read-only. An
- * address puts the asset in that asset's Club instead of its own: a memecoin and the collection it
- * goes with (CHOG and the Chogs) share one Club.
+ * `false` lists an asset as verified without a Club; `"archived"` keeps a Club read-only. A
+ * memecoin has no Club of its own: its `club` is the address of the collection it goes with (CHOG
+ * and the Chogs share one Club), or `false`.
  */
 export type ClubSetting = boolean | "archived" | Address;
 
@@ -32,9 +33,12 @@ export type AssetEntry = {
   status: AssetStatus;
   /** Why it's on the list. Required: a bare "verified" says nothing. */
   note: string;
-  /** Club setting; absent means a verified collection or memecoin has a Club. */
+  /** Club setting; absent means a verified collection has a Club. A memecoin must set it. */
   club?: ClubSetting;
-  /** ERC-20 only: the smallest balance (base units, as a decimal string) that earns the Holder badge. */
+  /**
+   * ERC-20 only: the smallest balance (base units, as a decimal string) that earns the Holder badge.
+   * It earns no Club Rewards: those follow the collection's NFTs (ADR 0025).
+   */
   minHolding?: string;
   /** The Club's art: a file the app ships under `web/public`, e.g. "/art/chogs/chog-01.png". */
   image?: string;
@@ -49,7 +53,7 @@ const IMAGE = /^\/(?:[\w-]+\/)*[\w-]+\.(?:png|jpe?g|webp|svg)$/;
 const KIND = new Set(["erc721", "erc20"]);
 const CATEGORY = new Set<string>(["memecoin", "stablecoin", "wrapped", "other"]);
 
-/** A collection or a memecoin: the assets that can have a community. */
+/** A collection or a memecoin: the assets that can be in a Club. Only a collection has one of its own. */
 export const isCommunityAsset = (e: Pick<AssetEntry, "kind" | "category">) => e.kind === "erc721" || e.category === "memecoin";
 
 /** Throws on the first problem, so a bad edit to the file fails the build and the tests. */
@@ -80,8 +84,13 @@ export function parseAssets(list: unknown): AssetEntry[] {
       if (e.club !== getAddress(e.club)) throw new Error(`${at}: club address must be checksummed (${getAddress(e.club)})`);
     }
     if (e.club !== undefined && e.club !== false && !isCommunityAsset(e as Pick<AssetEntry, "kind" | "category">)) {
-      throw new Error(`${at}: only NFT collections and memecoins have a Club; leave club out or set it to false`);
+      throw new Error(`${at}: only NFT collections and their memecoins are in a Club; leave club out or set it to false`);
     }
+    const joins = typeof e.club === "string" && e.club.startsWith("0x");
+    if (e.category === "memecoin" && e.club !== false && !joins) {
+      throw new Error(`${at}: a memecoin has no Club of its own; set club to its collection's address, or to false`);
+    }
+    if (e.kind === "erc721" && joins) throw new Error(`${at}: a collection has its own Club and can't join another`);
     if (e.minHolding !== undefined) {
       if (e.kind !== "erc20") throw new Error(`${at}: minHolding is only for erc20`);
       if (typeof e.minHolding !== "string" || !/^[1-9][0-9]*$/.test(e.minHolding)) {
@@ -99,8 +108,8 @@ export function parseAssets(list: unknown): AssetEntry[] {
 }
 
 /**
- * A Club as the registry hands it out: the entry of its own asset, which keys everything the Club
- * stores, and the asset that joined it (a memecoin in a collection's Club, or the other way round).
+ * A Club as the registry hands it out: the entry of its collection, which keys everything the Club
+ * stores, and the memecoin that joined it, if any.
  */
 export type ClubEntry = AssetEntry & { linked?: AssetEntry };
 
@@ -129,13 +138,13 @@ export function makeRegistry(entries: AssetEntry[]): Registry {
   const live = (e: AssetEntry) => e.status === "verified" && e.club !== false && isCommunityAsset(e);
   const joins = (e: AssetEntry) => typeof e.club === "string" && e.club.startsWith("0x");
 
-  // A Club takes one asset of the other kind: a collection and its memecoin, never a chain of them.
+  // A collection's Club takes at most one memecoin, never a chain of them.
   const linked = new Map<string, AssetEntry>();
   for (const e of entries.filter((e) => live(e) && joins(e))) {
     const home = byKey.get(keyOf(e.chainId, e.club as string));
     const at = `${e.symbol} (${e.address})`;
     if (!home || !live(home) || joins(home)) throw new Error(`${at}: club names ${e.club as string}, which has no Club of its own on chain ${e.chainId}`);
-    if (home.kind === e.kind) throw new Error(`${at}: a Club pairs a collection with a memecoin, not two of a kind`);
+    if (home.kind !== "erc721") throw new Error(`${at}: a memecoin joins a collection's Club, not another token's`);
     const key = keyOf(home.chainId, home.address);
     if (linked.has(key)) throw new Error(`${at}: ${home.symbol}'s Club already has ${linked.get(key)!.symbol}`);
     linked.set(key, e);
@@ -146,7 +155,7 @@ export function makeRegistry(entries: AssetEntry[]): Registry {
   };
 
   const clubs = new Map<string, ClubEntry>();
-  for (const e of entries) if (live(e) && !joins(e)) clubs.set(keyOf(e.chainId, e.address), asClub(e));
+  for (const e of entries) if (live(e) && !joins(e) && e.kind === "erc721") clubs.set(keyOf(e.chainId, e.address), asClub(e));
 
   return {
     entry,

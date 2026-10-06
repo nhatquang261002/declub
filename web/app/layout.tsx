@@ -13,7 +13,7 @@ const brand = Bricolage_Grotesque({ variable: "--font-brand", subsets: ["latin"]
 // The favicon is app/icon.svg, picked up by Next automatically.
 export const metadata: Metadata = {
   title: "De(al) Club",
-  description: "Clubs for Monad's collections and memecoins, where Holders share in the fees their Club's market makes.",
+  description: "Clubs for Monad's NFT collections, where Holders share in the fees their Club's market makes.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
