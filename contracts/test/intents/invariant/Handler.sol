@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OnDealIntents} from "../../../src/OnDealIntents.sol";
-import {IOnDealIntents} from "../../../src/interfaces/IOnDealIntents.sol";
+import {DeClubIntents} from "../../../src/DeClubIntents.sol";
+import {IDeClubIntents} from "../../../src/interfaces/IDeClubIntents.sol";
 import {MockChog} from "../../../src/mocks/MockChog.sol";
 import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 
@@ -13,7 +13,7 @@ import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 ///      changes the fee as the run goes, and makers sometimes sign a `maxFee` below the fee in
 ///      force (must fail) or above it (pays only the fee).
 contract Handler is Test {
-    OnDealIntents public immutable SWAP;
+    DeClubIntents public immutable SWAP;
     MockChog public immutable CHOG;
     MockERC20 public immutable USDC;
     MockERC20 public immutable WETH;
@@ -43,7 +43,7 @@ contract Handler is Test {
     bool public settledAfterDeadline;
 
     constructor(
-        OnDealIntents swap_,
+        DeClubIntents swap_,
         MockChog chog_,
         MockERC20 usdc_,
         MockERC20 weth_,
@@ -80,7 +80,7 @@ contract Handler is Test {
         uint256 pay = extra % 8 == 0 ? ask - 1 : ask + bound(extra, 0, 100 ether);
         uint64 deadline = uint64(block.timestamp + bound(seed >> 128, 1, 2 days));
 
-        IOnDealIntents.Intent[] memory cycle = new IOnDealIntents.Intent[](2);
+        IDeClubIntents.Intent[] memory cycle = new IDeClubIntents.Intent[](2);
         cycle[0] = _intent(i, _one(_nft(id)), _one(_erc20(address(USDC), ask)), seed, deadline);
         cycle[1] =
             _intent(j, _one(_erc20(address(USDC), pay)), _one(_nft(id)), seed >> 64, deadline);
@@ -108,7 +108,7 @@ contract Handler is Test {
         uint256 nonce = amountSeed >> 200;
         uint64 deadline = uint64(block.timestamp + 1 days);
 
-        IOnDealIntents.Intent[] memory cycle = new IOnDealIntents.Intent[](3);
+        IDeClubIntents.Intent[] memory cycle = new IDeClubIntents.Intent[](3);
         cycle[0] = _intent(i, _one(_nft(id)), _one(_erc20(address(USDC), amountU)), nonce, deadline);
         cycle[1] = _intent(j, _one(_erc20(address(WETH), amountW)), _one(_nft(id)), nonce, deadline);
         cycle[2] = _intent(
@@ -181,7 +181,7 @@ contract Handler is Test {
         return (0, false);
     }
 
-    function _trySettle(IOnDealIntents.Intent[] memory cycle, uint256[] memory who) internal {
+    function _trySettle(IDeClubIntents.Intent[] memory cycle, uint256[] memory who) internal {
         ++attempts;
         bytes[] memory sigs = new bytes[](cycle.length);
         for (uint256 n; n < cycle.length; ++n) {
@@ -206,12 +206,12 @@ contract Handler is Test {
 
     function _intent(
         uint256 who,
-        IOnDealIntents.Asset[] memory give,
-        IOnDealIntents.Asset[] memory want,
+        IDeClubIntents.Asset[] memory give,
+        IDeClubIntents.Asset[] memory want,
         uint256 nonce,
         uint64 deadline
-    ) internal view returns (IOnDealIntents.Intent memory) {
-        return IOnDealIntents.Intent(
+    ) internal view returns (IDeClubIntents.Intent memory) {
+        return IDeClubIntents.Intent(
             actors[who],
             give,
             want,
@@ -229,7 +229,7 @@ contract Handler is Test {
         return fee;
     }
 
-    function _sign(uint256 key, IOnDealIntents.Intent memory it)
+    function _sign(uint256 key, IDeClubIntents.Intent memory it)
         internal
         view
         returns (bytes memory)
@@ -238,24 +238,24 @@ contract Handler is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function _nft(uint256 id) internal view returns (IOnDealIntents.Asset memory) {
-        return IOnDealIntents.Asset(IOnDealIntents.AssetType.ERC721, address(CHOG), id, 1);
+    function _nft(uint256 id) internal view returns (IDeClubIntents.Asset memory) {
+        return IDeClubIntents.Asset(IDeClubIntents.AssetType.ERC721, address(CHOG), id, 1);
     }
 
     function _erc20(address token, uint256 amount)
         internal
         pure
-        returns (IOnDealIntents.Asset memory)
+        returns (IDeClubIntents.Asset memory)
     {
-        return IOnDealIntents.Asset(IOnDealIntents.AssetType.ERC20, token, 0, amount);
+        return IDeClubIntents.Asset(IDeClubIntents.AssetType.ERC20, token, 0, amount);
     }
 
-    function _one(IOnDealIntents.Asset memory a)
+    function _one(IDeClubIntents.Asset memory a)
         internal
         pure
-        returns (IOnDealIntents.Asset[] memory r)
+        returns (IDeClubIntents.Asset[] memory r)
     {
-        r = new IOnDealIntents.Asset[](1);
+        r = new IDeClubIntents.Asset[](1);
         r[0] = a;
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title On Deal fee admin: the one thing about a deployed contract that can change
+/// @title DeClub fee admin: the one thing about a deployed contract that can change
 /// @notice The protocol fee amount. A fee admin can lower it at once or queue a raise that waits
 ///         `FEE_RAISE_DELAY`, never above `MAX_FEE`, and can hand the role on or renounce it. The
 ///         recipient, the ceiling and (for intents) the fee token are fixed at deploy, and the

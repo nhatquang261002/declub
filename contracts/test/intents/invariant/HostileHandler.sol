@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {OnDealIntents} from "../../../src/OnDealIntents.sol";
-import {IOnDealIntents} from "../../../src/interfaces/IOnDealIntents.sol";
+import {DeClubIntents} from "../../../src/DeClubIntents.sol";
+import {IDeClubIntents} from "../../../src/interfaces/IDeClubIntents.sol";
 import {MockERC20} from "../../../src/mocks/MockERC20.sol";
 import {LyingNft, SoftNft} from "../../utils/WeirdTokens.sol";
 
@@ -20,7 +20,7 @@ contract HostileHandler is Test {
     uint256 public constant LIAR_BASE = 1000;
     uint256 public constant START_USDC = 1_000_000 ether;
 
-    OnDealIntents public immutable SWAP;
+    DeClubIntents public immutable SWAP;
     SoftNft public immutable SOFT;
     LyingNft public immutable LIAR;
     MockERC20 public immutable USDC;
@@ -35,7 +35,7 @@ contract HostileHandler is Test {
 
     mapping(bytes32 => uint256) public calls;
 
-    constructor(OnDealIntents swap_, SoftNft soft_, LyingNft liar_, MockERC20 usdc_) {
+    constructor(DeClubIntents swap_, SoftNft soft_, LyingNft liar_, MockERC20 usdc_) {
         SWAP = swap_;
         SOFT = soft_;
         LIAR = liar_;
@@ -66,11 +66,11 @@ contract HostileHandler is Test {
     function settlePair(uint256 iSeed, uint256 jSeed, uint256 kind, uint256 seed) external {
         uint256 i = iSeed % 4;
         uint256 j = (i + 1 + jSeed % 3) % 4;
-        (IOnDealIntents.Asset memory x, bool hostile, bool found) = _give(i, j, kind, seed);
+        (IDeClubIntents.Asset memory x, bool hostile, bool found) = _give(i, j, kind, seed);
         if (!found) return;
-        IOnDealIntents.Asset memory cash = _usdc(bound(seed >> 128, 1, 1_000 ether));
+        IDeClubIntents.Asset memory cash = _usdc(bound(seed >> 128, 1, 1_000 ether));
 
-        IOnDealIntents.Intent[] memory cycle = new IOnDealIntents.Intent[](2);
+        IDeClubIntents.Intent[] memory cycle = new IDeClubIntents.Intent[](2);
         cycle[0] = _intent(i, x, cash);
         cycle[1] = _intent(j, cash, x);
         _try(cycle, _who(i, j, 4), hostile, "pair");
@@ -82,15 +82,15 @@ contract HostileHandler is Test {
         uint256 j = (i + 1 + step % 3) % 4;
         uint256 k = (i + 1 + (step >> 8) % 3) % 4;
         if (j == k) return;
-        (IOnDealIntents.Asset memory x, bool hostileX, bool okX) = _give(i, j, kinds, seed);
-        (IOnDealIntents.Asset memory y, bool hostileY, bool okY) =
+        (IDeClubIntents.Asset memory x, bool hostileX, bool okX) = _give(i, j, kinds, seed);
+        (IDeClubIntents.Asset memory y, bool hostileY, bool okY) =
             _give(k, i, kinds >> 8, seed >> 64);
         if (!okX || !okY) return;
         // Two gives of one id can't both be honest; skip the overlap rather than model it.
         if (x.token == y.token && x.id == y.id && x.assetType == y.assetType) return;
-        IOnDealIntents.Asset memory cash = _usdc(bound(seed >> 128, 1, 1_000 ether));
+        IDeClubIntents.Asset memory cash = _usdc(bound(seed >> 128, 1, 1_000 ether));
 
-        IOnDealIntents.Intent[] memory cycle = new IOnDealIntents.Intent[](3);
+        IDeClubIntents.Intent[] memory cycle = new IDeClubIntents.Intent[](3);
         cycle[0] = _intent(i, x, y);
         cycle[1] = _intent(j, cash, x);
         cycle[2] = _intent(k, y, cash);
@@ -122,7 +122,7 @@ contract HostileHandler is Test {
     function _give(uint256 from, uint256 to, uint256 kind, uint256 seed)
         internal
         view
-        returns (IOnDealIntents.Asset memory a, bool hostile, bool found)
+        returns (IDeClubIntents.Asset memory a, bool hostile, bool found)
     {
         kind %= 9;
         if (kind <= 5) {
@@ -135,11 +135,11 @@ contract HostileHandler is Test {
         if (kind == 6) return (_nft(address(LIAR), LIAR_BASE + from), true, true);
         if (kind == 7) return (_nft(address(USDC), seed % 100), true, true);
         return
-            (IOnDealIntents.Asset(IOnDealIntents.AssetType.ERC20, address(SOFT), 0, 1), true, true);
+            (IDeClubIntents.Asset(IDeClubIntents.AssetType.ERC20, address(SOFT), 0, 1), true, true);
     }
 
     function _try(
-        IOnDealIntents.Intent[] memory cycle,
+        IDeClubIntents.Intent[] memory cycle,
         uint256[3] memory who,
         bool hostile,
         bytes32 label
@@ -157,9 +157,9 @@ contract HostileHandler is Test {
             calls[label]++;
             if (hostile) ghost_hostileSettled++;
             for (uint256 m; m < n; ++m) {
-                IOnDealIntents.Intent memory it = cycle[m];
+                IDeClubIntents.Intent memory it = cycle[m];
                 address to = cycle[(m + 1) % n].maker;
-                IOnDealIntents.Intent memory prev = cycle[(m + n - 1) % n];
+                IDeClubIntents.Intent memory prev = cycle[(m + n - 1) % n];
                 // Every give is one asset: an NFT lands with the next maker, and USDC nets out.
                 if (it.give[0].token == address(SOFT) && SOFT.ownerOf(it.give[0].id) != to) {
                     ghost_badSettlement++;
@@ -178,14 +178,14 @@ contract HostileHandler is Test {
 
     function _intent(
         uint256 who,
-        IOnDealIntents.Asset memory give,
-        IOnDealIntents.Asset memory want
-    ) internal returns (IOnDealIntents.Intent memory) {
-        IOnDealIntents.Asset[] memory g = new IOnDealIntents.Asset[](1);
-        IOnDealIntents.Asset[] memory w = new IOnDealIntents.Asset[](1);
+        IDeClubIntents.Asset memory give,
+        IDeClubIntents.Asset memory want
+    ) internal returns (IDeClubIntents.Intent memory) {
+        IDeClubIntents.Asset[] memory g = new IDeClubIntents.Asset[](1);
+        IDeClubIntents.Asset[] memory w = new IDeClubIntents.Asset[](1);
         (g[0], w[0]) = (give, want);
         // A fresh nonce every time: nonce reuse is the other suite's job.
-        return IOnDealIntents.Intent(
+        return IDeClubIntents.Intent(
             actors[who], g, w, SWAP.FEE_TOKEN(), 0, uint64(block.timestamp + 1 days), ++_nonce
         );
     }
@@ -211,11 +211,11 @@ contract HostileHandler is Test {
         return (0, false);
     }
 
-    function _nft(address token, uint256 id) internal pure returns (IOnDealIntents.Asset memory) {
-        return IOnDealIntents.Asset(IOnDealIntents.AssetType.ERC721, token, id, 1);
+    function _nft(address token, uint256 id) internal pure returns (IDeClubIntents.Asset memory) {
+        return IDeClubIntents.Asset(IDeClubIntents.AssetType.ERC721, token, id, 1);
     }
 
-    function _usdc(uint256 amount) internal view returns (IOnDealIntents.Asset memory) {
-        return IOnDealIntents.Asset(IOnDealIntents.AssetType.ERC20, address(USDC), 0, amount);
+    function _usdc(uint256 amount) internal view returns (IDeClubIntents.Asset memory) {
+        return IDeClubIntents.Asset(IDeClubIntents.AssetType.ERC20, address(USDC), 0, amount);
     }
 }
