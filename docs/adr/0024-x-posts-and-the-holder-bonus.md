@@ -31,7 +31,7 @@ Constraints:
   - 50 points earn the whole bonus. Without reach, a week of daily X shares gives at most 21, so posting alone reaches about +21% and trading makes up the rest.
 - **Two modes, chosen by `X_BEARER_TOKEN` where the epoch is built:**
   - *Counting only* (no token, the default): every counted X share adds the same. Nothing is read again at the epoch, so a post deleted on X after it was shared still counts; hiding or deleting the Board post still stops it. Quotes and replies of the project account, and Club links behind X's shortened `t.co` links, aren't seen (a plain @-mention is).
-  - *With reach* (token set): before the epoch is built (`lib/server/xReach.ts`, run by `npm run rewards:epoch`), every X share is read from the X API. Engagement is likes + reposts + quotes + replies (impressions are too easy to inflate). Each share is checked again: the author by X's numeric id, which a rename can't fake, and the signals with full links and quoted authors. A deleted post, or one edited so it's no longer about the Club, counts nothing. The read is saved and published with the epoch.
+  - *With reach* (token set; in development, not turned on for a while): before the epoch is built (`lib/server/xReach.ts`, run by `npm run rewards:epoch`), every X share is read from the X API. Engagement is likes + reposts + quotes + replies (impressions are too easy to inflate). Each share is checked again: the author by X's numeric id, which a rename can't fake, and the signals with full links and quoted authors. A deleted post, or one edited so it's no longer about the Club, counts nothing. The read is saved and published with the epoch.
 
 ## What it does not do
 

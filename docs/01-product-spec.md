@@ -142,7 +142,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 2. Alice posts on the Board: *"WTB any Chog with a crown"*. Her wallet signs it; the post shows **Signed**. Bob **follows** her and switches the Board's lens to **Following**.
 3. Carol links the project's X account under **Manage → The Club on X** with a proof post: the Club page shows "@ChogNFT ✓". Alice posts on X about the Club, mentioning it, and shares the link in a note: the card says **Counts**, and her Momentum rises.
 4. Bob and Dave swap Chogs in the Club's Market. Each side pays the fee; the Club's Momentum goes up.
-5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 40% to Holders (Alice, with her "+N% active" bonus for her X post; with `X_BEARER_TOKEN` set, its likes and reposts add to it), 20% to the Club fund (Carol). The operator funds it on chain.
+5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 40% to Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is in development), 20% to the Club fund (Carol). The operator funds it on chain.
 6. Alice opens the **Rewards** tab and claims her MON. Carol sees "the Club fund is ready" and collects it.
 7. Open `/api/clubs/<Chog>/feed` and `/api/rewards/epochs/<n>`: every post and every payout is public and verifiable.
 

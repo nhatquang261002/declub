@@ -244,10 +244,13 @@ export default function ClubsGuidePage() {
                 day counts per Club, and each X post counts once.
               </li>
               <li>
-                <b className="text-[#111318]">Engagement, where the app reads it:</b> when the app is connected to the X API, each post is read again
-                before an epoch is paid. Likes, reposts, quotes and replies then add up to {REWARDS.reachCapPerEpoch} more points (capped, so one viral
-                post can&apos;t take everything), and a post that was deleted, or edited so it&apos;s no longer about the Club, counts for nothing.
-                Without it, every counted post adds the same.
+                <b className="text-[#111318]">Engagement:</b>{" "}
+                <span className="mr-1 inline-block rounded-full border-2 border-[#111318] bg-peach px-2 text-[11px] font-black uppercase tracking-wide text-[#111318]">
+                  In development
+                </span>
+                for now, every counted post adds the same, however it does on X. Later, likes, reposts, quotes and replies will add up to{" "}
+                {REWARDS.reachCapPerEpoch} more points (capped, so one viral post can&apos;t take everything), and a post that was deleted, or edited
+                so it&apos;s no longer about the Club, will count for nothing. This isn&apos;t coming soon.
               </li>
             </ul>
           </div>

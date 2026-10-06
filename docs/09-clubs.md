@@ -204,7 +204,7 @@ This is the first user-written content in the app. Every post is signed by its a
 
   With the X API configured, the account's numeric id is saved too, so a rename doesn't break it. `DELETE .../x {handle}` unlinks. The Club page shows linked accounts as "@handle ✓". Refusals: `bad_handle`, `already_linked`, `too_many_accounts`, `xlink_expired`, `xlink_mismatch`, `xlink_unavailable`.
 - **Counting only, by default.** With no `X_BEARER_TOKEN`, every counted X share adds the same points, and nothing is read again at the epoch: a post deleted on X after sharing still counts (hiding or deleting the Board post stops it). Quotes and replies of the project account and `t.co`-shortened Club links aren't detected; plain @-mentions, the address in the text and tags are.
-- **Reach, with the X API:** with `X_BEARER_TOKEN` set, `npm run rewards:epoch` reads every X share of the epoch before building it (`GET /2/tweets`, 100 per call). It checks each share again:
+- **Reach, with the X API (in development, not turned on for a while):** the code is built but no `X_BEARER_TOKEN` is set, so the app runs counting only. With the token set, `npm run rewards:epoch` reads every X share of the epoch before building it (`GET /2/tweets`, 100 per call). It checks each share again:
   - the author by X's numeric id (Privy's `subject`);
   - the signals, with the full links and the authors of quoted and replied-to posts, so a post can turn strong, or drop out if edited or deleted.
 
@@ -225,7 +225,7 @@ This is the first user-written content in the app. Every post is signed by its a
 - **The activity bonus** ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md)): a Holder's shares count up to 50% more (`REWARDS.maxBonusBps`) for their activity in the Club during the epoch, counted in full with no decay (`activityPoints`):
   - trading points as Momentum weighs them (10 a swap side, wash halved; 2 a new deal, 3 a day);
   - per X share, 3, halved for a weak one;
-  - with reach on, `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
+  - with reach on (in development, off for now), `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
 
   `bonus = 50% × min(1, points / 50)`. Without reach, X shares alone give at most 21 points a week (about +21%). Each holder payout in the record carries `shares`, `bonusBps` and `points`. Splitting holdings across accounts gains nothing but rounding.
 - **Carry:** a Club with no Holder members keeps its Holder pool, one with no Owner keeps its fund, and rounding dust stays too, all rolling into the next epoch (`declub:rewards:{chain}:carry:{club}`).

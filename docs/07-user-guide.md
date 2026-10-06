@@ -120,7 +120,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - you posted it on X in the last 48 hours;
 - it is about the Club: it links the Club or its token, mentions, quotes or replies to the project's X account (shown as "@handle ✓" on the Club page), or uses one of the Club's tags (a tag alone counts half). The composer lists them.
 
-One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. Where the app is connected to the X API (the Club's **Rewards** tab says so), likes, reposts, quotes and replies add to it, and an X post you delete counts for nothing when the week is paid.
+One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. For now every counted X post adds the same, however it does on X. Counting likes, reposts, quotes and replies (and dropping X posts you delete) is in development and not coming soon.
 
 **Your posts are signed.** When you press **Sign & post**, your Club wallet (the one the Members list shows for you) signs the post. It costs no gas and moves nothing. If another wallet is connected, the app asks you to switch first. Because each post is signed, it's your own record: anyone can check it, and each Club's posts are public with their signatures at `/api/clubs/<address>/feed`, yours across Clubs at `/api/wallets/<your wallet>/posts`.
 
@@ -135,7 +135,7 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
 - **40%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
-  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Where the app reads X engagement, well-received posts earn up to 30 more points a week. A Holder who does nothing still gets their base share.
+  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Every counted post earns the same; counting X engagement (well-received posts earning up to 30 more points a week) is in development and not coming soon. A Holder who does nothing still gets their base share.
 - **20%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.
 

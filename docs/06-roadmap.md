@@ -98,8 +98,8 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Rewards screens: the Club's Rewards tab, the Owner's Club-fund alert, Your Club rewards on Account, one claim for every open epoch
 - [x] Signed posts and follows ([ADR 0023](adr/0023-signed-posts-and-lenses.md)): EIP-712 under `("DeClub Social", "1")`, signed by the Club wallet, checked on the server (ERC-1271 too), exported per Club and per wallet; follows per wallet, newest wins
 - [x] Feed lenses: Newest, Most active (was Top traders), Holders, Following, as pure functions over public inputs
-- [x] X posts ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md)): a note shares an X post as a card (oEmbed); a Holder's own post about the Club counts in Momentum, by the Club's signals (its token or page, its project account linked by a proof post, its tags); the Holder bonus (up to +50% for activity in the epoch, with X reach read once per epoch from the X API)
-- [ ] Optional: get an X API bearer token (pay per use) so engagement counts and deleted X posts drop out, and set `X_BEARER_TOKEN` where `npm run rewards:epoch` runs. Without it, X posts count by number
+- [x] X posts ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md)): a note shares an X post as a card (oEmbed); a Holder's own post about the Club counts in Momentum, by the Club's signals (its token or page, its project account linked by a proof post, its tags); the Holder bonus (up to +50% for activity in the epoch; X reach, read once per epoch from the X API, is built but in development and off for now)
+- [ ] Deferred, not soon: get an X API bearer token (pay per use) so engagement counts and deleted X posts drop out, and set `X_BEARER_TOKEN` where `npm run rewards:epoch` runs. Without it, X posts count by number
 - [x] The app and docs lead with Clubs: home page, nav, Clubs and Deals guides, product spec and demo script, README
 - [x] e2e on anvil: a real swap's fee through the app's builder to claims on `DeClubRewards`, revoke, over-claim and sweep (RW-01 to RW-03)
 - [ ] Deploy `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` on testnet, verify them on Sourcify, and set the addresses in `.env` and the README
