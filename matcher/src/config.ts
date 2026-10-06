@@ -89,8 +89,8 @@ function addressList(name: string): Set<string> | null {
 }
 
 export function loadConfig(): Config {
-  const swap = need("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS");
-  if (!isAddress(swap)) throw new Error("NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is not an address");
+  const swap = need("NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS");
+  if (!isAddress(swap)) throw new Error("NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS is not an address");
   const key = need("MATCHER_PRIVATE_KEY");
   if (!isHex(key, { strict: true }) || key.length !== 66) {
     throw new Error("MATCHER_PRIVATE_KEY must be a 0x-prefixed 32-byte hex key");
@@ -100,10 +100,10 @@ export function loadConfig(): Config {
   return {
     chainId,
     rpcUrl: need("MATCHER_RPC_URL", "NEXT_PUBLIC_RPC_URL"),
-    // Monad testnet has Multicall3 at the canonical address; any other chain must opt in.
+    // Monad testnet and mainnet have Multicall3 at the canonical address; any other chain must opt in.
     multicall3: multicall
       ? (multicall as Address)
-      : chainId === 10143
+      : chainId === 10143 || chainId === 143
         ? CANONICAL_MULTICALL3
         : undefined,
     swap,

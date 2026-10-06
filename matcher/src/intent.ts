@@ -12,7 +12,7 @@ export const MAX_CYCLE = 4;
 export const MAX_ASSETS_PER_SIDE = 10;
 
 export const domain = (chainId: number, verifyingContract: Address) =>
-  ({ name: "OnDealIntents", version: "3", chainId, verifyingContract }) as const;
+  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
 
 export const types = {
   Asset: [

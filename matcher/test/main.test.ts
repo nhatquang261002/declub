@@ -35,7 +35,7 @@ describe("the matcher process", { skip }, () => {
         PATH: process.env.PATH,
         NEXT_PUBLIC_CHAIN_ID: String(CHAIN_ID),
         MATCHER_RPC_URL: w.rpcUrl,
-        NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS: w.swap,
+        NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS: w.swap,
         MATCHER_PRIVATE_KEY: toHex(
           mnemonicToAccount("test test test test test test test test test test test junk", { addressIndex: 9 })
             .getHdKey().privateKey!,
@@ -104,14 +104,14 @@ describe("the matcher process", { skip }, () => {
       encoding: "utf8",
     });
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS is required/);
+    assert.match(r.stderr, /NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS is required/);
   });
 
   it("rejects a malformed key", () => {
     const r = spawnSync("node", [MAIN], {
       env: {
         PATH: process.env.PATH,
-        NEXT_PUBLIC_ON_DEAL_INTENTS_ADDRESS: w.swap,
+        NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS: w.swap,
         MATCHER_RPC_URL: w.rpcUrl,
         MATCHER_PRIVATE_KEY: "0x1234",
         MATCHER_ENV_FILE: "/nonexistent/.env",

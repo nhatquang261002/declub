@@ -40,7 +40,7 @@ const artifact = (file: string, name: string) => {
 
 /** Why the end-to-end tests can't run here, or null when they can. */
 export function skipReason(): string | null {
-  if (!existsSync(`${OUT}/OnDealIntents.sol/OnDealIntents.json`)) {
+  if (!existsSync(`${OUT}/DeClubIntents.sol/DeClubIntents.json`)) {
     return "contracts/out is missing: run `forge build` in contracts/";
   }
   return hasAnvil() ? null : "anvil is not installed";
@@ -182,7 +182,7 @@ export async function startWorld(): Promise<World> {
   const wmon = await deploy("MockERC20.sol", "MockERC20", ["Wrapped MON", "WMON"]);
   const feeRecipient = makeActor(8, rpcUrl).address;
   const feeAdmin = makeActor(7, rpcUrl);
-  const swap = await deploy("OnDealIntents.sol", "OnDealIntents", [
+  const swap = await deploy("DeClubIntents.sol", "DeClubIntents", [
     wmon, FEE, MAX_FEE, feeRecipient, feeAdmin.address,
   ]);
   const chog = await deploy("MockChog.sol", "MockChog");
@@ -222,7 +222,7 @@ export async function startWorld(): Promise<World> {
       reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [who] }),
     ownerOf: (id) => reader.readContract({ address: chog, abi: chogAbi, functionName: "ownerOf", args: [id] }),
     async deployWallet(owner) {
-      return deploy("OnDealIntents.signatures.t.sol", "Mock1271Wallet", [owner]);
+      return deploy("DeClubIntents.signatures.t.sol", "Mock1271Wallet", [owner]);
     },
     intent(maker, give, want, extra = {}) {
       return {
