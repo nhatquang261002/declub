@@ -319,7 +319,8 @@ export async function readCapped(res: Response, max: number): Promise<string | n
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function readJson(uri: string, budget?: AbortSignal): Promise<unknown> {
+/** A `tokenURI`'s JSON: inline, or fetched from a public https host (see `safeUrl`). `null` when it can't be fetched. */
+export async function readJson(uri: string, budget?: AbortSignal): Promise<unknown> {
   const base64 = "data:application/json;base64,";
   const utf8 = "data:application/json;utf8,";
   if (uri.startsWith(base64)) return JSON.parse(Buffer.from(uri.slice(base64.length), "base64").toString("utf8"));

@@ -26,16 +26,20 @@ export type NftPickerProps = {
   taken: ReadonlySet<string>;
   onConfirm: (collection: Address, ids: bigint[]) => void;
   onClose: () => void;
+  /** The confirm button's text, where the NFTs aren't going into a deal. */
+  confirmLabel?: string;
 };
 
 const tokenKey = (collection: string, id: bigint) => `${collection.toLowerCase()}:${id}`;
+/** Whether no other NFT can be picked. Never with room for one: a new pick replaces the old. */
+const isFull = (selected: readonly bigint[], room: number) => room > 1 && selected.length >= room;
 
 /**
  * Pick NFTs without copying addresses and ids: search the collections people use (or paste a
  * contract address), then tick tokens from a grid. A wallet's own NFTs are listed when the
  * collection can enumerate them; otherwise the id is typed and checked against the chain.
  */
-export function NftPicker({ owner, collection: initial, room, taken, onConfirm, onClose }: NftPickerProps) {
+export function NftPicker({ owner, collection: initial, room, taken, onConfirm, onClose, confirmLabel }: NftPickerProps) {
   const [collection, setCollection] = useState<Address | null>(initial ?? null);
   const [selected, setSelected] = useState<bigint[]>([]);
   const panel = useRef<HTMLDivElement>(null);
@@ -52,8 +56,11 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
     };
   }, [onClose]);
 
+  // With room for one, picking another NFT swaps it in.
   const toggle = (id: bigint) =>
-    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : current.length < room ? [...current, id] : current));
+    setSelected((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : room === 1 ? [id] : current.length < room ? [...current, id] : current,
+    );
 
   return (
     <div
@@ -93,6 +100,7 @@ export function NftPicker({ owner, collection: initial, room, taken, onConfirm, 
               setSelected([]);
             }}
             onConfirm={() => onConfirm(collection, selected)}
+            confirmLabel={confirmLabel}
           />
         ) : (
           <CollectionStep owner={owner} onSelect={setCollection} />
@@ -205,6 +213,7 @@ function TokenStep({
   onToggle,
   onChangeCollection,
   onConfirm,
+  confirmLabel,
 }: {
   collection: Address;
   owner?: Address;
@@ -214,6 +223,7 @@ function TokenStep({
   onToggle: (id: bigint) => void;
   onChangeCollection: () => void;
   onConfirm: () => void;
+  confirmLabel?: string;
 }) {
   const { info } = useCollectionInfo(collection);
   const enumerable = !!info?.enumerable;
@@ -249,7 +259,7 @@ function TokenStep({
           {room < 10 && ` · room for ${room}`}
         </span>
         <button type="button" className="btn-primary" disabled={selected.length === 0} onClick={onConfirm}>
-          {selected.length <= 1 ? "Add NFT" : `Add ${selected.length} NFTs`}
+          {confirmLabel ?? (selected.length <= 1 ? "Add NFT" : `Add ${selected.length} NFTs`)}
         </button>
       </div>
     </div>
@@ -283,7 +293,7 @@ function OwnedGrid({ collection, owner, enumerable, taken, selected, onToggle, r
       </p>
       <TileGrid>
         {ids.slice(0, shown).map((id) => (
-          <Tile key={id.toString()} id={id} view={views.get(id.toString())} taken={taken.has(tokenKey(collection, id))} selected={selected.includes(id)} full={selected.length >= room} onClick={() => onToggle(id)} />
+          <Tile key={id.toString()} id={id} view={views.get(id.toString())} taken={taken.has(tokenKey(collection, id))} selected={selected.includes(id)} full={isFull(selected, room)} onClick={() => onToggle(id)} />
         ))}
       </TileGrid>
       {ids.length > shown && (
@@ -318,7 +328,7 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
             caption={views.get(id.toString())?.owner ? <>held by <CopyAddress address={views.get(id.toString())!.owner!} inLink /></> : undefined}
             taken={taken.has(tokenKey(collection, id))}
             selected={selected.includes(id)}
-            full={selected.length >= room}
+            full={isFull(selected, room)}
             onClick={() => onToggle(id)}
           />
         ))}
@@ -423,7 +433,7 @@ function ManualId({
             ? "Your wallet doesn't own this token."
             : already
               ? "Already added."
-              : selected.length >= room
+              : isFull(selected, room)
                 ? "No room for more on this side."
                 : null;
   const ok = id !== null && !check.isLoading && check.exists && mine && !problem;

@@ -91,6 +91,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 
 The **Account** page (signed in with Privy) lets you:
 
+- set **Your avatar**: pick an NFT one of your linked wallets holds (**Pick from my NFTs**) or upload a picture. It shows on your wallet everywhere, on every wallet linked to your sign-in, and an NFT avatar disappears while your wallets no longer hold it;
 - link or unlink email, Google, X and Discord;
 - link several wallets and choose the one you trade with (**Use this wallet**);
 - turn on **Show my profile to other traders**, which shows your X or Discord handle beside your wallet on your deals and lets people find you by handle;

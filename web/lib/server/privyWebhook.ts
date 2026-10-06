@@ -1,4 +1,5 @@
 import { linkedEthereumWallets } from "../profiles";
+import { syncAvatar } from "./avatars";
 import { syncMemberships } from "./members";
 import { syncProfile } from "./profileSync";
 import type { Store } from "./store";
@@ -50,6 +51,8 @@ export async function handlePrivyEvent(event: unknown, store: Store, load: LoadA
     await syncProfile(store, userId, accounts ?? [], true);
     // Club members' wallets follow the account too (ADR 0016): an unlinked wallet stops counting.
     await syncMemberships(store, userId, linkedEthereumWallets(accounts ?? []));
+    // So does the avatar (ADR 0028): it leaves an unlinked wallet, and an NFT one leaves with its holder.
+    await syncAvatar(store, userId, linkedEthereumWallets(accounts ?? []));
   }
   return users;
 }

@@ -714,6 +714,16 @@ body {
   font-weight: 800;
 }
 
+/* The owner's chosen picture, over the address colours (ADR 0028). */
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 /* Online dot on the corner of an avatar: the wallet is connected. */
 .avatar-dot {
   position: absolute;

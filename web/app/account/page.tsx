@@ -12,6 +12,7 @@ import { PRIVY_APP_ID } from "@/lib/config";
 import { PROFILE_LABEL, type Profile } from "@/lib/profiles";
 import { CopyAddress } from "@/components/CopyAddress";
 import { RewardsClaim } from "@/components/RewardsClaim";
+import { AvatarSection } from "./AvatarSection";
 
 export default function AccountPage() {
   return (
@@ -82,6 +83,8 @@ function Account() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AvatarSection />
+
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Your Club rewards</h2>
         <p className="mt-1 mb-4 text-sm text-muted">
