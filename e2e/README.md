@@ -44,7 +44,7 @@ Needs Node 24+, and `anvil` for the local run.
 | IN-06 | Refused: expired, `maxFee` below the fee, wrong fee token, bad signature, want not met, same maker twice, cycle of one |
 | IN-07 | ERC-1271 contract wallet as a maker (and its refusal) |
 | IN-08 | Matcher over HTTP: post a pair, it settles, `/settlements`; cancel by signature, signature withheld after |
-| RW-01 | A real swap's fee goes through the app's activity log and epoch builder: 40% to Holders by holdings, 20% to the Owner (local only) |
+| RW-01 | A real swap's fee goes through the app's activity log and epoch builder: 50% to Holders by holdings, 25% to the Owner (local only) |
 | RW-02 | The relayer publishes the epoch on `DeClubRewards`; claims wait for the delay, pay each leaf once, and anyone can send them (local only) |
 | RW-03 | A wrong root is revoked before claims open; an underfunded one can't overpay; the rest is swept after the window (local only) |
 | FA-01 | Only the admin sets the fee, never above the ceiling; both contracts charge the same |

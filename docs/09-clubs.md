@@ -216,9 +216,9 @@ This is the first user-written content in the app. Every post is signed by its a
 
 | Share of a Club's swap fees | Goes to |
 |---|---|
-| 40% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT of the collection, summed over a member's linked wallets, read when the epoch is built. A Club's memecoin earns the Holder badge, not shares ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Joined members only, paid at their Club wallet. |
-| 20% | The Club fund, paid to the Owner's Club wallet. |
-| 40% | Stays with the protocol. |
+| 50% | The Club's Holders, by shares × (1 + activity bonus): one share per NFT of the collection, summed over a member's linked wallets, read when the epoch is built. A Club's memecoin earns the Holder badge, not shares ([ADR 0025](adr/0025-clubs-are-for-nft-collections.md)). Joined members only, paid at their Club wallet. |
+| 25% | The Club fund, paid to the Owner's Club wallet. |
+| 25% | Stays with the protocol. |
 
 - **Epochs:** a week by default (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS`), numbered from `NEXT_PUBLIC_REWARDS_GENESIS` (default 2026-10-05 00:00 UTC). An epoch is built after it ends, in order (`out_of_order` otherwise), once (`exists` after), under a lock.
 - **Fees:** each completed swap's `fee` (both sides together): from the escrow fill's `FeeCharged` in the activity log, or the settlement's `FeeCharged` for a signed swap. A swap in k Clubs gives each 1/k.
@@ -234,7 +234,7 @@ This is the first user-written content in the app. Every post is signed by its a
 - **Claiming:** the screens read each leaf's epoch and `isClaimed` on chain and show it as on its way (not published or not open yet), ready, claimed or expired; **Claim** sends `claimMany` for every ready leaf. Anyone may claim for an account; the MON goes to the account.
 - **Reads:** `GET /api/rewards/epochs/[n]` (the whole epoch, cacheable for ever), `GET /api/rewards/me?account=` (an account's leaves with proofs), `GET /api/clubs/[token]/rewards` (the Club's line in the latest epochs, its carry and top earners).
 
-What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, and at most 60% comes back, shared with every Holder.
+What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, and at most 75% comes back, shared with every Holder.
 
 ## Data (Upstash)
 

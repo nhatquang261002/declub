@@ -80,7 +80,7 @@ async function sameLeavesFor(w: World, record: EpochRecord, epoch: number): Prom
 export const rewardCases: Case<World>[] = [
   {
     id: "RW-01",
-    title: "A real swap's fee goes through the app's epoch builder: 40% to Holders by holdings and activity, 20% to the Owner",
+    title: "A real swap's fee goes through the app's epoch builder: 50% to Holders by holdings and activity, 25% to the Owner",
     skip: localOnly,
     async run(w, note) {
       const app = await web();

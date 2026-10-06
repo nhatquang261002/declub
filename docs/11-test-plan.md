@@ -179,7 +179,7 @@ What each ID checks, so the cross-references below make sense:
 | IN-06 | Rejections: expired, `maxFee` below the fee, wrong fee token, bad signature, want not met, the same maker twice, a cycle of one |
 | IN-07 | ERC-1271 contract-wallet maker |
 | IN-08 | Matcher round trip over HTTP: post, settle, `/settlements`, cancel by signature |
-| RW-01 | A real swap's fee through the app's activity log and epoch builder: 40% to Holders by holdings, 20% to the Owner (local) |
+| RW-01 | A real swap's fee through the app's activity log and epoch builder: 50% to Holders by holdings, 25% to the Owner (local) |
 | RW-02 | Publish on `DeClubRewards`; claims wait for the delay, pay each leaf once, anyone can send them (local) |
 | RW-03 | Revoke before claims open, an underfunded root refused past its funding, sweep after the window (local) |
 | FA-01 | Non-admin or above-ceiling `setFee` rejected |
@@ -389,7 +389,7 @@ This is the live checklist in [10 · Privy](10-privy.md#what-remains-to-validate
 
 | ID | P | Case | Preconditions | Steps | Expected | Automated |
 |---|---|---|---|---|---|---|
-| M-RWD-01 | P0 | An epoch pays Holders and the Owner | A and B are members holding MockChogs (A more than B); C is the Club's Owner; short epochs (2.2) | 1. B fills a deal from D in MockChog. 2. After the epoch closes, `npm run rewards:epoch -- --publish`. 3. A, B and C open the Club's **Rewards** tab. | The script prints the Club's fees, 40% to Holders split by NFTs held, 20% to the fund. A and B see their shares **Ready to claim**; C sees the Club-fund alert on the Club page. | RW-01, RW-02 (local) |
+| M-RWD-01 | P0 | An epoch pays Holders and the Owner | A and B are members holding MockChogs (A more than B); C is the Club's Owner; short epochs (2.2) | 1. B fills a deal from D in MockChog. 2. After the epoch closes, `npm run rewards:epoch -- --publish`. 3. A, B and C open the Club's **Rewards** tab. | The script prints the Club's fees, 50% to Holders split by NFTs held, 25% to the fund. A and B see their shares **Ready to claim**; C sees the Club-fund alert on the Club page. | RW-01, RW-02 (local) |
 | M-RWD-02 | P0 | Claim | M-RWD-01 | A presses **Claim** on the Rewards tab; C presses it on **Account**. | The MON arrives; the share moves to Claimed; a second claim isn't offered. | RW-02 (local) |
 | M-RWD-03 | P1 | What can't be paid rolls over | A Club with a swap and no Holder members, or no Owner | Build the next epoch. | The Club's line shows the pools rolling over; they are paid in the epoch after a Holder joins or an Owner claims. | `web/test/rewards.test.ts` |
 | M-RWD-04 | P1 | Signed posts | A is a member with a shared profile, two wallets linked; the Club wallet is the first | 1. Connect the second wallet, post. 2. Switch to the Club wallet, **Sign & post**. 3. Open `/api/clubs/<MockChog>/feed`. | 1 is refused before the wallet opens ("Switch to your Club wallet"). 2 shows **Signed**. 3 has the post with its signature, which verifies against the domain in the answer. | `web/test/social.test.ts` |

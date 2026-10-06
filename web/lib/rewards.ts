@@ -11,11 +11,11 @@ import { strengthFactor, type SignalStrength } from "./xPosts";
  */
 export const REWARDS = {
   /** Of the fees a Club's swaps paid, in basis points: to its Holders, by holdings. */
-  holderBps: 4_000,
+  holderBps: 5_000,
   /** To the Club fund, which the Club's Owner claims. */
-  fundBps: 2_000,
+  fundBps: 2_500,
   /** What the protocol keeps. The three add up to 10,000. */
-  protocolBps: 4_000,
+  protocolBps: 2_500,
   /**
    * The Holder bonus (ADR 0024): a Holder's shares count up to this much more (basis points) for
    * their activity in the Club during the epoch. Holding stays the base: a quiet Holder keeps theirs.

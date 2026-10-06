@@ -10,10 +10,10 @@ DeClub (written De(al) Club) turns the people around an asset into the owners of
 |---|---|
 | **Gather** | A Club for each verified NFT collection (its memecoin joins it): its Market, a Board, Members ranked by Momentum, Holder badges, an Owner and Moderators ([09 · Clubs](docs/09-clubs.md)). |
 | **Trade** | Members swap inside the Club, through escrow or by signing, with no trust between them. Every completed swap pays a small flat fee per side. |
-| **Own the market** | Each week, 40% of the fees a Club's swaps paid goes to its Holders, by holdings, and 20% to its Club fund, which the Owner collects, claimed on chain from `DeClubRewards` ([ADR 0022](docs/adr/0022-club-rewards.md)). |
+| **Own the market** | Each week, 50% of the fees a Club's swaps paid goes to its Holders, by holdings, and 25% to its Club fund, which the Owner collects, claimed on chain from `DeClubRewards` ([ADR 0022](docs/adr/0022-club-rewards.md)). |
 | **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered ([ADR 0023](docs/adr/0023-signed-posts-and-lenses.md)). |
 
-Faking volume to farm rewards loses money: each side of a swap pays the whole fee, and at most 60% of it comes back, shared with every Holder.
+Faking volume to farm rewards loses money: each side of a swap pays the whole fee, and at most 75% of it comes back, shared with every Holder.
 
 Underneath is the trading engine. Two people swap any ERC-721, ERC-20 and MON, in any mix, through an on-chain escrow (`DeClubEscrow`) that settles atomically:
 

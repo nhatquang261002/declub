@@ -16,7 +16,7 @@ Constraints:
 
 **Each epoch, the server splits each Club's share of the fees between its Holders and its Owner, publishes a Merkle root, and the operator funds it on `DeClubRewards`, where members claim.**
 
-- **The split, per Club:** of the fees its completed swaps paid in the epoch, **40%** to its Holders, **20%** to the Club fund, **40%** stays with the protocol (`REWARDS` in `web/lib/rewards.ts`). A swap naming two Clubs' assets splits its fee evenly between them.
+- **The split, per Club:** of the fees its completed swaps paid in the epoch, **50%** to its Holders, **25%** to the Club fund, **25%** stays with the protocol (`REWARDS` in `web/lib/rewards.ts`; 40% / 20% / 40% until 2026-10-06). A swap naming two Clubs' assets splits its fee evenly between them.
 - **Holders are paid by holdings,** read fresh when the epoch is built: one share per NFT of the collection, and one per `minHolding` (or whole token) of the memecoin, summed over the member's linked wallets. Only joined members are paid; a member is paid at their Club wallet. Splitting one's NFTs across accounts earns nothing extra.
 - **The Club fund goes to the Owner** (ADR 0016's claimed or assigned Owner), at their Club wallet.
 - **What can't be paid rolls over:** a Club with no Holder members, a Club with no Owner, and rounding dust carry into its next epoch.
@@ -36,7 +36,7 @@ Constraints:
 
 ## Consequences
 
-- **Faking volume loses money.** Each side of a swap pays the whole fee; at most 60% of it comes back, shared with every other Holder of the Club.
+- **Faking volume loses money.** Each side of a swap pays the whole fee; at most 75% of it comes back, shared with every other Holder of the Club.
 - **A new trusted role,** the rewards operator, separate from the fee admin. On mainnet it is a Safe (`DeployRewards.s.sol` refuses an EOA there).
 - **The operator has a weekly job:** run `npm run rewards:epoch -- --publish` (or build, then publish from the Safe). An epoch that is built but never published rolls nothing over and pays nothing until it is.
 - **The activity log carries fees now** (`ActivityEvent.fee`), and the store holds epochs, per-account indexes and per-Club carry.

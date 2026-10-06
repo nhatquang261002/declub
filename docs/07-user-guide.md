@@ -78,7 +78,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 - **Locked deals** take it in MON with your side, hold it, and refund it if the deal doesn't complete. A deal keeps the fee it was listed with, for both sides.
 - **Signed swaps** take it in WMON from your wallet when the swap settles. You sign the most you'll pay; if the fee is cut before then, you pay less.
 - The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. It can never go above a ceiling set when the contract was deployed ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)).
-- **Where it goes:** each week, 40% of the fees a Club's swaps paid goes back to that Club's Holders and 20% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
+- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
 - You also pay Monad's network gas.
 
 ## Finding deals and keeping track
@@ -134,9 +134,9 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
-- **40%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
+- **50%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
   - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Every counted post earns the same; counting X engagement (well-received posts earning up to 30 more points a week) is in development and not coming soon. A Holder who does nothing still gets their base share.
-- **20%** goes to the **Club fund**, which the Club's Owner collects.
+- **25%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.
 
 A swap that names two Clubs' assets splits its fee between them. If a Club has no Holder members yet, or no Owner, that part waits and is added to the next week's.
