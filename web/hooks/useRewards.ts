@@ -37,8 +37,9 @@ export function useClubRewards(token: string) {
 }
 
 /** The running epoch as if it closed now (ADR 0032), with `wallet`'s own place. */
-export function useClubStandings(token: string, wallet: string | undefined) {
+export function useClubStandings(token: string, wallet: string | undefined, enabled = true) {
   const query = useQuery({
+    enabled: enabled && !!token,
     queryKey: ["club-standings", token.toLowerCase(), wallet?.toLowerCase() ?? ""],
     queryFn: () => getJson<{ enabled: boolean; standings: StandingsView | null }>(`/api/clubs/${token}/rewards/standings${wallet ? `?wallet=${wallet}` : ""}`),
     refetchInterval: 60_000,

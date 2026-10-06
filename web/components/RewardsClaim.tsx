@@ -2,7 +2,7 @@
 
 import type { Address } from "viem";
 import { TxButton, TxStatus } from "@/components/Tx";
-import { useMyRewards } from "@/hooks/useRewards";
+import { useClubStandings, useMyRewards } from "@/hooks/useRewards";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { clubRewards } from "@/lib/contracts";
 import { formatMon } from "@/lib/format";
@@ -15,6 +15,7 @@ import { formatMon } from "@/lib/format";
 export function RewardsClaim({ account, club }: { account: Address | undefined; club?: string }) {
   const mine = useMyRewards(account);
   const tx = useTxFlow();
+  const live = useClubStandings(club ?? "", account, !!club && !!account);
 
   if (!account) return <p className="text-sm text-muted">Join a Club with a wallet linked to see what it earns you.</p>;
   if (mine.isLoading) return <p className="text-sm text-muted">Checking your rewards…</p>;
@@ -24,6 +25,9 @@ export function RewardsClaim({ account, club }: { account: Address | undefined; 
   const here = club
     ? mine.leaves.reduce((sum, leaf) => sum + leaf.breakdown.filter((b) => b.club === club.toLowerCase()).reduce((s, b) => s + BigInt(b.amount), 0n), 0n)
     : null;
+  // The running epoch isn't a leaf yet, so add what the live standings say it would pay if it closed now.
+  const me = live.standings?.me;
+  const running = me && "estimate" in me && me.estimate ? BigInt(me.estimate) : 0n;
   const claim = () =>
     tx.run({
       ...clubRewards!,
@@ -40,7 +44,8 @@ export function RewardsClaim({ account, club }: { account: Address | undefined; 
         </div>
         <div>
           <dt className="kicker">On its way</dt>
-          <dd className="mt-1 text-lg font-black tabular-nums">{formatMon(mine.totals.waiting)}</dd>
+          <dd className="mt-1 text-lg font-black tabular-nums">{formatMon(mine.totals.waiting + running)}</dd>
+          {running > 0n && <p className="mt-0.5 text-xs text-muted">{formatMon(running)} is this epoch’s estimate</p>}
         </div>
         <div>
           <dt className="kicker">{here === null ? "Claimed" : "Earned here"}</dt>
@@ -52,8 +57,8 @@ export function RewardsClaim({ account, club }: { account: Address | undefined; 
           <TxButton state={tx.state} disabled={mine.claimable.length === 0} onClick={claim}>
             {mine.claimable.length > 1 ? `Claim ${mine.claimable.length} epochs` : "Claim"}
           </TxButton>
-          {mine.claimable.length === 0 && mine.totals.waiting > 0n && (
-            <p className="text-xs text-muted">Rewards open once the epoch is published and its review day has passed.</p>
+          {mine.claimable.length === 0 && mine.totals.waiting + running > 0n && (
+            <p className="text-xs text-muted">Rewards open once an epoch closes, is published and its review day has passed.</p>
           )}
         </div>
       ) : (
