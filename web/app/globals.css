@@ -1281,13 +1281,16 @@ body {
 }
 
 .club-hero {
-  overflow: hidden;
+  /* No overflow: hidden, so a tooltip in the stats can hang below the header. The cover and the
+     stats round their own outer corners instead. */
   border: 2px solid #111318;
   border-radius: 1.5rem;
   background: var(--chog-cream-500);
   color: #111318;
   box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
 }
+
+.club-hero > .club-cover { border-radius: calc(1.5rem - 2px) calc(1.5rem - 2px) 0 0; }
 
 :is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-muted { color: #4e5968; }
 :is(.club-card, .club-panel, .club-hero, .deal-panel, .deal-sheet) .text-danger { color: #a9282f; }
@@ -1312,6 +1315,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 2px solid #111318;
+  border-radius: 0 0 calc(1.5rem - 2px) calc(1.5rem - 2px);
   background: #fdf3c4;
 }
 
