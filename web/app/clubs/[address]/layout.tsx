@@ -12,7 +12,13 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   if (!facts) return {};
   const title = `${facts.name} Club on De(al) Club`;
   const description = `Own ${facts.symbol}, post about it, get paid: swap fees go back to the Club's Holders every epoch.`;
-  return { title, description, openGraph: { title, description, type: "website" }, twitter: { card: "summary_large_image", title, description } };
+  const image = `/clubs/${address}/opengraph-image`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: `${facts.name} Club preview on De(al) Club` }] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
+  };
 }
 
 export default function ClubLayout({ children }: { children: ReactNode }) {

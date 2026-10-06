@@ -4,7 +4,7 @@ import { formatEther } from "viem";
 export type Recap = { symbol: string; epoch: number; fees: bigint; paidHolders: bigint; holderCount: number };
 
 /** An amount for a post: two decimals at most, so `0.1249 MON` reads as `0.12 MON`. */
-function short(wei: bigint): string {
+export function short(wei: bigint): string {
   if (wei > 0n && wei < 10n ** 16n) return "<0.01 MON";
   const [whole, frac = ""] = formatEther(wei).split(".");
   const cents = frac.slice(0, 2).replace(/0+$/, "");

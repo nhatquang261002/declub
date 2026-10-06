@@ -3,7 +3,7 @@ import { chain } from "../chain";
 import { DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import { swapV2Abi } from "../contracts";
 import { displayStatus } from "../deals";
-import { describeAssets, type DealFacts } from "../dealShare";
+import { cardItems, describeAssets, type DealFacts } from "../dealShare";
 import { isOpenOffer, toDealV2, type RawDealV2 } from "../dealsV2";
 import { erc20Tokens, type TokenInfo } from "../assets";
 import { registry } from "../verifiedAssets";
@@ -38,12 +38,17 @@ export async function readDealFacts(id: string, nowSec = Math.floor(Date.now() /
     );
     const info = new Map(reads.flat());
     const nameOf = (token: string) => registry.entry(token)?.name;
+    const club = [...deal.offered, ...deal.requested].map((a) => registry.clubFor(a.token)).find((c) => c !== null);
     return {
       id,
       status: displayStatus(deal, nowSec),
       give: describeAssets(deal.offered, info, nameOf),
       want: describeAssets(deal.requested, info, nameOf),
       openOffer: isOpenOffer(deal),
+      club: club?.name,
+      clubImage: club?.image,
+      giveItems: cardItems(deal.offered, info, (t) => registry.entry(t)),
+      wantItems: isOpenOffer(deal) ? [] : cardItems(deal.requested, info, (t) => registry.entry(t)),
     };
   } catch {
     return null;

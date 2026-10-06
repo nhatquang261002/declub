@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState } from "react";
+import { SharePreviewDialog } from "@/components/SharePreviewDialog";
 import { XLogoIcon } from "@/components/Icons";
 import type { Asset, TokenInfo } from "@/lib/assets";
 import { displayStatus } from "@/lib/deals";
@@ -18,9 +19,10 @@ const clubOf = (assets: readonly Asset[]) => assets.map((a) => registry.clubFor(
  */
 export function ShareDeal({ deal, info, now }: { deal: DealV2; info: ReadonlyMap<string, TokenInfo>; now: number }) {
   // The page's own origin: known in the browser, empty while rendering on the server.
-  const origin = useSyncExternalStore(() => () => {}, () => window.location.origin, () => "");
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const [open, setOpen] = useState(false);
   const status = displayStatus(deal, now);
-  if ((status !== "open" && status !== "filled") || !origin) return null;
+  if (status !== "open" && status !== "filled") return null;
 
   const nameOf = (token: string) => registry.entry(token)?.name;
   const facts: DealFacts = {
@@ -31,18 +33,21 @@ export function ShareDeal({ deal, info, now }: { deal: DealV2; info: ReadonlyMap
     openOffer: isOpenOffer(deal),
   };
   const club = clubOf([...deal.offered, ...deal.requested]);
-  const href = dealPostLink(facts, `${origin}/v2/deal/${facts.id}`, club?.name);
+  const dealUrl = `${origin}/v2/deal/${facts.id}`;
+  const imageUrl = `${dealUrl}/opengraph-image`;
+  const href = dealPostLink(facts, dealUrl, club?.name);
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <a href={href} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex items-center gap-2">
+      <button type="button" className="btn-secondary inline-flex items-center gap-2" onClick={() => setOpen(true)}>
         <XLogoIcon className="size-3.5" />
         {status === "filled" ? "Share the swap on X" : "Share on X"}
-      </a>
+      </button>
       {club && (
         <span className="text-xs text-muted">
           Then paste the post on the {club.symbol} Club’s Board: your own post about the Club counts toward your Holder bonus.
         </span>
       )}
+      {open && <SharePreviewDialog imageUrl={imageUrl} shareUrl={href} title={status === "filled" ? "Share the swap" : "Share the deal"} onClose={() => setOpen(false)} />}
     </div>
   );
 }

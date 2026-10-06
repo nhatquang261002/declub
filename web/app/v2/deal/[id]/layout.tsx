@@ -16,7 +16,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     facts.status === "open"
       ? "A swap held in escrow on Monad: both sides or nothing. Open it to take the deal."
       : "A swap held in escrow on Monad.";
-  return { title, description, openGraph: { title, description, type: "website" }, twitter: { card: "summary_large_image", title, description } };
+  const image = `/v2/deal/${id}/opengraph-image`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: "Deal preview on De(al) Club" }] },
+    twitter: { card: "summary_large_image", title, description, images: [image] },
+  };
 }
 
 export default function DealLayout({ children }: { children: ReactNode }) {

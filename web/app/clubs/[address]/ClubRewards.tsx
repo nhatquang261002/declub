@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import type { Address } from "viem";
 import { LoadError } from "@/components/ErrorPanel";
 import { CrownIcon, XLogoIcon } from "@/components/Icons";
+import { SharePreviewDialog } from "@/components/SharePreviewDialog";
 import { RewardsClaim } from "@/components/RewardsClaim";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -21,6 +23,8 @@ const wei = (s: string | undefined) => BigInt(s ?? "0");
  */
 export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: string; symbol: string; wallet?: string; isOwner: boolean; now: number }) {
   const { data, isLoading, error } = useClubRewards(token);
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (isLoading) return <Loading label="Loading rewards" rows={3} />;
   if (error) return <LoadError title="Couldn’t load rewards" error={error} />;
@@ -80,18 +84,21 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
             <p className="text-sm">
               Post this week’s numbers on X. A post that links the Club counts as yours: share it on the Board too, and as a Holder it adds to your bonus.
             </p>
-            <a
-              className="btn-secondary mt-3 inline-flex items-center gap-2"
-              href={recapLink(
-                { symbol, epoch: latest!.n, fees: wei(latest!.fees), paidHolders: wei(latest!.paidHolders), holderCount: latest!.holderCount },
-                typeof window === "undefined" ? "" : `${window.location.origin}/clubs/${token}`,
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <button type="button" className="btn-secondary mt-3 inline-flex items-center gap-2" onClick={() => setShareOpen(true)}>
               <XLogoIcon className="size-3.5" />
               Post the recap
-            </a>
+            </button>
+            {shareOpen && origin && (
+              <SharePreviewDialog
+                imageUrl={`${origin}/clubs/${token}/opengraph-image`}
+                shareUrl={recapLink(
+                  { symbol, epoch: latest!.n, fees: wei(latest!.fees), paidHolders: wei(latest!.paidHolders), holderCount: latest!.holderCount },
+                  `${origin}/clubs/${token}`,
+                )}
+                title={`${symbol} Club recap`}
+                onClose={() => setShareOpen(false)}
+              />
+            )}
           </Panel>
 
           {data.earners.length > 0 && (

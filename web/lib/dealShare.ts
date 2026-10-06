@@ -12,7 +12,49 @@ export type DealFacts = {
   want: string;
   /** An open offer asks nothing: takers send proposals. */
   openOffer: boolean;
+  /** The Club of the first asset in the deal that has one: the card and the post say so. */
+  club?: string;
+  /** The Club's art, a path under `public/`, for the card's avatar. */
+  clubImage?: string;
+  /** Each side's assets as pictures; an open offer asks for none. */
+  giveItems?: CardItem[];
+  wantItems?: CardItem[];
 };
+
+/** One asset of a deal, for the preview card to draw as its own picture. */
+export type CardItem = {
+  /** The collection's or token's name: "Chog Genesis", "mUSD", "MON". */
+  name: string;
+  /** An NFT's id ("#4"), or "ANY" for one of a kind. */
+  id?: string;
+  /** A token's amount, already worded ("1.5"). */
+  amount?: string;
+  native?: boolean;
+  /** Art the app ships under `public/`: the collection's, when it has one. */
+  image?: string;
+};
+
+/** The assets of one side as pictures: an NFT each, then a token or MON each. */
+export function cardItems(
+  assets: readonly Asset[],
+  info: ReadonlyMap<string, TokenInfo>,
+  entryOf: (token: string) => { name: string; image?: string } | null | undefined,
+): CardItem[] {
+  const nfts: CardItem[] = [];
+  const rest: CardItem[] = [];
+  for (const a of assets) {
+    const entry = entryOf(a.token.toLowerCase());
+    const name = entry?.name ?? `${a.token.slice(0, 6)}…`;
+    if (a.kind === "erc721") nfts.push({ name, id: `#${a.id}`, image: entry?.image });
+    if (a.kind === "trait") nfts.push({ name, id: a.amount === 1n ? "ANY" : `ANY ×${a.amount}`, image: entry?.image });
+    if (a.kind === "erc20") {
+      const t = info.get(a.token.toLowerCase());
+      rest.push({ name: t?.symbol ?? name, amount: t ? formatUnits(a.amount, t.decimals) : undefined, image: entry?.image });
+    }
+    if (a.kind === "native") rest.push({ name: "MON", amount: formatMon(a.amount).replace(/ MON$/, ""), native: true });
+  }
+  return [...nfts, ...rest];
+}
 
 /** The words for one side: NFTs grouped by collection, then tokens, then MON. */
 export function describeAssets(
