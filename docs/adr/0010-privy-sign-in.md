@@ -21,7 +21,7 @@ The app connects injected wallets only. Anyone without MetaMask or Rabby can't u
 
 ## Consequences
 
-- `@privy-io/wagmi` pins viem to exactly `2.56.0`, so the app pins viem to match. Privy's optional smart-wallet peer (`permissionless`) wants a different `ox`, so installs need `--legacy-peer-deps`, and `@stripe/stripe-js@^1` is added by hand because Privy's on-ramp screens import it.
+- `@privy-io/wagmi` pins viem to exactly `2.56.0`, so the app pins viem to match. Privy's optional smart-wallet peer (`permissionless`) wants a different `ox`, so installs need `--legacy-peer-deps`, and `@stripe/stripe-js@^1` is added by hand because Privy's on-ramp screens import it. Nothing in the app imports it directly, so keep it in `web/package.json`.
 - Without embedded wallets, a person with no wallet can't trade. Turning them on fixes that, and an embedded wallet starts with no MON, so testnet users still need a faucet.
 - Each approval and transaction shows Privy's confirmation modal for embedded wallets.
 - Smart wallets, gas sponsorship and batching are **not** part of this. They would make `msg.sender` a contract wallet and need their own review (ERC-1271 for intents works already; escrow and `withdraw` need checking).

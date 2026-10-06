@@ -31,13 +31,18 @@ export async function recordActive(store: Store, club: string, post: { id: strin
 
 /** Each member's active days in a Club's epoch `n`, by user id, counting only posts still shown. */
 export async function activeDays(store: Store, club: string, n: number): Promise<Map<string, number>> {
-  const entries = (await store.members(activeKey(club, n))).map((m) => m.split(":")).filter((p) => p.length === 3);
-  const posts = await store.getMany<StoredPost>(entries.map(([, , id]) => postKey(club, id!)));
+  const entries = (await store.members(activeKey(club, n))).flatMap((m) => {
+    // The user id is a Privy DID (`did:privy:…`), so it holds colons: read the day and post id off the right.
+    const postAt = m.lastIndexOf(":");
+    const dayAt = m.lastIndexOf(":", postAt - 1);
+    return dayAt > 0 ? [{ userId: m.slice(0, dayAt), day: m.slice(dayAt + 1, postAt), id: m.slice(postAt + 1) }] : [];
+  });
+  const posts = await store.getMany<StoredPost>(entries.map(({ id }) => postKey(club, id)));
   const days = new Map<string, Set<string>>();
-  entries.forEach(([userId, day], i) => {
+  entries.forEach(({ userId, day }, i) => {
     const post = posts[i];
     if (!post || post.hidden || post.parent || post.userId !== userId) return;
-    days.set(userId!, (days.get(userId!) ?? new Set()).add(day!));
+    days.set(userId, (days.get(userId) ?? new Set()).add(day));
   });
   return new Map([...days].map(([userId, set]) => [userId, set.size]));
 }

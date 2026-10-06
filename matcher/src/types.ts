@@ -1,6 +1,6 @@
 import type { Address, Hex } from "viem";
 
-/** Numerically aligned with `IDeClubIntents.AssetType` (and V2). Native is never valid here. */
+/** Numerically aligned with `IDeClubIntents.AssetType` (and the `AssetType` values in `IDeClubEscrow`). Native is never valid here. */
 export const AssetType = { Native: 0, ERC20: 1, ERC721: 2 } as const;
 
 export interface Asset {

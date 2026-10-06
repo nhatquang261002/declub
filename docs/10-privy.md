@@ -10,7 +10,7 @@ state and Clubs.
 
 | Capability | Current behavior | Frontend / server surface |
 |---|---|---|
-| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on Monad testnet only. Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
+| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on the app's network (Monad testnet, or Monad mainnet in the mainnet flavor). Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
 | Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/account`, `components/ConnectButton.tsx` |
 | Multiple wallets | Linked wallets are shown on `/account`; a connected wallet can be made active without changing the account. | `/account`, `useSetActiveWallet` |
 | Embedded wallets | Disabled by default (`createOnLogin: "off"`). Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one at login for users who have no wallet (`"users-without-wallets"`). | `components/Providers.tsx`, `lib/config.ts` |
@@ -39,7 +39,7 @@ The header's wallet control renders one of two modes, selected at build time:
 2. **Injected-wallet mode** when the app id is absent. The button reads **Connect wallet**; wagmi
    exposes installed EIP-6963 wallets and there is no Privy account or linked-account screen.
 
-In both modes a wallet on another chain sees **Switch to Monad Testnet**. `components/Providers.tsx`
+In both modes a wallet on another chain sees **Switch to Monad Testnet** (**Switch to Monad** in the mainnet flavor). `components/Providers.tsx`
 wraps the app in `PrivyProvider` and `@privy-io/wagmi`'s `WagmiProvider` in Privy mode, and in
 wagmi's own `WagmiProvider` otherwise.
 

@@ -10,7 +10,7 @@ import type { AppNotification, NotificationKind } from "@/lib/notifications";
 const KIND_LABEL: Record<NotificationKind, string> = {
   request: "For you",
   filled: "Accepted",
-  expiring: "Ending soon",
+  expiring: "Deal ending",
   expired: "Expired",
   "intent-settled": "Settled",
   "intent-paused": "Paused",
@@ -19,9 +19,9 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   "club-pinned": "Pinned",
   "club-reward": "Rewards",
   "club-reply": "Replied",
-  "club-xshare": "Counted",
-  "club-rank": "This epoch",
-  "club-closing": "Ending soon",
+  "club-xshare": "X post counted",
+  "club-rank": "Your rank",
+  "club-closing": "Epoch ending",
 };
 
 // One icon and tint per kind: the colour says good news, needs you, or gone.
@@ -101,7 +101,7 @@ export function NotificationBellView({
               <span className={`truncate text-sm ${isNew ? "font-bold text-white" : "font-semibold text-white/75"}`}>
                 {n.title}
               </span>
-              {isNew && <span className="size-2 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+              {isNew && <span className="size-2 shrink-0 rounded-full bg-accent" role="img" aria-label="Unread" />}
             </span>
             <span className="text-xs leading-5 text-white/60">{n.body}</span>
             <span className="mt-0.5 flex items-center gap-1.5 text-[0.65rem] font-bold tracking-wide text-white/45 uppercase">
@@ -147,7 +147,7 @@ export function NotificationBellView({
               <span className="hdr-pop-icon !size-11 !rounded-full text-white/70"><BellIcon className="size-5" /></span>
               <p className="text-sm font-bold text-white">You&apos;re all caught up</p>
               <p className="text-xs leading-5 text-white/55">
-                Direct offers, accepted deals, settled swaps and expiries show up here.
+                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards and your rank) show up here.
               </p>
             </div>
           ) : (

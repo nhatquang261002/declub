@@ -4,7 +4,7 @@
 
 ## Context
 
-`OnDeal` (v1) is written around one immutable ERC-721 collection plus native MON: `offeredIds` / `requestedIds` and a single `offeredMon` / `requestedMon` per trade. Phase 4 needs any ERC-721, ERC-20s and native in one trade, in any mix. It has no admin and no proxy ([03](../03-contract-design.md#scope-of-v1)), so the model can't change in place. v1 is also live and verified on testnet, with open trades in it.
+`OnDeal` (v1) is written around one immutable ERC-721 collection plus native MON: `offeredIds` / `requestedIds` and a single `offeredMon` / `requestedMon` per trade. Phase 4 needs any ERC-721, ERC-20s and native in one trade, in any mix. It has no admin and no proxy ([03](../03-contract-design.md#declubescrow-locked-deals)), so the model can't change in place. v1 is also live and verified on testnet, with open trades in it.
 
 ## Decision
 

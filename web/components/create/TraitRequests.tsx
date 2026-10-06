@@ -28,7 +28,7 @@ type Props = {
 const chip = "rounded-full border-2 border-[#111318] px-2.5 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45";
 
 /**
- * Trait requests for a V2 deal: pick a collection, and if its traits can be read, pick 2–3 (up to
+ * Trait requests for a DeClubEscrow deal: pick a collection, and if its traits can be read, pick 2–3 (up to
  * MAX_TRAIT_PICKS) and say whether an NFT needs any of them or all of them. The matching ids and
  * their Merkle root are computed from the scan, so nothing here is typed except the collection.
  */

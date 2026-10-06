@@ -139,7 +139,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents (`BadCycleSize`), one signature each (`SignatureCountMismatch`). `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces (bit `nonce & 0xff` of word `nonce >> 8`), so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`DeClubIntents`, version `3`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
+- Signatures: EIP-712 (`DeClubIntents`, version `1`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
 - Rules on every intent in a cycle:
 
   | Rule | Error |
@@ -257,6 +257,14 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 - `mintBatch(to, quantity) → firstId`: owner only, sequential ids from 1; `InvalidQuantity` for 0, `MaxSupplyExceeded` past 1,969
 - `tokenURI(id)`: `METADATA_BASE` (the real collection's IPFS folder) + `id` + `.json`. Traits come from that metadata, not from the contract.
 
+### CollectionMirror
+
+[`CollectionMirror.sol`](../contracts/src/mocks/CollectionMirror.sol): a testnet copy of a mainnet collection, for the demo world ([12 · Demo](12-demo.md)).
+
+- `ERC721Enumerable`, `Ownable`; name, symbol, `MAX_SUPPLY`, base URI, URI suffix and `REVEAL_OFFSET` are set at construction
+- `mintBatch(to, quantity)`: sequential minting, owner only; `InvalidQuantity` and `MaxSupplyExceeded` as in `ChogGenesisMirror`
+- `tokenURI(id)`: token `n` reads metadata `((n - 1 + offset) % maxSupply) + 1`, so a shifted reveal like Chog Genesis's is reproduced
+
 ### MockERC20
 
 [`MockERC20.sol`](../contracts/src/mocks/MockERC20.sol): `ERC20(name, symbol)`, 18 decimals. `mint(to, amount)` is open to anyone, up to `MAX_MINT_PER_TX = 1_000_000 ether` per call (`InvalidAmount` for 0 or more). `DeployEscrow.s.sol` deploys it as "Mock USD" (mUSD).
@@ -267,7 +275,7 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 
 ## Deployment
 
-Four scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). `DeployChog` deploys mocks, so it requires `block.chainid` 10143 (Monad testnet) or 31337 (Anvil) and reverts with "testnet deployment only" anywhere else; the other three also run on Monad mainnet (143), with stricter rules there, and revert with "unsupported chain" on any other chain. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
+Five scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). `DeployChog` and `DeployMirrors` deploy mocks, so they require `block.chainid` 10143 (Monad testnet) or 31337 (Anvil) and revert with "testnet deployment only" anywhere else; the other three also run on Monad mainnet (143), with stricter rules there, and revert with "unsupported chain" on any other chain. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
 
 ### `DeployEscrow.s.sol`
 
@@ -286,6 +294,10 @@ Four scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses
 1. Deploy `DeClubRewards(operator, claimDelay, claimWindow)` from `REWARDS_OPERATOR` (required), `REWARDS_CLAIM_DELAY` (default 1 day, 0 for a demo) and `REWARDS_CLAIM_WINDOW` (default 90 days).
 2. On mainnet, refuse an operator with no code (it must be a Safe) and a claim delay under a day.
 3. Print `NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS`, `NEXT_PUBLIC_DECLUB_REWARDS_DEPLOY_BLOCK`, and the operator, delay and window read back from the contract.
+
+### `DeployMirrors.s.sol` (testnet only)
+
+Deploys three `CollectionMirror`s for the demo: testnet copies of the Chog Genesis, skrumpeys and r3tards collections, with their names, symbols, supplies and metadata, minting nothing. It prints `DEMO_CHOG_ADDRESS`, `DEMO_SKRUMPEYS_ADDRESS` and `DEMO_R3TARDS_ADDRESS`; `web/scripts/demo.ts` mints the holdings and hands each mirror to its Club's Owner.
 
 ### `DeployChog.s.sol` (testnet only)
 

@@ -6,7 +6,7 @@
 
 Club Rewards pay Holders out of the fees their Club's swaps pay ([ADR 0022](0022-club-rewards.md)). That fits NFTs and fits memecoins badly:
 
-- **A memecoin Club's fee pool is close to empty.** The fee is a flat $2 a side ([ADR 0015](0015-protocol-fee.md)). NFTs have no AMM, so OTC is where they trade; a memecoin trades on DEXes and bonding curves for cents, and almost nobody pays $4 to swap one here. The split can be fair and still pay nothing.
+- **A memecoin Club's fee pool is close to empty.** The fee is a flat amount a side: $2 in [ADR 0015](0015-protocol-fee.md), $5 in [ADR 0018](0018-adjustable-protocol-fee.md). NFTs have no AMM, so OTC is where they trade; a memecoin trades on DEXes and bonding curves for cents, and almost nobody pays that to swap one here. The split can be fair and still pay nothing.
 - **One snapshot is easy to game on a liquid token.** Holdings are read once, when the epoch is built. NFTs change hands slowly; a memecoin can be bought before the build and sold after it, and a long holder who sold the day before gets nothing.
 - **Shares in a paired Club mixed units.** One share per NFT plus one per `minHolding` (or whole token) of the coin: with a billion-token supply, coin holders swamped NFT holders. Tuning `minHolding` to fix that would also raise the Holder badge bar, which it sets too.
 

@@ -133,7 +133,7 @@ contracts/test/escrow/
 contracts/test/utils/WeirdTokens.sol   fee, lying, soft, no-return, blocklist and hook tokens
 ```
 
-`test/escrow/` holds 202 tests plus the two invariant suites (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubEscrow.sol` is 100% of lines, statements, branches and functions.
+`test/escrow/` holds 206 tests plus the two invariant suites (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubEscrow.sol` is 100% of lines, statements, branches and functions.
 
 ## DeClubIntents
 
@@ -156,7 +156,7 @@ contracts/test/intents/
 └── symbolic/                        Halmos: every pair and 3-ring pays every want (run with halmos, not forge)
 ```
 
-`test/intents/` holds 104 tests plus the two invariant suites (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubIntents.sol` is 100% of lines, statements, branches and functions. Slither is triaged [above](#static-analysis).
+`test/intents/` holds 108 tests plus the two invariant suites (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubIntents.sol` is 100% of lines, statements, branches and functions. Slither is triaged [above](#static-analysis).
 
 **Hostile collections** (`DeClubIntents.hostile.invariant.t.sol`). Signed pairs and 3-rings where each give is either honest or hostile: a `SoftNft` id the receiver already owns, one a third actor owns, one whose maker revoked approval (so `SoftNft` silently refuses), a `LyingNft`, USDC given as an ERC-721 or an NFT given as an ERC-20. Every maker signs, so the signature never stops a bad cycle; the contract's checks have to. Honest cycles must settle and leave every NFT with the next maker and every USDC balance exact; hostile ones must revert. Invariants: the contract holds nothing, `LyingNft` ids never move, and USDC is conserved. Removing the `ownerOf == from` check in `_send` makes it fail within one run.
 

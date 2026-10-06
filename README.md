@@ -5,6 +5,32 @@
 DeClub gives each verified Monad NFT collection a Club: a market, a signed
 conversation, member rankings and rewards funded by completed swaps.
 
+## Key points
+
+DeClub is an NFT marketplace that each community owns, built around one question:
+when a community creates the value, who captures it?
+
+- **A more fun way to trade.** Swap NFT for NFT, with MON on either side, or ask
+  for any NFT with the traits you want. Every swap settles atomically, so
+  nobody has to trust the other side or send first.
+- **Your own market for your community.** Every verified Monad NFT collection
+  gets a Club with its own market, board and ranked members, run by an Owner
+  and Moderators.
+- **Participation turns into a stake.** Each week, 50% of the fees a Club's swaps
+  pay goes to its 10 biggest Holders, 25% to the Club fund the Owner collects and 25% to the
+  protocol. Holders' own X posts and active days raise their share. Trading and
+  likes earn nothing, so fake accounts and wash trades don't pay, and every payout
+  is a Merkle claim anyone can check on chain.
+- **The social graph is yours.** Posts and follows are signed by the member's
+  wallet and exported in full, so a Club's conversation can't be locked in or
+  deleted by a platform.
+- **The feed is a choice.** The Board is ordered by a lens the reader picks
+  (Newest, Most active, Holders, Following). A lens is a pure function over
+  public data, so another app can rank the same posts its own way. There is no
+  registry of third-party lenses yet.
+- **Governance is next.** Holder votes for Moderators and Club-fund grants are
+  planned but not built ([roadmap](docs/06-roadmap.md)). Today the Owner decides.
+
 The application supports:
 
 - locked swaps through `DeClubEscrow`;
@@ -14,6 +40,80 @@ The application supports:
 
 See the [product spec](docs/01-product-spec.md), [user guide](docs/07-user-guide.md)
 and [Club specification](docs/09-clubs.md) for details.
+
+## The problem and who it is for
+
+NFT communities do their work in Discord and on X, but the value that work creates
+leaves: a marketplace keeps the trading fee, a Discord server can be banned or deleted,
+and Holders who post, welcome newcomers and trade with each other earn nothing for it.
+Swapping with a stranger still means someone has to send first.
+
+DeClub is for three people around a Monad NFT collection: the **Owner** who wants Holders
+who stay and a way to fund the community, the **Holder** who wants something back for
+holding and talking, and the **Trader** who wants an NFT-for-NFT swap with no one to
+trust. See [docs/13-go-to-market.md](docs/13-go-to-market.md).
+
+## Architecture
+
+A Next.js app reads the chain directly (no indexer) and keeps Club data, posts and
+profiles in Upstash Redis. A small matcher service pools signed swaps and settles pairs
+and rings of up to four. Three contracts hold the money, and none depends on a Club.
+
+```text
+Browser (Next.js, wagmi + viem, Privy) ──► Monad: DeClubEscrow  (locked swaps)
+        │                                         DeClubIntents (signed swaps)
+        ├──► Next.js API ──► Upstash Redis        DeClubRewards (Merkle claims)
+        │    (Clubs, posts, profiles, epoch builder, fill watcher)
+        └──► Matcher (HTTP + SQLite) ──► settle(cycle, signatures)
+```
+
+The full diagram, components and trade-offs are in [docs/02-architecture.md](docs/02-architecture.md),
+the contracts in [docs/03-contract-design.md](docs/03-contract-design.md) and the threat
+model in [docs/04-security.md](docs/04-security.md).
+
+## Technology stack
+
+| Layer | Technology |
+| --- | --- |
+| Contracts | Solidity 0.8.28 (EVM `prague`), Foundry, OpenZeppelin; fuzz tests, Slither and Halmos checks |
+| Web | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| Chain access | wagmi 3, viem 2, TanStack Query |
+| Identity | Privy (sign-in, linked X and Discord handles, webhooks via svix), EIP-712 signatures |
+| Data | Upstash Redis for Clubs, posts, follows and profiles; the chain for deals and holdings |
+| Matcher | Node.js 24 with built-in SQLite, viem |
+| Rewards | Merkle distributor, weekly epochs built by `npm run rewards:epoch` |
+| Tests | Foundry, Node test runner, end-to-end checks on a local Anvil chain |
+
+## Monad integration
+
+DeClub runs on Monad testnet (chain `10143`); the same code builds for mainnet (`143`) as a
+[flavor](#flavors-testnet-and-mainnet), but nothing is deployed there.
+
+- **`DeClubEscrow`** settles a swap of NFTs, tokens and MON between two wallets in one
+  atomic transaction, and takes a fee per side in MON.
+- **`DeClubRewards`** is a Merkle distributor. Each week the operator publishes one root of
+  everyone's share of the fees, and a Holder claims in one transaction.
+- **Why Monad.** The product turns a swap into a social action that happens many times a
+  week, with approval, fill and claim steps, so every step has to confirm fast and cost
+  little. Monad is EVM-compatible, so the contracts are plain Solidity and any wallet works,
+  and its fast blocks and low gas make a three-step swap feel like one click. Rewards are
+  paid in the native MON the fees were paid in.
+- Wallets sign messages (EIP-712 posts, follows and swaps) with the same account that holds
+  the NFTs, so identity and ownership are the same address.
+
+### Contracts on Monad testnet
+
+| Contract | Address | Deployment transaction |
+| --- | --- | --- |
+| `DeClubEscrow` | `0xb8bB420CFf0dFB781cD6c1cF1569B137EFc3148f` | `0xd92da81efa343e96bdd4f2a18d26a0b03795d7fb55ceb6d0c6e5b78a28f25d35` |
+| `DeClubRewards` | `0xfEC46AF05cAFe35B6b715982bCAf1DD02bb73E9a` | `0x16f552b69fb56e006dd35163a344dac061064df6dd2908c3c4af6423aea1397c` |
+| Chog Genesis mirror (demo) | `0xadca7be2cdf247a388a6fb4b19fdf0b436ad2584` | `0x0b7ef957000870b3d6b39f7d91c0e1221c3c2c2bd5213fcfc72d2e034ff04406` |
+| skrumpeys mirror (demo) | `0xa2545c8c2907cfdaccfc43774a04ffa5c3d174c2` | `0x69ee93540db7df39ba41436d2cd8fbab913502e799098fc8e004165fab61392d` |
+| r3tards mirror (demo) | `0x816f53ac5f57f7a69e0a9467d945e5778a864da8` | `0xe91895e88a47ffe661aca82a381aa9144a109d4e5c8e3ff600362c94d834bfdd` |
+
+Look any of them up on <https://testnet.monadvision.com>. The mirrors are testnet copies of
+three mainnet collections, so the demo has art and holders to show ([docs/12-demo.md](docs/12-demo.md)).
+The full records are in `contracts/broadcast/`.
 
 ## Status
 
@@ -38,7 +138,7 @@ On Monad testnet (chain `10143`):
 | --- | --- |
 | `DeClubEscrow` | Deployed for the [demo world](docs/12-demo.md) (fixed 0.05 MON fee per side) |
 | `DeClubRewards` | Deployed for the demo world, the bank wallet is the operator |
-| `DeClubIntents` | **Not deployed.** The address in `.env` is the retired `OnDealIntents`, which signs with an older EIP-712 domain, so the app's signed swaps fail against it |
+| `DeClubIntents` | **Not deployed.** The retired `OnDealIntents` signs with an older EIP-712 domain, so the app can't use it. Leave `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` blank and the app hides signed swaps until this is deployed |
 
 Deploy `DeClubIntents` with the instructions in
 [contracts/script/README.md](contracts/script/README.md), then put the printed
@@ -72,6 +172,28 @@ cd ../e2e && npm install
 ```
 
 Copy `.env.example` to `.env` and set the required addresses and secrets.
+
+### Try it against the testnet deployment
+
+The on-chain parts need no secrets. Put these in the root `.env`:
+
+```bash
+NEXT_PUBLIC_CHAIN_ID=10143
+NEXT_PUBLIC_RPC_URL=https://testnet-rpc.monad.xyz
+NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS=0xb8bB420CFf0dFB781cD6c1cF1569B137EFc3148f
+NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS=0xfEC46AF05cAFe35B6b715982bCAf1DD02bb73E9a
+NEXT_PUBLIC_CHOG_ADDRESS=0xadca7be2cdf247a388a6fb4b19fdf0b436ad2584
+NEXT_PUBLIC_IPFS_GATEWAY=https://ipfs.filebase.io/ipfs/
+```
+
+Then `cd web && npm install && npm run dev`, connect a wallet on Monad testnet and
+get test MON from a Monad testnet faucet. Swaps and claims are on-chain transactions.
+
+Posts, follows, profiles and Club membership are stored in Upstash Redis and sign-in
+uses Privy, so a local run without `UPSTASH_REDIS_REST_URL`/`_TOKEN` and
+`NEXT_PUBLIC_PRIVY_APP_ID`/`PRIVY_APP_SECRET` (see `.env.example`) shows the market but
+not the demo world's conversation. Signed swaps (`DeClubIntents`) are not deployed on
+testnet. **fill:** the hosted demo URL, which has all of it.
 
 ### Run the web app
 

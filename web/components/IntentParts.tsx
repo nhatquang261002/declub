@@ -193,7 +193,7 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
 
 /**
  * Deals and signed swaps in one grid, each tagged with how it settles. A signed swap links to
- * its own page (it has no deal id); everything else is an ordinary V2 deal card.
+ * its own page (it has no deal id); everything else is an ordinary deal card.
  */
 export function ListingGrid({ listings, now, me, info }: { listings: readonly DealV2[]; now: number; me?: string; info: Info }) {
   return (

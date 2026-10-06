@@ -113,7 +113,7 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
-/** GET /api/me/club-inbox: likes on your posts, your pins and the rewards you earned (lib/server/inbox.ts). */
+/** GET /api/me/club-inbox: likes, replies, pins, counted X posts, rewards and your standing in the running epoch (lib/server/inbox.ts). */
 export function clubInboxHandler(deps: Pick<RouteDeps, "gate"> & Pick<InboxDeps, "now" | "standings"> = {}) {
   return async function GET(request: Request) {
     const g = await (deps.gate ?? gateUser)(request, "me-club-inbox", 60);

@@ -3,7 +3,7 @@ import { readDealFacts } from "@/lib/server/dealCard";
 import type { CardItem, DealFacts } from "@/lib/dealShare";
 import { Avatar, BLUE, CARD_SIZE, cardFonts, CardFrame, CREAM, GREEN, INK, PINK, Pill, publicImage, YELLOW } from "@/lib/server/cardKit";
 
-export const alt = "A deal on De(al) Club";
+export const alt = "A deal on DeClub";
 export const size = CARD_SIZE;
 export const contentType = "image/png";
 // A deal's status changes (open, filled), and the chain is read per request.

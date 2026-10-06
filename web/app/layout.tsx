@@ -14,7 +14,7 @@ const brand = Bricolage_Grotesque({ variable: "--font-brand", subsets: ["latin"]
 // The favicon is app/icon.svg, picked up by Next automatically.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "De(al) Club",
+  title: { default: "De(al) Club", template: "%s · De(al) Club" },
   description: "Clubs for Monad's NFT collections, where Holders share in the fees their Club's market makes.",
 };
 
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 ·{" "}
               </>
             )}
-            assets only move in your transactions, and the fee is flat, capped and only charged when a deal completes
+            assets only move in transactions or signatures you approve, and the fee is flat, capped and only charged when a deal completes
           </footer>
         </Providers>
       </body>

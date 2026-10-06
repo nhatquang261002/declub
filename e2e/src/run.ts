@@ -5,7 +5,7 @@
  *   node src/run.ts --target testnet   the addresses in the root .env, funded E2E wallets
  *
  * Options: --only V2,IN-02 (id prefixes)  --no-matcher (local)
- * Writes e2e/results/<target>-<time>.{json,md}. Exits 1 if anything failed.
+ * Writes e2e/results/e2e-<target>-<time>.{json,md}. Exits 1 if anything failed.
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";

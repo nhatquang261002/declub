@@ -36,8 +36,8 @@ import { CopyAddress } from "@/components/CopyAddress";
 
 export default function IntentPage() {
   const params = useParams<{ hash: string }>();
-  if (!SHOW_INTENTS) return <EmptyState>Intents aren&apos;t enabled on this deployment yet.</EmptyState>;
-  if (!/^0x[0-9a-fA-F]{64}$/.test(params.hash)) return <EmptyState>Invalid intent id.</EmptyState>;
+  if (!SHOW_INTENTS) return <EmptyState>Signed swaps aren&apos;t enabled on this deployment yet.</EmptyState>;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(params.hash)) return <EmptyState>Invalid signed swap id.</EmptyState>;
   return <IntentDetail hash={params.hash as Hex} />;
 }
 
@@ -50,11 +50,11 @@ function IntentDetail({ hash }: { hash: Hex }) {
     <>
       <BackToDeals />
       {error ? (
-        <LoadError title="Couldn&apos;t load this intent" error={error} />
+        <LoadError title="Couldn&apos;t load this signed swap" error={error} />
       ) : isLoading ? (
-        <EmptyState>Loading intent…</EmptyState>
+        <EmptyState>Loading signed swap…</EmptyState>
       ) : !row ? (
-        <EmptyState>The pool doesn&apos;t know this intent.</EmptyState>
+        <EmptyState>The pool doesn&apos;t know this signed swap.</EmptyState>
       ) : (
         <Body row={row} me={address} now={now} />
       )}
@@ -209,7 +209,7 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
   const contract = swapIntents;
 
   return (
-    <DealDock tone={stale ? "warn" : "maker"} eyebrow="Your intent" title={stale ? "Your swap is on hold" : "Your swap is in the pool"}>
+    <DealDock tone={stale ? "warn" : "maker"} eyebrow="Your signed swap" title={stale ? "Your swap is on hold" : "Your swap is in the pool"}>
 
       {stale && (
         <div className="space-y-2">
@@ -242,7 +242,7 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
       {contract && (
         <div className="space-y-2 border-t-2 border-dashed border-[#111318]/15 pt-4">
           <p className="text-sm text-muted">
-            To be certain it can never settle, burn its nonce on-chain. That costs gas. Revoking the approval in your
+            To be certain it can never settle, cancel it permanently on-chain. That costs gas. Revoking the approval in your
             wallet also stops the assets from moving.
           </p>
           <TxButton

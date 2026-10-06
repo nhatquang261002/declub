@@ -226,7 +226,7 @@ export const STATUS_LABEL: Record<IntentStatus, string> = {
 
 /** What a status means for the maker, in one sentence. */
 export const STATUS_HELP: Record<IntentStatus, string> = {
-  open: "Waiting for a match. It settles on its own when intents that fit are found.",
+  open: "Waiting for a match. It settles on its own when swaps that fit are found.",
   stale: "The matcher skips it for now because your wallet can't honour it. It comes back by itself once it can.",
   settled: "Matched and swapped on-chain.",
   cancelled: "Removed from the pool. A copy of the signature elsewhere could still settle until it expires.",
@@ -243,16 +243,16 @@ export function reasonText(reason: string | null): string | null {
   if (!reason) return null;
   const code = reason.split(":")[0];
   const copy: Record<string, string> = {
-    balance: "You no longer hold everything this intent gives.",
-    allowance: "Your token approval for this intent is missing or too small.",
+    balance: "You no longer hold everything this swap gives.",
+    allowance: "Your token approval for this swap is missing or too small.",
     fee_balance: "You don't hold enough WMON for the protocol fee any more.",
     fee_allowance: "Your WMON approval for the protocol fee is missing or too small.",
-    wrong_fee: "The protocol fee went up past the most this intent agreed to pay. Sign it again to keep it in play.",
-    not_owner: "You no longer own an NFT this intent gives.",
-    not_approved: "An NFT this intent gives isn't approved for DeClub any more.",
-    bad_token: "A token in this intent stopped answering.",
-    nonce_used: "This intent's nonce was already used.",
-    expired: "This intent's deadline passed.",
+    wrong_fee: "The protocol fee went up past the most this swap agreed to pay. Sign it again to keep it in play.",
+    not_owner: "You no longer own an NFT this swap gives.",
+    not_approved: "An NFT this swap gives isn't approved for DeClub any more.",
+    bad_token: "A token in this swap stopped answering.",
+    nonce_used: "This swap's nonce was already used.",
+    expired: "This swap's deadline passed.",
   };
   return (code && copy[code]) || reason;
 }
@@ -292,7 +292,7 @@ export const nonceBit = (nonce: bigint) => ({ word: nonce >> 8n, mask: 1n << (no
 // ─────────────────────────────────────────────────────────────── In the deals list
 
 /**
- * A signed intent shaped like a V2 deal, so deals and signed swaps can share one list and one set
+ * A signed intent shaped like a DeClubEscrow deal, so deals and signed swaps can share one list and one set
  * of filters (search, MON, sort). `id` is -1n so a numeric search never matches it; the card links
  * by `signed.hash` instead. An intent has no counterparty, so `taker` is always null.
  */

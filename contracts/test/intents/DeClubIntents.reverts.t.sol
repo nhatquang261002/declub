@@ -248,14 +248,14 @@ contract DeClubIntentsRevertsTest is DeClubIntentsBase {
 
     /// @dev In a ring a want is covered by the *previous* maker only, not by anyone else.
     function test_ringWantMustBeCoveredByThePreviousMakerOnly() public {
-        // carol gives USDC, but bob (not carol) precedes alice... order: alice → bob → carol.
+        // Ring alice → bob → carol: alice's want (USDC) is covered by carol, who precedes her, and bob's
+        // want (A1) by alice, but carol's want (A1) is only given by alice, and bob precedes carol.
         IDeClubIntents.Intent memory a =
             _intent(alice, _list(_chog(A1)), _list(_erc20(address(usdc), 5 ether)), 0);
         IDeClubIntents.Intent memory b =
             _intent(bob, _list(_erc20(address(weth), 1 ether)), _list(_chog(A1)), 0);
         IDeClubIntents.Intent memory c =
             _intent(carol, _list(_erc20(address(usdc), 5 ether)), _list(_chog(A1)), 0);
-        // carol's want (A1) is only given by alice, who is not carol's predecessor (bob is).
         IDeClubIntents.Intent[] memory cycle = _cycle3(a, b, c);
         bytes[] memory sigs = _sigs3(_sign(aliceKey, a), _sign(bobKey, b), _sign(carolKey, c));
 

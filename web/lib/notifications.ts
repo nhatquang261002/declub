@@ -165,11 +165,11 @@ export function deriveIntentNotifications(
     const base = { href: `/intent/${row.hash}`, recency: BigInt(row.createdAt) };
 
     if (row.status === "settled") {
-      out.push({ ...base, key: `intent-settled:${row.hash}`, kind: "intent-settled", title: `Intent ${id} settled`, body: "It was matched and swapped on-chain.", actionable: false });
+      out.push({ ...base, key: `intent-settled:${row.hash}`, kind: "intent-settled", title: `Signed swap ${id} settled`, body: "It was matched and swapped on-chain.", actionable: false });
     } else if (row.status === "stale" && row.intent.deadline >= BigInt(nowSec)) {
-      out.push({ ...base, key: `intent-paused:${row.hash}`, kind: "intent-paused", title: `Intent ${id} is paused`, body: reasonText(row.reason) ?? "Your wallet can't honour it right now.", actionable: true });
+      out.push({ ...base, key: `intent-paused:${row.hash}`, kind: "intent-paused", title: `Signed swap ${id} is paused`, body: reasonText(row.reason) ?? "Your wallet can't honour it right now.", actionable: true });
     } else if (row.status === "rejected") {
-      out.push({ ...base, key: `intent-dropped:${row.hash}`, kind: "intent-dropped", title: `Intent ${id} was dropped`, body: reasonText(row.reason) ?? "It failed on-chain checks too often.", actionable: false });
+      out.push({ ...base, key: `intent-dropped:${row.hash}`, kind: "intent-dropped", title: `Signed swap ${id} was dropped`, body: reasonText(row.reason) ?? "It failed on-chain checks too often.", actionable: false });
     }
   }
   return out;

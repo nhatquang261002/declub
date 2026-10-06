@@ -6,6 +6,7 @@
 | `DeployIntents.s.sol` | `DeClubIntents`, optionally `MockWMON` | yes (and the matcher) |
 | `DeployRewards.s.sol` | `DeClubRewards` | yes (Rewards tab, Account, `npm run rewards:epoch`) |
 | `DeployChog.s.sol` | `MockChog` or the `ChogGenesisMirror` (testnet only) | the Chog collection |
+| `DeployMirrors.s.sol` | Three `CollectionMirror` contracts, testnet copies of Chog Genesis, skrumpeys and r3tards for the demo (testnet and Anvil only) | the demo world (`web/scripts/demo.ts`, [docs/12-demo.md](../../docs/12-demo.md)) |
 
 `DeployEscrow`, `DeployIntents` and `DeployRewards` run on Monad testnet (`10143`), local Anvil (`31337`, for tests) and Monad mainnet (`143`); any other chain reverts with "unsupported chain". On mainnet they also refuse mocks and demo wallets, a zero fee or ceiling, a missing `FEE_RECIPIENT`, `FEE_FIXED`, a `FEE_ADMIN` that is unset or equal to the recipient, and (intents) any `FEE_TOKEN` but the canonical WMON `0x3bd3…433A`. See [mainnet](#mainnet). `DeployChog.s.sol` deploys mocks, so it stays testnet-only: "testnet deployment only". Each `run()` only parses the env into a `Config` and calls `deploy(Config)`, so tests call `deploy` directly. All of them print ready-to-paste lines for the root `.env`.
 
@@ -54,7 +55,7 @@ Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset 
 
 The same `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT`, `FEE_ADMIN` and `FEE_FIXED` go to `DeployEscrow.s.sol` (there the fee is plain MON), so both contracts charge the same amount. Both print the fee settings they deployed with. The recipient, token and ceiling are immutable. The amount isn't: the fee admin calls `setFee` on each contract (a cut applies at once, a raise needs `applyFee` 7 days later), so keep the two in step.
 
-The recipient, token and ceiling can't be changed after deploy, so the scripts don't guess them (both share `script/FeeConfig.sol`): a fee without `PROTOCOL_FEE_MAX_WEI` is refused rather than given a default ceiling, and a non-zero ceiling without `FEE_ADMIN` is refused unless `FEE_FIXED=true` says a fee nobody can change is what you want. The contracts accept any ceiling up to 500; the roadmap's plan is about 4 × the launch fee.
+The recipient, token and ceiling can't be changed after deploy, so the scripts don't guess them (both share `script/FeeConfig.sol`): a fee without `PROTOCOL_FEE_MAX_WEI` is refused rather than given a default ceiling, and a non-zero ceiling without `FEE_ADMIN` is refused unless `FEE_FIXED=true` says a fee nobody can change is what you want. The contracts accept any ceiling up to 500; the plan is about 4 × the launch fee ([ADR 0018](../../docs/adr/0018-adjustable-protocol-fee.md), `.env.mainnet.example`).
 
 ```bash
 cd contracts

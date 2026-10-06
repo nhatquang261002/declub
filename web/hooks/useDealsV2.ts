@@ -6,9 +6,9 @@ import { swapV2 } from "@/lib/contracts";
 import { toDealV2, type DealV2 } from "@/lib/dealsV2";
 
 /**
- * The newest `limit` DeClubEscrow deals, newest first. Same approach as `useDeals` (ADR 0004):
- * `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
- * Returns nothing while V2 isn't configured.
+ * The newest `limit` DeClubEscrow deals, newest first. Same approach as the original deal list
+ * (ADR 0004): `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
+ * Returns nothing while DeClubEscrow isn't configured.
  */
 export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
   const active = enabled && !!swapV2;

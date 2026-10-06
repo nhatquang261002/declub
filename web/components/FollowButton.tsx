@@ -22,7 +22,7 @@ export function FollowButton({ target, follows }: { target: string; follows: Ret
       onClick={() => follows.toggle(target)}
     >
       {busy && <Spinner />}
-      {busy ? (follows.stage === "sending" ? "Saving…" : "Sign in wallet…") : on ? "Following" : "Follow"}
+      {busy ? (follows.stage === "sending" ? "Saving…" : "Confirm in wallet…") : on ? "Following" : "Follow"}
     </button>
   );
 }

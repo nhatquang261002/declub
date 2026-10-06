@@ -9,17 +9,17 @@ lives in the git log and the relevant ADRs.
 - [x] Local contract, matcher, web and e2e test suites
 - [x] Demo world and repeatable testnet seeding scripts
 - [x] Deploy `DeClubEscrow` and `DeClubRewards` to testnet (demo deployment, root `.env` set)
-- [ ] Deploy `DeClubIntents` to testnet: the root `.env` still points at the retired `OnDealIntents`, whose EIP-712 domain doesn't match, so signed swaps fail
+- [ ] Deploy `DeClubIntents` to testnet: the retired `OnDealIntents` has a different EIP-712 domain, so `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` stays blank, which hides signed swaps, until it is deployed
 - [ ] Verify the deployments on Sourcify
 - [ ] Run the manual testnet pass with two real wallets
 - [ ] Run the rewards epoch and claim flow on testnet
+- [ ] Turn on X reach: set `X_BEARER_TOKEN` (the code is built; off by default)
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
 
 ## Deferred
 
-- [ ] X engagement counts and deleted-post filtering
+- [ ] Hold-time snapshot for Holder shares (lowest balance across the epoch), so buying just before an epoch closes earns nothing
 - [ ] Holder governance for Moderators and Club-fund grants
-- [ ] Curator credit for “Looking for” posts that lead to a swap
 - [ ] Trade-receipt badges
 
 ## References

@@ -47,7 +47,7 @@ export function LiveStandings({ token, symbol, wallet, now }: { token: string; s
           )}
         </ol>
       )}
-      <p className="mt-3 text-xs text-muted">An estimate, a few minutes old: holdings are read again and everything can change before the epoch closes.</p>
+      <p className="mt-3 text-xs text-muted">An estimate, a few minutes old. Holdings are read once more when the epoch is built, shortly after it ends, so everything can still change.</p>
     </Panel>
   );
 }
@@ -138,12 +138,12 @@ function Row({ r, mine }: { r: StandingRow; mine: boolean }) {
       </span>
       <span className="text-xs tabular-nums text-muted">{plural(BigInt(r.shares), "NFT")}</span>
       {r.streak >= 2 && (
-        <span className="chip chip-peach">
+        <span className="chip chip-peach" aria-label={`${plural(r.streak, "week")} streak`}>
           <FlameIcon />
           {r.streak}
         </span>
       )}
-      {r.bonusBps > 0 && <span className="chip chip-peach">+{percent(r.bonusBps)}</span>}
+      {r.bonusBps > 0 && <span className="chip chip-peach" aria-label={`${percent(r.bonusBps)} bonus`}>+{percent(r.bonusBps)}</span>}
       <span className="w-24 text-right tabular-nums">{r.estimate ? formatMon(wei(r.estimate)) : "—"}</span>
     </li>
   );

@@ -2,7 +2,7 @@
 
 > **De(al) Club: your community's market, owned by its members.**
 >
-> Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.
+> Every verified Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.
 
 ## 0. De(al) Club
 
@@ -14,10 +14,10 @@
 |---|---|---|
 | **Gather** | A Club per verified NFT collection (its memecoin joins it): its Market, a Board, its Members ranked by Momentum, Holder badges, an Owner and Moderators | [09 · Clubs](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md) |
 | **Trade** | Members swap inside the Club, wallet to wallet or through escrow, with no trust between them | `DeClubEscrow`, `DeClubIntents` (sections 1–8 below) |
-| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its Holders, by holdings, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
+| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its 10 biggest Holders, by NFT count, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
 | **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered | [ADR 0023](adr/0023-signed-posts-and-lenses.md) |
 
-**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared with every Holder of the Club. Rewards follow holdings, which cost something to have, not posting, which costs nothing.
+**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared by the Club's 10 biggest Holders. Rewards follow holdings, which cost something to have; posting only adds a capped bonus (up to 50%) on top, and trading earns nothing.
 
 **What it isn't.** A rating of assets, or a promise that a Club is safe. Momentum and rewards say a market is busy; the Club still tells you to check every asset before you sign.
 
@@ -142,7 +142,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 2. Alice posts on the Board: *"WTB any Chog with a crown"*. Her wallet signs it; the post shows **Signed**. Bob **follows** her and switches the Board's lens to **Following**.
 3. Carol links the project's X account under **Manage → The Club on X** with a proof post: the Club page shows "@ChogNFT ✓". Alice posts on X about the Club, mentioning it, and shares the link in a note: the card says **Counts**, and her Momentum rises.
 4. Bob and Dave swap Chogs in the Club's Market. Each side pays the fee; the Club's Momentum goes up.
-5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is in development), 25% to the Club fund (Carol). The operator funds it on chain.
+5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to the top 10 Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is built, and off until `X_BEARER_TOKEN` is set), 25% to the Club fund (Carol). The operator funds it on chain.
 6. Alice opens the **Rewards** tab and claims her MON. Carol sees "the Club fund is ready" and collects it.
 7. Open `/api/clubs/<Chog>/feed` and `/api/rewards/epochs/<n>`: every post and every payout is public and verifiable.
 
@@ -157,7 +157,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 
 ## 10. Pitch
 
-> **De(al) Club gives every Monad NFT collection a Club where members trade, talk in posts they own, and Holders earn a share of the fees their market pays.**
+> **DeClub gives every verified Monad NFT collection a Club where members trade, talk in posts they own, and Holders earn a share of the fees their market pays.**
 >
 > *The people who make a market should own a piece of it.*
 

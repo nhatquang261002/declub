@@ -15,7 +15,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
         <div className="page-section error-panel max-w-md" role="alert">
           <h1 className="text-xl font-extrabold">DeClub couldn&apos;t load</h1>
           <p className="text-sm text-muted">
-            Something went wrong starting the app. Your assets are safe: nothing moves without your signature.
+            Something went wrong starting the app. Your assets are safe: nothing moves without a transaction or signature from you.
           </p>
           <button type="button" className="btn-primary mt-3" onClick={() => retry()}>
             Reload

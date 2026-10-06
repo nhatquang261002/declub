@@ -2,11 +2,13 @@
  * Read-only checks of a deployment: safe against mainnet, needs no key and sends nothing.
  *
  *   node src/verify.ts                 the addresses in the root .env
- *   node src/verify.ts --mainnet       stricter: an EOA fee admin, a missing expectation, demo
- *                                      flags or a default Chog collection fail instead of warn
+ *   node src/verify.ts --mainnet       stricter: an EOA fee admin, a missing expectation, a blank
+ *                                      Chog address or a blank FILL_WATCHER_START_BLOCK fail instead of warn
  *
  * Expectations (optional; checked when set): EXPECT_FEE_WEI, EXPECT_MAX_FEE_WEI,
  * EXPECT_FEE_RECIPIENT, EXPECT_FEE_ADMIN, EXPECT_FEE_TOKEN, EXPECT_CHAIN_ID.
+ * Other variables: VERIFY_RPC_URL (default NEXT_PUBLIC_RPC_URL), VERIFY_V2_ADDRESS and
+ * VERIFY_INTENTS_ADDRESS (default the root .env addresses), E2E_MATCHER_MIN_MON (matcher balance floor).
  * Writes e2e/results/verify-<time>.{json,md}. Exits 1 if anything failed.
  */
 import assert from "node:assert/strict";

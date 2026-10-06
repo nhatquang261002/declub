@@ -99,8 +99,9 @@ export function covers(gives: Asset[], want: Asset[]): boolean {
 }
 
 /**
- * The contract's per-intent rules (`_validateIntent`), minus the `token.code.length` check which
- * needs the chain. Returns the first problem, or null.
+ * The contract's per-intent rules (`_validateIntent`) that need no chain read: shape, sizes and
+ * duplicates. The checks that need the chain (token code, ERC-165 NFT detection, expiry) and the fee
+ * are left to the matcher's simulation and the contract. Returns the first problem, or null.
  */
 export function shapeProblem(intent: Intent): string | null {
   if (isAddressEqual(intent.maker, zeroAddress)) return "maker is the zero address";

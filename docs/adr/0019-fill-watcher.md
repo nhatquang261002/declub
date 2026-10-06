@@ -15,7 +15,7 @@ A cron route follows the chain from a cursor and feeds what it finds through the
 - **Finalized blocks only**, so a recorded fill can't be reorganised away. On Monad the finalized head is about a second behind the latest.
 - **A time budget, not a block budget.** A run starts no new queries after 40 s (`maxDuration` is 60 s), so a backlog is worked off over several runs. Live, a run covers about 11,000 empty blocks in 20 s.
 - **One run at a time.** A lease in the store (`hit` with a TTL, deleted at the end) turns an overlapping run away with `{ status: "busy" }`. Overlap would only repeat work: recording is idempotent, a fill is a sorted-set member keyed by trade id and an activity event's id is `txHash:logIndex`.
-- **Where it starts.** With no cursor, the first run starts at the head, so only new deals are followed. `FILL_WATCHER_START_BLOCK` makes it start there instead, to backfill (the v1 deploy block, 66352698 on testnet, covers everything). To rescan, delete the key `ondeal:watch:<chain>:fills:cursor`.
+- **Where it starts.** With no cursor, the first run starts at the head, so only new deals are followed. `FILL_WATCHER_START_BLOCK` makes it start there instead, to backfill (the `DeClubEscrow` deploy block, printed by `DeployEscrow` as `NEXT_PUBLIC_DECLUB_ESCROW_DEPLOY_BLOCK`, covers everything). To rescan, delete the key `declub:watch:<chain>:fills:cursor`.
 
 ## Alternatives
 

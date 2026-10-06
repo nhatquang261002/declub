@@ -20,7 +20,7 @@ type Web = {
   buildEpoch: (store: unknown, n: number, deps: unknown) => Promise<{ status: string; record?: EpochRecord }>;
   parseAssets: (list: unknown) => unknown[];
   REWARDS: { holderBps: number; fundBps: number };
-  activityPoints: (events: unknown[], reach: null, wallets: readonly string[], end: number) => { bonusBps: number };
+  activityPoints: (events: unknown[], reach: null, wallets: readonly string[], days?: number) => { bonusBps: number };
   rewardLeaf: (chainId: number, contract: Address, epoch: number, account: Address, amount: bigint) => Hex;
   buildMerkleTree: (leaves: readonly Hex[]) => { root: Hex; proofs: Hex[][] };
 };
@@ -136,20 +136,21 @@ export const rewardCases: Case<World>[] = [
       const holderPool = (fees * BigInt(app.REWARDS.holderBps)) / 10_000n;
       const fundPool = (fees * BigInt(app.REWARDS.fundBps)) / 10_000n;
       // Earlier scenarios may have left any of them holding NFTs: each holds what the chain says.
-      // Each Holder's shares count (1 + bonus): Alice and Bob traded in the epoch, Carol didn't (ADR 0024).
+      // Each Holder's shares count (1 + bonus). Only X posts and active days earn a bonus (ADR 0029, 0032), so Alice and
+      // Bob, who only traded, get none, same as Carol.
       const [a, b, c] = await holdings(w.nft, [w.alice.address, w.bob.address, w.carol.address]);
-      const bonus = (who: Address) => BigInt(app.activityPoints(events, null, [who.toLowerCase()], at + 50).bonusBps);
+      const bonus = (who: Address) => BigInt(app.activityPoints(events, null, [who.toLowerCase()]).bonusBps);
       const weight = (held: bigint, who: Address) => held * (10_000n + bonus(who));
       const [wa, wb, wc] = [weight(a!, w.alice.address), weight(b!, w.bob.address), weight(c!, w.carol.address)];
       const total = wa + wb + wc;
-      assert.ok(bonus(w.alice.address) > 0n && bonus(w.carol.address) === 0n, "the traders earn an activity bonus");
+      assert.ok([w.alice, w.bob, w.carol].every((who) => bonus(who.address) === 0n), "trading earns no bonus");
       const amountOf = (who: Address) => BigInt(built!.leaves.find((l) => l.account === who)?.amount ?? "0");
       assert.equal(amountOf(w.alice.address), (holderPool * wa) / total, "Alice's Holder share");
       assert.equal(amountOf(w.bob.address), (holderPool * wb) / total, "Bob's Holder share");
       assert.equal(amountOf(w.carol.address), fundPool + (holderPool * wc) / total, "the Owner's Club fund (plus any Holder share)");
       note(
         `fees ${w.fmt(fees)} MON; Holders ${w.fmt(holderPool)} over ${a! + b! + c!} NFTs (Alice ${a}, Bob ${b}, Carol ${c}; ` +
-          `traders +${Number(bonus(w.alice.address)) / 100}%); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`,
+          `no bonus for trading); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`,
       );
     },
   },

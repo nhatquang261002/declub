@@ -13,6 +13,7 @@ import { useClubs } from "@/hooks/useClubs";
 import { useMyClubs } from "@/hooks/useClubMembership";
 import { useNow } from "@/hooks/useNow";
 import { infoAssets, toClubInfo } from "@/lib/clubs";
+import { REWARDS } from "@/lib/rewards";
 import { registry } from "@/lib/verifiedAssets";
 import { CardSkeleton, ClubListHeader, ClubRow, Leaderboard, type Row } from "./parts";
 
@@ -139,8 +140,8 @@ export default function ClubsPage() {
         <div>
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Clubs</h1>
           <p className="mt-1 text-sm text-muted">
-            One for each verified NFT collection, with its memecoin if it has one. Members trade, post and share in its fees.{" "}
-            <Link href="/#clubs" className="font-bold underline">
+            One for each verified NFT collection, with its memecoin if it has one. Members trade and post; its {REWARDS.maxHolders} biggest Holders share in its fees.{" "}
+            <Link href="/guide/clubs" className="font-bold underline">
               How Clubs work
             </Link>
           </p>

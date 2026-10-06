@@ -23,7 +23,7 @@ const SORTS = [
   { value: "new", label: "Newest" },
 ] as const;
 
-/** The top three get a podium once three members have traded. */
+/** The top three get a podium once three members have Momentum. */
 const PODIUM = 3;
 
 export function RoleChip({ role }: { role?: PublicMember["role"] }) {
@@ -50,9 +50,9 @@ export function RoleChip({ role }: { role?: PublicMember["role"] }) {
 export function StreakChip({ streak }: { streak?: number }) {
   if (!streak || streak < 2) return null;
   return (
-    <span className="chip chip-peach" title={`Active on the Board ${streak} epochs in a row`}>
+    <span className="chip chip-peach" title={`Active on the Board ${streak} weeks (epochs) in a row`} aria-label={`${streak}-week streak`}>
       <FlameIcon />
-      {streak} wk
+      {streak} {streak === 1 ? "week" : "weeks"}
     </span>
   );
 }
@@ -105,7 +105,7 @@ function Podium({
   // In a row the winner stands in the middle and highest; stacked on a phone, it's simply first.
   const place = ["sm:order-2", "sm:order-1 sm:mt-6", "sm:order-3 sm:mt-10"];
   return (
-    <ol className="mb-5 grid gap-3 sm:grid-cols-3 sm:items-start" aria-label="Top three traders">
+    <ol className="mb-5 grid gap-3 sm:grid-cols-3 sm:items-start" aria-label="Top three members">
       {members.slice(0, PODIUM).map((m, i) => {
         return (
           <li key={m.wallet} className={`club-panel relative flex flex-col items-center gap-2 px-4 py-5 text-center ${place[i]}`}>

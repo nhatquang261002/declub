@@ -9,7 +9,7 @@ export type PlainKind = Exclude<AssetKind, "trait">;
 const KIND: Record<number, AssetKind> = { 0: "native", 1: "erc20", 2: "erc721", 3: "trait" };
 
 /**
- * One line of a V2 deal side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1.
+ * One line of a DeClubEscrow deal side. Native has token 0x0 and id 0; ERC-20 has id 0; ERC-721 has amount 1.
  * A "trait" request (requested side only) names a collection: `id` is the Merkle root of the token
  * ids that satisfy it and `amount` is how many of them the taker hands over (ADR 0006).
  */

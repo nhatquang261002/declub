@@ -36,20 +36,20 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
     <div className="flex flex-col gap-5">
       <Panel title="How this Club earns">
         <p className="max-w-3xl text-sm">
-          Every completed swap of {symbol} pays a small protocol fee. Each epoch,{" "}
+          Every completed swap of {symbol} pays a small protocol fee. Each epoch (one week, Monday to Monday UTC),{" "}
           <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s {REWARDS.maxHolders} biggest Holders, split by the NFTs they hold, and{" "}
-          <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as one of the {REWARDS.maxHolders} members holding the most {symbol}{" "}
-          when the epoch closes: one share per NFT. A Club’s memecoin can make you a Holder, if the Owner allows it, but earns no share.
+          <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as one of the {REWARDS.maxHolders} members holding the most {symbol}: one share per NFT.
+          Holdings are read once, when the epoch is built, shortly after it ends. A Club’s memecoin can make you a Holder, if the Owner allows it, but earns no share.
         </p>
         <p className="mt-2 max-w-3xl text-sm">
           Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for posting on the Board (each day you post counts) and
           sharing your own X posts about the Club there (one a day counts). Post on {REWARDS.streakMinDays} or more days, epoch after epoch, for a streak worth up to{" "}
-          <strong>{percent(REWARDS.maxStreakBps)} more</strong>. Trading and replies don’t count, and the bonus can’t buy a place in the {REWARDS.maxHolders}.{" "}
+          <strong>{percent(REWARDS.maxStreakBps)} more</strong>. Trading, likes and replies don’t count, and the bonus can’t buy a place in the {REWARDS.maxHolders}.{" "}
           {data?.xReach
             ? "X posts that people liked, reposted, quoted or replied to count for more."
             : "Each counted X post adds the same, however it did on X."}
         </p>
-        <p className="mt-3 text-xs text-muted">Rewards are paid in MON.</p>
+        <p className="mt-3 text-xs text-muted">Rewards are paid in MON. Claim within the claim window (90 days unless the deployment sets another), or the operator can sweep what is left.</p>
       </Panel>
 
       <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} />
@@ -82,11 +82,11 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
 
           <Panel title="Share the week">
             <p className="text-sm">
-              Post this week’s numbers on X. A post that links the Club counts as yours: share it on the Board too, and as a Holder it adds to your bonus.
+              Post this week’s numbers on X, then paste that post on the Board. It counts as your own X post about the Club (one a day), so it adds to your Holder bonus.
             </p>
             <button type="button" className="btn-secondary mt-3 inline-flex items-center gap-2" onClick={() => setShareOpen(true)}>
               <XLogoIcon className="size-3.5" />
-              Post the recap
+              Share the week
             </button>
             {shareOpen && origin && (
               <SharePreviewDialog
@@ -95,7 +95,7 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
                   { symbol, epoch: latest!.n, fees: wei(latest!.fees), paidHolders: wei(latest!.paidHolders), holderCount: latest!.holderCount },
                   `${origin}/clubs/${token}`,
                 )}
-                title={`${symbol} Club recap`}
+                title="Share the week"
                 onClose={() => setShareOpen(false)}
               />
             )}
@@ -152,8 +152,7 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
       )}
 
       <p className="text-xs text-muted">
-        Rewards say this market has been busy, not that the asset is safe. Each epoch’s numbers and proofs are public at{" "}
-        <span className="font-mono">/api/rewards/epochs/&lt;n&gt;</span>, so anyone can check the payouts.
+        Rewards say this market has been busy, not that the asset is safe. Each epoch’s numbers and proofs are public, so anyone can check the payouts.
       </p>
     </div>
   );

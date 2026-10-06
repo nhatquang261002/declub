@@ -90,7 +90,7 @@ export type ClubPage = { enabled: boolean; description: string; links: string[];
 /** Why a member's own X post didn't count, in words. */
 const NOT_COUNTED: Record<NonNullable<XShareVerdict["reason"]>, string> = {
   not_own: "",
-  not_holder: "Only Holders’ X posts count toward the Club’s activity.",
+  not_holder: "Only Holders’ X posts count toward the Club’s Momentum.",
   too_old: "Only X posts from the last 48 hours count.",
   no_signal: "It doesn’t link the Club, mention its X account or use its tags.",
   daily_limit: "One X post a day counts per Club; this one is shown, not counted.",
@@ -160,7 +160,7 @@ export function useClubActions(token: string) {
         toast.show({
           tone: "success",
           title: "Your X post counts for the Club",
-          message: share.counted === "weak" ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full." : "It adds to your Momentum and your Holder bonus.",
+          message: share.counted === "weak" ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full." : "It adds to your Momentum, and to your Holder bonus if you hold the Club’s NFT.",
         });
       } else if (share?.own && share.reason && NOT_COUNTED[share.reason]) {
         toast.show({ tone: "info", title: "Posted, not counted", message: NOT_COUNTED[share.reason] });

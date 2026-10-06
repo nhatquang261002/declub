@@ -74,8 +74,6 @@ export function rewardLeaf(chainId: number, contract: Address, epoch: number, ac
   return keccak256(inner);
 }
 
-// ─────────────────────────────────────────────────────────────── the split
-
 // ─────────────────────────────────────────────────────────────── the Holder bonus
 
 /** One counted X share's reach, read from the X API before the epoch is built (lib/server/xReach.ts). */
@@ -107,8 +105,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * A member's activity in a Club over an epoch: their active days on the Board, each worth
- * `dayPoints` (ADR 0032), and their own X shares, each worth `xShareBase` and its reach. Trading doesn't count: a swap costs the fee both ways, but a member can still wash trade
- * against themselves for the bonus, so only posts earn it. The reach read has the last word on an X
+ * `dayPoints` (ADR 0032), and their own X shares, each worth `xShareBase` and its reach. Trading earns nothing: a member could wash trade
+ * against themselves, so only posts count (ADR 0029). At most 7 active days count. The reach read has the last word on an X
  * share: one that was deleted, or edited so it's no longer about the Club, counts for nothing.
  */
 export function activityPoints(events: readonly ActivityEvent[], reach: ReachRecord | null, wallets: readonly string[], days = 0): Activity {

@@ -69,7 +69,7 @@ The local deployment uses anvil's public test mnemonic: accounts 1 to 5 trade, 7
 
 ### Testnet
 
-Run it on a fresh redeploy of the current source (the deployed contracts in the README predate the fee; `npm run verify` shows it).
+Run it against a deployment of the current source (`npm run verify` shows what is deployed). The README's `DeClubEscrow` and `DeClubRewards` are current; deploy `DeClubIntents` first.
 
 | Variable | |
 |---|---|

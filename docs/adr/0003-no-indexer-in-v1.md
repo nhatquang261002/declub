@@ -14,7 +14,7 @@ v1 has **no indexer and no backend**. The frontend:
 2. Multicalls `getTrade` for the live status.
 3. Filters by indexed `maker` / `taker` topics for History and direct requests.
 
-`TradeCreated` carries all the trade terms so this works without extra reads ([03 · Contract Design](../03-contract-design.md#events)).
+`TradeCreated` carries all the trade terms so this works without extra reads ([03 · Contract Design](../03-contract-design.md#declubescrow-events)).
 
 ## When to revisit
 

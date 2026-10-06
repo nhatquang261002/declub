@@ -112,7 +112,7 @@ export function PostItem({
   const own: MenuAction[] = [];
   if (role !== undefined && !post.mine && !post.hidden) {
     own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post?",
-      confirmNote: "The Club’s moderators will be asked to look at it. If enough members report it, it is hidden until they decide.",
+      confirmNote: "The Club’s moderators will be asked to look at it. If enough Holders report it, it is hidden until they decide.",
       confirmLabel: "Report",
       onSelect: () => actions.report(post.id) });
   }
@@ -306,7 +306,7 @@ function Thread({ parent, context, role, now }: { parent: string; context: Threa
           />
           <button type="submit" className="btn-primary px-3 py-2 text-sm" aria-busy={reply.isPending} disabled={reply.isPending || length === 0 || length > POST_MAX}>
             {reply.isPending && <Spinner />}
-            {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Sign in wallet…") : "Reply"}
+            {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Confirm in wallet…") : "Reply"}
           </button>
         </form>
       )}

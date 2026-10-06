@@ -2,15 +2,15 @@ import { MAX_X_TAGS, normalizeTag, parseXStatus, type SignalStrength, type XAcco
 
 /**
  * Club posts (ADR 0016, docs/09-clubs.md): the first user-written text in the app, so the rules
- * are strict and live in one pure place. Posts are plain text: no HTML, markdown or links in the
- * text. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
+ * are strict and live in one pure place. Posts are plain text, rendered as text and never as HTML or
+ * markdown; control characters are stripped. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
  * for" post, or an X post on a note (ADR 0024).
  */
 export const POST_MAX = 280;
 export const POSTS_PER_HOUR = 5;
 export const POST_COOLDOWN_SEC = 30;
 export const REPORTS_PER_DAY = 20;
-/** This many distinct reports hide a post until a Moderator restores or deletes it. */
+/** This many reports from Holders or staff hide a post (never a staff member's) until a Moderator restores or deletes it. */
 export const REPORTS_TO_HIDE = 3;
 export const MAX_PINNED = 3;
 /** How many posts a Club keeps. Older ones fall off the list. */

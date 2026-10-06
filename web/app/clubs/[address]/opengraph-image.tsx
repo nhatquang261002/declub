@@ -3,7 +3,7 @@ import { short } from "@/lib/recap";
 import { readClubFacts } from "@/lib/server/clubCard";
 import { CARD_SIZE, Avatar, cardFonts, CardFrame, publicImage, Pill } from "@/lib/server/cardKit";
 
-export const alt = "A Club on De(al) Club";
+export const alt = "A Club on DeClub";
 export const size = CARD_SIZE;
 export const contentType = "image/png";
 // A Club's epochs close weekly, and the store is read per request.

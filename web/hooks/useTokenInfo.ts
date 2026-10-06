@@ -9,7 +9,7 @@ import { erc20Tokens, type TokenInfo } from "@/lib/assets";
 import type { DealV2 } from "@/lib/dealsV2";
 
 /**
- * Symbol and decimals read from each token contract. Anyone can list any ERC-20 in V2, so the
+ * Symbol and decimals read from each token contract. Anyone can list any ERC-20 in a deal, so the
  * UI must show what the token says about itself, never a label chosen by the deal's maker.
  * Tokens that don't answer are left out, and the UI falls back to the short address.
  */
@@ -40,7 +40,7 @@ export function useTokenInfo(tokens: readonly Address[]) {
   return { info, isLoading: result.isLoading };
 }
 
-/** `useTokenInfo` for every ERC-20 that appears in a list of V2 deals. */
+/** `useTokenInfo` for every ERC-20 that appears in a list of DeClubEscrow deals. */
 export function useDealsTokenInfo(deals: readonly DealV2[]) {
   const tokens = useMemo(
     () => erc20Tokens(deals.flatMap((t) => [...t.offered, ...t.requested])),

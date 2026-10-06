@@ -15,7 +15,7 @@ type Info = ReadonlyMap<string, TokenInfo>;
 
 const KIND_TEXT = { native: "Native coin", erc20: "Token", erc721: "NFT", trait: "By trait" } as const;
 
-/** A read-only side of a V2 deal. Token names come from the token contracts (`info`). */
+/** A read-only side of a DeClubEscrow deal. Token names come from the token contracts (`info`). */
 export function AssetList({ assets, info }: { assets: readonly Asset[]; info: Info }) {
   return (
     <ul className="space-y-2">

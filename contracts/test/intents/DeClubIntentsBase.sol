@@ -200,7 +200,7 @@ abstract contract DeClubIntentsBase is Test {
         }
     }
 
-    /// @dev Alice gives her Chog A1 for 100 of bob's USDC (alice wants at least `aliceWants`).
+    /// @dev Alice gives her Chog A1 for bob's USDC: alice wants at least `aliceWants`, bob gives `bobGives`.
     function _chogForUsdc(uint256 aliceWants, uint256 bobGives, uint256 nonceA, uint256 nonceB)
         internal
         view

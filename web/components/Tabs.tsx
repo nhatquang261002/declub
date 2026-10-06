@@ -4,7 +4,7 @@ export type TabOption<T extends string> = { value: T; label: string };
 
 /**
  * The one tab bar: a row of toggle buttons where exactly one is selected. Used for deal filters,
- * the contract-version switch and the like. (Page numbers use the same `tabbar`/`tab` styles.)
+ * the history filters, the trait-request mode and the like. (Page numbers use the same `tabbar`/`tab` styles.)
  */
 export function Tabs<T extends string>({
   value,

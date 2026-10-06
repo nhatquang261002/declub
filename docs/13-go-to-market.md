@@ -1,6 +1,6 @@
 # 13 · Why communities move, and how we grow
 
-This page answers two questions the product spec leaves open: why would a Monad NFT community start using De(al) Club when it already has Discord, X and a marketplace, and how do we get the first Clubs and Holders. Anything marked **to fill** needs a real number from a real conversation; nothing here counts as traction until it is filled.
+This page answers two questions the product spec leaves open: why would a Monad NFT community start using DeClub when it already has Discord, X and a marketplace, and how do we get the first Clubs and Holders. Anything marked **to fill** needs a real number from a real conversation; nothing here counts as traction until it is filled.
 
 ## Who it is for
 

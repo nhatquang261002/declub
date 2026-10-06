@@ -10,7 +10,7 @@ import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
 /** One thing that happened to a Club's asset. Field order is fixed: the log stores it as JSON. */
 export type ActivityEvent = {
-  /** `txHash:logIndex`, so a replayed report is the same event. */
+  /** `txHash:logIndex` for escrow events (`txHash:settled` for a signed swap, `x:<tweet>` for an X share), so a replayed report is the same event. */
   id: string;
   kind: ActivityKind;
   /** The contract that emitted it, lowercase. */

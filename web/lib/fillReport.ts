@@ -3,7 +3,7 @@ import { DECLUB_ESCROW_ADDRESS } from "./config";
 
 /** The writes that emit `TradeFilled` (an accepted proposal fills the deal for its proposer). */
 const FILL_FUNCTIONS = new Set(["fillTrade", "fillTraitTrade", "acceptProposal"]);
-/** The V2 writes that start a deal. They add to a Club's activity, not to anyone's History. */
+/** The DeClubEscrow writes that start a deal. They add to a Club's activity, not to anyone's History. */
 const CREATE_FUNCTIONS = new Set(["createTrade", "createTraitTrade", "createOpenOffer"]);
 
 /** True for a contract call whose receipt can hold a fill that History should know about. */

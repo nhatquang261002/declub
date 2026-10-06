@@ -76,7 +76,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
   );
 }
 
-/** One side of a V2 deal as tiles: Chog art, plain NFT tiles, token amounts and a MON pill. */
+/** One side of a DeClubEscrow deal as tiles: Chog art, plain NFT tiles, token amounts and a MON pill. */
 export function AssetSide({ assets, info }: { assets: readonly Asset[]; info: Info }) {
   if (assets.length === 0) return <span className="text-sm text-muted">Nothing</span>;
   return (

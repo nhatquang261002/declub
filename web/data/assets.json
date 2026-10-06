@@ -16,7 +16,7 @@
     "name": "Chog Genesis",
     "symbol": "CHOG",
     "status": "verified",
-    "note": "The Chog Genesis collection on Monad testnet, the one this app's NEXT_PUBLIC_CHOG_ADDRESS points at (ERC-721, 1,969 minted).",
+    "note": "The Chog Genesis collection on Monad testnet (ERC-721, 1,969 minted).",
     "image": "/art/chogs/chog-02.png"
   },
   {

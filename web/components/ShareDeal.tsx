@@ -13,9 +13,10 @@ import { registry } from "@/lib/verifiedAssets";
 const clubOf = (assets: readonly Asset[]) => assets.map((a) => registry.clubFor(a.token)).find((c) => c !== null) ?? null;
 
 /**
- * "Share on X": a compose link for a live offer or a swap that went through. The link goes to the
- * deal's page, whose preview card (opengraph-image) shows the offer. A post that links the Club also
- * counts as about it ([ADR 0024](docs/adr/0024-x-posts-and-the-holder-bonus.md)) once it's on the Board.
+ * "Share on X" for a live offer or a swap that went through: it opens a preview of the deal's card
+ * first, and from there a compose link posts it. The link goes to the deal's page, whose preview card
+ * (opengraph-image) shows the offer. A post that links the Club also counts as about it (ADR 0024,
+ * docs/adr/0024-x-posts-and-the-holder-bonus.md) once it's on the Board.
  */
 export function ShareDeal({ deal, info, now }: { deal: DealV2; info: ReadonlyMap<string, TokenInfo>; now: number }) {
   // The page's own origin: known in the browser, empty while rendering on the server.

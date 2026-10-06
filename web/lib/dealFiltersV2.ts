@@ -6,7 +6,7 @@ const nativeAmount = (assets: DealV2["offered"]) =>
   assets.reduce((sum, a) => (a.kind === "native" ? sum + a.amount : sum), 0n);
 
 /**
- * Free-text match for V2 deals. A bare number ("42" or "#42") hits the deal id or any NFT id
+ * Free-text match for DeClubEscrow deals. A bare number ("42" or "#42") hits the deal id or any NFT id
  * on either side. Anything else matches the maker / taker, a token address, or a token symbol
  * (read from the token, never typed by the maker).
  */
@@ -46,7 +46,7 @@ function matchesMon(deal: DealV2, mon: MonFilter): boolean {
   }
 }
 
-/** Free-text query, MON filter and sorting (lib/dealFilters.ts) over V2 deals and signed swaps. */
+/** Free-text query, MON filter and sorting (lib/dealFilters.ts) over DeClubEscrow deals and signed swaps. */
 export function applyDealFiltersV2<T extends DealV2>(
   deals: T[],
   filters: DealFilters,

@@ -68,7 +68,9 @@ On top of that, a maker's intents are checked together, so one balance can't bac
 | `balance_committed` | the maker's live intents and this one together give more of an ERC-20 than the maker holds |
 | `token_not_allowed` | `MATCHER_TOKEN_ALLOWLIST` is set and the intent names a token not on it |
 | `token_banned` | the intent names a token suspended after an on-chain revert |
-| `rate_limited` (429) | too many intents from this maker; only posts with the maker's valid signature count, so nobody can use up someone else's budget | Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
+| `rate_limited` (429) | too many intents from this maker; only posts with the maker's valid signature count, so nobody can use up someone else's budget |
+
+Cancelling only drops an intent from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
 
 ## How matching works
 

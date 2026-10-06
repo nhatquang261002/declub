@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 
-/// @notice Fee settings shared by DeployEscrow and DeployIntents. The ceiling, recipient and token
+/// @notice Fee settings shared by DeployEscrow and DeployIntents (DeployRewards uses its chain check). The ceiling, recipient and token
 ///         are immutable once deployed, so the scripts refuse defaults that would lock in a
 ///         choice nobody made.
 library FeeConfig {

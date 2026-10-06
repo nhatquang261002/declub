@@ -28,7 +28,7 @@ import {
 import { adminIds, loadProfile, loadRoles, readLog } from "./clubState";
 import { signalsOf, startXLink, unlinkX, verifyXLink } from "./xPosts";
 import { signalsHint } from "../xPosts";
-import type { ClubProfile } from "../clubPosts";
+import { POST_COOLDOWN_SEC, type ClubProfile } from "../clubPosts";
 import type { ClubEntry } from "../verifiedAssets";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { getMember } from "./members";
@@ -59,7 +59,7 @@ const REFUSALS: Record<string, [number, string]> = {
   not_member: [403, "Join the Club first."],
   banned: [403, "You can’t do that in this Club."],
   no_profile: [403, "Turn on “Show my profile to other traders” on your Account page first (with X or Discord linked), so people can see who is posting."],
-  holders_only: [403, "The Owner has limited posting to holders."],
+  holders_only: [403, "The Owner has limited posting to Holders."],
   bad_kind: [400, "A post is a note or a “looking for”."],
   empty: [400, "Write something first."],
   too_long: [400, "Posts are at most 280 characters."],
@@ -75,7 +75,7 @@ const REFUSALS: Record<string, [number, string]> = {
   xlink_expired: [409, "Start again: that code has expired, or none was asked for this account."],
   xlink_mismatch: [422, "That post isn’t from that account, or it doesn’t have the code."],
   xlink_unavailable: [503, "Couldn’t reach X to read that post. Try again."],
-  cooldown: [429, "Wait a few seconds between posts."],
+  cooldown: [429, `Wait ${POST_COOLDOWN_SEC} seconds between posts.`],
   rate_limited: [429, "You’ve reached the limit for now. Try again later."],
   unsigned: [400, "Sign the post with your wallet first."],
   wrong_club: [400, "That post was signed for another Club."],
@@ -88,13 +88,13 @@ const REFUSALS: Record<string, [number, string]> = {
   own_post: [409, "You can’t report your own post."],
   own_like: [409, "You can’t like your own post."],
   too_many_pinned: [409, "At most 3 posts can be pinned."],
-  hidden: [409, "A hidden post can’t be pinned."],
+  hidden: [409, "A hidden post can’t be pinned or liked."],
   thread_full: [409, "This post has as many replies as it can take."],
   too_many_moderators: [409, "A Club has at most 10 Moderators."],
   already_owner: [409, "They are already the Owner."],
   no_change: [409, "Nothing to change."],
-  no_owner: [422, "This token has no owner() to claim through. Ask an admin."],
-  not_owner: [403, "None of your linked wallets is this token’s owner."],
+  no_owner: [422, "This collection’s contract doesn’t name an owner, so there is nothing to claim through. Ask an admin."],
+  not_owner: [403, "None of your linked wallets is this collection’s owner."],
   has_owner: [409, "This Club already has an Owner. Ask an admin."],
   invalid: [400, "That isn’t valid."],
   not_hidden: [409, "Only a Club that is hidden from the list can be purged."],
@@ -146,7 +146,7 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const url = new URL(request.url);
       const lens = lensOf(url.searchParams.get("lens")).id;
       const as = url.searchParams.get("as") ?? undefined;
-      // Without `limit` the whole board comes back, as before; with it, one page of it.
+      // Without `limit` the whole board comes back; with it, one page of it.
       const limit = Number(url.searchParams.get("limit"));
       const offset = Number(url.searchParams.get("offset"));
       const page = Number.isInteger(limit) && limit > 0 ? { limit: Math.min(limit, 100), offset: Number.isInteger(offset) && offset > 0 ? offset : 0 } : {};

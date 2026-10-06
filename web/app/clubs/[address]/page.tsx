@@ -236,7 +236,7 @@ function Club({ entry }: { entry: ClubEntry }) {
           >
             {stats ? formatMomentum(stats.momentum) : error ? "—" : "…"}
           </Stat>
-          <Stat label="Members" hint={club ? `${holders.toLocaleString()} ${holders === 1 ? "holder" : "holders"}` : undefined}>
+          <Stat label="Members" hint={club ? `${holders.toLocaleString()} ${holders === 1 ? "Holder" : "Holders"}` : undefined}>
             {club ? club.members.toLocaleString() : "…"}
           </Stat>
           <Stat
@@ -324,7 +324,7 @@ function Club({ entry }: { entry: ClubEntry }) {
           {tab === "board" && <ClubBoard token={entry.address} symbol={held} archived={info.archived} now={now} />}
           {tab === "members" && <ClubMembers token={entry.address} symbol={held} now={now} />}
           {tab === "rewards" && (
-            <ClubRewards token={entry.address} symbol={held} wallet={me.member ? me.wallet : undefined} isOwner={me.role === "owner"} now={now} />
+            <ClubRewards token={entry.address} symbol={info.symbol} wallet={me.member ? me.wallet : undefined} isOwner={me.role === "owner"} now={now} />
           )}
           {tab === "manage" && me.role && staff && <ClubManage token={entry.address} role={me.role} now={now} />}
         </div>

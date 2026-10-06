@@ -28,7 +28,7 @@ import type { Store } from "./store";
 /**
  * The rewards epoch builder (ADR 0022). For a finished epoch it takes each Club's completed swaps,
  * the fees they paid, and a fresh read of every member's holdings, and works out who gets what:
- * the Holders' share by holdings, the Club fund to the Owner. It stores the result, Merkle proofs
+ * the top 10 Holders' share by NFT shares × (1 + bonus), the Club fund to the Owner. It stores the result, Merkle proofs
  * included, for `DeClubRewards` and the claim screens. Epochs are built in order and once each,
  * because what one epoch can't pay rolls into the next.
  *
@@ -281,7 +281,7 @@ async function compute(
 /**
  * Each member's shares, from a fresh read of every wallet they've linked: one per NFT of the
  * collection. A Club's memecoin earns the Holder badge but no shares (ADR 0025). Throws when the
- * chain can't be read, so an epoch is never built on missing balances.
+ * whole read fails; a single wallet whose balanceOf fails counts as zero.
  */
 async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ userId: string; wallet: string; wallets: string[]; shares: bigint; joinedAt: number }[]> {
   const rows = (await allRows(store, club.address)).filter((r) => r.displayWallet && r.wallets.length > 0);

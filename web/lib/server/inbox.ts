@@ -108,7 +108,7 @@ export async function clubInbox(store: Store, userId: string, wallets: readonly 
         kind: "club-reward",
         at: nowMs,
         title: `You earned ${formatMon(BigInt(leaf.amount))} from epoch ${leaf.epoch}`,
-        body: "Club Rewards for the Clubs you hold. Claim them from your Account page.",
+        body: "Club Rewards from swap fees. Claim them from the Rewards tab or your Account page.",
         href: "/account",
       });
     }

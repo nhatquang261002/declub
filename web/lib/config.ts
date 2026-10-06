@@ -52,12 +52,12 @@ export const IPFS_GATEWAY = (env.ipfsGateway?.trim() || "https://ipfs.io/ipfs/")
 
 /**
  * DeClubEscrow, the deal contract (ADR 0005): any ERC-721, ERC-20 and MON. The app has no deals
- * without it, so the deal screens stay off until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set (or mocked).
+ * without it, so the deal screens stay off until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set.
  */
 export const DECLUB_ESCROW_ADDRESS: Address | undefined = env.swapV2?.trim()
   ? getAddress(env.swapV2.trim())
   : undefined;
-/** Test ERC-20 with an open mint, for demoing V2 on testnet. */
+/** Test ERC-20 with an open mint, for demoing DeClubEscrow on testnet. */
 export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim()
   ? getAddress(env.mockErc20.trim())
   : undefined;
@@ -100,7 +100,7 @@ export const KNOWN_COLLECTIONS: Address[] = (env.knownCollections ?? "")
 
 /** MockChog has an open `mint`. Set NEXT_PUBLIC_CHOG_MINTABLE=false for the real collection. */
 export const CHOG_MINTABLE = env.chogMintable !== "false";
-/** Whether multi-asset deals and signed swaps are shown: only when their contracts are configured. */
+/** Whether the deal screens (DeClubEscrow deals) are shown: only when the contract is configured. */
 export const SHOW_V2 = !!DECLUB_ESCROW_ADDRESS;
 export const SHOW_INTENTS = !!DECLUB_INTENTS_ADDRESS;
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
@@ -14,7 +15,7 @@ import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTE
 const SECTIONS: GuideSection[] = [
   { id: "what", label: "What a Club is" },
   { id: "join", label: "Join a Club" },
-  { id: "badges", label: "Badges" },
+  { id: "badges", label: "Badges and Momentum" },
   { id: "rewards", label: "Rewards" },
   { id: "post", label: "Post and report" },
   { id: "roles", label: "Who runs a Club" },
@@ -24,20 +25,19 @@ const SECTIONS: GuideSection[] = [
 
 const TABS = [
   { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals and signed swaps for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
-  { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies under them. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
-  { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by how much they trade it. <b>Follow</b> the ones you trust.</> },
-  { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim.</> },
-  { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>Only for the Club&apos;s staff: the description, links, pinned posts, moderators and bans.</> },
+  { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies and likes under them. Order them by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
+  { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by Momentum. <b>Follow</b> the ones you trust.</> },
+  { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim. <b>Share the week</b> posts the recap to X.</> },
+  { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>For staff. Owners edit the Club page, the coin rule and the X links; everyone on staff sees the bans and the moderation log. Pins and moderators are set from the post menus and the Members list.</> },
 ];
 
 const JOIN_STEPS = [
   { title: "Sign in and link a wallet", body: <>Press <b>Sign in</b>, then link the wallet you trade with on the <b>Account</b> page.</> },
-  { title: "Press Join", body: <>Open the Club from <b>Clubs</b> and press <b>Join</b>. Anyone signed in can join.</> },
-  { title: "Leave any time", body: <><b>Leave</b> takes you off the Members list again.</> },
+  { title: "Press Join Club", body: <>Open the Club from <b>Clubs</b> and press <b>Join Club</b>. Anyone signed in can join. To leave, open the <b>⋯</b> menu and choose <b>Leave this Club</b>; that takes you off the Members list again.</> },
 ];
 
 const MOMENTUM_RULES = [
-  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade.` },
+  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. The same two wallets swapping again within ${MOMENTUM.washDays} days counts ${MOMENTUM.washFactor * 100}%.` },
   { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points each, at most ${MOMENTUM.createdPerDay} a day per wallet.` },
   {
     title: "Your X posts count too",
@@ -72,7 +72,7 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
     icon: <UsersIcon className="size-4" />,
     role: "Member",
     who: "Anyone who joined.",
-    can: "Posts, reports, and appears on the leaderboard.",
+    can: "Posts, replies, likes and reports, follows other members, and appears on the leaderboard.",
   },
   {
     icon: <FlagIcon className="size-4" />,
@@ -91,14 +91,16 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (a week), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} members who hold the most of the collection when the epoch is built, one share per NFT (a tie goes to whoever joined first); ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", "An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it."],
+  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} members who hold the most of the collection when the epoch is built, one share per NFT (a tie goes to whoever joined first); ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that, so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
   ["How does someone become the Owner?", "The wallet that the token contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
 ];
+
+export const metadata: Metadata = { title: "Clubs guide" };
 
 export default function ClubsGuidePage() {
   return (
@@ -113,7 +115,7 @@ export default function ClubsGuidePage() {
             Explore Clubs <span aria-hidden>→</span>
           </Link>
         }
-        summary={["Anyone signed in can join.", `Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
+        summary={["Anyone signed in can join.", `The top ${REWARDS.maxHolders} Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
         sections={SECTIONS}
       />
 
@@ -127,7 +129,7 @@ export default function ClubsGuidePage() {
           <CardGrid cols={2} items={TABS} />
         </Section>
 
-        <Section sections={SECTIONS} id="join" title="Join in three steps">
+        <Section sections={SECTIONS} id="join" title="Join in two steps">
           <ol className={`${CARD} divide-y divide-[#111318]/10`}>
             {JOIN_STEPS.map((step, i) => (
               <li key={step.title} className="flex gap-4 p-5 sm:p-6">
@@ -145,7 +147,9 @@ export default function ClubsGuidePage() {
             <UsersIcon className="mt-0.5 size-5 shrink-0 text-[#a9282f]" />
             <span>
               <b>Joining shows your wallet</b> on the Members list, so join with an account whose wallet you&apos;re happy
-              to show.{!PRIVY_APP_ID && " Sign-in is off on this deployment, so joining and posting aren't available here."}
+              to show.{!PRIVY_APP_ID && " Sign-in is off on this deployment, so joining and posting aren't available here."} Your <b>Club wallet</b> is
+              the linked wallet shown next to your name on the Members list. The bell in the header tells you about replies, likes, pins, counted X posts,
+              rewards and your rank, and on the Account page you can set an avatar from an NFT you hold.
             </span>
           </p>
         </Section>
@@ -159,7 +163,7 @@ export default function ClubsGuidePage() {
               <h3 className="mt-4 text-lg font-black">Holder badge</h3>
               <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
                 Members whose linked wallets hold the asset get a <b className="text-[#111318]">Holder</b> badge: any NFT of
-                the collection. When the Club has a memecoin, its Owner can let holders of the coin count too, from a minimum they set.
+                the collection. When the Club has a memecoin, its Owner can let coin holders earn the badge too, from a minimum they set. Only NFTs earn reward shares.
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
                 It shows what they held at the last check, which runs about once a day. It gives no extra powers, unless
@@ -202,7 +206,7 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small flat fee per side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} biggest Holders, by how much they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
+                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} biggest Holders, by how many NFTs they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
                 <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
                 <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
               </ul>
@@ -214,12 +218,15 @@ export default function ClubsGuidePage() {
               </span>
               <h3 className="mt-4 text-lg font-black">Claiming</h3>
               <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-                Your share is paid to your Club wallet in MON. After an epoch is published, claims open a day later; then press
+                Your share is paid to your Club wallet in MON. After an epoch is published, claims open a day later (the default delay); then press
                 <b className="text-[#111318]"> Claim</b> on a Club&apos;s <b className="text-[#111318]">Rewards</b> tab or on
                 your Account page. One claim collects every open epoch.
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
                 Every epoch&apos;s numbers and proofs are public, so anyone can check who was paid what.
+              </p>
+              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
+                Claim in time: once the claim window closes (90 days unless the deployment sets another), the operator can sweep what is left.
               </p>
             </div>
           </div>
@@ -232,8 +239,8 @@ export default function ClubsGuidePage() {
               Holding is the base: one share per NFT of the collection. A Holder&apos;s shares then count up to{" "}
               <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for their activity on its Board: each day they post earns{" "}
               {REWARDS.dayPoints} points, and each of their own X posts about the Club shared there earns {REWARDS.xShareBase}.{" "}
-              {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Trading
-              and replies earn nothing here, so they can&apos;t be farmed, and the bonus can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
+              {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Trading,
+              Board replies and Board likes earn nothing here, so they can&apos;t be farmed, and the bonus can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
               who does nothing still gets their base share.
             </p>
             <ul className={`mt-3 space-y-1.5 text-sm leading-6 ${MUTED}`}>
@@ -247,7 +254,7 @@ export default function ClubsGuidePage() {
                 shows where you stand while the epoch runs.
               </li>
               <li>
-                <b className="text-[#111318]">What counts as about the Club:</b> a link to the Club or its token, a mention, quote or reply of the
+                <b className="text-[#111318]">What counts as about the Club:</b> a link to the Club or its token, a mention of, or a quote or reply to, the
                 project&apos;s X account (the Owner links it), or one of the Club&apos;s tags (half).
               </li>
               <li>
@@ -257,17 +264,18 @@ export default function ClubsGuidePage() {
               <li>
                 <b className="text-[#111318]">Engagement:</b>{" "}
                 <span className="mr-1 inline-block rounded-full border-2 border-[#111318] bg-peach px-2 text-[11px] font-black uppercase tracking-wide text-[#111318]">
-                  In development
+                  When switched on
                 </span>
-                for now, every counted post adds the same, however it does on X. Later, likes, reposts, quotes and replies will add up to{" "}
-                {REWARDS.reachCapPerEpoch} more points (capped, so one viral post can&apos;t take everything), and a post that was deleted, or edited
-                so it&apos;s no longer about the Club, will count for nothing. This isn&apos;t coming soon.
+                until then, every counted post adds the same, however it does on X. Once the operator turns on the X read, likes, reposts, quotes
+                and replies on your X post add up to {REWARDS.reachCapPerEpoch} more points (capped, so one viral post can&apos;t take everything), and
+                a post that was deleted, or edited so it&apos;s no longer about the Club, counts for nothing. Likes and replies on the Board earn
+                nothing.
               </li>
             </ul>
           </div>
           <p className="mt-4 text-sm leading-6 text-muted">
             Faking volume to earn rewards loses money: each side of a swap pays the full fee, and only part of it comes back,
-            shared with every other Holder.
+            shared with the Club&apos;s other top Holders.
           </p>
         </Section>
 

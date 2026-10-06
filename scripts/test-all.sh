@@ -4,7 +4,7 @@
 #   scripts/test-all.sh                 contracts, matcher, web (incl. build), e2e on a local anvil
 #   scripts/test-all.sh --quick         skip the web build and the e2e run
 #   scripts/test-all.sh --coverage --slither --halmos   add the slow/static checks
-#   scripts/test-all.sh --only contracts,matcher        run some sections (contracts, matcher, web, e2e)
+#   scripts/test-all.sh --only=contracts,matcher        run some sections (contracts, matcher, web, e2e)
 #
 # Each step's output goes to test-results/<time>/<step>.log; a summary table prints at the end and
 # is saved as summary.md. Exits 1 if any step failed. Needs forge/anvil, Node 24+, npm.
@@ -20,7 +20,7 @@ for a in "$@"; do
     --halmos) HALMOS=1 ;;
     --only=*) ONLY="${a#--only=}" ;;
     --only) echo "use --only=contracts,web" >&2; exit 2 ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
   esac
 done

@@ -196,6 +196,18 @@ describe("active days and streaks", () => {
   const club = NFT.toLowerCase();
   const post = (id: string, userId: string, at: number, over: object = {}) => ({ id, userId, wallet: alice, kind: "note", text: "gm", at: at * 1000, ...over });
 
+  it("work with Privy user ids, which contain colons", async () => {
+    const store = memoryStore();
+    const day = 86_400;
+    const id = "did:privy:cm0abc123";
+    const posts = [post("p1", id, GENESIS + 10), post("p2", id, GENESIS + day + 5)];
+    for (const p of posts) {
+      await store.set(postKey(club, p.id), p);
+      await recordActive(store, club, p, GENESIS, WEEK);
+    }
+    assert.deepEqual(Object.fromEntries(await activeDays(store, club, 0)), { [id]: 2 });
+  });
+
   it("count a member's distinct days with a post still shown", async () => {
     const store = memoryStore();
     const day = 86_400;

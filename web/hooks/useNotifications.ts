@@ -79,7 +79,7 @@ export function useNotifications() {
   // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
   const intents = useIntents({ status: "all", maker: address, enabled: !!address });
 
-  // What the Clubs say (likes, pins, rewards) needs the server's read of the member's posts, so it
+  // What the Clubs say (likes, replies, pins, counted X posts, rewards, your rank) needs the server's read of the member's posts, so it
   // only exists signed in. Without it the bell shows deals alone.
   const inboxToken = useAccessToken();
   const inbox = useQuery({

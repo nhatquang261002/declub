@@ -4,7 +4,7 @@ import { CHAIN_ID, CHOG_ADDRESS, DECLUB_ESCROW_ADDRESS, DECLUB_INTENTS_ADDRESS, 
 
 export const chog = { address: CHOG_ADDRESS, abi: mockChogAbi, chainId: CHAIN_ID } as const;
 
-// V2 moves NFTs and ERC-20s, so their revert errors (ERC721InsufficientApproval, ...) bubble up
+// DeClubEscrow moves NFTs and ERC-20s, so their revert errors (ERC721InsufficientApproval, ...) bubble up
 // through it, and the swap ABI carries them so viem can decode them by name. viem's erc20Abi has
 // no errors, so the OpenZeppelin ones are declared here.
 const chogErrors = mockChogAbi.filter((item) => item.type === "error");
@@ -45,7 +45,7 @@ export const wmonAbi = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 
-/** The ERC-721 calls the V2 and intent screens make on any collection. */
+/** The ERC-721 calls the deal and intent screens make on any collection. */
 export const erc721Abi = parseAbi([
   "function isApprovedForAll(address owner, address operator) view returns (bool)",
   "function setApprovalForAll(address operator, bool approved)",

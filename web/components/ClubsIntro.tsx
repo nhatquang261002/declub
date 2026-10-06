@@ -9,14 +9,14 @@ import { ClubsTeaser } from "./ClubsTeaser";
 const WHAT = [
   { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
   { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, reply, or share your X posts, signed by your wallet, and pick how the feed is ordered." },
-  { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard of who actually trades it, with Holder badges. Follow who you trust." },
+  { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard ranked by Momentum, with Holder badges. Follow who you trust." },
   { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its ${REWARDS.maxHolders} biggest Holders each week, more to the ones who post, and ${percent(REWARDS.fundBps)} to the Club fund.` },
 ];
 
 const HOW = [
-  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} for each side of a finished trade. Each side pays the fee, so faking it costs real money.` },
-  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} for each new deal or intent, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
-  { title: "Attention counts a little", body: `${MOMENTUM.xShareWeight} when a Holder shares their own X post about the Club, one a day.` },
+  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. Each side pays the fee, so faking it costs real money.` },
+  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points for each new deal or signed swap, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
+  { title: "Attention counts a little", body: `${MOMENTUM.xShareWeight} points when a Holder shares their own X post about the Club, one a day.` },
   { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by staying busy.` },
 ];
 

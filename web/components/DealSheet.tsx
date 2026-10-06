@@ -9,7 +9,7 @@ import { Who } from "./Who";
 /**
  * The pieces of a deal's page (globals.css, "Deals"): a sheet with a stamped status, the two
  * sides on a stage, the terms as facts, and a dock with what this wallet can do next. Locked
- * deals, V2 deals and signed swaps all build their page from these, so they read as one thing.
+ * deals and signed swaps all build their page from these, so they read as one thing.
  */
 
 /** What a stamp can show. Locked deals use their display status; signed swaps map onto these. */

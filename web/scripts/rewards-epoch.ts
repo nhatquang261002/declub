@@ -83,7 +83,7 @@ async function main() {
   }
 
   const bonused = record.leaves.flatMap((l) => l.breakdown).filter((b) => (b.bonusBps ?? 0) > 0);
-  if (bonused.length > 0) console.log(`  Holder bonus: ${bonused.length} Holder payouts got an activity bonus`);
+  if (bonused.length > 0) console.log(`  Holder bonus: ${bonused.length} Holder payouts got a bonus`);
   const streaking = record.leaves.flatMap((l) => l.breakdown).filter((b) => (b.streak ?? 0) >= 2);
   if (streaking.length > 0) console.log(`  Streaks: ${streaking.length} Holder payouts had a streak bonus`);
 

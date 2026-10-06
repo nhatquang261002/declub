@@ -11,6 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const facts = await readDealFacts(id);
   if (!facts) return {};
+  // The root layout's title template adds the site name.
   const title = `Deal #${id}: ${dealTitle(facts)}`;
   const description =
     facts.status === "open"
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description,
-    openGraph: { title, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: "Deal preview on De(al) Club" }] },
+    openGraph: { title, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: "Deal preview on DeClub" }] },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }

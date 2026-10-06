@@ -25,6 +25,6 @@ Two things already pointed the other way. Clubs had the parts a community needs 
 
 ## Consequences
 
-- **Testnet must be redeployed.** Nothing deployed runs under the new names. The escrow's ABI didn't change, so locked deals still work against the old `OnDealV2` deployment; the old intents contract signs with the old domain, so signed swaps against it fail with the new app until `DeClubIntents` is deployed.
+- **Testnet must be redeployed.** The contracts run under the new names only once redeployed. Since then `DeClubEscrow` and `DeClubRewards` are deployed on testnet; `DeClubIntents` is not, and the old intents contract signs with the old domain, so the app keeps signed swaps off until it is.
 - **Store data is dropped.** Memberships, posts and the activity log start over under `declub:`. On testnet that's acceptable; there was no production data.
 - **One fewer contract to audit.** v1's tests (about 80) leave the suite with it.

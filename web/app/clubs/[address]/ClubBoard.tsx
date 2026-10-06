@@ -152,7 +152,7 @@ function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xH
                 disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}
               >
                 {post.isPending && <Spinner />}
-                {post.isPending ? (postStage === "sending" ? "Posting…" : "Sign in wallet…") : "Sign & post"}
+                {post.isPending ? (postStage === "sending" ? "Posting…" : "Confirm in wallet…") : "Sign & post"}
               </button>
             </div>
           </div>
@@ -167,7 +167,7 @@ function CantPost({ token, symbol, reason }: { token: string; symbol: string; re
   return (
     <div className="club-panel mb-5 flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
       <div>
-        <p className="font-extrabold">{reason === "join" ? "Join the conversation" : "Only holders post here"}</p>
+        <p className="font-extrabold">{reason === "join" ? "Join the conversation" : "Only Holders post here"}</p>
         <p className="mt-0.5 text-sm text-muted">
           {reason === "join"
             ? `Members of this Club can post notes and what they’re looking for. Joining shows your wallet on the Members list.`

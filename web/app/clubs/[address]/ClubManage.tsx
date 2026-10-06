@@ -96,7 +96,7 @@ function PageEditor({ token }: { token: string }) {
           onChange={(e) => setDraft({ ...current, holdersOnlyPosts: e.target.checked })}
         />
         <span>
-          <span className="font-bold">Only holders can post</span>
+          <span className="font-bold">Only Holders can post</span>
           <span className="block text-xs text-muted">Members who don’t hold the asset can still read and report. Moderators can always post.</span>
         </span>
       </label>

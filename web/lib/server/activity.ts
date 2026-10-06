@@ -22,8 +22,8 @@ import type { Store } from "./store";
  * hash is trusted, and a fake or repeated report records nothing new.
  *
  * One event goes into the log of every Club it names, once per Club however many of the Club's
- * assets it names. Deals made outside the app are missed until a watcher feeds the same function
- * (docs/09-clubs.md).
+ * assets it names. Deals made outside the app come in through the fill watcher (ADR 0019), which
+ * feeds the same function.
  */
 
 /** What this module needs from a receipt, so tests can hand one in without a node. */
@@ -81,7 +81,7 @@ export function viemReader(): Reader {
   };
 }
 
-/** The DeClubEscrow contracts whose events count. V2 is optional (see lib/config.ts). */
+/** The DeClubEscrow contracts whose events count. It is optional (see lib/config.ts). */
 export const ACTIVITY_CONTRACTS: Address[] = DECLUB_ESCROW_ADDRESS ? [DECLUB_ESCROW_ADDRESS] : [];
 
 export type IngestOptions = {

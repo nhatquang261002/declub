@@ -26,8 +26,7 @@ export default function AccountPage() {
 function NotConfigured() {
   return (
     <div className="page-section px-6 py-10 text-center text-sm text-muted">
-      Sign-in and linked accounts are off. Set <span className="font-mono">NEXT_PUBLIC_PRIVY_APP_ID</span> to
-      turn them on; until then you connect an installed wallet.
+      Sign-in and linked accounts aren&apos;t available here. Connect an installed wallet instead.
     </div>
   );
 }
@@ -88,8 +87,8 @@ function Account() {
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Your Club rewards</h2>
         <p className="mt-1 mb-4 text-sm text-muted">
-          What the Clubs you hold in paid this wallet from their swaps’ fees. Rewards go to your Club wallet, the one each
-          Club’s Members list shows; switch to it below to see its rewards here.
+          What Clubs have paid this wallet from their swap fees. Rewards go to your Club wallet (the one each Club’s Members list
+          shows); switch to it below to see its rewards here.
         </p>
         <RewardsClaim account={active} />
       </section>
@@ -98,7 +97,7 @@ function Account() {
         <h2 className="text-lg font-semibold">Linked accounts</h2>
         <p className="mt-1 text-sm text-muted">
           Link a Google, X or Discord account to your wallet to sign in with it later, without opening
-          your wallet first. They are for signing in and recovery. Nothing is shown to other traders unless you turn it on below.
+          your wallet first. They are for signing in and recovery. You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders unless you turn it on below.
         </p>
         <ul className="mt-4 flex flex-col gap-2">
           {socials.length === 0 && <li className="text-sm text-muted">Nothing linked yet.</li>}

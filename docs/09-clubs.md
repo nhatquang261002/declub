@@ -8,7 +8,7 @@ A **Club** is the community for one verified NFT collection, and the heart of De
 - **Board:** short posts from members: notes, and "Looking for" posts that can link a deal.
 - **Members:** a leaderboard ranked by member Momentum, with verified X or Discord handles ([ADR 0011](adr/0011-verified-profiles.md)) and a Holder badge.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
-- **Rewards:** a share of the fees the Club's swaps paid, to its Holders and its Owner, each week ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).
+- **Rewards:** a share of the fees the Club's swaps paid, to its 10 biggest Holders and its Owner, each week ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).
 
 No deal contract, matcher rule or pool rule depends on a Club: a deal settles the same either way. Rewards are paid after the fact, from a separate contract (`DeClubRewards`).
 
@@ -79,7 +79,7 @@ Rules:
 - Totals: Clubs, active Clubs, members, completed swaps this week. A "Your Clubs" row when signed in.
 - **Most active right now:** the top three Clubs by Momentum, as cards (cover, avatar, rank, heat, Momentum and its change, members, swaps in 7 days, last activity). Only Clubs with some Momentum; otherwise a note that it's quiet.
 - **Rising this week** (largest weekly gain) and **Most traded · 7 days** (completed swaps), five each.
-- **All Clubs:** search (name, symbol, address, of either asset of a paired Club), Collections / Memecoins (a paired Club is in both), and sorts: busiest, rising, most traded, most members, recently active, A–Z. A list view by default (rank, Club, heat, Momentum, members, swaps in 7 days, last active), or cards; the choice is remembered per browser. Twelve at a time with "Show more". Archived Clubs go last.
+- **All Clubs:** search (name, symbol, address, of either asset of a paired Club), All / With a memecoin, and sorts: busiest, rising, most traded, most members, recently active, A–Z. A list view by default (rank, Club, heat, Momentum, members, swaps in 7 days, last active), or cards; the choice is remembered per browser. Twelve at a time with "Show more". Archived Clubs go last.
 - The directory draws from the assets list at once; the numbers fill in from the server, and are left out, with a note, if it can't be reached.
 
 **`/clubs/[address]` header**
@@ -88,7 +88,7 @@ Rules:
 - Name, symbol, kind, a Verified chip (its tooltip is the list's note), when it was last active, an Archived chip, the description and links.
 - Join / Leave. Signed out it offers "Sign in to join"; without sign-in or a store it shows nothing and the Club is read-only. A member sees a Holder badge when they hold the asset, and Leave in the "⋯" menu beside it. Under Join: "Shows your wallet on the Members list."
 - Stats: Momentum and its trend (with an explanation) · members and holders · swaps in 7 days · new deals in 7 days · traders in 30 days · heat.
-- A side column: the heat scale (Quiet, Stirring, Active, Busy, Hot) with this Club's step marked, the top five traders, and the contract, kind and why it is verified.
+- A collapsed **Contract details** block under the header (`ClubDetails.tsx`): the contract and kind of each asset, and which holdings earn the badge. Heat (Quiet, Stirring, Active, Busy, Hot) is one of the header stats.
 - The open tab is in the URL, `?tab=market|board|members|rewards|manage`.
 - The Owner sees "*X* in the Club fund is ready" when the fund can be claimed, with a link to the Rewards tab. It is worded apart from "This Club has no Owner yet · Claim it", which claims the Club, not money.
 
@@ -109,7 +109,7 @@ Three views, switched with pills:
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
 
-**Rewards tab**: how the Club earns (the split from `REWARDS`), the epoch running and when it closes, **Your share** (ready to claim, on its way, earned here, and one **Claim** button for every open epoch), the latest epoch's fees, Holder pool, Club fund and what rolls over, who earned, **Share the week** (an X compose link with the epoch's fees and what the biggest Holders were paid, linking the Club page; `web/lib/recap.ts`), and earlier epochs.
+**Rewards tab**: how the Club earns (the split from `REWARDS`), the epoch running and when it closes, **Your share** (ready to claim, on its way, earned here, and one **Claim** button for every open epoch), the latest epoch's fees, Holder pool, Club fund and what rolls over, who earned, **Share the week** (a preview of the Club card first, then an X compose link with the epoch's fees and what the biggest Holders were paid, linking the Club page; `web/lib/recap.ts`), and earlier epochs.
 
 **Deep links**: not built yet. An asset row on a deal page doesn't link to its Club.
 
@@ -206,7 +206,7 @@ This is the first user-written content in the app. Every post is signed by its a
 
   With the X API configured, the account's numeric id is saved too, so a rename doesn't break it. `DELETE .../x {handle}` unlinks. The Club page shows linked accounts as "@handle ✓". Refusals: `bad_handle`, `already_linked`, `too_many_accounts`, `xlink_expired`, `xlink_mismatch`, `xlink_unavailable`.
 - **Counting only, by default.** With no `X_BEARER_TOKEN`, every counted X share adds the same points, and nothing is read again at the epoch: a post deleted on X after sharing still counts (hiding or deleting the Board post stops it). Quotes and replies of the project account and `t.co`-shortened Club links aren't detected; plain @-mentions, the address in the text and tags are.
-- **Reach, with the X API (in development, not turned on for a while):** the code is built but no `X_BEARER_TOKEN` is set, so the app runs counting only. With the token set, `npm run rewards:epoch` reads every X share of the epoch before building it (`GET /2/tweets`, 100 per call). It checks each share again:
+- **Reach, with the X API (built, off until `X_BEARER_TOKEN` is set):** with no token the app runs counting only. With the token set, `npm run rewards:epoch` reads every X share of the epoch before building it (`GET /2/tweets`, 100 per call). It checks each share again:
   - the author by X's numeric id (Privy's `subject`);
   - the signals, with the full links and the authors of quoted and replied-to posts, so a post can turn strong, or drop out if edited or deleted.
 
@@ -227,7 +227,7 @@ This is the first user-written content in the app. Every post is signed by its a
 - **The activity bonus** ([ADR 0024](adr/0024-x-posts-and-the-holder-bonus.md), [ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): a Holder's shares count up to 50% more (`REWARDS.maxBonusBps`) for their activity in the Club during the epoch, counted in full with no decay (`activityPoints`):
   - per **active day**, 2 (`dayPoints`): a UTC day with at least one visible top-level Board post by the member in the Club, at most 7 an epoch. Recorded when posted (`web/lib/server/activeDays.ts`, the first 3 posts a day); a deleted or hidden post counts for nothing. Replies don't count;
   - per X share, 3, halved for a weak one. Trading earns nothing: a member can wash trade against themselves ([ADR 0029](adr/0029-top-holders-and-posts-only-bonus.md));
-  - with reach on (in development, off for now), `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
+  - with reach on (needs `X_BEARER_TOKEN`), `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
 
   `bonus = 50% × min(1, points / 35)`: posting every day and sharing an own X post each day earns all of it without reach. Each holder payout in the record carries `shares`, `bonusBps` (activity plus streak), `points`, `days` and `streak`. Splitting holdings across accounts gains nothing but rounding.
 - **Streaks** ([ADR 0032](adr/0032-live-standings-active-days-and-replies.md)): an epoch with at least 3 active days (`streakMinDays`) keeps a member's streak going; from the second epoch in a row it adds `250 × (streak − 1)` basis points, up to 10% (`maxStreakBps`), on top of the activity bonus. Only the epoch builder writes streaks (`rewards:{chain}:streaks:{club}`, by user id), so a rebuild agrees. Members who aren't Holders keep streaks too; the Members list shows a flame from the second week.
@@ -238,7 +238,7 @@ This is the first user-written content in the app. Every post is signed by its a
 - **Claiming:** the screens read each leaf's epoch and `isClaimed` on chain and show it as on its way (not published or not open yet), ready, claimed or expired; **Claim** sends `claimMany` for every ready leaf. Anyone may claim for an account; the MON goes to the account.
 - **Reads:** `GET /api/rewards/epochs/[n]` (the whole epoch, cacheable for ever), `GET /api/rewards/me?account=` (an account's leaves with proofs), `GET /api/clubs/[token]/rewards` (the Club's line in the latest epochs, its carry and top earners).
 
-What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, and at most 75% comes back, shared with every Holder.
+What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, and at most 75% comes back, shared by the Club's 10 biggest Holders.
 
 ## Data (Upstash)
 
@@ -321,9 +321,9 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - **Data:** `web/data/assets.json`, `web/lib/verifiedAssets.ts` (`clubFor(token)`).
 - **Server:** `web/lib/server/activity.ts` (the log), `clubs.ts` (a Club's events from the log and the pool, its summary and detail), `clubRoutes.ts` (the read handlers, built over a registry so tests can use their own list), `members.ts` (membership, Holder checks, sync, the list) and `memberRoutes.ts` (its handlers, with the caller's gate injectable for tests), `board.ts` (posts, reports, bans, roles, the claim, the profile, the purge), `boardRoutes.ts` (its handlers), `clubState.ts` (roles, profile, bans and log documents; the admin list), the store ops (`addMember`, `removeMember`, `countMembers`), and the routes under `web/app/api/clubs/` and `web/app/api/activity/`.
 - **Shared:** `web/lib/momentum.ts` (the score), `web/lib/clubs.ts` (event and stats types, `summarize`, `settlementEvents`, `mergeEvents`) and `web/lib/members.ts` (`isHolder`, display wallet, stale-row picking, ranking), `clubRoles.ts` (the permission matrix, role changes) and `clubPosts.ts` (text cleaning, links, what each viewer sees, profile checks).
-- **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubSidebar.tsx` and `parts.tsx`.
+- **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubRewards.tsx`, `LiveStandings.tsx`, `ClubDetails.tsx` and `parts.tsx`.
 - **Hooks:** `useClubs`, `useClub`, `useClubMarket`, `useClubMembership` (with `useMyClubs`, `useClubMembers`), `useSignIn`, `useClubBoard` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`), on React Query and `useAccessToken`. Writes report errors through `useToast`; loads use `LoadError`.
-- **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's side column is `ClubSidebar.tsx`.
+- **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's collapsed details block is `ClubDetails.tsx`.
 - **Rewards:** `web/lib/rewards.ts` (the split, epochs, leaves), `web/lib/server/rewards.ts` (the builder and its reads), `rewardRoutes.ts`, `web/scripts/rewards-epoch.ts` (`npm run rewards:epoch`), `hooks/useRewards.ts`, `components/RewardsClaim.tsx` (Club tab and Account) and `app/clubs/[address]/ClubRewards.tsx`.
 - **Signed posts and follows:** `web/lib/social.ts` (typed data, drafts, parsing), `web/lib/lenses.ts`, `web/lib/server/follows.ts`, `socialRoutes.ts`, `createSignedPost` / `exportPosts` / `walletPosts` in `board.ts`, `hooks/useSocial.ts` (`useSocialSign`, `useFollows`) and `components/FollowButton.tsx`.
 - **X posts:** `web/lib/xPosts.ts`, `web/lib/server/xPosts.ts`, `xApi.ts`, `xReach.ts`, the card in `components/PostItem.tsx`, the Owner's panel in `ClubManage.tsx`.

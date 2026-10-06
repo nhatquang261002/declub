@@ -14,7 +14,7 @@ export default function RouteError({ error, retry }: { error: Error & { digest?:
   return (
     <ErrorPanel
       title="This page hit a problem"
-      message="Something broke while showing this page. Your assets and deals are safe: nothing moves without your signature."
+      message="Something broke while showing this page. Your assets and deals are safe: nothing moves without a transaction or signature from you."
       details={[error.message, error.digest && `Reference: ${error.digest}`].filter(Boolean).join("\n")}
       onRetry={retry}
     >

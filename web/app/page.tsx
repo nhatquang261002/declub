@@ -22,7 +22,7 @@ const STEPS = [
   {
     number: "03",
     title: "Own a share of the market",
-    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s biggest Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
+    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s ${REWARDS.maxHolders} biggest Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
   },
 ];
 
@@ -47,7 +47,7 @@ export default function HomePage() {
               <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own,
+              Every verified Monad NFT collection gets a Club, and its memecoin joins it. Members trade inside it, talk in posts they sign and own,
               and Holders earn a share of the fees their Club’s swaps pay.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -65,7 +65,7 @@ export default function HomePage() {
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
           <div className="hero-stat"><strong>{percent(REWARDS.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
           <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
-          <div className="hero-stat"><strong>Non-custodial</strong><span>Assets move only in swaps you approve</span></div>
+          <div className="hero-stat"><strong>Escrowed by a contract</strong><span>Assets move only in transactions or signatures you approve</span></div>
         </div>
       </section>
 
@@ -90,7 +90,7 @@ export default function HomePage() {
         <div>
           <p className="font-semibold">New to DeClub?</p>
           <p className="mt-1 text-sm text-muted">
-            Learn how Clubs, rewards and signed posts work, and how a swap settles safely.
+            Learn how Clubs, rewards and signed posts work.
           </p>
         </div>
         <Link href="/guide/clubs" className="btn-secondary shrink-0">Read the field guide</Link>
@@ -151,7 +151,7 @@ export default function HomePage() {
             </div>
           </div>
           <p className="mt-8 border-t border-white/15 pt-4 text-xs text-white/40">
-            Assets move only in transactions you approve.
+            Assets move only in transactions or signatures you approve.
           </p>
         </div>
       </footer>

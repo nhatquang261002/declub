@@ -1,6 +1,6 @@
 # ADR 0022: Club Rewards — a share of the fees goes back to the Club
 
-**Status:** Accepted · 2026-10-05 · New contract `DeClubRewards`, an epoch builder in the web server, and Rewards screens. Part of [ADR 0021](0021-declub-pivot.md). The spec is [09 · Clubs](../09-clubs.md#rewards). Amended by [ADR 0024](0024-x-posts-and-the-holder-bonus.md): Holders' shares now count up to 50% more for their activity in the epoch, including their X posts. Amended by [ADR 0025](0025-clubs-are-for-nft-collections.md): shares are one per NFT only; a Club's memecoin earns no shares.
+**Status:** Accepted · 2026-10-05 · New contract `DeClubRewards`, an epoch builder in the web server, and Rewards screens. Part of [ADR 0021](0021-declub-pivot.md). The spec is [09 · Clubs](../09-clubs.md#rewards). Amended by [ADR 0029](0029-top-holders-and-posts-only-bonus.md) (only the top 10 Holders are paid). Amended by [ADR 0024](0024-x-posts-and-the-holder-bonus.md): Holders' shares now count up to 50% more for their activity in the epoch, including their X posts. Amended by [ADR 0025](0025-clubs-are-for-nft-collections.md): shares are one per NFT only; a Club's memecoin earns no shares.
 
 ## Context
 

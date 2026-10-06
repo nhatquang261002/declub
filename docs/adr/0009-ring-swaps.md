@@ -71,7 +71,7 @@ Same as ADR 0008. In addition:
 
 - No extra deployment: the intents contract already handles rings through `settle`. The extra work is the matcher's cycle search, the worst-case gas test for `MAX_CYCLE`, ring-specific fuzz and invariants, and the "matched in a ring" UI.
 - New tests beyond ADR 0008's: rings of every length from 2 to `MAX_CYCLE`, a ring with one bad signature, one expired intent, one used nonce, a duplicate maker, a ring where one participant moved their asset, a hook token trying to re-enter, and a fuzz over random valid cycles that checks invariants N1 to N5 still hold.
-- Gas worst case is measured and recorded in [03 · Contract Design](../03-contract-design.md#gas-bounds), like V2's.
+- Gas worst case is measured and recorded in [03 · Contract Design](../03-contract-design.md#gas-worst-case-4-makers--10-nfts-each-way), like V2's.
 - Needs external review with ADR 0008.
 
 ## Decisions on the open questions (2026-10-01)

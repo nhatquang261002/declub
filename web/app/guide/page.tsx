@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -41,8 +42,15 @@ const START = [
   },
   {
     icon: <Image src="/brand/mon.svg" alt="" width={20} height={20} className="size-5" />,
-    title: "Get test MON",
-    body: <>You need a little test MON for gas, plus any MON you want to put in a deal.</>,
+    title: NETWORK.mainnet ? "Get MON" : "Get test MON",
+    body: NETWORK.mainnet ? (
+      <>You need a little MON for gas, plus any MON you want to put in a deal.</>
+    ) : (
+      <>
+        You need a little test MON for gas, plus any MON you want to put in a deal. Get some from the{" "}
+        <a href="https://faucet.monad.xyz" target="_blank" rel="noreferrer" className="font-bold underline">Monad faucet</a>.
+      </>
+    ),
   },
 ];
 
@@ -68,7 +76,7 @@ const MAKE_STEPS = [
     title: "Confirm",
     body: (
       <>
-        Check the summary, <b>Approve</b> each asset you offer, then <b>Create deal</b>. Your side and your share of
+        Check the summary, <b>Approve</b> each asset you offer, then <b>Create deal</b> (<b>Post open offer</b> for an open offer). Your side and your share of
         the fee are now held by the contract.
       </>
     ),
@@ -148,7 +156,7 @@ const FEES = [
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
-  `Most of it goes back to the community: ${percent(REWARDS.holderBps)} to the traded asset's Club top Holders and ${percent(REWARDS.fundBps)} to its Club fund, each week.`,
+  `When a swap includes a verified Club's asset, ${percent(REWARDS.holderBps)} of the fee goes each week to that Club's ${REWARDS.maxHolders} biggest Holders and ${percent(REWARDS.fundBps)} to its Club fund. The protocol keeps the rest.`,
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [
@@ -213,6 +221,8 @@ const FAQ_ITEMS = [
   ...FAQ.slice(5),
 ];
 
+export const metadata: Metadata = { title: "Deals guide" };
+
 export default function GuidePage() {
   return (
     <div className="space-y-10 pb-10">
@@ -257,7 +267,8 @@ export default function GuidePage() {
           <CardGrid items={KINDS} />
           <p className="mt-4 text-sm leading-6 text-muted">
             Each side holds up to 10 assets: any mix of NFTs, tokens and MON. To make a deal for one person, put their
-            wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b>.
+            wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b> (<b>Only this wallet can send offers</b> on an open offer). A live or settled deal can be shared
+            with <b>Share on X</b>, which shows a preview card first.
           </p>
         </Section>
 
@@ -338,7 +349,7 @@ export default function GuidePage() {
                 <table className="w-full min-w-[34rem] text-left text-sm">
                   <thead>
                     <tr className="text-xs tracking-wider text-[#4e5968] uppercase">
-                      <th className="px-5 py-3" />
+                      <th className="px-5 py-3"><span className="sr-only">Feature</span></th>
                       <th className="px-5 py-3 font-black">Lock assets now</th>
                       <th className="px-5 py-3 font-black">Sign only</th>
                     </tr>
@@ -395,7 +406,7 @@ export default function GuidePage() {
         </Section>
 
         <GuideFooter
-          other={{ href: "/guide/clubs", title: "Clubs guide", body: "Join a community, earn a Holder badge, and post what you're after." }}
+          other={{ href: "/guide/clubs", title: "Clubs guide", body: "Join a Club, share in its fees, and post what you're after." }}
         />
       </GuideBody>
     </div>

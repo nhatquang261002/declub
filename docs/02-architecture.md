@@ -169,9 +169,10 @@ The first deployment's creation bytecode (the v1 escrow and MockChog; solc 0.8.2
 
 ### Deployed (testnet)
 
-The current DeClub contracts are not deployed to testnet yet. Deploy them
-fresh from [`contracts/script/`](../contracts/script/README.md); existing
-deployments use retired names and domains.
+`DeClubEscrow` and `DeClubRewards` are deployed on testnet (the demo
+deployment, see the README and `contracts/broadcast/`). `DeClubIntents` is not: the
+retired `OnDealIntents` signs with an older EIP-712 domain, so the app keeps
+signed swaps off until it is deployed. Deploy it from [`contracts/script/`](../contracts/script/README.md).
 
 A few Monad specifics that affect the design:
 

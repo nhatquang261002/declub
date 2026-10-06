@@ -100,7 +100,7 @@ const clip = (text: string) => (text.length > 70 ? `${text.slice(0, 69)}…` : t
 export function dealPost(f: DealFacts, club?: string): string {
   const give = clip(f.give);
   const want = clip(f.want);
-  const where = club ? `In the ${club} Club on De(al) Club.` : "On De(al) Club.";
+  const where = club ? `In the ${club} Club on DeClub.` : "On DeClub.";
   if (f.status === "filled") return `Swapped ${give} for ${f.openOffer ? "an offer I accepted" : want} ✅\n\n${where} Escrowed on Monad, atomic, done.`;
   if (f.status === "open" && f.openOffer) return `Offering ${give}, open to offers 🤝\n\n${where} Escrowed on Monad. Make me an offer 👇`;
   if (f.status === "open") return `Offering ${give} for ${want} 🤝\n\n${where} Escrowed on Monad: both sides or nothing. Take the deal 👇`;

@@ -8,7 +8,7 @@ The in-app version of this guide has two bases, side by side: **Deals** at `/gui
 
 - **Sign in** (top right) opens Privy. You can use Google, X, Discord or a wallet; the wallet option is listed first. If you sign in with a social account and this browser has no wallet for it, the button turns into **Connect wallet** or **Link a wallet**.
 - On a deployment without Privy, the button says **Connect wallet** and lists the wallets installed in your browser.
-- On the wrong network the button turns into **Switch to Monad Testnet**.
+- On the wrong network the button turns into **Switch to Monad Testnet** (**Switch to Monad** on mainnet).
 - You need test MON for gas, and for any MON you put in a deal.
 
 ## Make a deal
@@ -16,7 +16,7 @@ The in-app version of this guide has two bases, side by side: **Deals** at `/gui
 Press **Create deal**. The form has three steps: **Deal type**, **Your assets**, **Confirm**.
 
 1. **Deal type.** If signed swaps are on, you first choose how the deal settles (see [Locked deals or signed swaps](#locked-deals-or-signed-swaps)). Then you choose one of three kinds:
-   - **Open offer:** post what you give, with an optional note of up to 280 characters, and let people send you offers. You pick the one you like.
+   - **Open offer:** post what you give, with an optional note of up to 280 bytes (plain text, so about 280 characters), and let people send you offers. You pick the one you like.
    - **Request exact assets:** name what you want back. Whoever holds it can accept in one transaction.
    - **Request by trait:** ask for NFTs with a trait, like "any 2 Chogs with a Crown hat". Paste a collection's address (or tap **Chog**), pick up to five trait values, choose *any of* or *all of*, and set how many. You can add several trait requests, and exact assets beside them.
 2. **Your assets.** Add what you give with **+ MON**, **+ Token** or **+ NFT**. The NFT picker shows what your wallet holds, or you can paste a collection address and an id. Then decide who can take it (anyone, or **Only this wallet can accept**) and when it expires: 1 hour, 24 hours (the default), 7 days or Never. A side holds up to 10 assets.
@@ -78,14 +78,15 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 - **Locked deals** take it in MON with your side, hold it, and refund it if the deal doesn't complete. A deal keeps the fee it was listed with, for both sides.
 - **Signed swaps** take it in WMON from your wallet when the swap settles. You sign the most you'll pay; if the fee is cut before then, you pay less.
 - The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. It can never go above a ceiling set when the contract was deployed ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)).
-- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
+- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's 10 biggest Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
 - You also pay Monad's network gas.
 
 ## Finding deals and keeping track
 
 - **Deals** lists everything open. Tabs: **Open**, **For you** (deals made for your wallet) and **All**. Search by NFT id, token symbol or address, or the maker's wallet; filter by MON or by type (**Locked** or **Signed**); sort by **Newest first** or **Ending soon**. Type a page number to jump to it.
 - **History** shows the deals your wallet made, took or filled, signed swaps included, with counts of active, completed and expired deals.
-- **The bell** tells you about a deal made for you, a deal of yours that was accepted, is about to expire or has expired, and a signed swap that settled, paused or was dropped. When signed in, what you've read syncs across devices. You can also turn on browser alerts.
+- **The bell** tells you about a deal made for you, a deal of yours that was accepted, is about to expire or has expired, and a signed swap that settled, paused or was dropped. When signed in it also carries Club news: replies and likes on your posts, your pins, X posts that counted, rewards you earned, your rank in a running epoch and a nudge when an epoch is about to close. What you've read syncs across devices. You can also turn on browser alerts.
+- **Share on X.** On a live deal, or one that went through, press **Share on X** (or **Share the swap on X**). The app first shows a preview of the card; the button there opens X with the text and the deal's link.
 
 ## Account
 
@@ -104,10 +105,10 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
-- **Rewards:** what the Club's swaps paid in fees, what went to its Holders and its Owner, and your share to claim.
+- **Rewards:** what the Club's swaps paid in fees, what went to its top 10 Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
 
-**Joining.** Sign in, link a wallet, and press **Join**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. **Leave** takes you off the list again.
+**Joining.** Sign in, link a wallet, and press **Join Club**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. To leave, open the **⋯** menu next to it and choose **Leave this Club**.
 
 **Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection; in a Club with a memecoin, also the coin, if the Owner lets it count, from the minimum they set). It is what they held **at the last check**, which the app repeats about once a day. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
 
@@ -121,13 +122,17 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - you posted it on X in the last 48 hours;
 - it is about the Club: it links the Club or its token, mentions, quotes or replies to the project's X account (shown as "@handle ✓" on the Club page), or uses one of the Club's tags (a tag alone counts half). The composer lists them.
 
-One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. For now every counted X post adds the same, however it does on X. Counting likes, reposts, quotes and replies (and dropping X posts you delete) is in development and not coming soon.
+One X post a day counts per Club, and each X post counts once. If yours didn't count, the app says why. If a moderator hides your Board post, it stops counting. For now every counted X post adds the same, however it does on X. Counting likes, reposts, quotes and replies (and dropping X posts you delete) is built, and switched on by the operator with `X_BEARER_TOKEN`.
 
 **Your posts are signed.** When you press **Sign & post**, your Club wallet (the one the Members list shows for you) signs the post. It costs no gas and moves nothing. If another wallet is connected, the app asks you to switch first. Because each post is signed, it's your own record: anyone can check it, and each Club's posts are public with their signatures at `/api/clubs/<address>/feed`, yours across Clubs at `/api/wallets/<your wallet>/posts`.
 
 **Choosing the order.** Above the Board, pick a lens: **Newest**; **Most active**, where posts from the members most active in the Club (trading, and their X posts about it) rise and older ones sink; **Holders**, only posts from members who hold it; or **Following**, only posts from wallets you follow (connect a wallet to see it). Pinned posts stay on top, except under Following.
 
+**Replies and likes.** Reply to a post once, one level deep (you can't reply to a reply), and like posts you value (not your own). Both are signed with your Club wallet. They earn nothing, so they are not worth farming; the author sees them in the bell.
+
 **Following.** Press **Follow** beside a member's name, on a post or in the Members list. Your connected wallet signs the follow, which must be one of the wallets linked to your account. Press again to unfollow. Your follows are public at `/api/wallets/<your wallet>/follows`.
+
+**Active days, streaks and live standings.** On the **Rewards** tab, **Live standings** shows where you stand in the running epoch: your rank among the Holders, what you'd get if it closed now, and how many of the 7 active days you've posted on. A day is active when you have a visible top-level Board post that UTC day. Post on 3 or more days in an epoch, week after week, and a streak adds to your bonus (see *Rewards*). Standings refresh about every five minutes, and holdings are read when the epoch is built, shortly after it ends.
 
 **Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different Holders (or staff) have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it. Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
 
@@ -135,14 +140,14 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
-- **50%** of those fees goes to the Club's **Holders**: members whose linked wallets hold the collection when the epoch is worked out. Each NFT is one share. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
-  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: trading there (10 points a swap), and sharing your own X posts about the Club on its Board (3 points each, one a day). 50 points earn the full 50%. Every counted post earns the same; counting X engagement (well-received posts earning up to 30 more points a week) is in development and not coming soon. A Holder who does nothing still gets their base share.
+- **50%** of those fees goes to the Club's **10 biggest Holders**: members whose linked wallets hold the most of the collection when the epoch is worked out (a tie goes to whoever joined first). Each NFT is one share, summed over your linked wallets. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
+  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: 2 points for each UTC day you posted on the Board (up to 7 days), and 3 points for each of your own X posts about the Club shared on its Board (one a day). 35 points earn the full 50%. Posting on 3 or more days of an epoch, week after week, adds a streak bonus of up to 10% more. Trading, likes and replies earn nothing. Counting X engagement (well-received posts earning up to 30 more points a week) is built but switched off until the operator sets `X_BEARER_TOKEN`; until then every counted post earns the same. A Holder who does nothing still gets their base share.
 - **25%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.
 
 A swap that names two Clubs' assets splits its fee between them. If a Club has no Holder members yet, or no Owner, that part waits and is added to the next week's.
 
-**Claiming.** After an epoch ends it is worked out and published, and claims open a day later, so a mistake can be caught first. Then press **Claim** on a Club's **Rewards** tab or on your **Account** page: one claim collects every open week, in MON. Anyone can send a claim for you, but the MON always goes to your wallet. Unclaimed rewards can be collected for 90 days.
+**Claiming.** After an epoch ends it is worked out and published, and claims open a day later (the default; a deployment can set another delay), so a mistake can be caught first. Then press **Claim** on a Club's **Rewards** tab or on your **Account** page: one claim collects every open week, in MON. Anyone can send a claim for you, but the MON always goes to your wallet. Unclaimed rewards can be collected for 90 days.
 
 Every week's numbers, and the proof for every payout, are public at `/api/rewards/epochs/<n>`. Rewards say a market has been busy, not that an asset is safe; and trading with yourself to earn them loses money, because each side pays the whole fee and only part of it comes back, shared with every Holder.
 

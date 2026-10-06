@@ -110,7 +110,6 @@ const isAdmin = (deps: Deps, userId: string) => (deps.admins ?? adminIds()).has(
 export const postsKey = (token: string) => `declub:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
 export const postKey = (token: string, id: string) => `declub:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 export const reportsKey = (token: string, id: string) => `declub:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
-/** Every signed post a wallet wrote, across Clubs, as `club:id`, newest first. */
 /** The members who liked a post, and the posts a member liked in a Club (to mark them on a read). */
 export const likesKey = (token: string, id: string) => `declub:club-likes:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 export const likedKey = (token: string, userId: string) => `declub:club-liked:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
@@ -118,6 +117,7 @@ export const likedKey = (token: string, userId: string) => `declub:club-liked:${
 /** The replies to a post (ADR 0032), by id. */
 export const repliesKey = (token: string, id: string) => `declub:club-replies:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
+/** Every post and reply a wallet wrote, across Clubs, as `club:id`, newest first. */
 export const walletPostsKey = (wallet: string) => `declub:wallet-posts:${CHAIN_ID}:${wallet.toLowerCase()}`;
 /** The reports that count toward hiding a post: those filed by Holders and staff. */
 export const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
@@ -137,7 +137,7 @@ const log = (store: Store, entry: AssetEntry, actor: Actor, action: string, targ
 const tokensOf = (assets: readonly { kind: string; token?: string }[]) =>
   assets.filter((a) => a.kind !== "native" && a.token).map((a) => a.token!.toLowerCase());
 
-/** The real lookup: V2's `getTrade`, or the pool's intent. */
+/** The real lookup: DeClubEscrow's `getTrade`, or the pool's intent. */
 export async function resolveLink(link: PostLink): Promise<string[] | null> {
   if (link.kind === "x") return null;
   if (link.kind === "intent") {

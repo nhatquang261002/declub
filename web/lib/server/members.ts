@@ -28,7 +28,7 @@ import type { Store } from "./store";
 /**
  * Club membership in the store (ADR 0016, docs/09-clubs.md). A member is a Privy user, kept by
  * user id; their wallets are copied from Privy's linked accounts, never from a request. The Holder
- * badge is a balance read on the server and is out of date by at most a day.
+ * badge is a balance read on the server and is usually out of date by less than a day (see `listMembers`).
  */
 
 export const membersKey = (token: string) => `declub:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
@@ -186,7 +186,7 @@ export const memberCount = (store: Store, token: string) => store.countMembers(m
 
 /**
  * The Club's members, ranked. Balances older than a day are re-read first (at most
- * `RECHECK_PER_READ` per call, in one multicall each), so the badge never lags by more than that.
+ * `RECHECK_PER_READ` per call, in one multicall each), so the badge usually lags by less than a day; a big or unread Club can lag longer.
  */
 export async function listMembers(
   store: Store,

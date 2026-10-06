@@ -29,7 +29,7 @@ const COPY: Record<string, string> = {
   SameAssetBothSides: "The same asset can't be on both sides of a deal.",
   UnsupportedToken: "This token takes a fee on transfer or otherwise changes amounts, so it can't be escrowed.",
   NftNotReceived: "The NFT didn't arrive in escrow, so the deal wasn't created.",
-  NoteTooLong: "The note is too long. Keep it under 280 bytes.",
+  NoteTooLong: "The note is too long. Keep it to at most 280 bytes.",
   NotOpenOffer: "This deal has a fixed ask, so it doesn't take offers.",
   OpenOfferNoFill: "This is an open offer. Send the maker an offer instead of accepting it directly.",
   SelfPropose: "You can't make an offer on your own deal.",
@@ -91,7 +91,7 @@ export function describeError(error: unknown): AppError {
   const details = (message: string) => (raw && raw !== message ? clip(raw) : undefined);
 
   if (error instanceof PoolError) {
-    return { kind: "pool", title: "Intent pool refused this", message: error.message, details: `Pool code: ${error.code}` };
+    return { kind: "pool", title: "Swap pool refused this", message: error.message, details: `Pool code: ${error.code}` };
   }
 
   const rejected =
