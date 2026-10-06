@@ -9,6 +9,7 @@ import {
   X_CARD_TEXT_MAX,
   clubSignals,
   isXHandle,
+  isXImage,
   matchSignals,
   parseXStatus,
   postedAtOf,
@@ -100,7 +101,36 @@ export async function oembedLookup(id: string): Promise<XCard | null> {
   }
   const text = await readCapped(res, MAX_OEMBED_BYTES);
   if (text === null) throw new Error("oEmbed answer too large");
-  return cardFromOembed(id, JSON.parse(text));
+  const card = cardFromOembed(id, JSON.parse(text));
+  if (!card) return null;
+  // oEmbed has no media, only a "pic.twitter.com/…" link in the text: ask the syndication endpoint.
+  const image = await syndicationImage(id).catch(() => undefined);
+  if (!image) return card;
+  // The trailing link only points at the media we now draw.
+  const stripped = card.text.replace(/(?:\s*https?:\/\/t\.co\/\w+)?\s*pic\.(?:twitter|x)\.com\/\w+\s*$/i, "").replace(/\s*https?:\/\/t\.co\/\w+\s*$/i, "").trim();
+  return { ...card, text: stripped || card.text, image };
+}
+
+const SYNDICATION = "https://cdn.syndication.twimg.com/tweet-result";
+
+/** The first photo (or a video's poster) of a post, from X's keyless embed endpoint; best effort. */
+export async function syndicationImage(id: string): Promise<string | undefined> {
+  const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+  const res = await fetch(`${SYNDICATION}?id=${id}&token=${token}&lang=en`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), redirect: "error" });
+  if (!res.ok) {
+    await res.body?.cancel().catch(() => {});
+    return undefined;
+  }
+  const text = await readCapped(res, MAX_OEMBED_BYTES * 8);
+  return text === null ? undefined : imageFromSyndication(JSON.parse(text));
+}
+
+/** The image URL in a syndication answer, only when it is on X's image host. */
+export function imageFromSyndication(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const { mediaDetails, photos } = body as { mediaDetails?: { media_url_https?: unknown }[]; photos?: { url?: unknown }[] };
+  const found = [mediaDetails?.[0]?.media_url_https, photos?.[0]?.url].find(isXImage);
+  return found;
 }
 
 /** The member's X account as Privy verified it: its handle and X's numeric id. */

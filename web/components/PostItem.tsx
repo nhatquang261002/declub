@@ -10,6 +10,7 @@ import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions, useClubReplies } from "@/hooks/useClubBoard";
 import { POST_MAX, type PostLink, type PublicPost, type StoredXCard } from "@/lib/clubPosts";
+import { isXImage } from "@/lib/xPosts";
 import { isOwnerOrAdmin, isStaff } from "@/lib/clubRoles";
 import { ago, shortAddress } from "@/lib/format";
 import type { ViewerRole } from "@/hooks/useClubMembership";
@@ -51,6 +52,12 @@ function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: num
         )}
       </span>
       {card && <p className="x-card-text">{card.text}</p>}
+      {isXImage(card?.image) && (
+        <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="x-card-media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={card.image} alt="Picture from the X post" loading="lazy" referrerPolicy="no-referrer" />
+        </a>
+      )}
       <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="x-card-open">
         View on X <ExternalIcon className="size-3" />
       </a>

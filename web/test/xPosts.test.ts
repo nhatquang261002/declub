@@ -13,7 +13,7 @@ import { joinClub } from "../lib/server/members";
 import { buildEpoch } from "../lib/server/rewards";
 import { memoryStore, type Store } from "../lib/server/store";
 import { parsePosts, type XApiPost } from "../lib/server/xApi";
-import { cardFromOembed, plainText, readXShares, startXLink, unlinkX, verifyXLink, xShareEvents } from "../lib/server/xPosts";
+import { cardFromOembed, imageFromSyndication, plainText, readXShares, startXLink, unlinkX, verifyXLink, xShareEvents } from "../lib/server/xPosts";
 import { collectReach } from "../lib/server/xReach";
 import { draftPost, linkString } from "../lib/social";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
@@ -133,6 +133,15 @@ describe("reading X", () => {
     assert.equal(card?.text, "If only Bradley's arm was longer. #oscars & more");
     assert.equal(cardFromOembed("1", { html: "<p>x</p>" }), null);
     assert.equal(plainText("a<br>b&#x41;&lt;"), "a bA<");
+  });
+
+  it("takes a post's picture only from X's image host", () => {
+    const photo = "https://pbs.twimg.com/media/A7EiDWcCYAAZT1D.jpg";
+    assert.equal(imageFromSyndication({ mediaDetails: [{ media_url_https: photo }] }), photo);
+    assert.equal(imageFromSyndication({ photos: [{ url: photo }] }), photo);
+    assert.equal(imageFromSyndication({ mediaDetails: [{ media_url_https: "https://evil.example/a.jpg" }] }), undefined);
+    assert.equal(imageFromSyndication({}), undefined);
+    assert.equal(imageFromSyndication(null), undefined);
   });
 
   it("reads the X API's posts: engagement, entities and who they quote", () => {

@@ -45,7 +45,12 @@ export type XCard = {
   text: string;
   /** Epoch ms, from the id; `null` for the oldest ids. */
   postedAt: number | null;
+  /** The post's first photo (or a video's poster), an https://pbs.twimg.com/ URL; absent when it has none. */
+  image?: string;
 };
+
+/** Only X's own image host is ever drawn, whatever a stored card says. */
+export const isXImage = (value: unknown): value is string => typeof value === "string" && /^https:\/\/pbs\.twimg\.com\/[\w./~-]{1,200}$/.test(value);
 
 export const X_CARD_TEXT_MAX = 400;
 
