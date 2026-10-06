@@ -8,8 +8,9 @@ lives in the git log and the relevant ADRs.
 - [x] DeClub contracts, rewards, signed social and Club screens
 - [x] Local contract, matcher, web and e2e test suites
 - [x] Demo world and repeatable testnet seeding scripts
-- [ ] Deploy `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` to testnet
-- [ ] Verify the deployments on Sourcify and configure the root `.env`
+- [x] Deploy `DeClubEscrow` and `DeClubRewards` to testnet (demo deployment, root `.env` set)
+- [ ] Deploy `DeClubIntents` to testnet: the root `.env` still points at the retired `OnDealIntents`, whose EIP-712 domain doesn't match, so signed swaps fail
+- [ ] Verify the deployments on Sourcify
 - [ ] Run the manual testnet pass with two real wallets
 - [ ] Run the rewards epoch and claim flow on testnet
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
@@ -32,3 +33,4 @@ lives in the git log and the relevant ADRs.
 - [09 · Clubs](09-clubs.md)
 - [11 · Test plan](11-test-plan.md)
 - [12 · Demo](12-demo.md)
+- [13 · Why communities move, and how we grow](13-go-to-market.md)

@@ -17,10 +17,12 @@ and [Club specification](docs/09-clubs.md) for details.
 
 ## Status
 
-The protocol, web app, matcher and rewards flow are implemented. The remaining
-release work is a fresh testnet deployment of the current DeClub contracts and
-a manual click-through with real wallets. See the [roadmap](docs/06-roadmap.md)
-and [test plan](docs/11-test-plan.md).
+The protocol, web app, matcher and rewards flow are implemented. `DeClubEscrow`
+and `DeClubRewards` are deployed on Monad testnet. `DeClubIntents` is not yet,
+so signed swaps don't work on testnet until it is. The remaining release work is
+that deployment, a manual click-through with real wallets and a rewards epoch
+run end to end. See the [roadmap](docs/06-roadmap.md) and
+[test plan](docs/11-test-plan.md).
 
 ## Privy
 
@@ -30,12 +32,18 @@ uses an injected wallet. See [docs/10-privy.md](docs/10-privy.md).
 
 ## Deployments
 
-The current DeClub contracts are not deployed to testnet yet. Deploy them with
-the instructions in [contracts/script/README.md](contracts/script/README.md),
-then put the printed addresses in the root `.env`.
+On Monad testnet (chain `10143`):
 
-Existing testnet deployments use retired contract names and domains. Do not
-use them with the current app.
+| Contract | State |
+| --- | --- |
+| `DeClubEscrow` | Deployed for the [demo world](docs/12-demo.md) (fixed 0.05 MON fee per side) |
+| `DeClubRewards` | Deployed for the demo world, the bank wallet is the operator |
+| `DeClubIntents` | **Not deployed.** The address in `.env` is the retired `OnDealIntents`, which signs with an older EIP-712 domain, so the app's signed swaps fail against it |
+
+Deploy `DeClubIntents` with the instructions in
+[contracts/script/README.md](contracts/script/README.md), then put the printed
+address and block in the root `.env`. The addresses are in the broadcast records
+under `contracts/broadcast/`.
 
 ## Repository map
 

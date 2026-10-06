@@ -297,7 +297,9 @@ The printed deploy blocks are the simulation block, a lower bound; the exact blo
 
 ### Deployed vs source
 
-The current DeClub contracts are not deployed to testnet yet. Deploy
-`DeClubEscrow`, `DeClubIntents` and `DeClubRewards` with the instructions in
-[`contracts/script/README.md`](../contracts/script/README.md) before using the
-app against testnet.
+On testnet, `DeClubEscrow` and `DeClubRewards` are deployed (the
+[demo deployment](12-demo.md)). `DeClubIntents` is not: the intents contract
+there is the retired `OnDealIntents`, whose EIP-712 domain differs. Deploy it
+with the instructions in
+[`contracts/script/README.md`](../contracts/script/README.md) before using
+signed swaps against testnet.
