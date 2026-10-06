@@ -113,7 +113,7 @@ export default function HomePage() {
               </p>
             </div>
             <a
-              href="mailto:support@on-deal.app"
+              href="mailto:support@declub.app"
               className="rounded-xl border border-[#f0b735] px-4 py-3 font-semibold text-[#f0b735] transition-colors hover:bg-[#f0b735] hover:text-[#111318]"
             >
               Need a hand? Contact support <span aria-hidden>↗</span>

@@ -105,7 +105,7 @@ Status key: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Deploy `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` on testnet, verify them on Sourcify, and set the addresses in `.env` and the README
 - [ ] Click-through on testnet with real wallets: join as a Holder, swap, build and publish a short epoch, claim as a Holder and as the Owner, sign a post, follow, switch lenses, read the exports
 - [x] Slither on `DeClubRewards` (0.11.6, 2026-10-06), triaged into [04 · Security](04-security.md#static-analysis): 15 results, none a bug
-- [ ] Rename the repo folder and the GitHub repository; the support address (`support@on-deal.app`) still names the old domain
+- [x] Rename the repo folder and the GitHub repository; support is now available at `support@declub.app`
 - [ ] Later: holder governance (signed votes on Moderators and Club-fund grants), curator credit for "Looking for" posts that lead to a swap, trade-receipt badges
 
 ## Open questions
