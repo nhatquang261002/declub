@@ -97,7 +97,7 @@ export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: 
 export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
   return (
     <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
-      <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+      <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
         <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
           gives
         </span>
@@ -106,7 +106,7 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
       <span className="deal-card-seal" aria-hidden>
         <SwapIcon />
       </span>
-      <div className="relative rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+      <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
         <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
           wants
         </span>
