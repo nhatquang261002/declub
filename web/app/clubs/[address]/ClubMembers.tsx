@@ -74,7 +74,8 @@ function staffActions(viewer: ViewerRole | undefined, m: PublicMember, actions: 
     roles.push({
       label: "Hand over the Club",
       icon: <CrownIcon />,
-      confirm: "Hand the Club to this member? You become a regular member.",
+      confirm: "Hand the Club to this member?",
+      confirmNote: "You become a regular member.",
       onSelect: () => actions.role.mutate({ wallet: m.wallet, role: "owner" }),
     });
   }
@@ -82,7 +83,8 @@ function staffActions(viewer: ViewerRole | undefined, m: PublicMember, actions: 
     label: "Ban from the Club",
     icon: <BanIcon />,
     danger: true,
-    confirm: "Ban this member from the Club? They are removed and can’t rejoin.",
+    confirm: "Ban this member?",
+    confirmNote: "They are removed from the Club and can’t rejoin.",
     onSelect: () => actions.ban.mutate({ wallet: m.wallet }),
   };
   return [roles, [ban]];

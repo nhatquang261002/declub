@@ -108,7 +108,10 @@ export function PostItem({
 
   const own: MenuAction[] = [];
   if (role !== undefined && !post.mine && !post.hidden) {
-    own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post to the Club’s moderators?", onSelect: () => actions.report(post.id) });
+    own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post?",
+      confirmNote: "The Club’s moderators will be asked to look at it. If enough members report it, it is hidden until they decide.",
+      confirmLabel: "Report",
+      onSelect: () => actions.report(post.id) });
   }
   if (role !== undefined && (post.mine || staff)) {
     own.push({
@@ -116,6 +119,7 @@ export function PostItem({
       icon: <TrashIcon />,
       danger: true,
       confirm: post.parent ? "Delete this reply?" : post.replies ? "Delete this post and its replies?" : "Delete this post?",
+      confirmNote: "This can’t be undone.",
       onSelect: () => actions.remove(post.id),
     });
   }
@@ -134,7 +138,9 @@ export function PostItem({
       label: "Ban author",
       icon: <BanIcon />,
       danger: true,
-      confirm: "Ban this member from the Club? They are removed and can’t rejoin.",
+      confirm: "Ban this member?",
+      confirmNote: "They are removed from the Club and can’t rejoin.",
+      confirmLabel: "Ban",
       onSelect: () => actions.ban(post.id),
     });
   }
