@@ -83,6 +83,7 @@ Older still, all retired: a later `OnDealV2` at `0x67a4a4ddfab155689ce2ee40c9c21
 | [`docs/09-clubs.md`](docs/09-clubs.md)                     | Clubs, Momentum, Rewards and signed posts: the spec, roles, data, API             |
 | [`docs/10-privy.md`](docs/10-privy.md)                     | What Privy powers, why embedded wallets are off by default, demo script and setup   |
 | [`docs/11-test-plan.md`](docs/11-test-plan.md)           | Pre-mainnet test plan: automated suites, manual testnet cases, go/no-go and canary   |
+| [`docs/12-demo.md`](docs/12-demo.md)                     | The testnet demo world: mirrored mainnet Clubs, personas, real swaps, and how to rebuild it |
 | [`docs/adr/`](docs/adr/README.md)                          | Architecture decision records ([index](docs/adr/README.md))                         |
 | [`contracts/`](contracts/)                                 | Foundry project: `src/DeClubEscrow.sol`, `src/DeClubIntents.sol`, `src/FeeAdmin.sol`, `src/mocks/`, tests, deploy scripts (`DeployEscrow`, `DeployIntents`, `DeployChog`) |
 | [`matcher/`](matcher/)                                     | Intent pool (HTTP + sqlite) and local matcher for signed intents ([README](matcher/README.md)) |
