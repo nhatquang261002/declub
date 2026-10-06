@@ -12,11 +12,16 @@ contract DeClubRewardsLeafFixtureTest is Test {
     address internal constant AT = 0x00000000000000000000000000000000000000eE;
     address internal constant ALICE = 0xAAaA000000000000000000000000000000000001;
     address internal constant OPERATOR = address(0x0b);
-    bytes32 internal constant ROOT = 0x900ceb6b4bf39dfec8495853b364500f485ff7d96e81b0b3c48b73c3fe604c65;
+    bytes32 internal constant ROOT =
+        0x900ceb6b4bf39dfec8495853b364500f485ff7d96e81b0b3c48b73c3fe604c65;
 
     function test_aRootBuiltByTheWebAppPays() public {
         vm.chainId(10143);
-        deployCodeTo("DeClubRewards.sol:DeClubRewards", abi.encode(OPERATOR, uint256(0), uint256(90 days)), AT);
+        deployCodeTo(
+            "DeClubRewards.sol:DeClubRewards",
+            abi.encode(OPERATOR, uint256(0), uint256(90 days)),
+            AT
+        );
         DeClubRewards rewards = DeClubRewards(payable(AT));
 
         vm.deal(OPERATOR, 6 ether);

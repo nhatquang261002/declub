@@ -360,9 +360,9 @@ const getPost = (store: Store, token: string, id: string) =>
 export async function listPosts(
   store: Store,
   entry: AssetEntry,
-  viewer: { userId?: string; lens?: LensId; as?: string },
+  viewer: { userId?: string; lens?: LensId; as?: string; offset?: number; limit?: number },
   deps: Deps = {},
-): Promise<{ posts: PublicPost[]; role: ClubRole | null }> {
+): Promise<{ posts: PublicPost[]; role: ClubRole | null; total: number }> {
   const token = entry.address.toLowerCase();
   const role = viewer.userId ? await roleIn(store, token, viewer.userId, deps) : null;
   const staff = role !== null && isStaff(role);
@@ -382,7 +382,9 @@ export async function listPosts(
   const lens = lensOf(viewer.lens);
   const ranked = lens.rank(recent.filter((p) => !lens.pins || !pinned.includes(p.id)), await lensContext(store, entry, lens.id, viewer.as, deps));
   const pinnedPosts = lens.pins ? pinned.flatMap((id) => (live.has(id) ? [live.get(id)!] : [])) : [];
-  const ordered = pinnedFirst([...pinnedPosts, ...ranked], lens.pins ? pinned : []);
+  const all = pinnedFirst([...pinnedPosts, ...ranked], lens.pins ? pinned : []);
+  // A page of the ranked list: the rank is the same on every request, so an offset is enough.
+  const ordered = viewer.limit === undefined ? all : all.slice(viewer.offset ?? 0, (viewer.offset ?? 0) + viewer.limit);
 
   // Staff see the report count of every reported post, hidden or not: reports that don't count
   // toward hiding (from members who aren't Holders) still reach them for review.
@@ -409,6 +411,7 @@ export async function listPosts(
       viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id), { count: likes.get(p.id) ?? 0, liked: liked.has(p.id) }, replies.get(p.id) ?? 0),
     ),
     role,
+    total: all.length,
   };
 }
 

@@ -4,7 +4,8 @@ import { FlameIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubStandings } from "@/hooks/useRewards";
-import { formatMon, untilLabel } from "@/lib/format";
+import { REWARDS_EPOCH_SECONDS } from "@/lib/config";
+import { countdown, formatMon } from "@/lib/format";
 import { REWARDS, percent } from "@/lib/rewards";
 import type { StandingRow, StandingsView } from "@/lib/server/standings";
 import { Panel } from "./parts";
@@ -23,11 +24,12 @@ export function LiveStandings({ token, symbol, wallet, now }: { token: string; s
   const next = s.rows[REWARDS.maxHolders];
 
   return (
-    <Panel title="This epoch · live" action={<span className="text-xs text-muted">Closes {untilLabel(s.endsAt, now)}</span>}>
-      <dl className="grid grid-cols-3 gap-4 text-sm">
+    <Panel title="This epoch · live">
+      <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
         <Figure label="Fees so far" value={formatMon(wei(s.fees))} />
         <Figure label="Holder pool" value={formatMon(wei(s.holderPool))} hint={`${plural(s.holders, "Holder")} in the race`} />
         <Figure label="Club fund" value={formatMon(wei(s.fundPool))} />
+        <Closing endsAt={s.endsAt} now={now} />
       </dl>
 
       {wallet && <MyCard s={s} symbol={symbol} />}
@@ -47,6 +49,30 @@ export function LiveStandings({ token, symbol, wallet, now }: { token: string; s
       )}
       <p className="mt-3 text-xs text-muted">An estimate, a few minutes old: holdings are read again and everything can change before the epoch closes.</p>
     </Panel>
+  );
+}
+
+/** When the epoch closes, as a figure like the others: time left, with a bar for how far through it is. */
+function Closing({ endsAt, now }: { endsAt: number; now: number }) {
+  const left = Math.max(0, endsAt - now);
+  const done = Math.min(100, Math.max(0, ((REWARDS_EPOCH_SECONDS - left) / REWARDS_EPOCH_SECONDS) * 100));
+  const soon = left < 3600 * 6;
+  const exact = new Date(endsAt * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  return (
+    <div title={`Closes ${exact}`}>
+      <dt className="kicker">Closes in</dt>
+      <dd className={`mt-1 text-lg font-black tabular-nums ${soon ? "text-[#a9282f]" : ""}`}>{left === 0 ? "now" : countdown(left)}</dd>
+      <dd
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#111318]/12"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(done)}
+        aria-label="How much of the epoch has passed"
+      >
+        <span className={`block h-full ${soon ? "bg-[#a9282f]" : "bg-[#111318]"}`} style={{ width: `${done}%` }} />
+      </dd>
+    </div>
   );
 }
 

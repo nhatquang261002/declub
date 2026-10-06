@@ -18,8 +18,16 @@ import { LENSES, type LensId } from "@/lib/lenses";
 import { Empty, Loading } from "./parts";
 
 const KINDS: { value: PostKind; label: string; hint: string }[] = [
-  { value: "note", label: "Note", hint: "Say something to the Club, or share an X post" },
-  { value: "looking", label: "Looking for", hint: "What you want to buy or trade for" },
+  {
+    value: "note",
+    label: "Note",
+    hint: "Say something to the Club, or share an X post",
+  },
+  {
+    value: "looking",
+    label: "Looking for",
+    hint: "What you want to buy or trade for",
+  },
 ];
 
 const FILTERS = [
@@ -33,7 +41,16 @@ function CharRing({ length }: { length: number }) {
   const ring = left < 0 ? "#a9282f" : left <= 20 ? "#d99a12" : "#315ea8";
   return (
     <span className="flex items-center gap-1.5" aria-live="polite">
-      <span className="char-ring" style={{ "--p": Math.min(100, (length / POST_MAX) * 100), "--ring": ring } as React.CSSProperties} aria-hidden />
+      <span
+        className="char-ring"
+        style={
+          {
+            "--p": Math.min(100, (length / POST_MAX) * 100),
+            "--ring": ring,
+          } as React.CSSProperties
+        }
+        aria-hidden
+      />
       <span className={`text-xs tabular-nums ${left < 0 ? "font-bold text-danger" : "text-muted"}`}>
         {left <= 40 ? left : ""}
         <span className="sr-only">{left >= 0 ? `${left} characters left` : `${-left} characters over`}</span>
@@ -55,10 +72,7 @@ function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xH
       className="club-panel mb-5 p-4 sm:p-5"
       onSubmit={(event) => {
         event.preventDefault();
-        post.mutate(
-          { kind, text, wallet, ...(link.trim() ? { link: link.trim() } : {}) },
-          { onSuccess: () => (setText(""), setLink("")) },
-        );
+        post.mutate({ kind, text, wallet, ...(link.trim() ? { link: link.trim() } : {}) }, { onSuccess: () => (setText(""), setLink("")) });
       }}
     >
       <div className="flex gap-3">
@@ -105,11 +119,7 @@ function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xH
                   onChange={(event) => setLink(event.target.value)}
                 />
               </label>
-              {xHint && (
-                <p className="text-xs text-muted">
-                  Your own X post counts for the Club, if you hold its asset, when it {xHint}. One a day.
-                </p>
-              )}
+              {xHint && <p className="text-xs text-muted">Your own X post counts for the Club, if you hold its asset, when it {xHint}. One a day.</p>}
             </div>
           )}
           {kind === "looking" && (
@@ -135,7 +145,12 @@ function Composer({ token, wallet, xHint }: { token: string; wallet?: string; xH
             </p>
             <div className="flex items-center gap-3">
               <CharRing length={length} />
-              <button type="submit" className="btn-primary btn-sm px-5" aria-busy={post.isPending} disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}>
+              <button
+                type="submit"
+                className="btn-primary btn-sm px-5"
+                aria-busy={post.isPending}
+                disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}
+              >
                 {post.isPending && <Spinner />}
                 {post.isPending ? (postStage === "sending" ? "Posting…" : "Sign in wallet…") : "Sign & post"}
               </button>
@@ -171,7 +186,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   // Following needs to know who's reading; without a wallet it falls back to everything.
   const lenses = LENSES.filter((l) => l.id !== "following" || follows.me);
   const active = lenses.find((l) => l.id === lens) ?? lenses[0]!;
-  const { enabled, posts, isLoading, error } = useClubPosts(token, active.id, follows.me);
+  const { enabled, posts, hasMore, loadMore, loadingMore, isLoading, error } = useClubPosts(token, active.id, follows.me);
   const me = useClubMembership(token);
   const page = useClubPage(token);
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
@@ -217,7 +232,9 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
       {isLoading ? (
         <Loading label="Loading the board" />
       ) : shown.length === 0 ? (
-        <Empty title={active.id === "following" ? "Nobody you follow has posted here" : filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}>
+        <Empty
+          title={active.id === "following" ? "Nobody you follow has posted here" : filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}
+        >
           {active.id === "following"
             ? "Follow members from their posts or the Members list to see them here."
             : me.member && !archived
@@ -233,7 +250,11 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
               role={me.role}
               now={now}
               follows={follows}
-              thread={{ token, wallet: me.wallet, canReply: !!me.member && !archived && !holdersOnly }}
+              thread={{
+                token,
+                wallet: me.wallet,
+                canReply: !!me.member && !archived && !holdersOnly,
+              }}
               actions={{
                 report: (id) => report.mutate(id),
                 like: (id, on) => like.mutate({ id, like: on }),
@@ -246,6 +267,14 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
             />
           ))}
         </ul>
+      )}
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button type="button" className="btn-secondary" aria-busy={loadingMore} disabled={loadingMore} onClick={loadMore}>
+            {loadingMore && <Spinner />}
+            {loadingMore ? "Loading…" : "Show more posts"}
+          </button>
+        </div>
       )}
       {!isLoading && posts.length > 0 && (
         <p className="mt-3 text-xs text-muted">Be kind: moderators can hide and remove posts, and {REPORTS_TO_HIDE} reports hide one at once.</p>

@@ -29,7 +29,10 @@ contract DeClubEscrowFeeTest is DeClubEscrowBase {
     /// @dev A one-leaf Merkle set: the root is the leaf, so the proof is empty.
     function _traitAsset(uint256 id) internal view returns (IDeClubEscrow.Asset memory) {
         bytes32 root = keccak256(abi.encode(address(chog), id));
-        return IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721Trait, address(chog), uint256(root), 1);
+        return
+            IDeClubEscrow.Asset(
+                IDeClubEscrow.AssetType.ERC721Trait, address(chog), uint256(root), 1
+            );
     }
 
     function _fillFor(uint256 id) internal pure returns (IDeClubEscrow.TraitFill[] memory fills) {
@@ -228,8 +231,9 @@ contract DeClubEscrowFeeTest is DeClubEscrowBase {
         uint256 other = _openOffer(alice, _list(_chog(2)), "");
         uint256 pid2 = _propose(bob, other, _list(_chog(7)));
         vm.prank(alice);
-        (bool ok,) =
-            address(swap).call{value: 1}(abi.encodeCall(IDeClubEscrow.acceptProposal, (other, pid2)));
+        (bool ok,) = address(swap).call{value: 1}(
+            abi.encodeCall(IDeClubEscrow.acceptProposal, (other, pid2))
+        );
         assertFalse(ok);
     }
 

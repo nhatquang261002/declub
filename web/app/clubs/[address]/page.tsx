@@ -9,7 +9,7 @@ import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
 import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
-import { formatMomentum, HeatMeter, MomentumChange, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
+import { formatMomentum, HeatMeter, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { Tooltip } from "@/components/Tooltip";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMarket } from "@/hooks/useClubMarket";
@@ -25,7 +25,7 @@ import { ClubManage } from "./ClubManage";
 import { ClubMarket } from "./ClubMarket";
 import { ClubMembers } from "./ClubMembers";
 import { ClubRewards } from "./ClubRewards";
-import { ClubSidebar } from "./ClubSidebar";
+import { ClubDetails } from "./ClubDetails";
 
 export default function ClubPage() {
   const params = useParams<{ address: string }>();
@@ -40,7 +40,9 @@ export default function ClubPage() {
     return (
       <div className="club-panel mx-auto max-w-md px-6 py-12 text-center">
         <p className="text-lg font-black">No Club here</p>
-        <p className="mt-1 text-sm text-muted">There is no Club for this address. Clubs are for verified NFT collections, and a memecoin made for one opens its Club. Other tokens have none.</p>
+        <p className="mt-1 text-sm text-muted">
+          There is no Club for this address. Clubs are for verified NFT collections, and a memecoin made for one opens its Club. Other tokens have none.
+        </p>
         <Link href="/clubs" className="btn-primary mt-5">
           See all Clubs
         </Link>
@@ -58,15 +60,30 @@ export default function ClubPage() {
 type Tab = "market" | "board" | "members" | "rewards" | "manage";
 const TABS: readonly Tab[] = ["market", "board", "members", "rewards", "manage"];
 
-function Stat({ label, children, hint }: { label: ReactNode; children: ReactNode; hint?: ReactNode }) {
+/** One figure under its label. `quiet` greys a zero so the numbers that moved stand out; `hint` sits on its own line below. */
+function Stat({ label, children, hint, quiet }: { label: ReactNode; children: ReactNode; hint?: ReactNode; quiet?: boolean }) {
   return (
     <div className="club-stat">
       <dt>{label}</dt>
       <dd>
-        {children}
+        <span className="club-stat-value" data-quiet={quiet ? "" : undefined}>
+          {children}
+        </span>
         {hint && <small>{hint}</small>}
       </dd>
     </div>
+  );
+}
+
+/** How Momentum moved over the week, in words: "▲ 12 this week", "new this week" when there was nothing before. */
+function momentumHint(momentum: number, change: number) {
+  const moved = Math.round(change);
+  if (moved === 0) return undefined;
+  if (moved > 0 && moved >= Math.round(momentum)) return "New this week";
+  return (
+    <span className={moved > 0 ? "club-stat-up" : "club-stat-down"}>
+      {moved > 0 ? "▲" : "▼"} {Math.abs(moved).toLocaleString()} this week
+    </span>
   );
 }
 
@@ -103,13 +120,30 @@ function Club({ entry }: { entry: ClubEntry }) {
     if (next === "market") params.delete("tab");
     else params.set("tab", next);
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
   };
 
   const tabs: { value: Tab; label: string; icon: ReactNode; count?: number }[] = [
-    { value: "market", label: "Market", icon: <TagIcon />, count: market.isLoading ? undefined : market.have.length + market.wanted.length },
-    { value: "board", label: "Board", icon: <ChatIcon />, count: board.enabled && !board.isLoading ? board.posts.length : undefined },
-    { value: "members", label: "Members", icon: <UsersIcon />, count: club?.members },
+    {
+      value: "market",
+      label: "Market",
+      icon: <TagIcon />,
+      count: market.isLoading ? undefined : market.have.length + market.wanted.length,
+    },
+    {
+      value: "board",
+      label: "Board",
+      icon: <ChatIcon />,
+      count: board.enabled && !board.isLoading ? board.total : undefined,
+    },
+    {
+      value: "members",
+      label: "Members",
+      icon: <UsersIcon />,
+      count: club?.members,
+    },
     { value: "rewards", label: "Rewards", icon: <CoinIcon /> },
     ...(staff ? [{ value: "manage" as const, label: "Manage", icon: <ShieldIcon /> }] : []),
   ];
@@ -188,6 +222,7 @@ function Club({ entry }: { entry: ClubEntry }) {
               ))}
             </ul>
           )}
+          <ClubDetails club={info} />
         </div>
 
         <dl className="club-stats">
@@ -197,22 +232,18 @@ function Club({ entry }: { entry: ClubEntry }) {
                 <span className="uppercase underline decoration-dotted underline-offset-2">Momentum</span>
               </Tooltip>
             }
+            hint={stats ? momentumHint(stats.momentum, stats.change) : undefined}
           >
-            {stats ? (
-              <span className="flex items-baseline gap-2">
-                {formatMomentum(stats.momentum)}
-                <MomentumChange change={stats.change} />
-              </span>
-            ) : error ? (
-              "—"
-            ) : (
-              "…"
-            )}
+            {stats ? formatMomentum(stats.momentum) : error ? "—" : "…"}
           </Stat>
           <Stat label="Members" hint={club ? `${holders.toLocaleString()} ${holders === 1 ? "holder" : "holders"}` : undefined}>
             {club ? club.members.toLocaleString() : "…"}
           </Stat>
-          <Stat label="Swaps · 7 days" hint={stats ? `${stats.created7d.toLocaleString()} new ${stats.created7d === 1 ? "deal" : "deals"}` : undefined}>
+          <Stat
+            label="Swaps · 7 days"
+            quiet={stats?.completed7d === 0}
+            hint={stats ? `${stats.created7d.toLocaleString()} new ${stats.created7d === 1 ? "deal" : "deals"}` : undefined}
+          >
             {stats ? stats.completed7d.toLocaleString() : "…"}
           </Stat>
           <Stat
@@ -221,10 +252,13 @@ function Club({ entry }: { entry: ClubEntry }) {
                 <span className="uppercase underline decoration-dotted underline-offset-2">X posts · 7 days</span>
               </Tooltip>
             }
+            quiet={stats ? !stats.xShares7d : false}
           >
             {stats ? (stats.xShares7d ?? 0).toLocaleString() : "…"}
           </Stat>
-          <Stat label="Traders · 30 days">{stats ? stats.traders30d.toLocaleString() : "…"}</Stat>
+          <Stat label="Traders · 30 days" quiet={stats?.traders30d === 0}>
+            {stats ? stats.traders30d.toLocaleString() : "…"}
+          </Stat>
           <Stat label="Heat">{stats ? <HeatMeter value={stats.momentum} /> : "…"}</Stat>
         </dl>
       </header>
@@ -268,7 +302,7 @@ function Club({ entry }: { entry: ClubEntry }) {
         )}
       </div>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="mt-8">
         <div className="min-w-0">
           <div className="tabbar mb-6 flex w-full sm:inline-flex sm:w-auto" role="group" aria-label="Club sections">
             {tabs.map((t) => (
@@ -294,8 +328,6 @@ function Club({ entry }: { entry: ClubEntry }) {
           )}
           {tab === "manage" && me.role && staff && <ClubManage token={entry.address} role={me.role} now={now} />}
         </div>
-
-        <ClubSidebar club={info} stats={stats} onSeeMembers={tab === "members" ? undefined : () => setTab("members")} />
       </div>
     </>
   );

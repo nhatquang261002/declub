@@ -169,7 +169,9 @@ The first deployment's creation bytecode (the v1 escrow and MockChog; solc 0.8.2
 
 ### Deployed (testnet)
 
-Nothing is deployed under the DeClub names yet. Every testnet deployment predates the rename ([ADR 0021](adr/0021-declub-pivot.md)), so `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` are deployed fresh from `contracts/script/`. The retired deployments and their broadcast records are listed in the [README](../README.md#retired-deployments).
+The current DeClub contracts are not deployed to testnet yet. Deploy them
+fresh from [`contracts/script/`](../contracts/script/README.md); existing
+deployments use retired names and domains.
 
 A few Monad specifics that affect the design:
 

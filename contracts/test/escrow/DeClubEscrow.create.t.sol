@@ -92,7 +92,9 @@ contract DeClubEscrowCreateTest is DeClubEscrowBase {
 
     function test_revertsInvalidNative() public {
         // token set
-        _expectInvalid(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.Native, address(usdc), 0, 1 ether));
+        _expectInvalid(
+            IDeClubEscrow.Asset(IDeClubEscrow.AssetType.Native, address(usdc), 0, 1 ether)
+        );
         // id set
         _expectInvalid(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.Native, address(0), 1, 1 ether));
         // zero amount
@@ -103,7 +105,9 @@ contract DeClubEscrowCreateTest is DeClubEscrowBase {
         _expectInvalid(_erc20(address(0), 1 ether)); // no code
         _expectInvalid(_erc20(alice, 1 ether)); // EOA
         _expectInvalid(_erc20(address(usdc), 0)); // zero amount
-        _expectInvalid(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(usdc), 7, 1 ether));
+        _expectInvalid(
+            IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(usdc), 7, 1 ether)
+        );
     }
 
     function test_revertsInvalidNft() public {

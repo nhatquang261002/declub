@@ -233,11 +233,7 @@ contract DeClubEscrowTraitsTest is DeClubEscrowBase {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.DuplicateAsset.selector, 1));
         swap.createTraitTrade(
-            _list(_chog(A1)),
-            _list(_traitAsset(root, 1), _traitAsset(root, 2)),
-            address(0),
-            0,
-            SPEC
+            _list(_chog(A1)), _list(_traitAsset(root, 1), _traitAsset(root, 2)), address(0), 0, SPEC
         );
 
         // Same collection, different roots: two separate requests.
@@ -560,13 +556,14 @@ contract DeClubEscrowTraitsTest is DeClubEscrowBase {
 
     function test_nativeInRequestedStillNeedsExactValue() public {
         (bytes32 root, bytes32[][] memory proofs) = _set();
-        uint256 id = _createTrait(
-            alice, _list(_chog(A1)), _list(_traitAsset(root, 1), _native(2 ether))
-        );
+        uint256 id =
+            _createTrait(alice, _list(_chog(A1)), _list(_traitAsset(root, 1), _native(2 ether)));
         IDeClubEscrow.TraitFill[] memory fills = _fill1(_one(6), _proofOf(proofs, 0));
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 2 ether, 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 2 ether, 1)
+        );
         swap.fillTraitTrade{value: 1}(id, fills);
 
         vm.prank(bob);

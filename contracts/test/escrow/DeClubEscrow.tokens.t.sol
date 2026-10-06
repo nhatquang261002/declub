@@ -25,7 +25,9 @@ contract DeClubEscrowTokensTest is DeClubEscrowBase {
         fee.approve(address(swap), type(uint256).max);
 
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.UnsupportedToken.selector, address(fee)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.UnsupportedToken.selector, address(fee))
+        );
         swap.createTrade(_list(_erc20(address(fee), 100 ether)), _list(_chog(B1)), address(0), 0);
         assertEq(fee.balanceOf(alice), 1_000 ether); // reverted, nothing moved
     }
@@ -44,7 +46,9 @@ contract DeClubEscrowTokensTest is DeClubEscrowBase {
         LyingNft liar = new LyingNft();
         liar.mint(alice, 1);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(liar), 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(liar), 1)
+        );
         swap.createTrade(_list(_nft(address(liar), 1)), _list(_chog(B1)), address(0), 0);
     }
 
@@ -228,7 +232,9 @@ contract DeClubEscrowTokensTest is DeClubEscrowBase {
         uint256 id = _create(alice, _list(_native(10 ether)), _list(_nft(address(soft), 2)));
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(soft), 2));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(soft), 2)
+        );
         swap.fillTrade(id);
         assertEq(soft.ownerOf(2), carol);
         assertEq(uint8(_status(id)), uint8(IDeClubEscrow.Status.Open));
@@ -240,7 +246,9 @@ contract DeClubEscrowTokensTest is DeClubEscrowBase {
         uint256 id = _create(alice, _list(_chog(A1)), _list(_nft(address(liar), 2)));
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(liar), 2));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(liar), 2)
+        );
         swap.fillTrade(id);
         _assertOwner(A1, address(swap));
     }
@@ -253,7 +261,9 @@ contract DeClubEscrowTokensTest is DeClubEscrowBase {
         assertEq(soft.ownerOf(1), address(swap));
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(soft), 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.NftNotReceived.selector, address(soft), 1)
+        );
         swap.createTrade(_list(_nft(address(soft), 1)), _list(_chog(A2)), address(0), 0);
 
         vm.prank(alice);

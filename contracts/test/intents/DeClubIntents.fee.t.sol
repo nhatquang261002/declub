@@ -187,9 +187,7 @@ contract DeClubIntentsFeeTest is DeClubIntentsBase {
     /// @dev An intent built for a fee-free deployment (fee 0, no token) can't be used here.
     function test_anIntentFromAFeeFreeDeploymentIsRefused() public {
         (IDeClubIntents.Intent[] memory cycle, bytes[] memory sigs) = _unsignedWith(address(0), 0);
-        vm.expectRevert(
-            abi.encodeWithSelector(IDeClubIntents.WrongFee.selector, 0, address(0), 0)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IDeClubIntents.WrongFee.selector, 0, address(0), 0));
         swap.settle(cycle, sigs);
     }
 

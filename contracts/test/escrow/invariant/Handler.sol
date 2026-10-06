@@ -199,7 +199,8 @@ contract Handler is Test {
         if (proposer == t.maker) return;
         // A proposal never repeats an asset the maker offers (SameAssetBothSides).
         mask = (mask & 7) & ~_maskOf(t.offered);
-        IDeClubEscrow.Asset[] memory assets = _side(proposer, mask, bound(nftSeed, 0, 2), amountSeed);
+        IDeClubEscrow.Asset[] memory assets =
+            _side(proposer, mask, bound(nftSeed, 0, 2), amountSeed);
         if (assets.length == 0) return;
 
         vm.prank(proposer);
@@ -384,8 +385,8 @@ contract Handler is Test {
         h[0] = who.balance + swap.claimable(who, IDeClubEscrow.AssetType.Native, address(0), 0);
         h[1] = usdc.balanceOf(who)
             + swap.claimable(who, IDeClubEscrow.AssetType.ERC20, address(usdc), 0);
-        h[2] =
-            blk.balanceOf(who) + swap.claimable(who, IDeClubEscrow.AssetType.ERC20, address(blk), 0);
+        h[2] = blk.balanceOf(who)
+            + swap.claimable(who, IDeClubEscrow.AssetType.ERC20, address(blk), 0);
     }
 
     function _sum(IDeClubEscrow.Asset[] memory assets, uint256 k)

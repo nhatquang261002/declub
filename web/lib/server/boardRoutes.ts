@@ -146,10 +146,14 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const url = new URL(request.url);
       const lens = lensOf(url.searchParams.get("lens")).id;
       const as = url.searchParams.get("as") ?? undefined;
-      const { posts, role } = await listPosts(store, entry, { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined }, deps);
+      // Without `limit` the whole board comes back, as before; with it, one page of it.
+      const limit = Number(url.searchParams.get("limit"));
+      const offset = Number(url.searchParams.get("offset"));
+      const page = Number.isInteger(limit) && limit > 0 ? { limit: Math.min(limit, 100), offset: Number.isInteger(offset) && offset > 0 ? offset : 0 } : {};
+      const { posts, role, total } = await listPosts(store, entry, { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined, ...page }, deps);
       // Anonymous readers share one cached answer; a signed-in reader's depends on who they are.
       const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
-      return Response.json({ enabled: true, posts, role }, { headers: { "Cache-Control": cache } });
+      return Response.json({ enabled: true, posts, role, total }, { headers: { "Cache-Control": cache } });
     },
 
     async POST(request: Request, ctx: Ctx) {

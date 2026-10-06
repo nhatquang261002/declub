@@ -7,7 +7,7 @@ import { RewardsClaim } from "@/components/RewardsClaim";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubRewards } from "@/hooks/useRewards";
-import { formatMon, untilLabel } from "@/lib/format";
+import { formatMon } from "@/lib/format";
 import { recapLink } from "@/lib/recap";
 import { REWARDS, percent } from "@/lib/rewards";
 import { LiveStandings } from "./LiveStandings";
@@ -31,13 +31,13 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
   return (
     <div className="flex flex-col gap-5">
       <Panel title="How this Club earns">
-        <p className="text-sm">
+        <p className="max-w-3xl text-sm">
           Every completed swap of {symbol} pays a small protocol fee. Each epoch,{" "}
           <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s {REWARDS.maxHolders} biggest Holders, split by the NFTs they hold, and{" "}
           <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. You earn as one of the {REWARDS.maxHolders} members holding the most {symbol}{" "}
           when the epoch closes: one share per NFT. A Club’s memecoin can make you a Holder, if the Owner allows it, but earns no share.
         </p>
-        <p className="mt-2 text-sm">
+        <p className="mt-2 max-w-3xl text-sm">
           Active Holders earn more: your shares count up to <strong>{percent(REWARDS.maxBonusBps)} more</strong> for posting on the Board (each day you post counts) and
           sharing your own X posts about the Club there (one a day counts). Post on {REWARDS.streakMinDays} or more days, epoch after epoch, for a streak worth up to{" "}
           <strong>{percent(REWARDS.maxStreakBps)} more</strong>. Trading and replies don’t count, and the bonus can’t buy a place in the {REWARDS.maxHolders}.{" "}
@@ -45,11 +45,7 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
             ? "X posts that people liked, reposted, quoted or replied to count for more."
             : "Each counted X post adds the same, however it did on X."}
         </p>
-        {data && data.epoch >= 0 && (
-          <p className="mt-3 text-xs text-muted">
-            Epoch {data.epoch} closes {untilLabel(data.endsAt, now)}. Rewards are paid in MON.
-          </p>
-        )}
+        <p className="mt-3 text-xs text-muted">Rewards are paid in MON.</p>
       </Panel>
 
       <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} />

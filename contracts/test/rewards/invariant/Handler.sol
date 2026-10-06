@@ -109,7 +109,9 @@ contract RewardsHandler is Test {
         vm.prank(OPERATOR);
         try REWARDS.revoke(epoch) {
             _expect(ok, "a late revoke went through");
-            _expect(OPERATOR.balance - before == ghost_left[epoch], "revoke refunded the wrong amount");
+            _expect(
+                OPERATOR.balance - before == ghost_left[epoch], "revoke refunded the wrong amount"
+            );
             ghost_funded -= ghost_left[epoch];
             ghost_left[epoch] = 0;
             published[epoch] = false;
@@ -174,7 +176,8 @@ contract RewardsHandler is Test {
                     continue;
                 }
                 if (idx == i || idx == i + 1) proof = _push(proof, level[idx == i ? i + 1 : i]);
-                (bytes32 a, bytes32 b) = level[i] <= level[i + 1] ? (level[i], level[i + 1]) : (level[i + 1], level[i]);
+                (bytes32 a, bytes32 b) =
+                    level[i] <= level[i + 1] ? (level[i], level[i + 1]) : (level[i + 1], level[i]);
                 up[i / 2] = keccak256(abi.encodePacked(a, b));
             }
             idx /= 2;

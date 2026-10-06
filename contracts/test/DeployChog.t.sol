@@ -19,7 +19,8 @@ contract DeployChogTest is Test {
         address[] memory wallets = new address[](2);
         (wallets[0], wallets[1]) = (a, b);
 
-        DeployChog.Result memory r = script.deploy(DeployChog.Config(wallets, 3, false, address(0), 20));
+        DeployChog.Result memory r =
+            script.deploy(DeployChog.Config(wallets, 3, false, address(0), 20));
 
         assertFalse(r.deployedMirror);
         assertEq(MockChog(r.chog).balanceOf(a), 3);
@@ -27,7 +28,8 @@ contract DeployChogTest is Test {
     }
 
     function test_deploysMockWithoutDemoWallets() public {
-        DeployChog.Result memory r = script.deploy(DeployChog.Config(new address[](0), 5, false, address(0), 20));
+        DeployChog.Result memory r =
+            script.deploy(DeployChog.Config(new address[](0), 5, false, address(0), 20));
         assertFalse(r.deployedMirror);
         assertEq(MockChog(r.chog).totalSupply(), 0);
     }

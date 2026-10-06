@@ -155,6 +155,24 @@ describe("createPost", () => {
 });
 
 describe("listPosts", () => {
+  it("pages the ranked list with limit and offset, and says how long it is", async () => {
+    const { store, own, deps } = await club1();
+    const ids: string[] = [];
+    for (const text of ["one", "two", "three", "four", "five"]) {
+      ids.push(await posted(store, "m1", text));
+      await new Promise((r) => setTimeout(r, 3));
+    }
+    await pinPost(store, club, own, ids[0]!, true, deps);
+    const first = await listPosts(store, club, { limit: 2, offset: 0 }, deps);
+    const second = await listPosts(store, club, { limit: 2, offset: 2 }, deps);
+    const last = await listPosts(store, club, { limit: 2, offset: 4 }, deps);
+    assert.deepEqual(first.posts.map((p) => p.text), ["one", "five"], "the pin is on the first page");
+    assert.deepEqual(second.posts.map((p) => p.text), ["four", "three"]);
+    assert.deepEqual(last.posts.map((p) => p.text), ["two"]);
+    assert.equal(first.total, 5);
+    assert.equal((await listPosts(store, club, {}, deps)).posts.length, 5, "no limit, the whole board");
+  });
+
   it("lists newest first with pinned on top, and skips deleted posts", async () => {
     const { store, own, deps } = await club1();
     const a = await posted(store, "m1", "first");

@@ -4,10 +4,11 @@ import { registry } from "@/lib/verifiedAssets";
 /**
  * The Club's board (ADR 0016, ADR 0023).
  *
- *   GET   ?lens=newest|momentum|holders|following&as=0x…   { enabled, posts, role }  public; pinned
+ *   GET   ?lens=newest|momentum|holders|following&as=0x…&limit=20&offset=0   { enabled, posts, role, total }  public; pinned
  *         first (except under `following`), then in the lens's order. A hidden post shows only a
  *         placeholder, except to its author and to staff (who send their access token). `as` is
- *         the reader's wallet, for the `following` lens.
+ *         the reader's wallet, for the `following` lens. `limit` (max 100) and `offset` page the
+ *         ranked list; without `limit` the whole board comes back. `total` is the whole list's size.
  *   POST  { message, signature }  members with a shared verified profile. `message` is the EIP-712
  *         `Post` (lib/social.ts) signed by the member's Club wallet.
  */

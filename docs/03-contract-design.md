@@ -297,4 +297,7 @@ The printed deploy blocks are the simulation block, a lower bound; the exact blo
 
 ### Deployed vs source
 
-Nothing on testnet runs the current source. Every deployment predates the rename to DeClub ([ADR 0021](adr/0021-declub-pivot.md)): they were deployed as `ChogSwapV2` / `OnDealV2` and `ChogSwapIntents` / `OnDealIntents`, and the intents ones sign with an older EIP-712 domain, not `("DeClubIntents", "1")`. `DeClubEscrow` and `DeClubIntents` have to be deployed (`DeployEscrow.s.sol`, `DeployIntents.s.sol`) before the app works against them. The old records stay in `contracts/broadcast/` under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`, `DeployIntents.s.sol`); the [README](../README.md#retired-deployments) lists them.
+The current DeClub contracts are not deployed to testnet yet. Deploy
+`DeClubEscrow`, `DeClubIntents` and `DeClubRewards` with the instructions in
+[`contracts/script/README.md`](../contracts/script/README.md) before using the
+app against testnet.

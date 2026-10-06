@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
@@ -16,6 +16,8 @@ import type { XShareVerdict } from "@/lib/server/xPosts";
 // signed-in reader sends their token so they also see their own hidden posts and, as staff, all.
 
 const REFRESH_MS = 30_000;
+/** Posts shown at first and added by each "Show more". */
+const POSTS_PAGE = 20;
 
 async function read<T>(path: string, getToken?: () => Promise<string | null>): Promise<T> {
   const token = await getToken?.();
@@ -35,14 +37,33 @@ async function read<T>(path: string, getToken?: () => Promise<string | null>): P
 export function useClubPosts(token: string, lens: LensId = "newest", as?: string) {
   const getToken = useAccessToken();
   const key = token.toLowerCase();
-  const params = new URLSearchParams(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }).toString();
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["club-posts", key, !!getToken, lens, as?.toLowerCase()],
-    queryFn: () => read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null }>(`/api/clubs/${token}/posts${params ? `?${params}` : ""}`, getToken),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(POSTS_PAGE), offset: String(pageParam), ...(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }) });
+      return read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null; total: number }>(`/api/clubs/${token}/posts?${params}`, getToken);
+    },
+    getNextPageParam: (last, all) => {
+      const loaded = all.reduce((n, page) => n + page.posts.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
-  return { enabled: query.data?.enabled !== false, posts: query.data?.posts ?? [], isLoading: query.isLoading, error: query.error };
+  const pages = query.data?.pages ?? [];
+  // A post that arrives between two pages shifts the next one by a row; show each post once.
+  const posts = [...new Map(pages.flatMap((page) => page.posts).map((post) => [post.id, post])).values()];
+  return {
+    enabled: pages[0]?.enabled !== false,
+    posts,
+    total: pages[0]?.total ?? 0,
+    hasMore: query.hasNextPage,
+    loadMore: () => void query.fetchNextPage(),
+    loadingMore: query.isFetchingNextPage,
+    isLoading: query.isLoading,
+    error: query.error,
+  };
 }
 
 /** A post's replies (ADR 0032), oldest first; read only while the thread is open. */
