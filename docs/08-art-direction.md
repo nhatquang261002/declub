@@ -1,7 +1,7 @@
 # 08 · Art Direction
 
-DeClub looks like a pinboard of trading stickers: a cream canvas, thick dark outlines, hard offset
-shadows and warm Chog-brand colours. The supplied Chog artwork adds an expressive, collectible
+DeClub looks like a pinboard of trading stickers: a cream canvas, thick dark outlines, red tape
+and warm Chog-brand colours. The brand's rules and files are in `15-brand-kit.md` and `brand/`. The supplied Chog artwork adds an expressive, collectible
 mood, while trade terms, wallet state and transaction actions stay clear.
 
 ## Visual language
@@ -9,8 +9,8 @@ mood, while trade terms, wallet state and transaction actions stay clear.
 The tokens are in `web/app/globals.css`: brand primitives (`--chog-*`) feed semantic tokens
 (`--surface-*`, `--content-*`, `--action-*`), and components use the semantic ones.
 
-- **Canvas and panels:** warm paper surfaces, dark ink outlines, offset shadows and red tape accents.
-- **Buttons:** bold bordered controls use the same offset-shadow language, with distinct primary,
+- **Canvas and panels:** warm paper surfaces, dark ink outlines and red tape accents, with no shadows.
+- **Buttons:** bold bordered controls use the same outline-and-tilt language, with distinct primary,
   secondary and danger treatments.
 - **Type:** Geist and Geist Mono for the interface, Bricolage Grotesque (800) for the wordmark.
 - **Header:** a dark translucent bar (`--surface-overlay`) carrying the logo.
