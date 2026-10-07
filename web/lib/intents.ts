@@ -306,7 +306,8 @@ export const intentAsListing = (row: PoolIntent): SignedListing => ({
   maker: row.intent.maker,
   taker: null,
   expiry: row.intent.deadline,
-  status: isLive(row.status) ? "open" : row.status === "settled" ? "filled" : "cancelled",
+  // An expired intent stays "open" like an expired locked deal, so displayStatus derives "expired" from its past deadline.
+  status: isLive(row.status) || row.status === "expired" ? "open" : row.status === "settled" ? "filled" : "cancelled",
   // The most each side pays per NFT it gives. What is charged is the contract's fee at settlement, never more.
   fee: row.intent.maxFee,
   offered: row.intent.give,

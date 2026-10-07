@@ -13,6 +13,7 @@ import {
   type BookSource,
 } from "../lib/dealBook";
 import { DEFAULT_FILTERS } from "../lib/dealFilters";
+import { displayStatus } from "../lib/deals";
 import type { DealV2 } from "../lib/dealsV2";
 import { intentAsListing, intentHash, type PoolIntent } from "../lib/intents";
 import { createBook, type BookReader } from "../lib/server/dealBook";
@@ -277,3 +278,13 @@ describe("GET /api/deals", () => {
   });
 });
 
+
+describe("intentAsListing", () => {
+  it("shows a pool-expired intent as expired, like an expired locked deal", () => {
+    const row = signedRow(1);
+    const expired: PoolIntent = { ...row, status: "expired", intent: { ...row.intent, deadline: BigInt(NOW - 60) } };
+    assert.equal(displayStatus(intentAsListing(expired), NOW), "expired");
+    assert.equal(displayStatus(intentAsListing({ ...row, status: "cancelled" }), NOW), "cancelled");
+    assert.equal(displayStatus(intentAsListing({ ...row, status: "settled" }), NOW), "filled");
+  });
+});
