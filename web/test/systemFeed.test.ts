@@ -25,7 +25,7 @@ const event = (id: string, at: number, kind: SystemEvent["kind"] = "swap"): Syst
 /** A post made at `at` seconds (the posts' own clock is milliseconds). */
 const post = (id: string, at: number, pinned = false) => ({ id, at: at * 1000, pinned });
 /** The feed as ids, a run of system messages between two posts as one bracketed group. */
-const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) => items.map((i) => (i.type === "post" ? i.post.id : `[${i.events.map((e) => e.id).join(" ")}]`));
+const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) => items.map((i) => (i.type === "post" ? i.post.id : i.type === "challenge" ? `<${i.event.id}>` : `[${i.events.map((e) => e.id).join(" ")}]`));
 
 describe("newest", () => {
   it("keeps the window, newest first, and says it is complete from the window's start", () => {
@@ -67,6 +67,11 @@ describe("weave", () => {
   it("puts the messages between two posts in one group, newest first", () => {
     const items = weave([post("p2", 500), post("p1", 100)], [event("a", 200), event("b", 400), event("c", 300), event("top", 600)], { since, complete: true });
     assert.deepEqual(order(items), ["[top]", "p2", "[b c a]", "p1"]);
+  });
+
+  it("draws a challenge as an item of its own, splitting the run of messages around it", () => {
+    const items = weave([post("p2", 500), post("p1", 100)], [event("a", 200), event("ch", 300, "challenge"), event("b", 400), event("c", 250), event("win", 150, "winner")], { since, complete: true });
+    assert.deepEqual(order(items), ["p2", "[b]", "<ch>", "[c a]", "<win>", "p1"]);
   });
 
   it("keeps pinned posts on top, and doesn't let an old pin set the floor", () => {

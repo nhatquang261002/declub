@@ -41,7 +41,7 @@ import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
-import { cancelChallenge, createChallenge, enterChallenge, listChallenges, pickWinners, withdrawEntry } from "./challenges";
+import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, withdrawEntry } from "./challenges";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -446,6 +446,7 @@ export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
 }
 
 /**
+ * GET /api/clubs/[token]/challenges/[id]: one challenge with its entries.
  * POST /api/clubs/[token]/challenges/[id]  { action }, where action is
  *   "enter" { post }  a member enters one of their Board posts,
  *   "withdraw"        a member takes their entry back,
@@ -454,6 +455,19 @@ export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
  */
 export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
+    /** GET (public): the challenge with its entries, or 404. */
+    async GET(request: Request, ctx: ItemCtx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const viewer = await softViewer(request, deps);
+      const challenge = await getChallenge(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
+      if (!challenge) return refuse("not_found");
+      const cache = viewer ? "private, no-store" : "public, s-maxage=10, stale-while-revalidate=30";
+      return Response.json({ enabled: true, challenge }, { headers: { "Cache-Control": cache } });
+    },
     async POST(request: Request, ctx: ItemCtx) {
       const f = await front(registry, ctx, request, deps, "club-challenge");
       if (f instanceof Response) return f;

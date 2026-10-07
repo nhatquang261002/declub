@@ -22,7 +22,9 @@ export type SystemEvent = {
   deal?: string;
   /** A signed swap: `deal` is a transaction, not an escrow deal. */
   signed?: true;
-  /** A challenge or a win (ADR 0045): the challenge's title, as the Owner wrote it (plain text). For "challenge" the wallet is the Owner's; for "winner", the winners', best first. */
+  /** A challenge or a win (ADR 0045): its id, so the feed can draw the challenge itself (a card of its own, not a line). For "challenge" the wallet is the Owner's; for "winner", the winners', best first. */
+  challenge?: string;
+  /** The challenge's title, as the Owner wrote it (plain text). */
   title?: string;
 };
 
@@ -30,6 +32,9 @@ export type SystemEvent = {
 export const SYSTEM_WINDOW_SEC = 7 * 86_400;
 /** The most one read returns, newest first. */
 export const SYSTEM_MAX = 40;
+
+/** A challenge's start or result is drawn as a card of its own in a feed, never as a line in a run of messages (ADR 0045). */
+export const isChallengeEvent = (e: Pick<SystemEvent, "kind">) => e.kind === "challenge" || e.kind === "winner";
 
 /** What `kind` of system message an activity event makes, or null for the kinds that make none (X shares are posts' business). */
 export const systemKindOf = (e: Pick<ActivityEvent, "kind">): SystemKind | null => (e.kind === "swapped" ? "swap" : e.kind === "created" ? "listing" : null);
@@ -65,14 +70,15 @@ export function mergeClubs(events: readonly SystemEvent[]): SystemEvent[] {
 export const SYSTEM_GROUP_SHOWN = 3;
 
 /** One row of a feed: a post, or the run of system messages between two posts, newest first. */
-export type FeedItem<P> = { type: "post"; post: P } | { type: "system"; events: SystemEvent[] };
+export type FeedItem<P> = { type: "post"; post: P } | { type: "system"; events: SystemEvent[] } | { type: "challenge"; event: SystemEvent };
 
 /**
  * Posts (as listed, `pinned` ones first and the rest newest first) with system messages set among
  * them by time. A message older than the oldest post loaded is held back while more posts are to
  * come (`complete` false), so it can't jump ahead of posts that haven't loaded; one older than
  * `since` is never drawn, since the list isn't complete that far back. Pinned posts stay on top,
- * and the messages between two posts come as one item.
+ * and the messages between two posts come as one item. A challenge's start or result (ADR 0045) is
+ * an item of its own, in its place by time, and splits a run.
  */
 export function weave<P extends { at: number; pinned?: boolean }>(posts: readonly P[], events: readonly SystemEvent[], options: { since: number; complete: boolean }): FeedItem<P>[] {
   // Posts' `at` is epoch ms; events' is unix seconds.
@@ -88,9 +94,19 @@ export function weave<P extends { at: number; pinned?: boolean }>(posts: readonl
   const queue = [...shown].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1));
   // Messages between two posts go in one item, so a busy hour reads as one block, not a wall.
   const flush = (until: number) => {
-    const run: SystemEvent[] = [];
-    while (queue.length > 0 && queue[0]!.at > until) run.push(queue.shift()!);
-    if (run.length > 0) items.push({ type: "system", events: run });
+    let run: SystemEvent[] = [];
+    const close = () => {
+      if (run.length > 0) items.push({ type: "system", events: run });
+      run = [];
+    };
+    while (queue.length > 0 && queue[0]!.at > until) {
+      const event = queue.shift()!;
+      if (isChallengeEvent(event)) {
+        close();
+        items.push({ type: "challenge", event });
+      } else run.push(event);
+    }
+    close();
   };
   for (const post of rest) {
     flush(seconds(post));

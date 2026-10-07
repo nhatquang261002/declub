@@ -271,6 +271,49 @@ export async function pickWinners(
   }
 }
 
+/** One challenge as `viewer` sees it, with its entries. */
+async function viewOf(store: Store, token: string, c: StoredChallenge, viewer: { userId?: string }, now: number): Promise<PublicChallenge> {
+  const phase = phaseOf(c, now);
+  const winnerPlace = new Map((c.settled?.winners ?? []).map((w) => [w.post, w.place]));
+  let entries: PublicEntry[] = [];
+  let mine: string | undefined;
+  let entryCount = 0;
+  if (phase !== "cancelled") {
+    const all = await entriesOf(store, token, c.id);
+    entryCount = all.length;
+    mine = all.find((e) => e.userId === viewer.userId)?.post;
+    const cands = await candidates(store, token, c);
+    entries = cands
+      .map((x): PublicEntry => ({ post: x.post, wallet: x.wallet, at: x.at, likes: x.likes, liked: !!viewer.userId && x.likers.includes(viewer.userId), mine: x.userId === viewer.userId, text: x.text, ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}) }))
+      .sort((a, b) => (winnerPlace.get(a.post) ?? 99) - (winnerPlace.get(b.post) ?? 99) || b.likes - a.likes || a.at - b.at);
+  }
+  return {
+    id: c.id,
+    title: c.title,
+    brief: c.brief,
+    judging: c.judging,
+    prizes: c.prizes,
+    holdersOnly: c.holdersOnly === true,
+    startsAt: c.startsAt,
+    endsAt: c.endsAt,
+    by: c.by,
+    phase,
+    ...(c.judging === "owner" && phase === "judging" ? { pickBy: c.endsAt + CHALLENGE_RULES.pickWindowMs } : {}),
+    entries,
+    entryCount,
+    ...(c.settled ? { settled: c.settled } : {}),
+    ...(mine ? { mine } : {}),
+  };
+}
+
+/** One challenge with its entries, settling it first if it has ended; null when the Club has no such challenge. */
+export async function getChallenge(store: Store, entry: AssetEntry, id: string, viewer: { userId?: string }, deps: Deps = {}): Promise<PublicChallenge | null> {
+  const token = entry.address.toLowerCase();
+  await settleDue(store, entry, deps);
+  const c = await load(store, token, id);
+  return c ? viewOf(store, token, c, viewer, nowOf(deps)) : null;
+}
+
 /**
  * The Club's challenges as `userId` sees them: open ones first (soonest end first), then those
  * being judged or settled, newest first. Settles what has ended first.
@@ -281,40 +324,7 @@ export async function listChallenges(store: Store, entry: AssetEntry, viewer: { 
   await settleDue(store, entry, deps);
   const ids = await store.ranked(challengesKey(token), 30);
   const stored = (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter((c): c is StoredChallenge => !!c);
-  const out: PublicChallenge[] = [];
-  for (const c of stored) {
-    const phase = phaseOf(c, now);
-    const winnerPlace = new Map((c.settled?.winners ?? []).map((w) => [w.post, w.place]));
-    let entries: PublicEntry[] = [];
-    let mine: string | undefined;
-    let entryCount = 0;
-    if (phase !== "cancelled") {
-      const all = await entriesOf(store, token, c.id);
-      entryCount = all.length;
-      mine = all.find((e) => e.userId === viewer.userId)?.post;
-      const cands = await candidates(store, token, c);
-      entries = cands
-        .map((x): PublicEntry => ({ post: x.post, wallet: x.wallet, at: x.at, likes: x.likes, liked: !!viewer.userId && x.likers.includes(viewer.userId), mine: x.userId === viewer.userId, text: x.text, ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}) }))
-        .sort((a, b) => (winnerPlace.get(a.post) ?? 99) - (winnerPlace.get(b.post) ?? 99) || b.likes - a.likes || a.at - b.at);
-    }
-    out.push({
-      id: c.id,
-      title: c.title,
-      brief: c.brief,
-      judging: c.judging,
-      prizes: c.prizes,
-      holdersOnly: c.holdersOnly === true,
-      startsAt: c.startsAt,
-      endsAt: c.endsAt,
-      by: c.by,
-      phase,
-      ...(c.judging === "owner" && phase === "judging" ? { pickBy: c.endsAt + CHALLENGE_RULES.pickWindowMs } : {}),
-      entries,
-      entryCount,
-      ...(c.settled ? { settled: c.settled } : {}),
-      ...(mine ? { mine } : {}),
-    });
-  }
+  const out = await Promise.all(stored.map((c) => viewOf(store, token, c, viewer, now)));
   const rank = (p: PublicChallenge) => (p.phase === "open" ? 0 : p.phase === "judging" || p.phase === "closing" ? 1 : 2);
   return out.sort((a, b) => rank(a) - rank(b) || (a.phase === "open" ? a.endsAt - b.endsAt : b.startsAt - a.startsAt));
 }

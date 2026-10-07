@@ -15,15 +15,13 @@ A **system message** is one quiet line, set among the posts by time. Its kind sh
 | Swap | green | swap arrows | "A ⇄ B **swapped**": the verb opens the deal, or a signed swap's transaction |
 | Listing | blue | tag | "A **listed a deal**", opening it |
 | Join | orange | people | "A joined" |
-| Challenge | purple | trophy | "A **started a challenge:** *title*", opening the Club's Challenges tab ([ADR 0045](0045-club-challenges.md)); not shown if it was cancelled |
-| Winner | amber | trophy | "A, B **won** *title*" (winners best first), told when a likes-judged challenge ends, or when the Owner picks |
 
 Names are the shown handle or the short address, with no copy button, so a line fits on one row (it is cut with an ellipsis if not). The messages between two posts are **one group**: the first three lines and "+N more". A busy stretch reads as one block, not a wall. An event that names two Clubs' assets is logged in both; on the timeline it shows once, naming both.
 
 On the Board a group is a row of the list. On the timeline it is a small dashed card, and each line names its Club. Names open profiles ([ADR 0042](0042-profile-page.md)) as everywhere. There is no author, no like, no reply and no menu: nobody wrote it.
 
 - **Where.** Only on the Board, when it is ordered newest first and shows all posts (another lens, or "Looking for", is a question about posts). Pinned posts stay on top. On the timeline, for the reader's own Clubs; the timeline's section for other Clubs was removed at the same time (ADR 0041, amended), since across every Club the messages crowded out the posts.
-- **What counts.** Completed swaps and new deals from the Club's activity events, members by `joinedAt`, and a Club's challenges (started, and won), over the last 7 days. X shares are not messages: they are posts already.
+- **What counts.** Completed swaps and new deals from the Club's activity events, and members by `joinedAt`, over the last 7 days. A challenge's start and result ([ADR 0045](0045-club-challenges.md)) ride the same feed but are drawn as cards of their own, not as lines. X shares are not messages: they are posts already.
 - **Nothing is stored.** `GET /api/clubs/[token]/system` and `GET /api/timeline/system` read the log and member rows when asked, take the newest 40, and return them with `since`: the moment from which the list is complete (the window's start, or where the 40 were cut). A Club's are cached like its Board, for 15 seconds; the timeline's are the caller's own Clubs (from their token; none without one) and aren't cached.
 - **Paging.** The Board and the timeline load posts a page at a time, and messages come in one list. A message older than the oldest post loaded is held back until the posts reach it (and one older than `since` is never drawn), so a message never jumps ahead of posts that have not loaded, and a quiet gap is never drawn where the list was only cut. Both are woven by `weave` in `lib/systemFeed.ts`.
 

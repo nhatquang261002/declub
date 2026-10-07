@@ -41,10 +41,10 @@ async function challengeEvents(store: Store, club: string, since: number): Promi
   return all.flatMap((c): SystemEvent[] => {
     const out: SystemEvent[] = [];
     const startedAt = Math.floor(c.startsAt / 1000);
-    if (c.state !== "cancelled" && startedAt > since) out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], title: c.title });
+    if (c.state !== "cancelled" && startedAt > since) out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], challenge: c.id, title: c.title });
     const winners = c.settled?.winners ?? [];
     const wonAt = c.settled ? Math.floor((c.judging === "likes" ? Math.min(c.endsAt, c.settled.at) : c.settled.at) / 1000) : 0;
-    if (winners.length > 0 && wonAt > since) out.push({ id: `challenge-won:${c.id}`, clubs: [club], kind: "winner", at: wonAt, wallets: winners.map((w) => w.wallet.toLowerCase()), title: c.title });
+    if (winners.length > 0 && wonAt > since) out.push({ id: `challenge-won:${c.id}`, clubs: [club], kind: "winner", at: wonAt, wallets: winners.map((w) => w.wallet.toLowerCase()), challenge: c.id, title: c.title });
     return out;
   });
 }

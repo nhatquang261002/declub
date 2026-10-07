@@ -7,6 +7,7 @@ import { ClubAvatar } from "@/components/ClubArt";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
 import { Masonry } from "@/components/Masonry";
+import { ChallengeFeedCard } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
 import { TimelineCard } from "@/components/TimelineCard";
 import { TimelineComposer } from "@/components/TimelineComposer";
@@ -40,8 +41,10 @@ function Section({ id, title, children, aside }: { id: string; title: string; ch
   );
 }
 
-const heightOf = (item: FeedItem<TimelinePost>) => (item.type === "post" ? estimateHeight(item.post) : systemHeight(item.events.length));
+const heightOf = (item: FeedItem<TimelinePost>) => (item.type === "post" ? estimateHeight(item.post) : item.type === "challenge" ? CHALLENGE_HEIGHT : systemHeight(item.events.length));
 const clubOf = (token: string) => CLUBS.get(token);
+/** About how tall a challenge's card is, for laying the masonry out before it has loaded. */
+const CHALLENGE_HEIGHT = 480;
 
 /**
  * The reader's Clubs' posts as cards, endlessly (the next page loads as the end nears), with what
@@ -65,6 +68,7 @@ function Feed({ now, empty }: { now: number; empty: React.ReactNode }) {
         items={items}
         height={heightOf}
         render={(item) => {
+          if (item.type === "challenge") return <ChallengeFeedCard key={`challenge:${item.event.id}`} event={item.event} now={now} clubs={clubOf} />;
           if (item.type === "system") return <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} clubs={clubOf} />;
           const club = CLUBS.get(item.post.club);
           return club ? <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined now={now} /> : null;

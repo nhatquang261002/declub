@@ -6,7 +6,7 @@ import type { ActivityEvent } from "../lib/clubs";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import { banUser, createPost, deletePost, hidePost, likePost, type Deps } from "../lib/server/board";
 import { challengesHandlers, challengeHandlers } from "../lib/server/boardRoutes";
-import { cancelChallenge, createChallenge, enterChallenge, listChallenges, pickWinners, settleDue, withdrawEntry } from "../lib/server/challenges";
+import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, settleDue, withdrawEntry } from "../lib/server/challenges";
 import { readAwards } from "../lib/server/challengeState";
 import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
@@ -455,6 +455,25 @@ describe("challenges in the system messages (the Board and the timeline)", () =>
     await listChallenges(store, club, {}, at(END + 500));
     const late = (await sys(END + 600)).events.filter((e) => e.kind === "winner");
     assert.deepEqual(late.map((e) => [e.id, e.wallets, e.title, e.at]), [[`challenge-won:${id}`, [wallet(3)], "Best meme", GENESIS + END]], "told at its end");
+  });
+});
+
+describe("one challenge's details", () => {
+  it("has the brief and the entries members posted, and nothing for an unknown id", async () => {
+    const store = await world();
+    const id = await start(store);
+    const g = await post(store, "g", 60);
+    assert.ok((await enterChallenge(store, club, "g", id, g, at(61))).ok);
+    assert.ok((await likePost(store, club, "a", g, true, at(62))).ok);
+    const view = (await getChallenge(store, club, id, { userId: "g" }, at(100)))!;
+    assert.deepEqual([view.title, view.brief, view.entryCount, view.mine], ["Best Chog meme", "Post your funniest Chog.", 1, g]);
+    assert.deepEqual(view.entries.map((e) => [e.post, e.wallet, e.likes, e.mine, e.text]), [[g, wallet(3), 1, true, "gm g 60"]]);
+    assert.equal((await getChallenge(store, club, id, { userId: "a" }, at(100)))!.entries[0]!.liked, true);
+    assert.equal((await getChallenge(store, club, id, { userId: "x" }, at(100)))!.entries[0]!.liked, false);
+    assert.equal(await getChallenge(store, club, "not-an-id", {}, at(100)), null);
+    assert.equal(await getChallenge(store, club, "00000000-0000-0000-0000-000000000000", {}, at(100)), null);
+    // Asking after it ended settles it.
+    assert.equal((await getChallenge(store, club, id, {}, at(END + 1)))!.phase, "settled");
   });
 });
 

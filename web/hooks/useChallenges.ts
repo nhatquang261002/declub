@@ -21,6 +21,19 @@ export function useChallenges(token: string) {
   return { enabled: query.data?.enabled !== false, challenges: query.data?.challenges ?? [], isLoading: query.isLoading, error: query.error };
 }
 
+/** One challenge with its entries (public; a signed-in reader also sees which are theirs and which they liked). */
+export function useChallenge(token: string, id: string | undefined) {
+  const getToken = useAccessToken();
+  const query = useQuery({
+    queryKey: ["club-challenges", token.toLowerCase(), "one", id, !!getToken],
+    enabled: !!id,
+    queryFn: () => read<{ enabled: boolean; challenge?: PublicChallenge }>(`/api/clubs/${token}/challenges/${id}`, getToken),
+    refetchInterval: REFRESH_MS,
+    retry: 1,
+  });
+  return { challenge: query.data?.challenge, isLoading: query.isLoading, error: query.error };
+}
+
 /** Starting, entering, picking and cancelling. Each refreshes the list, the log and the standings. */
 export function useChallengeActions(token: string) {
   const getToken = useAccessToken();

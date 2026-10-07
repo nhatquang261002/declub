@@ -8,6 +8,7 @@ import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
 import { PostItem } from "@/components/PostItem";
 import { Spinner } from "@/components/Spinner";
+import { ChallengeFeedCard } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
@@ -113,7 +114,9 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
       ) : (
         <ul className="club-panel club-list">
           {items.map((item) =>
-            item.type === "system" ? (
+            item.type === "challenge" ? (
+              <ChallengeFeedCard key={`challenge:${item.event.id}`} event={item.event} now={now} className="p-3" />
+            ) : item.type === "system" ? (
               <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} />
             ) : (
               <PostItem
