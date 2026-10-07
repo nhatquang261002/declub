@@ -238,6 +238,7 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
           xShares={ranked ? me.xShares : undefined}
           backedPoints={ranked ? me.backedPoints : undefined}
           backers={ranked ? me.backers : undefined}
+          challengePoints={ranked ? me.challengePoints : undefined}
         />
       </div>
       <p className="mt-4 rounded-lg bg-[#f0b735]/25 px-3 py-2 text-sm font-semibold">{hint}</p>

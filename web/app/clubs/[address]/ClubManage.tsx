@@ -41,6 +41,9 @@ const ACTIONS: Record<string, string> = {
   edit_rules: "changed the reward rules",
   reward_ban: "banned from rewards:",
   reward_unban: "lifted the rewards ban on",
+  create_challenge: "started a challenge:",
+  cancel_challenge: "cancelled a challenge:",
+  settle_challenge: "settled a challenge:",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";

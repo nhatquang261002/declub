@@ -9,6 +9,7 @@ A **Club** is the community for one verified NFT collection, and the heart of De
 - **Members:** a leaderboard ranked by member Momentum, with verified X or Discord handles ([ADR 0011](adr/0011-verified-profiles.md)) and a Holder badge.
 - **Pulse:** the Club speaking between posts. Swaps, new deals and new members of the last week show on the Board, and across Clubs on the timeline, as coloured one-line **system messages** with their own icons ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
+- **Challenges:** tasks the Owner sets the Club at any time; members answer with a post and the winners earn activity points ([ADR 0045](adr/0045-club-challenges.md); [below](#challenges)).
 - **Rewards:** a share of the fees the Club's swaps paid, to its active Holders and its Owner, each week, by rules the Owner sets ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).
 
 No deal contract, matcher rule or pool rule depends on a Club: a deal settles the same either way. Rewards are paid after the fact, from a separate contract (`DeClubRewards`).
@@ -19,7 +20,7 @@ No deal contract, matcher rule or pool rule depends on a Club: a deal settles th
 |---|---|
 | `/timeline` | Board posts from the Clubs you joined, then from every other Club (see *Screens*) |
 | `/clubs` | The directory: totals, "Your Clubs", the Most active / Rising / Most traded boards, then All Clubs (see *Screens*) |
-| `/clubs/[address]` | One Club, with the tabs Market, Board, Members, Rewards, and Manage for staff |
+| `/clubs/[address]` | One Club, with the tabs Market, Board, Challenges, Members, Rewards, and Manage for staff |
 
 "Timeline" and "Clubs" are in the header's nav.
 
@@ -59,7 +60,7 @@ Kept per Club, by Privy user id, in `club-roles:{chain}:{token}`. The app admin 
 | Role | How you get it | Can |
 |---|---|---|
 | **App admin** | `CLUB_ADMIN_USER_IDS` environment variable | Everything below, in every Club. Assign or remove Owners. Ban someone from every Club. Purge a hidden Club. |
-| **Owner** (at most one) | **Claim:** a member whose linked wallet is the contract's `owner()`, read on chain by the server. **Or** an admin assigns one after checking the project another way. | Edit the Club profile: description (500 characters), up to 3 links (a banner image is not built yet). Pin up to 3 posts. Appoint and remove Moderators (at most 10). Hand ownership to another member. Set "holders only can post". |
+| **Owner** (at most one) | **Claim:** a member whose linked wallet is the contract's `owner()`, read on chain by the server. **Or** an admin assigns one after checking the project another way. | Edit the Club profile: description (500 characters), up to 3 links (a banner image is not built yet). Pin up to 3 posts. Appoint and remove Moderators (at most 10). Hand ownership to another member. Set "holders only can post". Start, judge and cancel challenges ([below](#challenges)). |
 | **Moderator** | Appointed by the Owner or an admin | Hide, restore and delete posts. Work through the report queue. Ban and unban members from this Club, but can't lift a ban the Owner or an admin made. Can't act on the Owner or on other Moderators. |
 | **Member** | Joins | Post (needs a shared verified profile), like and report posts, appear on the leaderboard. |
 | **Visitor** | Not joined, or not signed in | Read only. |
@@ -91,7 +92,7 @@ Rules:
 - Join / Leave. Signed out it offers "Sign in to join"; without sign-in or a store it shows nothing and the Club is read-only. A member sees a Holder badge when they hold the asset, and Leave in the "⋯" menu beside it. Under Join: "Shows your wallet on the Members list."
 - Stats: Momentum and its trend (with an explanation) · members and holders · swaps in 7 days · new deals in 7 days · traders in 30 days · heat.
 - A collapsed **Contract details** block under the header (`ClubDetails.tsx`): the contract and kind of each asset, and which holdings earn the badge. Heat (Quiet, Stirring, Active, Busy, Hot) is one of the header stats.
-- The open tab is in the URL, `?tab=market|board|members|rewards|manage`.
+- The open tab is in the URL, `?tab=market|board|challenges|members|rewards|manage`.
 - The Owner sees "*X* in the Club fund is ready" when the fund can be claimed, with a link to the Rewards tab. It is worded apart from "This Club has no Owner yet · Claim it", which claims the Club, not money.
 
 **Market tab**
@@ -109,6 +110,8 @@ Three views, switched with pills:
 - *Note*: plain text, 280 characters at most, plus an optional X post, shown as a card ([X posts](#x-posts)). Under the field, the composer says what makes an X post count for this Club.
 - *Looking for*: text, plus an optional deal id or intent hash, shown as its card. For example "WTB any Chog with a crown, 2 MON over floor".
 
+**Challenges tab** ([ADR 0045](adr/0045-club-challenges.md); `ClubChallenges.tsx`): open challenges first, then ones being judged, then past ones. Each card has the title, brief, a status chip (Open, Counting likes, Owner is picking, Done, Cancelled), the points per place, the time left, who judges, and the entries with their likes and, once settled, their place. A member writes an entry in the card ("Sign & enter": it is signed and posted to the Board like any note, then entered), likes other entries, and can withdraw. The Owner (or an app admin) sees **Start a challenge** (title, brief, who judges, points for up to three places, how long), and on a challenge they judge, a place picker and **Award the points** once it has ended; they can cancel a challenge until it is settled. The tab counts the open ones.
+
 **Timeline** (`/timeline`, [ADR 0041](adr/0041-timeline.md)): Board posts from many Clubs in one list, newest first, in two sections. **From your Clubs** (signed in) is a masonry of the posts from Clubs you belong to, with a strip of those Clubs on top; you can like, reply and report there, exactly as on the Board. **Around the other Clubs** is the same masonry of posts from every other live Club (archived ones are left out). A post is a card under a cover in its Club's colours, with the author, the text (a short post with nothing attached is set large), its X card or deal link, and its counts; for a Club you haven't joined the card says "Join <symbol> to like and reply" and links to that Club's Board. Both lists are endless: the next page of 20 loads as the end nears (`InfiniteSentinel`), with no cap short of the Boards' own, and a failed load shows a retry button. Hidden posts, replies and pins are not shown, and moderation stays on the Board.
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
@@ -119,6 +122,20 @@ Three views, switched with pills:
 - **History**: the latest epoch's fees, sponsored amount, Holder pool, Club fund and what rolls over, **Share the week** (a preview of the Club card first, then an X compose link with the epoch's fees and what the most active Holders were paid, linking the Club page; `web/lib/recap.ts`), who earned, and earlier epochs.
 
 **Deep links**: not built yet. An asset row on a deal page doesn't link to its Club.
+
+## Challenges
+
+[ADR 0045](adr/0045-club-challenges.md). Pure rules in `web/lib/challenges.ts` (`CHALLENGE_RULES`, `CHALLENGE_CAP_PER_EPOCH`, `checkChallenge`, `winnersByLikes`, `winnersByPick`, `phaseOf`), the store logic in `web/lib/server/challenges.ts` (`createChallenge`, `enterChallenge`, `withdrawEntry`, `pickWinners`, `cancelChallenge`, `settleDue`, `listChallenges`), the keys and the points read by the rewards builder in `web/lib/server/challengeState.ts`.
+
+| | |
+|---|---|
+| **Who starts one** | The Owner or an app admin, at any time, with `POST /api/clubs/[token]/challenges` `{ title, brief, judging, prizes, hours }`. A title of at most 60 characters, a brief of at most 280, `judging` `"likes"` or `"owner"`, 1 to 3 `prizes` (whole points, 1 to 20 each, never more than the place above), `hours` from 1 to 720. At most 3 are open at once. Logged (`create_challenge`). |
+| **Entering** | `POST …/challenges/[id] { action: "enter", post }`: a member enters one of their own top-level Board posts made after the challenge started and before it ends, that isn't hidden. One entry each (a new one replaces the old, `withdraw` takes it back), one challenge per post, at most 200 entries. Not the Owner or an admin, and not a member banned from the Club or from rewards. Moderators may enter; one who has can't hide, delete or ban another entrant of the same unsettled challenge (`rivals`, `challenge_conflict`). |
+| **Judging by likes** | Entries ranked by distinct likes from other members still in the Club and not banned from rewards, then the earlier entry; at least 1 like to win; a member wins once; as many places as `prizes`. The likes of an entry lock when the challenge ends: `likePost` refuses with `voting_closed` (`votingClosed`). |
+| **Judging by the Owner** | Once it has ended, `POST …/challenges/[id] { action: "pick", posts: [id, …] }` names the winners best first, among the entries that can win (not hidden, not deleted, the member still in and not banned). After 14 days with no pick it ends with no winners (`expired`). |
+| **Settling** | `settleDue` settles everything that has ended: on `GET …/challenges`, in the live standings, and in `/api/cron/close` before the epoch is frozen. Locked per challenge; a win is keyed by challenge id, so a repeat pays once. Logged (`settle_challenge`). |
+| **The points** | A win is `prizes[place − 1]` points in epoch *n*: the epoch a likes-judged challenge ended in while it isn't closed, else the running one; an Owner pick counts in the epoch it is made. Kept at `declub:challenge:{chain}:{club}:awards:{n}`, by user id. When the epoch's inputs are read (`readInputs`) a member's wins count up to `CHALLENGE_CAP_PER_EPOCH` (20), frozen in `ClosingHolder.challenge`, and enter `activityPoints` as ordinary points (bonus and ramp). A member banned from rewards wins nothing. |
+| **Published** | `PublishedLedger.challenges` is `{ cap, wins: [{ challenge, title, wallet, place, points }] }` and each ledger row has `challengePoints`; the live standings row has `challengePoints` too, and the Points meter shows a Challenges line. |
 
 ## Momentum
 
@@ -240,6 +257,7 @@ This is the first user-written content in the app. Every post is signed by its a
   - per **active day**, 1 (`dayPoints`): a UTC day with a visible top-level Board post by the member in the Club, or a like or reply they gave there, at most 7 an epoch. Posts are recorded when posted (`web/lib/server/activeDays.ts`, the first 3 a day), likes and replies with backing; a deleted post, or one a moderator hid, counts for nothing, and a like given again after being taken back adds no day (its day counts once, the first);
   - per X share, 3, halved for a weak one;
   - per **completed swap** with a wallet that isn't the member's own, 2 (`swapPoints`), half for a counterparty they already swapped with in the epoch within 7 days (Momentum's `washFactor`), at most 14 an epoch (`swapCapPerEpoch`, [ADR 0034](adr/0034-swaps-count-in-the-holder-bonus.md)). A swap between a member's own wallets earns nothing;
+  - **challenge wins** ([ADR 0045](adr/0045-club-challenges.md)): the points the Owner set for a place in a challenge the member won, at most 20 an epoch (`CHALLENGE_CAP_PER_EPOCH`; [Challenges](#challenges));
   - with reach on (needs `X_BEARER_TOKEN`), `2 × log2(1 + engagement)` more per share, capped at 30 per member per epoch; a share the reach read refused counts 0.
 
   `bonus = 25% × min(1, points / 35)`: a post and an X share every day (28) isn't enough alone; backing makes up the rest. Each holder payout in the record carries `shares`, `bonusBps` (activity plus streak), `points`, `days`, `streak` and `backed`. Splitting holdings across accounts gains nothing but rounding.
@@ -289,6 +307,9 @@ All keys start with `declub:` and are per chain.
 | `rewards:{chain}:reach:{n}` | the X reach read for epoch `n`, by X post id: `{club, wallet, ok, strength, engagement, reason?}` |
 | `club-rules:{chain}:{club}` | every save of the Club's reward rules: `{ from, rules, at, by }[]` ([ADR 0044](adr/0044-owner-reward-settings.md)) |
 | `reward-bans:{chain}:{club}` | members banned from rewards, by userId: `{ wallet, at, by }` |
+| `challenge:{chain}:{club}:list` / `…:c:{id}` | zset of a Club's challenge ids by start time (100 kept) / one challenge: title, brief, judging, prizes, window, state, settlement ([ADR 0045](adr/0045-club-challenges.md)) |
+| `challenge:{chain}:{club}:entries:{id}` / `…:entry-of:{post}` | set of `postId|userId` entries / the challenge a post was entered in |
+| `challenge:{chain}:{club}:awards:{n}` | challenge wins counted in epoch `n`, by userId: `{ wallet, points, wins[] }` |
 | `rewards:{chain}:closing:{club}:{n}` | the frozen inputs of one Club's epoch, server-private ([ADR 0040](adr/0040-points-floor-held-average-public-backing.md)) |
 | `rewards:{chain}:points:{n}` | epoch `n`'s final points for every Holder, by Club and public wallet |
 | `held:{chain}:{club}:{n}` | the daily holdings samples for epoch `n` ([ADR 0040](adr/0040-points-floor-held-average-public-backing.md)): `{ days: number[], sums: { [userId]: decimal string } }` |
@@ -343,7 +364,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - **Data:** `web/data/assets.json`, `web/lib/verifiedAssets.ts` (`clubFor(token)`).
 - **Server:** `web/lib/server/activity.ts` (the log), `clubs.ts` (a Club's events from the log and the pool, its summary and detail), `clubRoutes.ts` (the read handlers, built over a registry so tests can use their own list), `members.ts` (membership, Holder checks, sync, the list) and `memberRoutes.ts` (its handlers, with the caller's gate injectable for tests), `board.ts` (posts, reports, bans, roles, the claim, the profile, the purge), `boardRoutes.ts` (its handlers), `clubState.ts` (roles, profile, bans and log documents; the admin list), the store ops (`addMember`, `removeMember`, `countMembers`), and the routes under `web/app/api/clubs/` and `web/app/api/activity/`.
 - **Shared:** `web/lib/momentum.ts` (the score), `web/lib/clubs.ts` (event and stats types, `summarize`, `settlementEvents`, `mergeEvents`) and `web/lib/members.ts` (`isHolder`, display wallet, stale-row picking, ranking), `clubRoles.ts` (the permission matrix, role changes) and `clubPosts.ts` (text cleaning, links, what each viewer sees, profile checks).
-- **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubRewards.tsx`, `LiveStandings.tsx`, `ClubDetails.tsx` and `parts.tsx`.
+- **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubChallenges.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubRewards.tsx`, `LiveStandings.tsx`, `ClubDetails.tsx` and `parts.tsx`.
 - **Timeline:** `web/lib/timeline.ts` (scopes, page sizes), `web/lib/server/timeline.ts` (`listTimeline`) and `timelineRoutes.ts`, `web/hooks/useTimeline.ts`, `web/components/TimelineCard.tsx`, `TimelineComposer.tsx`, `PostComposer.tsx` (shared with the Board), `InfiniteSentinel.tsx` and `web/app/timeline/page.tsx`. `Masonry.tsx` (with `useColumns` and `toColumns`) fills a card list without gaps; the Deals, History and Market lists (`ListingGrid`) use it too.
 - **Hooks:** `useClubs`, `useClub`, `useClubMarket`, `useClubMembership` (with `useMyClubs`, `useClubMembers`), `useSignIn`, `useClubBoard` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`), on React Query and `useAccessToken`. Writes report errors through `useToast`; loads use `LoadError`.
 - **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's collapsed details block is `ClubDetails.tsx`.

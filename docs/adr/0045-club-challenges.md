@@ -1,0 +1,30 @@
+# ADR 0045: Club challenges: the Owner sets a task, winners earn activity points
+
+**Status:** Accepted · 2026-10-07 · Web only: no contract change. Builds on [ADR 0038](0038-points-from-backing.md) (points) and [ADR 0044](0044-owner-reward-settings.md) (what Owners may set). The spec is [09 · Clubs](../09-clubs.md#challenges). Replaces the roadmap's "weekly prompt".
+
+## Context
+
+A Club's points mostly come from backing: members liking and replying to each other. Nothing lets an Owner point that activity at something, such as a meme contest, a best pitch or a naming vote, or reward the members who do it well. The roadmap sketched a *weekly* prompt on the Board. A fixed weekly cadence doesn't fit: Owners want to start one when something happens (a mint, a collab, a quiet week) and end it when it suits, not on a calendar.
+
+The Owner choosing how many points a winner gets is a power to tune the point system toward themselves or friends, which ADR 0044 deliberately kept from Owners. So whatever the Owner sets has to stay inside bounds the protocol fixes, and has to be checkable.
+
+## Decision
+
+- **A challenge is started by the Owner (or an app admin) at any time** and runs from that moment for 1 hour to 30 days. It has a title (60 characters), a brief (280), who judges, and the points per place. At most 3 are open at once, so the Board isn't buried. The Owner can cancel it until it is settled. `POST /api/clubs/[token]/challenges`; logged (`create_challenge`, `cancel_challenge`, `settle_challenge`).
+- **Points are the Owner's to set, within protocol bounds** (`CHALLENGE_RULES`, `CHALLENGE_CAP_PER_EPOCH`): 1 to 3 paid places, each a whole number of points from 1 to 20, a lower place never more than a higher one. Whatever a member wins, at most **20 challenge points count for them in one epoch**: the wins are all kept and published, the epoch counts the first 20. Challenge points are ordinary activity points (`activityPoints`'s `challenge`): they raise the bonus (up to +25%) and move a Holder up the ramp. They never pay anyone directly, and a member without NFTs only benefits in a Club that gives them a slice.
+- **Members answer with a Board post.** A member enters one of their own top-level posts made while the challenge is open (`POST …/challenges/[id] { action: "enter", post }`); the app's form signs and posts it in one step. One entry each (a new one replaces the old), a post is an entry in one challenge, the Owner and app admins can't enter, nor can members banned from the Club or from rewards. Using the Board post means likes, replies, signatures, reports and moderation all work as they do already, and a hidden or deleted entry drops out.
+- **Two ways to pick winners**, chosen when the challenge starts:
+  - **Likes** (`judging: "likes"`): entries are ranked by distinct likes from other members who are still in the Club and not banned from rewards, the earlier entry first on a tie, at least one like to win, a member wins once. The likes of an entry are **locked from the end** (`votingClosed`: a like or a taken-back like is refused with `voting_closed`), so the tally can't move between the end and the settling.
+  - **The Owner** (`judging: "owner"`): after it ends the Owner has 14 days to name the winners, best first (`action: "pick"`). Likes aren't locked; the Owner may weigh them or not. If they don't pick in time the challenge ends with no winners (`expired`).
+- **Settling is lazy and idempotent.** `settleDue` settles every challenge that has ended, when challenges are read, when the live standings are worked out, and in the epoch close job before inputs are frozen. A lock per challenge and a win keyed by challenge id mean a repeat never pays twice.
+- **Which epoch the points count in.** A likes-judged challenge counts in the epoch it ended in, if that epoch hasn't been closed yet, else in the running one; an Owner-judged one counts in the epoch of the pick. Wins are kept per epoch (`declub:challenge:{chain}:{club}:awards:{n}`), read when the epoch's inputs are frozen (`ClosingHolder.challenge`), so a frozen epoch never changes. A member banned from rewards wins nothing.
+- **Public.** The points ledger of each epoch carries `challengePoints` per member and `challenges: { cap, wins[] }` with every win (challenge id, title, wallet, place, points), so anyone can see where a member's points came from and recompute them. The live standings and the Points meter show them.
+
+## Consequences
+
+- An Owner can still favour friends: in an owner-judged challenge they pick, and in a likes-judged one friends' likes count. The bounds contain it: at most 20 points per member per epoch, 3 places, the Owner can't enter, every challenge and pick is in the Club's log and published with the epoch, and members the Owner shouldn't reward can be banned only by someone who outranks them. It's the same trust as the Owner's other settings (ADR 0044), with a smaller blast radius than letting them set rules.
+- Like rings can win a likes-judged challenge. Likes come from members who joined the Club, a member can't like their own entry, likes lock at the end, and the prize is bounded; a Club that sees farming can switch to Owner judging or ban the accounts from rewards. No new anti-sybil work here: backing already has voices and pair caps, but a challenge's likes don't use them.
+- Challenge points reach only the epoch's points. Holding still sets the size of a share (NFTs held, averaged); a member with 20 challenge points and no activity otherwise is paid a whole ramp share of their NFTs and a 14% bonus (20/35 of the 25% cap), not more.
+- Moderators may enter. So staff can't clear the field, a Moderator who has entered a challenge that is still running or being judged can't hide, delete or ban a member who is in the same one (`rivals`, refused with `challenge_conflict`); the Owner, an app admin or another Moderator has to. Once it is settled the restriction ends.
+- Entering costs a Board post, so it also counts as an active day and is rate limited like any post.
+- Nothing about challenges is on chain, and the Board, momentum and the deal contracts are unchanged.

@@ -5,6 +5,7 @@ import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "./streaks";
 
 export { standingsKey };
+import { settleDue } from "./challenges";
 import { rulesFor } from "./clubRules";
 import { clubEvents } from "./clubs";
 import { allRows, viemHoldings, type Holdings } from "./members";
@@ -41,6 +42,8 @@ export type StandingRow = {
   xPoints?: number;
   swapPoints?: number;
   backedPoints?: number;
+  /** Of `points`: won in the Club's challenges this epoch (ADR 0045). */
+  challengePoints?: number;
   /** How many members backed them this epoch. */
   backers?: number;
   /** Of `backedPoints`: from verified accounts' base voices (ADR 0039). */
@@ -109,6 +112,8 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   const settlementFee = cachedSettlementFee(store, deps.settlementFee ?? viemSettlementFee);
   const intents = (deps.intents ?? DECLUB_INTENTS_ADDRESS ?? "").toLowerCase();
 
+  // Challenges that have ended count in the standings, so settle them first (ADR 0045).
+  await settleDue(store, club, { now: () => now * 1000, ...(deps.genesis !== undefined && deps.length !== undefined ? { epochs: { genesis: deps.genesis, length: deps.length } } : {}) });
   const events = (await (deps.events ?? ((c: ClubEntry) => clubEvents(store, c)))(club)).filter((e) => e.at >= window.start && e.at < window.end);
   let fees = 0n;
   for (const event of events) {
@@ -151,6 +156,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       xPoints: h.xPoints,
       swapPoints: h.swapPoints,
       backedPoints: h.backedPoints,
+      ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
       backers: h.backers,
       basePoints: h.basePoints,
       bonusBps: payout?.bonusBps ?? 0,

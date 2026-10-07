@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { CHALLENGE_CAP_PER_EPOCH } from "@/lib/challenges";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR } from "@/lib/clubPosts";
 import { PRIVY_APP_ID } from "@/lib/config";
@@ -27,6 +28,7 @@ const SECTIONS: GuideSection[] = [
 const TABS = [
   { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals{swapIntents ? " and signed swaps" : ""} for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
   { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies and likes under them. Order them by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
+  { icon: <TrophyIcon className="size-4" />, title: "Challenges", body: <>Tasks the Owner sets the Club, any time. Answer one with a post; the winners, picked by likes or by the Owner, earn activity points for the week (at most {CHALLENGE_CAP_PER_EPOCH} count for you), which raise your share of the rewards.</> },
   { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by Momentum. <b>Follow</b> the ones you trust.</> },
   { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim. <b>Share the week</b> posts the recap to X.</> },
   { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>For staff. Owners edit the Club page, the coin rule and the X links; everyone on staff sees the bans and the moderation log. Pins and moderators are set from the post menus and the Members list.</> },

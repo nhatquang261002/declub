@@ -34,6 +34,8 @@ import {
 import { registry, type ClubEntry } from "../verifiedAssets";
 import { activeDays } from "./activeDays";
 import { backingRecordKey, publishBacking, readBacking, voicesFor, type PublishedBacking } from "./backing";
+import { awardedPoints, publishAwards, readAwards } from "./challengeState";
+import type { PublishedAward } from "./challengeState";
 import { rewardBans, rulesFor } from "./clubRules";
 import { readHeld } from "./held";
 import { nextStreaks, readStreaks, standingsKey, streakAt, streaksKey, type Streaks } from "./streaks";
@@ -87,6 +89,8 @@ export type LedgerRow = {
   xPoints: number;
   swapPoints: number;
   backedPoints: number;
+  /** Of `points`: won in the Club's challenges (ADR 0045). Absent in epochs built before. */
+  challengePoints?: number;
   backers: number;
   basePoints: number;
   /** The whole bonus: activity plus streak, in basis points, and the streak in epochs. */
@@ -96,7 +100,16 @@ export type LedgerRow = {
   paid: boolean;
 };
 
-export type PublishedLedger = { closedAt: number; rules: ClubRules; samples: number; /** Wallets banned from rewards (ADR 0044). */ excluded: string[]; rows: LedgerRow[] };
+export type PublishedLedger = {
+  closedAt: number;
+  rules: ClubRules;
+  samples: number;
+  /** Wallets banned from rewards (ADR 0044). */
+  excluded: string[];
+  /** Every challenge win in the epoch (ADR 0045), and the most one member could count; absent when there were none. */
+  challenges?: { cap: number; wins: PublishedAward[] };
+  rows: LedgerRow[];
+};
 
 export type RewardsDeps = {
   /** Unix seconds. */
@@ -296,6 +309,8 @@ export type HolderInput = Holder & {
   xPoints: number;
   swapPoints: number;
   backedPoints: number;
+  /** Of `points`: won in challenges (ADR 0045). */
+  challengePoints: number;
   /** How many members backed them. */
   backers: number;
   /** Of `backedPoints`: from base voices (ADR 0039), at most `baseCapPerReceiver`. */
@@ -328,6 +343,8 @@ export type ClosingHolder = {
   backed: number;
   backers: number;
   base: number;
+  /** Challenge points won in the epoch, capped (ADR 0045). Absent in snapshots taken before. */
+  challenge?: number;
 };
 
 /**
@@ -348,6 +365,8 @@ export type Closing = {
   members?: ClosingHolder[];
   /** The Club wallets of members banned from rewards at the close (ADR 0044). */
   excluded?: string[];
+  /** Challenge wins counted in the epoch (ADR 0045), as published. */
+  challenges?: { cap: number; wins: PublishedAward[] };
   /** Every member's active days, by user id: streaks move for members without shares too. */
   days: Record<string, number>;
   /** Who backed whom, by public wallet. Published with the epoch. */
@@ -378,6 +397,8 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
   const voices = await voicesFor(store, n, actions.map((a) => a.giver), average, linkedBy, rules);
   const backed = backingPoints(actions, voices, rules);
   const days = await activeDays(store, club.address, n, read0.days);
+  // What members won in the Club's challenges (ADR 0045); a member banned from rewards wins nothing.
+  const awards = Object.fromEntries(Object.entries(await readAwards(store, club.address, n)).filter(([userId]) => !banned.has(userId)));
   const row = (userId: string, wallet: string, wallets: string[], shares: bigint, joinedAt: number): ClosingHolder => {
     const support = backed.get(userId);
     return {
@@ -391,17 +412,19 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
       backed: support?.points ?? 0,
       backers: support?.backers ?? 0,
       base: support?.base ?? 0,
+      ...(awards[userId] ? { challenge: awardedPoints(awards[userId]) } : {}),
     };
   };
   const holders = held.map(({ userId, wallet, wallets, shares, joinedAt }) => row(userId, wallet, wallets, shares, joinedAt));
   const rows = await allRows(store, club.address);
   // Members without NFTs who did something: the Club may pay them a slice (ADR 0044).
   const members = rows
-    .filter((r) => r.displayWallet && r.wallets.length > 0 && !closing.has(r.userId) && !banned.has(r.userId) && ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId)))
+    .filter((r) => r.displayWallet && r.wallets.length > 0 && !closing.has(r.userId) && !banned.has(r.userId) && ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId) || !!awards[r.userId]))
     .map((r) => row(r.userId, r.displayWallet!, r.wallets, 0n, r.joinedAt));
   const wallets = new Map(rows.flatMap((r) => (r.displayWallet ? [[r.userId, r.displayWallet] as const] : [])));
   const read: BackingRead = { actions, removed, voices, wallets };
-  return { holders, members, excluded: Object.values(bans).map((b) => b.wallet).sort(), days: Object.fromEntries(days), samples, read };
+  const challenges = Object.keys(awards).length > 0 ? publishAwards(awards) : undefined;
+  return { holders, members, excluded: Object.values(bans).map((b) => b.wallet).sort(), days: Object.fromEntries(days), samples, read, ...(challenges ? { challenges } : {}) };
 }
 
 /**
@@ -417,8 +440,8 @@ export function scoreHolders(
   streaks: Streaks,
   rules: ClubRules = DEFAULT_CLUB_RULES,
 ): HolderInput[] {
-  return inputs.holders.map(({ userId, wallet, wallets, shares, held, joinedAt, days, backed, backers, base }) => {
-    const { points, bonusBps, x, swaps, backed: backedPoints } = activityPoints(events, reach, wallets, days, backed, rules);
+  return inputs.holders.map(({ userId, wallet, wallets, shares, held, joinedAt, days, backed, backers, base, challenge }) => {
+    const { points, bonusBps, x, swaps, backed: backedPoints, challenge: challengePoints = 0 } = activityPoints(events, reach, wallets, days, backed, rules, challenge ?? 0);
     return {
       userId,
       wallet,
@@ -430,6 +453,7 @@ export function scoreHolders(
       xPoints: x,
       swapPoints: swaps,
       backedPoints,
+      challengePoints,
       backers,
       basePoints: base,
       days,
@@ -631,6 +655,7 @@ async function compute(
       xPoints: h.xPoints,
       swapPoints: h.swapPoints,
       backedPoints: h.backedPoints,
+      ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
       backers: h.backers,
       basePoints: h.basePoints,
       bonusBps: holder ? totalBonusBps(h, rules) : 0,
@@ -642,6 +667,7 @@ async function compute(
       rules,
       samples: closing.samples,
       excluded: closing.excluded ?? [],
+      ...(closing.challenges ? { challenges: closing.challenges } : {}),
       rows: [...rankHolders(holdersOf.get(input.club)!).map((h) => rowOf(h, true)), ...rankMembers(membersOf.get(input.club)!).map((m) => rowOf(m, false))],
     };
   }

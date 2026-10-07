@@ -113,6 +113,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
+- **Challenges:** tasks the Owner sets the Club. Answer one with a post and, if you win, you earn points toward your share of the week's rewards (see below).
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
 - **Rewards:** what the Club's swaps paid in fees, what went to its Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
@@ -136,6 +137,8 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 **Your posts are signed.** When you press **Sign & post**, your Club wallet (the one the Members list shows for you) signs the post. It costs no gas and moves nothing. If another wallet is connected, the app asks you to switch first. Because each post is signed, it's your own record: anyone can check it, and each Club's posts are public with their signatures at `/api/clubs/<address>/feed`, yours across Clubs at `/api/wallets/<your wallet>/posts`.
 
 **Choosing the order.** Above the Board, pick a lens: **Newest**; **Most active**, where posts from the members most active in the Club (trading, and their X posts about it) rise and older ones sink; **Holders**, only posts from members who hold it; or **Following**, only posts from wallets you follow (connect a wallet to see it). Pinned posts stay on top, except under Following.
+
+**Challenges.** The Owner can set the Club a challenge at any time: a title, what to do, how long it runs, and how many points each of the top one to three places earns. Open the **Challenges** tab, write your entry and press **Sign & enter**: it's posted on the Board too, and you can enter one post at a time (a new entry replaces the old one). The Owner chose how winners are picked: **by likes**, from other members of the Club (you can't like your own entry, and likes lock when it ends), or **by the Owner**, who has 14 days after the end to pick. Winners earn the points as ordinary activity points for that week, so they raise your bonus and your place on the ramp; at most 20 challenge points count for you in a week, however many you win. The Owner can't enter their own challenge; Moderators can, but can't hide or ban someone in the same challenge while it runs. Every win is published with the week's points.
 
 **Replies and likes.** Reply to a post once, one level deep (you can't reply to a reply), and like posts you value (not your own). Replies are signed with your Club wallet; likes aren't. Both count toward Club Rewards: they make your day active, and if you hold an NFT they give the author part of your weekly voice (see below). The author sees them in the bell.
 

@@ -270,7 +270,7 @@ export const SPONSOR_MIN_WEI = 10n ** 17n;
 export const sponsorMessage = (club: string, tx: string, name: string) =>
   `DeClub sponsorship\nClub: ${club.toLowerCase()}\nPayment: ${tx.toLowerCase()}\nName: ${name}`;
 
-export type Activity = { x: number; days: number; swaps: number; backed: number; points: number; bonusBps: number };
+export type Activity = { x: number; days: number; swaps: number; backed: number; /** Won in challenges (ADR 0045); absent when none. */ challenge?: number; points: number; bonusBps: number };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -279,7 +279,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * ADR 0038), their active days, each worth `dayPoints`, their own X shares, each worth `xShareBase`
  * and its reach, and their completed swaps (`swapPoints`, ADR 0034). At most 7 active days count.
  * The reach read has the last word on an X share: one that was deleted, or edited so it's no longer
- * about the Club, counts for nothing.
+ * about the Club, counts for nothing. `challenge` is what the member won in the Club's challenges
+ * this epoch (ADR 0045), already capped.
  */
 export function activityPoints(
   events: readonly ActivityEvent[],
@@ -288,6 +289,7 @@ export function activityPoints(
   days = 0,
   backed = 0,
   rules: ClubRules = DEFAULT_CLUB_RULES,
+  challenge = 0,
 ): Activity {
   const own = new Set(wallets.map((w) => w.toLowerCase()));
   let base = 0;
@@ -303,8 +305,9 @@ export function activityPoints(
   const swaps = swapActivity(events, own, rules);
   const active = Math.max(0, Math.min(7, Math.floor(days)));
   const support = Math.max(0, backed);
-  const points = x + swaps + active * rules.dayPoints + support;
-  return { x: round2(x), days: active, swaps: round2(swaps), backed: round2(support), points: round2(points), bonusBps: bonusBps(points, rules) };
+  const won = Math.max(0, challenge);
+  const points = x + swaps + active * rules.dayPoints + support + won;
+  return { x: round2(x), days: active, swaps: round2(swaps), backed: round2(support), ...(won > 0 ? { challenge: round2(won) } : {}), points: round2(points), bonusBps: bonusBps(points, rules) };
 }
 
 /** One like or reply a member gave another in a Club's epoch (ADR 0038), by user id. */

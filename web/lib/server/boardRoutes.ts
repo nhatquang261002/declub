@@ -41,6 +41,7 @@ import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
+import { cancelChallenge, createChallenge, enterChallenge, listChallenges, pickWinners, withdrawEntry } from "./challenges";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -91,6 +92,18 @@ const REFUSALS: Record<string, [number, string]> = {
   own_like: [409, "You can’t like your own post."],
   too_many_pinned: [409, "At most 3 posts can be pinned."],
   hidden: [409, "A hidden post can’t be pinned or liked."],
+  too_many_open: [409, "A Club can have 3 challenges open at once."],
+  owner_entry: [403, "The Owner sets the challenge and can’t enter it."],
+  bad_post: [422, "Enter a post of your own, posted while the challenge is open, that isn’t hidden or a reply."],
+  already_entered: [409, "That post is already an entry in another challenge."],
+  full: [409, "This challenge has as many entries as it can take."],
+  closed: [409, "This challenge has ended."],
+  not_judging: [409, "This challenge isn’t waiting for the Owner’s pick."],
+  no_entry: [404, "You haven’t entered this challenge."],
+  reward_banned: [403, "You’re banned from this Club’s rewards, so you can’t enter its challenges."],
+  busy: [409, "That is being settled right now. Try again in a moment."],
+  challenge_conflict: [409, "You and this member are in the same challenge, so the Owner or another Moderator has to do that."],
+  voting_closed: [409, "This post is an entry in a challenge that has ended, so its likes are locked."],
   thread_full: [409, "This post has as many replies as it can take."],
   too_many_moderators: [409, "A Club has at most 10 Moderators."],
   already_owner: [409, "They are already the Owner."],
@@ -402,6 +415,62 @@ export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
       if (f instanceof Response) return f;
       const result = await updateRules(f.store, f.entry, f.actor, await bodyOf(request), deps);
       return result.ok ? json({ enabled: true, ...result.view }) : refuse(result.reason, result.message);
+    },
+  };
+}
+
+/**
+ * Club challenges (ADR 0045). GET (public) lists them, settling the ones that ended; POST (the Owner
+ * or an app admin) starts one: `{ title, brief, judging: "likes" | "owner", prizes: [points…], hours }`.
+ */
+export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false, challenges: [] }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const viewer = await softViewer(request, deps);
+      const challenges = await listChallenges(store, entry, { userId: viewer?.id }, deps);
+      const cache = viewer ? "private, no-store" : "public, s-maxage=10, stale-while-revalidate=30";
+      return Response.json({ enabled: true, challenges }, { headers: { "Cache-Control": cache } });
+    },
+    async POST(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await createChallenge(f.store, f.entry, f.actor, await bodyOf(request), deps);
+      return result.ok ? json({ enabled: true, id: result.id }, 201) : refuse(result.reason, result.message);
+    },
+  };
+}
+
+/**
+ * POST /api/clubs/[token]/challenges/[id]  { action }, where action is
+ *   "enter" { post }  a member enters one of their Board posts,
+ *   "withdraw"        a member takes their entry back,
+ *   "pick" { posts }  the Owner names the winners of a challenge they judge, best first,
+ *   "cancel"          the Owner calls it off.
+ */
+export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async POST(request: Request, ctx: ItemCtx) {
+      const f = await front(registry, ctx, request, deps, "club-challenge");
+      if (f instanceof Response) return f;
+      const id = (await ctx.params).id;
+      const body = await bodyOf(request);
+      const result =
+        body.action === "enter"
+          ? await enterChallenge(f.store, f.entry, f.user.id, id, body.post, deps)
+          : body.action === "withdraw"
+            ? await withdrawEntry(f.store, f.entry, f.user.id, id, deps)
+            : body.action === "pick"
+              ? await pickWinners(f.store, f.entry, f.actor, id, body.posts, deps)
+              : body.action === "cancel"
+                ? await cancelChallenge(f.store, f.entry, f.actor, id, deps)
+                : null;
+      if (!result) return refuse("invalid", "Send { action: \"enter\" | \"withdraw\" | \"pick\" | \"cancel\" }.");
+      return result.ok ? json({ enabled: true }) : refuse(result.reason, "message" in result && typeof result.message === "string" ? result.message : undefined);
     },
   };
 }

@@ -90,15 +90,18 @@ const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u200b\u202a-\u202e\u2066-\u2069\ufef
 
 export type CleanText = { ok: true; text: string } | { ok: false; reason: "empty" | "too_long" };
 
-/** The text as it is stored: unsafe characters become spaces, runs of space collapse, ends trimmed. */
-export function cleanText(input: unknown): CleanText {
+/** `input` as it is stored when at most `max` characters long: unsafe characters become spaces, runs of space collapse, ends trimmed. */
+export function cleanLine(input: unknown, max: number): CleanText {
   if (typeof input !== "string") return { ok: false, reason: "empty" };
   const text = input.replace(UNSAFE, " ").replace(/ {2,}/g, " ").trim();
   if (text.length === 0) return { ok: false, reason: "empty" };
   // Counted in characters, not UTF-16 units, so an emoji isn't two.
-  if ([...text].length > POST_MAX) return { ok: false, reason: "too_long" };
+  if ([...text].length > max) return { ok: false, reason: "too_long" };
   return { ok: true, text };
 }
+
+/** A post's text as it is stored. */
+export const cleanText = (input: unknown): CleanText => cleanLine(input, POST_MAX);
 
 /**
  * A deal id (digits), an intent hash (0x and 64 hex digits) or an X post link, or `null` for

@@ -22,7 +22,7 @@ lives in the git log and the relevant ADRs.
 ## Next: Club social
 
 - [x] Club Pulse: swaps, new deals and new members as coloured system messages between posts on the Board and the timeline, built from the activity log and member list, with no signing (ADR 0043)
-- [ ] Club challenges: a weekly prompt on the Board, answered with posts and picked by the Owner or a Holder vote; the winner gets a badge, never money
+- [x] Club challenges: the Owner starts a challenge any time, members answer with a Board post, winners are picked by likes or by the Owner and earn the points the Owner set, as epoch points (ADR 0045)
 - [ ] Member roles and titles: the Owner gives custom titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
 
 ## Deferred

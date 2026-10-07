@@ -52,6 +52,7 @@ export const EyeIcon = (p: P) => (<Icon {...p}><path d="M2.5 12S6 5.5 12 5.5 21.
 export const EyeOffIcon = (p: P) => (<Icon {...p}><path d="M4 4l16 16" /><path d="M9.9 5.8A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4M6.3 7.6A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5a8.9 8.9 0 0 0 4.1-1" /></Icon>);
 export const BanIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="12" r="8.5" /><path d="m6 6 12 12" /></Icon>);
 export const ShieldIcon = (p: P) => (<Icon {...p}><path d="M12 3.5 19 6v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-2.5Z" /></Icon>);
+export const TrophyIcon = (p: P) => (<Icon {...p}><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" /><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4" /><path d="M12 13v4M8.5 20h7M10 17h4" /></Icon>);
 export const CrownIcon = (p: P) => (<Icon {...p}><path d="M4 8l4 4 4-6 4 6 4-4-1.5 10h-13L4 8Z" /></Icon>);
 export const UsersIcon = (p: P) => (<Icon {...p}><circle cx="9" cy="8.5" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.8c1.8.6 3.1 2.2 3.5 4.7" /></Icon>);
 export const ChatIcon = (p: P) => (<Icon {...p}><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-8l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5Z" /></Icon>);

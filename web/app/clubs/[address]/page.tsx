@@ -7,10 +7,11 @@ import { isAddress } from "viem";
 import { Alert } from "@/components/Alert";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
-import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { formatMomentum, HeatMeter, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { Tooltip } from "@/components/Tooltip";
+import { useChallenges } from "@/hooks/useChallenges";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMarket } from "@/hooks/useClubMarket";
 import { useClubMembership } from "@/hooks/useClubMembership";
@@ -21,6 +22,7 @@ import { toClubInfo } from "@/lib/clubs";
 import { ago, formatMon } from "@/lib/format";
 import { registry, type ClubEntry } from "@/lib/verifiedAssets";
 import { ClubBoard } from "./ClubBoard";
+import { ClubChallenges } from "./ClubChallenges";
 import { ClubManage } from "./ClubManage";
 import { ClubMarket } from "./ClubMarket";
 import { ClubMembers } from "./ClubMembers";
@@ -57,8 +59,8 @@ export default function ClubPage() {
   );
 }
 
-type Tab = "market" | "board" | "members" | "rewards" | "manage";
-const TABS: readonly Tab[] = ["market", "board", "members", "rewards", "manage"];
+type Tab = "market" | "board" | "challenges" | "members" | "rewards" | "manage";
+const TABS: readonly Tab[] = ["market", "board", "challenges", "members", "rewards", "manage"];
 
 /** One figure under its label. `quiet` greys a zero so the numbers that moved stand out; `hint` sits on its own line below. */
 function Stat({ label, children, hint, quiet }: { label: ReactNode; children: ReactNode; hint?: ReactNode; quiet?: boolean }) {
@@ -104,6 +106,7 @@ function Club({ entry }: { entry: ClubEntry }) {
   const page = useClubPage(entry.address);
   const market = useClubMarket([entry.address, entry.linked?.address], now);
   const board = useClubPosts(entry.address);
+  const challenges = useChallenges(entry.address);
   const { claim } = useClubActions(entry.address);
   const staff = me.role !== undefined && me.role !== "member";
   // The Club fund this Owner can claim now (ADR 0022), as opposed to claiming the Club itself.
@@ -137,6 +140,12 @@ function Club({ entry }: { entry: ClubEntry }) {
       label: "Board",
       icon: <ChatIcon />,
       count: board.enabled && !board.isLoading ? board.total : undefined,
+    },
+    {
+      value: "challenges",
+      label: "Challenges",
+      icon: <TrophyIcon />,
+      count: challenges.enabled && !challenges.isLoading ? challenges.challenges.filter((c) => c.phase === "open").length || undefined : undefined,
     },
     {
       value: "members",
@@ -322,6 +331,7 @@ function Club({ entry }: { entry: ClubEntry }) {
 
           {tab === "market" && <ClubMarket market={market} symbol={held} recent={recent} now={now} />}
           {tab === "board" && <ClubBoard token={entry.address} symbol={held} archived={info.archived} now={now} />}
+          {tab === "challenges" && <ClubChallenges token={entry.address} symbol={held} archived={info.archived} now={now} />}
           {tab === "members" && <ClubMembers token={entry.address} symbol={held} now={now} />}
           {tab === "rewards" && (
             <ClubRewards token={entry.address} symbol={info.symbol} wallet={me.member ? me.wallet : undefined} isOwner={me.role === "owner"} now={now} />

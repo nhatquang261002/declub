@@ -47,6 +47,7 @@ import {
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
 import { activeKey, recordActive } from "./activeDays";
 import { backingKey, recordBacking } from "./backing";
+import { rivals, votingClosed } from "./challengeState";
 import { heldKey } from "./held";
 import { activityKey, viemReader } from "./activity";
 import { clubEvents } from "./clubs";
@@ -353,7 +354,7 @@ export async function walletPosts(store: Store, wallet: string, limit = POSTS_KE
 }
 
 // Unsigned posts have a random 32-hex id; signed ones their 64-hex struct hash.
-const getPost = (store: Store, token: string, id: string) =>
+export const getPost = (store: Store, token: string, id: string) =>
   /^(?:[0-9a-f]{32}|[0-9a-f]{64})$/.test(id) ? store.get<StoredPost>(postKey(token, id)) : Promise.resolve(null);
 
 /**
@@ -575,7 +576,7 @@ async function threadKeys(store: Store, token: string, id: string): Promise<stri
   return [...keysOf(id), ...replies.flatMap(keysOf), repliesKey(token, id)];
 }
 
-export type Refusal = "archived" | "own_like" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden";
+export type Refusal = "archived" | "own_like" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden" | "voting_closed" | "challenge_conflict";
 
 /** Author, or staff who may act on the author's role. */
 export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, id: string, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
@@ -587,6 +588,7 @@ export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, 
     const roles = await loadRoles(store, token);
     const mine = roleOf(roles, actor.userId, isAdmin(deps, actor.userId));
     if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
+    if (mine === "moderator" && (await rivals(store, token, actor.userId, post.userId))) return { ok: false, reason: "challenge_conflict" };
   }
   // Deleting a post takes its thread with it; deleting a reply takes it out of its thread.
   await store.del(...(await threadKeys(store, token, id)));
@@ -619,6 +621,8 @@ export async function likePost(
   if (!post) return { ok: false, reason: "not_found" };
   if (post.hidden) return { ok: false, reason: "hidden" };
   if (post.userId === userId) return { ok: false, reason: "own_like" };
+  // The likes of a challenge's entry are locked once it ends, so the tally can't move before it's settled (ADR 0045).
+  if (await votingClosed(store, token, id, nowOf(deps))) return { ok: false, reason: "voting_closed" };
   if (like) {
     if (!(await withinLimit(store, "club-like", userId, LIKES_PER_HOUR, 3_600))) return { ok: false, reason: "rate_limited" };
     await store.addMember(likesKey(token, id), userId);
@@ -701,6 +705,7 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
   const post = await getPost(store, token, id);
   if (!post) return { ok: false, reason: "not_found" };
   if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
+  if (hide && mine === "moderator" && (await rivals(store, token, actor.userId, post.userId))) return { ok: false, reason: "challenge_conflict" };
 
   if (hide) {
     // A deliberate hide by staff also unpins; posts the reports of old hid keep their pin.
@@ -786,6 +791,7 @@ export async function banUser(
   if (!userId || !wallet) return { ok: false, reason: "not_found" };
   if (userId === actor.userId) return { ok: false, reason: "forbidden" };
   if (!mayActOn(mine, roleOf(roles, userId, isAdmin(deps, userId)))) return { ok: false, reason: "forbidden" };
+  if (mine === "moderator" && (await rivals(store, token, actor.userId, userId))) return { ok: false, reason: "challenge_conflict" };
 
   const scope = everywhere ? ALL : token;
   const bans = await loadBans(store, scope);
