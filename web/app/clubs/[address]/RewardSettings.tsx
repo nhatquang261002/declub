@@ -53,9 +53,17 @@ export function RewardSettings({ token, owner, now }: { token: string; owner: bo
   const dirty = Object.keys(changes).length > 0;
   const bad = Object.keys(errors).length > 0;
 
+  // Whether the form, as edited, is back to the defaults: then there's nothing to reset.
+  const atDefaults = OWNER_RULES.every((k) => stored(k, value(k)) === DEFAULT_CLUB_RULES[k]);
+
   const input = (k: OwnerRule) => (
     <label key={k} className="flex flex-col gap-1">
-      <span className="text-sm font-bold">{FIELDS[k].label}</span>
+      <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm font-bold">
+        {FIELDS[k].label}
+        <span className={`text-xs font-normal ${stored(k, value(k)) === DEFAULT_CLUB_RULES[k] ? "text-muted" : "text-[#a9282f]"}`}>
+          Default: {shown(k, DEFAULT_CLUB_RULES[k])}
+        </span>
+      </span>
       <input
         className={`${field} tabular-nums`}
         inputMode="decimal"
@@ -66,7 +74,6 @@ export function RewardSettings({ token, owner, now }: { token: string; owner: bo
       />
       <span className={`text-xs ${errors[k] ? "text-danger" : "text-muted"}`}>
         {errors[k] ?? FIELDS[k].hint}
-        {!errors[k] && base[k] !== DEFAULT_CLUB_RULES[k] && ` Default ${shown(k, DEFAULT_CLUB_RULES[k])}.`}
       </span>
     </label>
   );
@@ -97,6 +104,15 @@ export function RewardSettings({ token, owner, now }: { token: string; owner: bo
             {save.isPending && <Spinner />}
             {save.isPending ? "Saving…" : "Save for the next epoch"}
           </button>
+          {!atDefaults && !save.isPending && (
+            <button
+              type="button"
+              className="text-sm font-bold text-muted hover:text-[#111318]"
+              onClick={() => setDraft(Object.fromEntries(OWNER_RULES.map((k) => [k, shown(k, DEFAULT_CLUB_RULES[k])])))}
+            >
+              Use the defaults
+            </button>
+          )}
           {Object.keys(draft).length > 0 && !save.isPending && (
             <button type="button" className="text-sm font-bold text-muted hover:text-[#111318]" onClick={() => setDraft({})}>
               Discard
