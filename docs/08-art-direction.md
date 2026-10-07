@@ -19,9 +19,9 @@ The tokens are in `web/app/globals.css`: brand primitives (`--chog-*`) feed sema
 
 - The logo is drawn inline in `web/components/Logo.tsx`; the favicon is the same mark in
   `web/app/icon.svg`. Keep the two in sync.
-- `web/public/brand/` holds the supplied Chog logo set. The app uses the face badge
-  (`Badge_(Face_Chog)/FACE_CHOG.svg`, on the home page and Club pages) and `mon.svg` (the MON
-  token icon in deal and asset rows).
+- Wherever the app shows its own mark (the home page eyebrow, empty lists), it uses `LogoMark`,
+  never a Chog. `web/public/brand/` still holds the supplied Chog logo set, but the app uses only
+  `mon.svg` from it (the MON token icon in deal and asset rows and share cards).
 
 ## Artwork
 

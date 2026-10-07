@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { DeClubArt } from "@/components/ChogArt";
 import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
@@ -35,13 +34,7 @@ export default function HomePage() {
         <div className="relative grid items-center gap-8 px-6 py-8 sm:px-10 sm:py-12 lg:grid-cols-[1.15fr_0.85fr] lg:px-14">
           <div className="relative z-10 max-w-2xl">
             <div className="eyebrow">
-              <Image
-                src="/brand/Badge_(Face_Chog)/FACE_CHOG.svg"
-                alt=""
-                width={18}
-                height={18}
-                className="size-[18px] rounded-full"
-              />
+              <LogoMark className="size-[18px]" />
               De(al) Club · {NETWORK.name}
             </div>
             <h1 className="mt-5 text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl">

@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { LogoMark } from "@/components/Logo";
 import type { ReactNode } from "react";
 
 /** A titled box in the Club page's side column or Manage tab. */
@@ -18,7 +18,7 @@ export function Panel({ title, action, children, className = "" }: { title: stri
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="club-panel flex flex-col items-center px-6 py-10 text-center">
-      <Image src="/brand/Badge_(Face_Chog)/FACE_CHOG.svg" alt="" width={56} height={56} className="mb-3 size-14 -rotate-6 rounded-full border-2 border-[#111318]" />
+      <LogoMark className="mb-3 size-14 -rotate-6" />
       <p className="font-extrabold">{title}</p>
       {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
       {action && <div className="mt-4">{action}</div>}

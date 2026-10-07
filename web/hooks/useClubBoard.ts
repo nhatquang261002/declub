@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call, type ViewerRole } from "@/hooks/useClubMembership";
 import { useSocialSign, type SocialStage } from "@/hooks/useSocial";
+import type { PublicChallenge } from "@/lib/challenges";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
 import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
@@ -33,21 +34,30 @@ export async function read<T>(path: string, getToken?: () => Promise<string | nu
   return body as T;
 }
 
-/** Where a post's like shows: the Board, a thread's replies and the timeline, which holds posts of many Clubs. */
-const LIKE_SHOWN_IN = ["club-posts", "club-replies", "timeline"];
+/** Where a post's like shows: the Board, a thread's replies, the timeline (posts of many Clubs) and challenge entries. */
+const LIKE_SHOWN_IN = ["club-posts", "club-replies", "timeline", "club-challenges"];
 
 /**
- * Sets whether the viewer likes `id` in every list already loaded, and the count with it, without
- * asking the server. Safe to repeat: a post already in that state is left alone.
+ * Sets whether the viewer likes `id` in every list already loaded, without asking the server: the
+ * count moves by one, or is set to `count` when the server has said it. Safe to repeat: a post
+ * already in that state is left alone.
  */
-function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, id: string, liked: boolean) {
-  const flip = <P extends PublicPost & { club?: string }>(p: P): P =>
-    p.id === id && (p.club === undefined || p.club === club) && p.liked !== liked ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p;
+function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, id: string, liked: boolean, count?: number) {
+  const next = <T extends { liked: boolean; likes: number }>(p: T): T =>
+    count !== undefined ? { ...p, liked, likes: count } : p.liked !== liked ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p;
+  const flip = <P extends PublicPost & { club?: string }>(p: P): P => (p.id === id && (p.club === undefined || p.club === club) ? next(p) : p);
   const board = (data: InfiniteData<{ posts: PublicPost[] }> | undefined) => data && { ...data, pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(flip) })) };
   queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["club-posts", club] }, board);
   // The timeline's key doesn't carry a Club: its posts say which one they are from.
   queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["timeline"] }, board);
   queryClient.setQueriesData<{ replies: PublicPost[] }>({ queryKey: ["club-replies", club] }, (data) => data && { ...data, replies: data.replies.map(flip) });
+  // A challenge entry is a Board post; it shows in the Club's list of challenges and on its own page.
+  const entries = (c: PublicChallenge): PublicChallenge =>
+    c.entries.some((e) => e.post === id) ? { ...c, entries: c.entries.map((e) => (e.post === id ? next(e) : e)) } : c;
+  queryClient.setQueriesData<{ challenges?: PublicChallenge[]; challenge?: PublicChallenge }>(
+    { queryKey: ["club-challenges", club] },
+    (data) => data && { ...data, ...(data.challenges && { challenges: data.challenges.map(entries) }), ...(data.challenge && { challenge: entries(data.challenge) }) },
+  );
 }
 
 /**
@@ -206,21 +216,23 @@ export function useClubActions(token: string) {
     report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies", "club-reported"], "Reported. Thank you."),
     // A like shows at once and is taken back if the server refuses it (a heart that waits for the
     // round trip feels broken). Likes in a Club go one at a time, so quick taps can't arrive out of order.
+    // Nothing is read again afterwards: a fresh read can lag the write and blink the heart back, or
+    // move the post under a ranked lens. The server's count is shown instead, and the next poll catches up.
     like: useMutation({
       mutationKey: ["club-like", key],
       scope: { id: `club-like:${key}` },
-      mutationFn: (v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`),
+      mutationFn: (v: { id: string; like: boolean }) => send<{ likes: number }>(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`),
       onMutate: async (v) => {
         await Promise.all(LIKE_SHOWN_IN.map((name) => queryClient.cancelQueries({ queryKey: [name, key] })));
         showLike(queryClient, key, v.id, v.like);
       },
+      // The exact count, unless another tap is still queued (it already shows, and would be undone for a moment).
+      onSuccess: (result, v) => {
+        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1 && typeof result?.likes === "number") showLike(queryClient, key, v.id, v.like, result.likes);
+      },
       onError: (error, v) => {
         showLike(queryClient, key, v.id, !v.like);
         toast.error(error);
-      },
-      // Read the server's counts again, unless another like is still on its way (it would be undone for a moment).
-      onSettled: () => {
-        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1) refresh("club-posts", "club-replies");
       },
     }),
     hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log", "club-reported"]),

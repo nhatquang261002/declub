@@ -1559,7 +1559,12 @@ a.chip:hover { border-color: #111318; background: white; }
   color: rgb(17 19 24 / 0.7);
   transition: transform 140ms ease, border-color 140ms ease, color 140ms ease;
 }
-button.post-like:hover:not(:disabled) { border-color: #111318; color: #111318; transform: translate(-1px, -1px); }
+/* Only where a pointer really hovers: a tap leaves :hover stuck on touch screens, so the pill stays nudged. */
+@media (hover: hover) {
+  button.post-like:hover:not(:disabled) { border-color: #111318; color: #111318; transform: translate(-1px, -1px); }
+}
+button.post-like { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button.post-like:active:not(:disabled) { transform: scale(0.94); }
 button.post-like:disabled { cursor: default; opacity: 0.7; }
 .post-like-on { border-color: #111318; background: rgb(240 183 53 / 0.45); color: #111318; }
 
