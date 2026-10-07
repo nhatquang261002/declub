@@ -14,6 +14,7 @@ import {
   type MemberRow,
   type MemberSort,
   type CoinRule,
+  type MembersPaging,
   type MembersView,
 } from "../members";
 import { score } from "../momentum";
@@ -195,6 +196,7 @@ export async function listMembers(
   sort: MemberSort,
   nowSec: number,
   deps: MemberDeps = {},
+  paging?: MembersPaging,
 ): Promise<MembersView> {
   let rows = await allRows(store, entry.address);
   const coin = await coinRuleOf(store, entry);
@@ -211,7 +213,17 @@ export async function listMembers(
   const current = epochAt(nowSec);
   const recorded = await readStreaks(store, entry.address);
   const streaks = new Map(rows.map((row) => [row.userId, liveStreak(recorded[row.userId], current)]));
-  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks);
+  // Handles are read only for a search: they live in the profile store, one lookup per member.
+  let handles: Map<string, string> | undefined;
+  if (paging?.query?.trim()) {
+    const profiles = await store.getMany<StoredProfile>(rows.map((row) => profileKey(row.displayWallet)));
+    handles = new Map();
+    rows.forEach((row, i) => {
+      const profile = profiles[i];
+      if (profile && profile.userId === row.userId) handles!.set(row.displayWallet, profile.handle);
+    });
+  }
+  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks, paging && { ...paging, handles });
 }
 
 /** How many members hold the asset, as of their last check. Reads every row. */

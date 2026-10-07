@@ -1,7 +1,7 @@
 import { isAddress } from "viem";
 import { linkedEthereumWallets } from "../profiles";
 import { clubInbox, type InboxDeps } from "./inbox";
-import type { MemberSort } from "../members";
+import { MEMBERS_MAX_PAGE, MEMBERS_QUERY_MAX, MEMBERS_SHOWN, type MemberSort } from "../members";
 import type { Registry } from "../verifiedAssets";
 import { roleIn, type Deps as BoardDeps } from "./board";
 import { clubEvents, type Deps } from "./clubs";
@@ -91,7 +91,7 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
 
 const SORTS = new Set<MemberSort>(["momentum", "new"]);
 
-/** GET /api/clubs/[token]/members?sort=momentum|new: the leaderboard. Public. */
+/** GET /api/clubs/[token]/members?sort=momentum|new&page=&size=&q=: one page of the leaderboard, or of the members whose wallet or handle contains q. Public. */
 export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
   return async function GET(request: Request, ctx: Ctx) {
     const entry = await clubOf(registry, ctx);
@@ -99,13 +99,23 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
     const asked = new URL(request.url).searchParams.get("sort") ?? "momentum";
     if (!SORTS.has(asked as MemberSort)) return fail(400, "bad_request", "sort is momentum or new.");
 
+    const params = new URL(request.url).searchParams;
+    const page = params.get("page") === null ? 1 : Number(params.get("page"));
+    const size = params.get("size") === null ? MEMBERS_SHOWN : Number(params.get("size"));
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > MEMBERS_MAX_PAGE) {
+      return fail(400, "bad_request", `page is a positive number, size at most ${MEMBERS_MAX_PAGE}.`);
+    }
+
+    const query = (params.get("q") ?? "").trim();
+    if (query.length > MEMBERS_QUERY_MAX) return fail(400, "bad_request", `q is at most ${MEMBERS_QUERY_MAX} characters.`);
+
     const store = getStore();
-    if (!store) return Response.json({ enabled: false, members: [], total: 0, holders: 0 }, { headers: { "Cache-Control": "no-store" } });
+    if (!store) return Response.json({ enabled: false, members: [], total: 0, matches: 0, holders: 0, topMomentum: 0, page: 1, size }, { headers: { "Cache-Control": "no-store" } });
     if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
     const nowSec = deps.now?.() ?? Math.floor(Date.now() / 1000);
     const events = await clubEvents(store, entry, deps);
-    const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps);
+    const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps, { page, size, query });
     return Response.json(
       { enabled: true, ...view },
       { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },

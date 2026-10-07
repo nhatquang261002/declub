@@ -1,9 +1,9 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/Toast";
 import { useAccessToken, type GetAccessToken } from "@/hooks/useAccessToken";
-import type { MemberSort, MembersView } from "@/lib/members";
+import { MEMBERS_PAGE, type MemberSort, type MembersView } from "@/lib/members";
 
 // Membership is per user, so it needs the Privy access token (ADR 0012's pattern). Without sign-in
 // or without a server that keeps it, a Club is read-only, and these hooks say so rather than fail.
@@ -90,16 +90,17 @@ export function useMyClubs(): string[] {
 }
 
 /** A Club's leaderboard. Public. */
-export function useClubMembers(token: string, sort: MemberSort) {
+export function useClubMembers(token: string, sort: MemberSort, page = 1, size = MEMBERS_PAGE, search = "") {
   const query = useQuery({
-    queryKey: ["club-members", token.toLowerCase(), sort],
+    queryKey: ["club-members", token.toLowerCase(), sort, page, size, search],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
-      const res = await fetch(`/api/clubs/${token}/members?sort=${sort}`);
+      const res = await fetch(`/api/clubs/${token}/members?sort=${sort}&page=${page}&size=${size}${search ? `&q=${encodeURIComponent(search)}` : ""}`);
       if (!res.ok) throw new Error(`The server answered ${res.status}.`);
       return (await res.json()) as MembersView & { enabled: boolean };
     },
     refetchInterval: 30_000,
     retry: 1,
   });
-  return { view: query.data, isLoading: query.isLoading, error: query.error };
+  return { view: query.data, isLoading: query.isLoading, isFetching: query.isFetching, error: query.error };
 }

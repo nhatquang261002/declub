@@ -354,6 +354,11 @@ describe("the routes", () => {
     assert.ok(me.momentum > 0 && me.swaps === 1);
     assert.ok(!JSON.stringify(body).includes("route-u"), "no user ids");
     assert.equal((await get(req("GET", "http://x/api?sort=bogus"), ctx(NFT))).status, 400);
+    assert.equal((await get(req("GET", "http://x/api?page=0"), ctx(NFT))).status, 400);
+    assert.equal((await get(req("GET", "http://x/api?size=101"), ctx(NFT))).status, 400);
+    assert.equal((await get(req("GET", `http://x/api?q=${"a".repeat(65)}`), ctx(NFT))).status, 400);
+    const found = await (await get(req("GET", `http://x/api?q=${W2.slice(0, 10)}`), ctx(NFT))).json();
+    assert.ok(found.matches >= 1 && found.matches <= found.total);
     assert.equal((await get(req(), ctx("0x00000000000000000000000000000000000000f1"))).status, 404);
   });
 });

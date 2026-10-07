@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
+import { Pagination } from "@/components/Pagination";
 import { Pills } from "@/components/Pills";
 import { HolderBadge } from "@/components/HolderBadge";
 import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
@@ -10,12 +11,13 @@ import { formatMomentum } from "@/components/MomentumBadge";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions } from "@/hooks/useClubBoard";
+import { useDebounced } from "@/hooks/useAssetSearch";
 import { useClubMembers, useClubMembership, type ViewerRole } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
 import { FollowButton } from "@/components/FollowButton";
 import { isOwnerOrAdmin, mayActOn } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
-import type { MemberSort, PublicMember } from "@/lib/members";
+import { MEMBERS_PAGE, MEMBERS_QUERY_MAX, type MemberSort, type PublicMember } from "@/lib/members";
 import { Empty, Loading } from "./parts";
 
 const SORTS = [
@@ -138,7 +140,15 @@ function Podium({
 /** The Club's leaderboard: members ranked by what their wallets added to its Momentum. */
 export function ClubMembers({ token, symbol, now }: { token: string; symbol: string; now: number }) {
   const [sort, setSort] = useState<MemberSort>("momentum");
-  const { view, isLoading, error } = useClubMembers(token, sort);
+  const [page, setPage] = useState(1);
+  const [text, setText] = useState("");
+  const search = useDebounced(text.trim());
+  const { view, isLoading, isFetching, error } = useClubMembers(token, sort, page, MEMBERS_PAGE, search);
+  const top = useRef<HTMLDivElement>(null);
+  const changePage = (next: number) => {
+    setPage(next);
+    top.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
   const me = useClubMembership(token);
   const actions = useClubActions(token);
   const follows = useFollows();
@@ -150,16 +160,44 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
   }
 
   const members = view?.members ?? [];
-  const podium = sort === "momentum" && members.length >= PODIUM && members[PODIUM - 1].momentum > 0;
+  // The podium is the first page's top three, and only without a search; later pages carry on from there.
+  const first = (view?.page ?? 1) === 1;
+  const podium = first && !search && sort === "momentum" && members.length >= PODIUM && members[PODIUM - 1].momentum > 0;
   const rest = podium ? members.slice(PODIUM) : members;
-  const top = Math.max(1, members[0]?.momentum ?? 0);
+  const scale = Math.max(1, view?.topMomentum ?? 0);
+  const totalPages = Math.max(1, Math.ceil((view?.matches ?? 0) / (view?.size ?? MEMBERS_PAGE)));
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Pills value={sort} options={SORTS} onChange={setSort} label="Sort members" />
+      <div ref={top} className="mb-5 flex scroll-mt-24 flex-wrap items-center justify-between gap-3">
+        <Pills
+          value={sort}
+          options={SORTS}
+          onChange={(next) => {
+            setSort(next);
+            setPage(1);
+          }}
+          label="Sort members"
+        />
+        <input
+          type="search"
+          className="input min-w-52 flex-1 sm:max-w-xs"
+          placeholder="Search by wallet or @handle"
+          aria-label="Search members"
+          maxLength={MEMBERS_QUERY_MAX}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPage(1);
+          }}
+        />
         {view && (
           <p className="text-sm text-muted">
+            {search && (
+              <>
+                <strong className="text-[#111318]">{view.matches.toLocaleString()}</strong> of{" "}
+              </>
+            )}
             <strong className="text-[#111318]">{view.total.toLocaleString()}</strong> {view.total === 1 ? "member" : "members"} ·{" "}
             <strong className="text-[#111318]">{view.holders.toLocaleString()}</strong> {view.holders === 1 ? "holds" : "hold"} {symbol}
           </p>
@@ -168,6 +206,8 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
 
       {isLoading ? (
         <Loading label="Loading members" rows={5} />
+      ) : members.length === 0 && search ? (
+        <Empty title="No members match">Nobody here has a wallet or X / Discord handle containing “{search}”.</Empty>
       ) : members.length === 0 ? (
         <Empty title="No members yet">Join to be the first on the list.</Empty>
       ) : (
@@ -176,9 +216,9 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
             <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />
           )}
           {rest.length > 0 && (
-            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={podium ? PODIUM + 1 : 1}>
-              {rest.map((m, i) => {
-                const rank = i + 1 + (podium ? PODIUM : 0);
+            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={rest[0]?.rank}>
+              {rest.map((m) => {
+                const rank = m.rank;
                 const mine = me.wallet === m.wallet;
                 return (
                   <li key={m.wallet} className={`flex items-center gap-3 px-4 py-3 sm:px-5 ${mine ? "bg-white/70" : ""}`}>
@@ -200,7 +240,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                       <span className="font-black tabular-nums">{formatMomentum(m.momentum)}</span>
                       {sort === "momentum" && (
                         <span className="meter w-full" aria-hidden>
-                          <span style={{ width: `${m.momentum > 0 ? Math.max(3, (m.momentum / top) * 100) : 0}%` }} />
+                          <span style={{ width: `${m.momentum > 0 ? Math.max(3, (m.momentum / scale) * 100) : 0}%` }} />
                         </span>
                       )}
                     </div>
@@ -214,11 +254,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
           )}
         </>
       )}
-      {view && view.total > members.length && (
-        <p className="mt-3 text-xs text-muted">
-          Showing the first {members.length} of {view.total.toLocaleString()}.
-        </p>
-      )}
+      {view && totalPages > 1 && <Pagination page={view.page} totalPages={totalPages} onPage={changePage} loading={isFetching} label="Member pages" />}
     </>
   );
 }

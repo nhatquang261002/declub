@@ -152,4 +152,38 @@ describe("rankMembers", () => {
     assert.equal(view.total, MEMBERS_SHOWN + 25);
     assert.ok(!JSON.stringify(view).includes("secret-"));
   });
+
+  it("serves one page at a time, clamps a page past the end, and keeps one meter scale", () => {
+    const many = Array.from({ length: 60 }, (_, i) =>
+      row(`u-${i}`, { wallets: [`0x${i.toString(16).padStart(40, "0")}`], displayWallet: `0x${i.toString(16).padStart(40, "0")}`, joinedAt: i }),
+    );
+    const second = rankMembers(many, scores, [], "new", undefined, undefined, { page: 2, size: 25 });
+    assert.equal(second.members.length, 25);
+    assert.equal(second.page, 2);
+    assert.equal(second.total, 60);
+    const last = rankMembers(many, scores, [], "new", undefined, undefined, { page: 3, size: 25 });
+    assert.equal(last.members.length, 10);
+    const past = rankMembers(many, scores, [], "new", undefined, undefined, { page: 99, size: 25 });
+    assert.equal(past.page, 3);
+    assert.deepEqual(past.members, last.members);
+    const pages = [1, 2, 3].flatMap((page) => rankMembers(many, scores, [], "new", undefined, undefined, { page, size: 25 }).members.map((m) => m.wallet));
+    assert.equal(new Set(pages).size, 60);
+  });
+
+  it("searches by wallet or handle, keeps true ranks, and pages the matches", () => {
+    const wallet = (i: number) => `0x${i.toString(16).padStart(40, "0")}`;
+    const many = Array.from({ length: 30 }, (_, i) => row(`u-${i}`, { wallets: [wallet(i)], displayWallet: wallet(i), joinedAt: i }));
+    const handles = new Map([[wallet(7), "MafiaInterlet"]]);
+    const byHandle = rankMembers(many, scores, [], "new", undefined, undefined, { page: 1, size: 25, query: "@mafia", handles });
+    assert.deepEqual(byHandle.members.map((m) => m.wallet), [wallet(7)]);
+    // Newest first: member 7 of 30 is 23rd from the top, whatever the search hides.
+    assert.equal(byHandle.members[0]!.rank, 23);
+    assert.equal(byHandle.matches, 1);
+    assert.equal(byHandle.total, 30);
+    const byWallet = rankMembers(many, scores, [], "new", undefined, undefined, { page: 1, size: 5, query: "0x" + "0".repeat(38) + "1" });
+    // Wallets 16 to 29 (0x…10 to 0x…1d) start with those digits.
+    assert.equal(byWallet.matches, 14);
+    assert.equal(byWallet.members.length, 5);
+    assert.equal(rankMembers(many, scores, [], "new", undefined, undefined, { page: 1, size: 5, query: "nobody" }).members.length, 0);
+  });
 });
