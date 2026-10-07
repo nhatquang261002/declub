@@ -92,8 +92,8 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} members who hold the most of the collection when the epoch is built, one share per NFT (a tie goes to whoever joined first); ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member and among the ${REWARDS.maxHolders} biggest Holders when the epoch is built. Your share waits under Rewards until you claim it.`],
+  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} most active Holders: members who hold at least one NFT of the collection when the epoch is built, ranked by the points they earned that epoch for posting, sharing on X and swapping (a tie goes to whoever holds more NFTs, then whoever joined first). Each one's share is their NFTs, plus up to the activity bonus; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and among the ${REWARDS.maxHolders} most active Holders, when the epoch is built. Holding alone doesn't earn a place: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
@@ -116,7 +116,7 @@ export default function ClubsGuidePage() {
             Explore Clubs <span aria-hidden>→</span>
           </Link>
         }
-        summary={["Anyone signed in can join.", `The top ${REWARDS.maxHolders} Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
+        summary={["Anyone signed in can join.", `The ${REWARDS.maxHolders} most active Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
         sections={SECTIONS}
       />
 
@@ -207,7 +207,7 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small fee for each NFT on each side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} biggest Holders, by how many NFTs they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>
+                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} most active Holders, split by the NFTs they hold, up to {percent(REWARDS.maxBonusBps)} more for the most active</li>
                 <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
                 <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
               </ul>
@@ -237,12 +237,13 @@ export default function ClubsGuidePage() {
               The activity bonus
             </h3>
             <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-              Holding is the base: one share per NFT of the collection. A Holder&apos;s shares then count up to{" "}
+              You have to hold an NFT of the collection to be paid, and the {REWARDS.maxHolders} Holders with the most activity points are the ones paid; their payout is split by one share per NFT. Those shares count up to{" "}
               <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for their activity on its Board: each day they post earns{" "}
               {REWARDS.dayPoints} points, and each of their own X posts about the Club shared there earns {REWARDS.xShareBase}.{" "}
-              {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Trading,
-              Board replies and Board likes earn nothing here, so they can&apos;t be farmed, and the bonus can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
-              who does nothing still gets their base share.
+              Each completed swap with another wallet earns {REWARDS.swapPoints}, half for a wallet they already swapped with in the last {MOMENTUM.washDays} days, up to{" "}
+              {REWARDS.swapCapPerEpoch} an epoch. {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Board
+              replies and Board likes earn nothing here, so they can&apos;t be farmed, and a big holding can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
+              who does nothing in an epoch isn&apos;t paid for it, however many NFTs they hold.
             </p>
             <ul className={`mt-3 space-y-1.5 text-sm leading-6 ${MUTED}`}>
               <li>

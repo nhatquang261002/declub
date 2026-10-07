@@ -78,7 +78,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 - **Locked deals** take it in MON with your side, hold it, and refund it if the deal doesn't complete. A deal keeps the fee it was listed with, for both sides.
 - **Signed swaps** take it in WMON from your wallet when the swap settles, for each NFT you give. You sign the most you'll pay per NFT; if the fee is cut before then, you pay less.
 - The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. It can never go above a ceiling set when the contract was deployed ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)).
-- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's 10 biggest Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
+- **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's 10 most active Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
 - You also pay Monad's network gas.
 
 ## Finding deals and keeping track
@@ -105,7 +105,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
-- **Rewards:** what the Club's swaps paid in fees, what went to its top 10 Holders and its Owner, and your share to claim.
+- **Rewards:** what the Club's swaps paid in fees, what went to its 10 most active Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
 
 **Joining.** Sign in, link a wallet, and press **Join Club**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. To leave, open the **⋯** menu next to it and choose **Leave this Club**.
@@ -132,7 +132,7 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 **Following.** Press **Follow** beside a member's name, on a post or in the Members list. Your connected wallet signs the follow, which must be one of the wallets linked to your account. Press again to unfollow. Your follows are public at `/api/wallets/<your wallet>/follows`.
 
-**Active days, streaks and live standings.** On the **Rewards** tab, **Live standings** shows where you stand in the running epoch: your rank among the Holders, what you'd get if it closed now, and how many of the 7 active days you've posted on. A day is active when you have a visible top-level Board post that UTC day. Post on 3 or more days in an epoch, week after week, and a streak adds to your bonus (see *Rewards*). Standings refresh about every five minutes, and holdings are read when the epoch is built, shortly after it ends.
+**Active days, streaks and live standings.** On the **Rewards** tab, **Live standings** shows where you stand in the running epoch: your rank among the Holders (by points), what you'd get if it closed now, and how many of the 7 active days you've posted on. A day is active when you have a visible top-level Board post that UTC day. Post on 3 or more days in an epoch, week after week, and a streak adds to your bonus (see *Rewards*). Standings refresh about every five minutes, and holdings are read when the epoch is built, shortly after it ends.
 
 **Reporting.** Report a post that is spam or abuse (once per post, and not your own). When three different Holders (or staff) have reported a post it is hidden for everyone but its author and the staff, until a moderator restores or deletes it. Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
 
@@ -140,10 +140,12 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
 
-- **50%** of those fees goes to the Club's **10 biggest Holders**: members whose linked wallets hold the most of the collection when the epoch is worked out (a tie goes to whoever joined first). Each NFT is one share, summed over your linked wallets. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
-  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: 2 points for each UTC day you posted on the Board (up to 7 days), and 3 points for each of your own X posts about the Club shared on its Board (one a day). 35 points earn the full 50%. Posting on 3 or more days of an epoch, week after week, adds a streak bonus of up to 10% more. Trading, likes and replies earn nothing. Counting X engagement (well-received posts earning up to 30 more points a week) is built but switched off until the operator sets `X_BEARER_TOKEN`; until then every counted post earns the same. A Holder who does nothing still gets their base share.
+- **50%** of those fees goes to the Club's **10 most active Holders**: members whose linked wallets hold at least one NFT of the collection when the epoch is worked out, ranked by the activity points they earned that week (a tie goes to whoever holds more NFTs, then whoever joined first). Each NFT is one share of the payout, summed over your linked wallets. Holding the Club's memecoin can make you a Holder, if the Owner allows it, but earns no share. Your share goes to your Club wallet.
+  - **Active Holders earn more:** your shares count up to 50% more for what you did in the Club that week: 2 points for each UTC day you posted on the Board (up to 7 days), and 3 points for each of your own X posts about the Club shared on its Board (one a day). 35 points earn the full 50%. Posting on 3 or more days of an epoch, week after week, adds a streak bonus of up to 10% more. Each completed swap with another wallet adds 2 points (half for a wallet you already swapped with that week, at most 14 an epoch); likes and replies earn nothing. Counting X engagement (well-received posts earning up to 30 more points a week) is built but switched off until the operator sets `X_BEARER_TOKEN`; until then every counted post earns the same. A Holder who earns no points in an epoch isn't paid for it, however many NFTs they hold.
 - **25%** goes to the **Club fund**, which the Club's Owner collects.
 - The rest stays with the protocol.
+
+Anyone can also sponsor an epoch from the Club's Rewards tab: enter an amount (at least 0.1 MON) and a name, send the MON, then sign to put your name on it. The MON is paid to the rewards operator, who funds the epoch with it, so it can't be refunded. It goes to the Club's Holders only, none to the protocol, and the Rewards tab says who gave what (with the wallet that paid). The weekly recap names only sponsors the operator recorded or the Owner paid as.
 
 A swap that names two Clubs' assets splits its fee between them. If a Club has no Holder members yet, or no Owner, that part waits and is added to the next week's.
 

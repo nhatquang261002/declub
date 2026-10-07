@@ -280,7 +280,7 @@ describe("the Club inbox: replies and standings", () => {
     assert.match(one[0]!.title, /^A reply to your post/);
   });
 
-  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: 0, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
+  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: i <= 10 ? 4 : 2, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
   const standings = (over: Partial<ClubStandings> = {}): ClubStandings => ({
     club: token, n: 3, start: 0, endsAt: 1_000_000, computedAt: 100, fees: "1", holderPool: "10", fundPool: "1",
     rows: Array.from({ length: 12 }, (_, i) => row(i + 1)), activity: {}, ...over,
@@ -292,7 +292,9 @@ describe("the Club inbox: replies and standings", () => {
     assert.match(inside!.title, /#4/);
     const [outside] = standingsNews(standings(), "N", new Set([wallet(12)]), 0);
     assert.equal(outside!.key, `club-rank:${token}:3:out`);
-    assert.match(outside!.body, /^3 more NFTs/, "10th holds 10 and joined earlier: 8 needs 3");
+    assert.match(outside!.body, /^About 2\.01 more activity points/, "the 10th has 4 points and holds more NFTs: 2 points tie, one more wins");
+    const [idle] = standingsNews(standings({ rows: standings().rows.map((r) => (r.wallet === wallet(12) ? { ...r, points: 0 } : r)) }), "N", new Set([wallet(12)]), 0);
+    assert.match(idle!.title, /not earning in N yet/);
     assert.deepEqual(standingsNews(standings({ holderPool: "0" }), "N", new Set([wallet(4)]), 0), [], "no pool, no race");
   });
 

@@ -141,7 +141,6 @@ export async function clubInbox(store: Store, userId: string, wallets: readonly 
   return out.sort((a, b) => b.at - a.at);
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Where a member stands in a Club's running epoch, as news: their place in (or out of) the paid
@@ -152,16 +151,18 @@ export function standingsNews(s: ClubStandings, name: string, wallets: ReadonlyS
   const href = `/clubs/${s.club}?tab=rewards`;
   const row = s.rows.find((r) => wallets.has(r.wallet));
   if (row && BigInt(s.holderPool) > 0n) {
-    const paid = row.rank <= REWARDS.maxHolders;
-    const gap = entryGap(s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), joinedAt: r.joinedAt })), row.wallet) ?? 0n;
+    const paid = row.estimate !== undefined;
+    const gap = entryGap(s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), row.wallet) ?? 0;
     out.push({
       key: `club-rank:${s.club}:${s.n}:${paid ? "in" : "out"}`,
       kind: "club-rank",
       at: s.computedAt * 1000,
-      title: paid ? `You’re #${row.rank} in ${name} this epoch` : `You’re #${row.rank} in ${name}, outside the top ${REWARDS.maxHolders}`,
+      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, outside the top ${REWARDS.maxHolders}` : `You’re not earning in ${name} yet`,
       body: paid
         ? `About ${formatMon(BigInt(row.estimate ?? "0"))} so far, if the epoch closed now.`
-        : `${plural(Number(gap), "more NFT")} would put you in the top ${REWARDS.maxHolders} and earn a share.`,
+        : row.points > 0
+          ? `About ${gap} more activity points would put you in the top ${REWARDS.maxHolders} and earn a share.`
+          : `Post on the Board, share on X or swap to earn a share: the top ${REWARDS.maxHolders} most active Holders are paid.`,
       href,
     });
   }

@@ -72,7 +72,7 @@ export function clubRewardsHandler(registry: Registry, deps: RouteDeps = {}) {
     const base = { contract: DECLUB_REWARDS_ADDRESS ?? null, ...current(nowOf(deps)), xReach: xApiConfigured() };
     if (!store) return Response.json({ enabled: false, ...base, epochs: [], carry: { holders: "0", fund: "0" }, earners: [] }, { headers: NO_STORE });
     if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
-    const view = await clubRewards(store, entry.address);
+    const view = await clubRewards(store, entry.address, nowOf(deps));
     return Response.json({ enabled: true, ...base, ...view }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } });
   };
 }

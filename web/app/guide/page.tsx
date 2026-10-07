@@ -156,7 +156,7 @@ const FEES = [
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
-  `When a swap includes a verified Club's asset, ${percent(REWARDS.holderBps)} of the fee goes each week to that Club's ${REWARDS.maxHolders} biggest Holders and ${percent(REWARDS.fundBps)} to its Club fund. The protocol keeps the rest.`,
+  `When a swap includes a verified Club's asset, ${percent(REWARDS.holderBps)} of the fee goes each week to that Club's ${REWARDS.maxHolders} most active Holders and ${percent(REWARDS.fundBps)} to its Club fund. The protocol keeps the rest.`,
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [

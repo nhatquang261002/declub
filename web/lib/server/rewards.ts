@@ -6,6 +6,7 @@ import { CHAIN_ID, DECLUB_INTENTS_ADDRESS, DECLUB_REWARDS_ADDRESS, RPC_URL } fro
 import { buildMerkleTree } from "../merkle";
 import {
   activityPoints,
+  epochAt,
   epochWindow,
   leavesOf,
   qualifies,
@@ -15,13 +16,16 @@ import {
   type ClubInput,
   type EpochRecord,
   type Holder,
+  type PublishedSponsor,
   type ReachRecord,
+  type Sponsorship,
 } from "../rewards";
 import { registry, type ClubEntry } from "../verifiedAssets";
 import { activeDays } from "./activeDays";
-import { nextStreaks, readStreaks, streakAt, streaksKey, type Streaks } from "./streaks";
+import { nextStreaks, readStreaks, standingsKey, streakAt, streaksKey, type Streaks } from "./streaks";
 import { clubEvents } from "./clubs";
 import { loadRoles } from "./clubState";
+import { cleanSponsorName, readSponsors, sponsorKey, sponsorsByClub } from "./sponsors";
 import { allRows, getMember, viemHoldings, type Holdings } from "./members";
 import type { Store } from "./store";
 
@@ -82,13 +86,93 @@ export type BuildResult =
   /** No rewards contract is configured, so there's nothing to bind leaves to. */
   | { status: "unconfigured" };
 
+export type SponsorResult =
+  | { status: "recorded"; entries: Sponsorship[] }
+  /** The epoch is already built: its pools are fixed. Record it for the next one. */
+  | { status: "built" }
+  /** Another sponsorship for this epoch is being written; try again in a moment. */
+  | { status: "busy" }
+  | { status: "invalid"; message: string };
+
+/**
+ * Records money a sponsor sent the operator for Club `club` in epoch `n` (ADR 0035). It joins that
+ * Club's Holder pool when the epoch is built, so it has to be recorded before then.
+ */
+export async function recordSponsor(
+  store: Store,
+  n: number,
+  input: { club: string; amount: bigint; sponsor: string; kind: Sponsorship["kind"]; by?: string; tx?: string },
+  now = Math.floor(Date.now() / 1000),
+): Promise<SponsorResult> {
+  const sponsor = cleanSponsorName(input.sponsor);
+  if (!Number.isInteger(n) || n < 0) return { status: "invalid", message: "Give an epoch number." };
+  if (input.amount <= 0n) return { status: "invalid", message: "The amount must be more than zero." };
+  if (!sponsor) return { status: "invalid", message: "Give the sponsor a name." };
+  if (await store.get<EpochRecord>(epochKey(n))) return { status: "built" };
+  // The ledger is one value, so two writers at once would lose one: take turns.
+  const lock = `${sponsorKey(n)}:lock`;
+  if ((await store.hit(lock, 10)) > 1) return { status: "busy" };
+  try {
+    return await append(store, n, input, sponsor, now);
+  } finally {
+    await store.del(lock);
+  }
+}
+
+/**
+ * Takes an entry out of epoch `n`'s ledger by its transaction, for a name that shouldn't be shown.
+ * The money stays with the operator; the payment stays recorded as taken, so it isn't added again.
+ */
+export async function removeSponsor(store: Store, n: number, tx: string): Promise<{ status: "removed"; entry: Sponsorship } | { status: "built" } | { status: "missing" }> {
+  if (await store.get<EpochRecord>(epochKey(n))) return { status: "built" };
+  const lock = `${sponsorKey(n)}:lock`;
+  if ((await store.hit(lock, 10)) > 1) return { status: "missing" };
+  try {
+    const entries = await readSponsors(store, n);
+    const at = entries.findIndex((e) => e.tx === tx.toLowerCase());
+    if (at < 0) return { status: "missing" };
+    const [entry] = entries.splice(at, 1);
+    await store.set(sponsorKey(n), entries);
+    // The live standings are cached for minutes: drop this Club's copy so the pool shows the change now.
+    await store.del(standingsKey(entry!.club));
+    return { status: "removed", entry: entry! };
+  } finally {
+    await store.del(lock);
+  }
+}
+
+async function append(
+  store: Store,
+  n: number,
+  input: { club: string; amount: bigint; kind: Sponsorship["kind"]; by?: string; tx?: string },
+  sponsor: string,
+  now: number,
+): Promise<SponsorResult> {
+  // Built while this call waited for its turn: the pools are fixed.
+  if (await store.get<EpochRecord>(epochKey(n))) return { status: "built" };
+  const entries = await readSponsors(store, n);
+  entries.push({
+    club: input.club.toLowerCase(),
+    amount: input.amount.toString(),
+    sponsor,
+    kind: input.kind,
+    at: now,
+    ...(input.by ? { by: input.by.toLowerCase() } : {}),
+    ...(input.tx ? { tx: input.tx.toLowerCase() } : {}),
+  });
+  await store.set(sponsorKey(n), entries);
+  // The live standings are cached for minutes: drop this Club's copy so the pool shows the money now.
+  await store.del(standingsKey(input.club));
+  return { status: "recorded", entries };
+}
+
 let cached: PublicClient | undefined;
-const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
+export const chainClient = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
 /** The fees a settlement paid: every `FeeCharged` the intents contract emitted in it. */
 export async function viemSettlementFee(txHash: Hex): Promise<bigint> {
   if (!DECLUB_INTENTS_ADDRESS) return 0n;
-  const receipt = await client().getTransactionReceipt({ hash: txHash });
+  const receipt = await chainClient().getTransactionReceipt({ hash: txHash });
   let total = 0n;
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== DECLUB_INTENTS_ADDRESS.toLowerCase()) continue;
@@ -217,6 +301,7 @@ async function compute(
   }
 
   const reach = await (deps.reach ?? ((k: number) => store.get<ReachRecord>(reachKey(k))))(n);
+  const sponsors = sponsorsByClub(await readSponsors(store, n));
   const inputs: ClubInput[] = [];
   const streaks = new Map<string, Streaks>();
   for (const club of clubs) {
@@ -230,6 +315,7 @@ async function compute(
       club: key,
       fees: fees.get(key) ?? 0n,
       carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
+      sponsored: sponsors.get(key)?.total ?? 0n,
       holders: holders.map(({ wallet, shares, bonusBps, points, days, streak, joinedAt }) => ({ wallet, shares, bonusBps, points, days, streak, joinedAt })),
       owner: await ownerWallet(store, club),
     });
@@ -252,6 +338,7 @@ async function compute(
     clubs: splits.map((s) => ({
       club: s.club,
       fees: str(s.fees),
+      ...(s.sponsored > 0n ? { sponsored: str(s.sponsored), sponsors: sponsors.get(s.club)?.sponsors ?? [] } : {}),
       holderPool: str(s.holderPool),
       fundPool: str(s.fundPool),
       paidHolders: str(s.paidHolders),
@@ -329,22 +416,38 @@ export async function claimableFor(store: Store, account: Address, limit = 52): 
 
 /** What a Club's Rewards tab shows: its line in the latest epochs, what's waiting, and who earned. */
 export type ClubRewardsView = {
-  epochs: { n: number; start: number; end: number; fees: string; holderPool: string; fundPool: string; paidHolders: string; paidFund: string; holderCount: number }[];
+  epochs: {
+    n: number;
+    start: number;
+    end: number;
+    fees: string;
+    sponsored?: string;
+    sponsors?: PublishedSponsor[];
+    holderPool: string;
+    fundPool: string;
+    paidHolders: string;
+    paidFund: string;
+    holderCount: number;
+  }[];
+  /** What sponsors have added to the running epoch so far (ADR 0035); absent when nothing is sponsored. */
+  open?: { n: number; sponsored: string; sponsors: PublishedSponsor[] };
   /** What rolls into the next epoch. */
   carry: { holders: string; fund: string };
   /** The latest epoch's payouts in this Club, largest first, with each Holder's activity bonus. */
   earners: { account: Address; kind: "holder" | "fund"; amount: string; bonusBps?: number }[];
 };
 
-export async function clubRewards(store: Store, club: string): Promise<ClubRewardsView> {
+export async function clubRewards(store: Store, club: string, now = Math.floor(Date.now() / 1000)): Promise<ClubRewardsView> {
   const key = club.toLowerCase();
   const records = await latestEpochs(store, 4);
   const epochs = records.flatMap((r) => {
     const line = r.clubs.find((c) => c.club === key);
     if (!line) return [];
-    const { fees, holderPool, fundPool, paidHolders, paidFund, holderCount } = line;
-    return [{ n: r.n, start: r.start, end: r.end, fees, holderPool, fundPool, paidHolders, paidFund, holderCount }];
+    const { fees, sponsored, sponsors, holderPool, fundPool, paidHolders, paidFund, holderCount } = line;
+    return [{ n: r.n, start: r.start, end: r.end, fees, ...(sponsored ? { sponsored, sponsors: sponsors ?? [] } : {}), holderPool, fundPool, paidHolders, paidFund, holderCount }];
   });
+  const running = epochAt(now);
+  const openLine = running >= 0 ? sponsorsByClub(await readSponsors(store, running)).get(key) : undefined;
   const latest = records[0];
   const earners = (latest?.leaves ?? [])
     .flatMap((l) =>
@@ -355,5 +458,5 @@ export async function clubRewards(store: Store, club: string): Promise<ClubRewar
     .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : BigInt(b.amount) < BigInt(a.amount) ? -1 : 0))
     .slice(0, 10);
   const carry = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
-  return { epochs, carry, earners };
+  return { epochs, ...(openLine ? { open: { n: running, sponsored: openLine.total.toString(), sponsors: openLine.sponsors } } : {}), carry, earners };
 }

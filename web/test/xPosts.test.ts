@@ -451,14 +451,28 @@ const swapEvent = (at: number, parties: string[], seq = 0): ActivityEvent => ({
 const xEvent = (at: number, w: string, tweet: string, weight = 1): ActivityEvent => ({ id: `x:${tweet}`, kind: "xshare", contract: "", deal: tweet, block: 0, at, parties: [w], tokens: [token], weight });
 
 describe("the Holder bonus", () => {
-  it("ignores trading, so wash trading earns nothing", () => {
-    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2)];
+  it("counts a swap with another wallet, never one between the member's own wallets (ADR 0034)", () => {
+    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2), swapEvent(300, [wallet(1), wallet(3)], 3)];
     const a = activityPoints(events, null, [wallet(1)]);
-    assert.deepEqual(a, { x: 0, days: 0, points: 0, bonusBps: 0 });
+    assert.deepEqual(a, { x: 0, days: 0, swaps: 2 * REWARDS.swapPoints, points: 2 * REWARDS.swapPoints, bonusBps: bonusBps(2 * REWARDS.swapPoints) });
+    const mine = activityPoints([swapEvent(100, [wallet(1), wallet(4)], 1)], null, [wallet(1), wallet(4)]);
+    assert.equal(mine.swaps, 0, "two wallets of the same member swapping earns nothing");
+    assert.equal(activityPoints(events, null, [wallet(9)]).swaps, 0, "a swap the member isn't on earns nothing");
+  });
+
+  it("halves a swap with a wallet already swapped with that week, and caps the swap points", () => {
+    const DAY = 86_400;
+    const again = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(100 + DAY, [wallet(1), wallet(2)], 2), swapEvent(100 + 9 * DAY, [wallet(1), wallet(2)], 3)];
+    assert.equal(activityPoints(again, null, [wallet(1)]).swaps, REWARDS.swapPoints * (1 + 0.5 + 1), "the third is more than 7 days after the second");
+    const many = Array.from({ length: 40 }, (_, i) => swapEvent(100 + i, [wallet(1), `0xee${String(i).padStart(38, "0")}`], i));
+    assert.equal(activityPoints(many, null, [wallet(1)]).swaps, REWARDS.swapCapPerEpoch);
+    const farm = Array.from({ length: 40 }, (_, i) => swapEvent(100 + i, [wallet(1), wallet(2)], i));
+    assert.equal(activityPoints(farm, null, [wallet(1)]).swaps, REWARDS.swapCapPerEpoch, "forty swaps with one partner can't beat the cap");
+    assert.equal(activityPoints(farm, null, [wallet(1)]).bonusBps, bonusBps(REWARDS.swapCapPerEpoch), "so trading alone is worth at most that bonus");
   });
 
   it("adds active days, at most 7, and a daily poster who shares on X each day earns the whole bonus", () => {
-    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
+    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, swaps: 0, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
     assert.equal(activityPoints([], null, [wallet(1)], 12).days, 7);
     const week = Array.from({ length: 7 }, (_, i) => xEvent(100 + i, wallet(1), `t${i}`));
     assert.equal(activityPoints(week, null, [wallet(1)], 7).bonusBps, REWARDS.maxBonusBps);
@@ -490,9 +504,9 @@ describe("the Holder bonus", () => {
       fees: 10_000n,
       carried: { holders: 1n, fund: 0n },
       holders: [
-        { wallet: wallet(1), shares: 1n, bonusBps: 5_000 },
-        { wallet: wallet(2), shares: 1n, bonusBps: 0 },
-        { wallet: wallet(3), shares: 2n, bonusBps: 99_999 },
+        { wallet: wallet(1), shares: 1n, points: 2, bonusBps: 5_000 },
+        { wallet: wallet(2), shares: 1n, points: 1, bonusBps: 0 },
+        { wallet: wallet(3), shares: 2n, points: 3, bonusBps: 99_999 },
       ],
       owner: null,
     });
@@ -540,7 +554,7 @@ describe("the Holder bonus", () => {
     assert.equal(result.status, "built");
     const record = result.status === "built" ? result.record : null;
     const holder = (w: string) => record!.leaves.find((l) => l.account === getAddress(w))!.breakdown.find((b) => b.kind === "holder")!;
-    assert.equal(holder(wallet(1)).bonusBps, 0, "a swap earns no bonus");
+    assert.equal(holder(wallet(1)).bonusBps, bonusBps(REWARDS.swapPoints), "a swap with another wallet earns its points");
     assert.equal(holder(wallet(2)).bonusBps, bonusBps(REWARDS.xShareBase + REWARDS.reachWeight * 4));
     assert.equal(holder(wallet(1)).shares, "1");
     assert.deepEqual(record!.reach, reach, "the reach is published with the epoch");

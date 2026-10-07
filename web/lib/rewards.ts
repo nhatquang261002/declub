@@ -10,9 +10,9 @@ import { strengthFactor, type SignalStrength } from "./xPosts";
  * Guide share one set of numbers.
  */
 export const REWARDS = {
-  /** Of the fees a Club's swaps paid, in basis points: to its biggest Holders, by holdings. */
+  /** Of the fees a Club's swaps paid, in basis points: to its most active Holders, by holdings and activity. */
   holderBps: 5_000,
-  /** Only a Club's biggest Holders by shares share the Holder pool: fewer claims, and the bigger bag earns. */
+  /** Only a Club's most active Holders share the Holder pool (ADR 0037): fewer claims, and you have to hold and take part. */
   maxHolders: 10,
   /** To the Club fund, which the Club's Owner claims. */
   fundBps: 2_500,
@@ -33,6 +33,14 @@ export const REWARDS = {
   streakStepBps: 250,
   /** At most this much streak bonus, on top of `maxBonusBps`. */
   maxStreakBps: 1_000,
+  /**
+   * Points per completed swap with a counterparty who isn't the member's own wallet (ADR 0034). A
+   * swap with a wallet the member already swapped with in the epoch within `MOMENTUM.washDays`
+   * counts `MOMENTUM.washFactor` of it.
+   */
+  swapPoints: 2,
+  /** At most this many swap points per member per Club per epoch, so trading can't carry the bonus (7 full swaps). */
+  swapCapPerEpoch: 14,
   /** Points per counted X share (halved when it's only weakly about the Club): Momentum's weight. */
   xShareBase: MOMENTUM.xShareWeight,
   /** Points per doubling of an X share's engagement (likes + reposts + quotes + replies). */
@@ -42,6 +50,8 @@ export const REWARDS = {
 } as const;
 
 export const percent = (bps: number) => `${bps / 100}%`;
+
+const DAY = 86_400;
 
 // ─────────────────────────────────────────────────────────────── epochs
 
@@ -99,15 +109,47 @@ export type ReachRecord = {
   posts: Record<string, ReachEntry>;
 };
 
-export type Activity = { x: number; days: number; points: number; bonusBps: number };
+/**
+ * Money a sponsor adds to one Club's Holder pool for one epoch (ADR 0035). The operator records it
+ * before the epoch is built, from MON the sponsor sent to the operator; the epoch publishes it.
+ */
+export type Sponsorship = {
+  club: string;
+  /** Wei, a decimal string. */
+  amount: string;
+  /** Shown on the Rewards tab and in the recap. */
+  sponsor: string;
+  /** A project's own top-up, or someone else's. */
+  kind: "owner" | "partner";
+  /** Unix seconds it was recorded. */
+  at: number;
+  /** The wallet that paid, and its transaction, when the app checked the payment on chain (ADR 0036). */
+  by?: string;
+  tx?: string;
+};
+
+/** The longest sponsor name kept. */
+export const SPONSOR_NAME_MAX = 40;
+
+/** A Club's sponsors in one epoch, as published. */
+export type PublishedSponsor = { sponsor: string; kind: Sponsorship["kind"]; amount: string; by?: string };
+
+/** The least a sponsorship made in the app can be, in wei (0.1 MON): enough that a name isn't free. */
+export const SPONSOR_MIN_WEI = 10n ** 17n;
+
+/** What the sponsor signs to claim a payment as theirs, under a name (ADR 0036). Nobody else can put their name on it. */
+export const sponsorMessage = (club: string, tx: string, name: string) =>
+  `DeClub sponsorship\nClub: ${club.toLowerCase()}\nPayment: ${tx.toLowerCase()}\nName: ${name}`;
+
+export type Activity = { x: number; days: number; swaps: number; points: number; bonusBps: number };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * A member's activity in a Club over an epoch: their active days on the Board, each worth
- * `dayPoints` (ADR 0032), and their own X shares, each worth `xShareBase` and its reach. Trading earns nothing: a member could wash trade
- * against themselves, so only posts count (ADR 0029). At most 7 active days count. The reach read has the last word on an X
- * share: one that was deleted, or edited so it's no longer about the Club, counts for nothing.
+ * `dayPoints` (ADR 0032), their own X shares, each worth `xShareBase` and its reach, and their
+ * completed swaps (`swapPoints`, ADR 0034). At most 7 active days count. The reach read has the last
+ * word on an X share: one that was deleted, or edited so it's no longer about the Club, counts for nothing.
  */
 export function activityPoints(events: readonly ActivityEvent[], reach: ReachRecord | null, wallets: readonly string[], days = 0): Activity {
   const own = new Set(wallets.map((w) => w.toLowerCase()));
@@ -121,9 +163,33 @@ export function activityPoints(events: readonly ActivityEvent[], reach: ReachRec
     if (read?.ok) reached += REWARDS.reachWeight * Math.log2(1 + read.engagement) * factor;
   }
   const x = base + Math.min(REWARDS.reachCapPerEpoch, reached);
+  const swaps = swapActivity(events, own);
   const active = Math.max(0, Math.min(7, Math.floor(days)));
-  const points = x + active * REWARDS.dayPoints;
-  return { x: round2(x), days: active, points: round2(points), bonusBps: bonusBps(points) };
+  const points = x + swaps + active * REWARDS.dayPoints;
+  return { x: round2(x), days: active, swaps: round2(swaps), points: round2(points), bonusBps: bonusBps(points) };
+}
+
+/**
+ * A member's swap points in an epoch (ADR 0034). A swap counts when someone other than the member's
+ * own wallets is on it, so swapping between one's own wallets earns nothing. Swapping again with a
+ * counterparty within `MOMENTUM.washDays` counts `MOMENTUM.washFactor` of a swap, as in Momentum,
+ * and the total is capped at `swapCapPerEpoch`.
+ */
+function swapActivity(events: readonly ActivityEvent[], own: ReadonlySet<string>): number {
+  const swaps = events.filter((e) => e.kind === "swapped" && e.parties.some((p) => own.has(p.toLowerCase()))).sort((a, b) => a.at - b.at);
+  const lastWith = new Map<string, number>();
+  let points = 0;
+  for (const e of swaps) {
+    const others = [...new Set(e.parties.map((p) => p.toLowerCase()))].filter((p) => !own.has(p));
+    if (others.length === 0) continue;
+    const repeat = others.some((o) => {
+      const previous = lastWith.get(o);
+      return previous !== undefined && e.at - previous <= MOMENTUM.washDays * DAY;
+    });
+    for (const o of others) lastWith.set(o, e.at);
+    points += REWARDS.swapPoints * (repeat ? MOMENTUM.washFactor : 1);
+  }
+  return Math.min(REWARDS.swapCapPerEpoch, points);
 }
 
 /** The bonus for `points`, in basis points: linear up to `fullBonusPoints`, then capped. */
@@ -148,6 +214,8 @@ export type ClubInput = {
   fees: bigint;
   /** What earlier epochs couldn't pay out and roll in now. */
   carried: { holders: bigint; fund: bigint };
+  /** Sponsors' money for this epoch (ADR 0035): all of it joins the Holder pool, none to the protocol. */
+  sponsored?: bigint;
   /**
    * Each Holder member's display wallet, its shares and its bonus. Zero-share members are left out.
    * `joinedAt` (unix seconds) breaks a tie at the cutoff in favour of the earlier member.
@@ -179,6 +247,7 @@ export type Payout = {
 export type ClubSplit = {
   club: string;
   fees: bigint;
+  sponsored: bigint;
   holderPool: bigint;
   fundPool: bigint;
   /** Paid this epoch, per kind. */
@@ -190,38 +259,51 @@ export type ClubSplit = {
   payouts: (Payout & { wallet: string })[];
 };
 
-/** A Club's pools for an epoch: its share of the fees, plus whatever rolled in. */
-export function pools(fees: bigint, carried: { holders: bigint; fund: bigint }) {
+/** A Club's pools for an epoch: its share of the fees, whatever rolled in, and what sponsors added to the Holder pool. */
+export function pools(fees: bigint, carried: { holders: bigint; fund: bigint }, sponsored = 0n) {
   return {
-    holderPool: (fees * BigInt(REWARDS.holderBps)) / 10_000n + carried.holders,
+    holderPool: (fees * BigInt(REWARDS.holderBps)) / 10_000n + carried.holders + sponsored,
     fundPool: (fees * BigInt(REWARDS.fundBps)) / 10_000n + carried.fund,
   };
 }
 
 /**
- * Holders in the order the Holder pool reads them: most shares first, a tie to the earlier member,
- * then the lower wallet, so a rebuild gives the same order. Zero-share members are left out. The
- * bonus never changes the order (ADR 0029).
+ * Holders in the order the Holder pool reads them (ADR 0037): most activity points first, then the
+ * bigger holding, the earlier member, the lower wallet, so a rebuild gives the same order.
+ * Zero-share members are left out. A Holder with no points is ranked but never paid: `paidPlaces`.
  */
 export function rankHolders<H extends Holder>(holders: readonly H[]): H[] {
   return holders
     .filter((h) => h.shares > 0n)
-    .sort((a, b) => (a.shares === b.shares ? (a.joinedAt ?? 0) - (b.joinedAt ?? 0) || (a.wallet.toLowerCase() < b.wallet.toLowerCase() ? -1 : 1) : a.shares > b.shares ? -1 : 1));
+    .sort(
+      (a, b) =>
+        (b.points ?? 0) - (a.points ?? 0) ||
+        (a.shares === b.shares ? 0 : a.shares > b.shares ? -1 : 1) ||
+        (a.joinedAt ?? 0) - (b.joinedAt ?? 0) ||
+        (a.wallet.toLowerCase() < b.wallet.toLowerCase() ? -1 : 1),
+    );
+}
+
+/** The Holders the pool pays: the `maxHolders` most active of those ranked, and only with some activity. */
+export function paidPlaces<H extends Holder>(ranked: readonly H[]): H[] {
+  return ranked.filter((h) => (h.points ?? 0) > 0).slice(0, REWARDS.maxHolders);
 }
 
 /**
- * How many more shares `wallet` needs to be among the `maxHolders` paid: 0 when it already is,
- * null when it isn't ranked at all. Matching the last paid Holder is enough only when `wallet`
- * would win the tie.
+ * How many more activity points `wallet` needs to be among the paid Holders: 0 when it already is,
+ * null when it isn't ranked at all (it holds nothing). With fewer than `maxHolders` active Holders
+ * any activity is enough, so the answer is the smallest step a point can make.
  */
-export function entryGap(ranked: readonly Holder[], wallet: string): bigint | null {
+export function entryGap(ranked: readonly Holder[], wallet: string): number | null {
   const at = ranked.findIndex((h) => h.wallet.toLowerCase() === wallet.toLowerCase());
   if (at < 0) return null;
-  if (at < REWARDS.maxHolders) return 0n;
   const me = ranked[at]!;
-  const last = ranked[REWARDS.maxHolders - 1]!;
-  const winsTie = rankHolders([{ ...me, shares: last.shares }, last])[0] !== last;
-  return last.shares - me.shares + (winsTie ? 0n : 1n);
+  const paid = paidPlaces(ranked);
+  if (paid.includes(me)) return 0;
+  if (paid.length < REWARDS.maxHolders) return 0.01;
+  const last = paid[paid.length - 1]!;
+  const winsTie = rankHolders([{ ...me, points: last.points }, last])[0] !== last;
+  return Number((Math.max(0, (last.points ?? 0) - (me.points ?? 0)) + (winsTie ? 0 : 0.01)).toFixed(2));
 }
 
 /** A Holder's whole bonus in basis points: activity (capped at `maxBonusBps`) plus streak. */
@@ -231,14 +313,15 @@ export function totalBonusBps(h: Pick<Holder, "bonusBps" | "streak">): number {
 }
 
 /**
- * Splits one Club's pools between its Holders and its Owner. Only the `maxHolders` biggest Holders
- * by shares are paid (`rankHolders`), and the bonus can't buy a place. Among them a Holder's weight
- * is their shares times (1 + bonus): holding is the base, activity adds up to `maxBonusBps` and a
- * streak up to `maxStreakBps`. Integer wei throughout; rounding dust rolls into the next epoch.
+ * Splits one Club's pools between its Holders and its Owner. Only the `maxHolders` most active
+ * Holders are paid (`paidPlaces`: the top of `rankHolders`, with some activity). Among them a
+ * Holder's weight is their shares times (1 + bonus): holding is the base, activity adds up to
+ * `maxBonusBps` and a streak up to `maxStreakBps`. Integer wei throughout; rounding dust rolls into
+ * the next epoch.
  */
 export function splitClub(input: ClubInput): ClubSplit {
-  const { holderPool, fundPool } = pools(input.fees, input.carried);
-  const holders = rankHolders(input.holders).slice(0, REWARDS.maxHolders);
+  const { holderPool, fundPool } = pools(input.fees, input.carried, input.sponsored ?? 0n);
+  const holders = paidPlaces(rankHolders(input.holders));
   const weightOf = (h: Holder) => h.shares * BigInt(10_000 + totalBonusBps(h));
   const totalWeight = holders.reduce((sum, h) => sum + weightOf(h), 0n);
   const payouts: ClubSplit["payouts"] = [];
@@ -268,6 +351,7 @@ export function splitClub(input: ClubInput): ClubSplit {
   return {
     club: input.club,
     fees: input.fees,
+    sponsored: input.sponsored ?? 0n,
     holderPool,
     fundPool,
     paidHolders,
@@ -320,6 +404,9 @@ export type EpochRecord = {
   clubs: {
     club: string;
     fees: string;
+    /** What sponsors added to the Holder pool (ADR 0035); absent in epochs built before. */
+    sponsored?: string;
+    sponsors?: PublishedSponsor[];
     holderPool: string;
     fundPool: string;
     paidHolders: string;

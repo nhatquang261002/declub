@@ -10,7 +10,7 @@ const WHAT = [
   { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
   { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, reply, or share your X posts, signed by your wallet, and pick how the feed is ordered." },
   { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard ranked by Momentum, with Holder badges. Follow who you trust." },
-  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its ${REWARDS.maxHolders} biggest Holders each week, more to the ones who post, and ${percent(REWARDS.fundBps)} to the Club fund.` },
+  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(REWARDS.holderBps)} of the Club's swap fees goes to its ${REWARDS.maxHolders} most active Holders each week, more to the ones who post and swap, and ${percent(REWARDS.fundBps)} to the Club fund.` },
 ];
 
 const HOW = [

@@ -7,11 +7,12 @@ import type { MemberRow } from "../lib/members";
 import { recapLink, recapText } from "../lib/recap";
 import { REWARDS, entryGap, epochAt, epochWindow, leavesOf, pools, rankHolders, rewardLeaf, splitClub, streakBps, type ClubInput } from "../lib/rewards";
 import { activeDays, activeKey, recordActive } from "../lib/server/activeDays";
-import { liveStreak, readStreaks, streakAt } from "../lib/server/streaks";
+import { liveStreak, readStreaks, standingsKey, streakAt } from "../lib/server/streaks";
 import { postKey } from "../lib/server/board";
 import { rolesKey } from "../lib/server/clubState";
 import { memberKey, membersKey, type Holdings } from "../lib/server/members";
-import { buildEpoch, carryKey, claimableFor, clubRewards, epochKey, lastKey, type RewardsDeps } from "../lib/server/rewards";
+import { buildEpoch, carryKey, claimableFor, clubRewards, epochKey, lastKey, recordSponsor, removeSponsor, type RewardsDeps } from "../lib/server/rewards";
+import { sponsorsByClub } from "../lib/server/sponsors";
 import { memoryStore, type Store } from "../lib/server/store";
 import { makeRegistry, parseAssets, type ClubEntry } from "../lib/verifiedAssets";
 
@@ -104,13 +105,29 @@ describe("splitClub", () => {
   });
 
   it("pays Holders by shares, and the fund to the Owner", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 3n }, { wallet: bob, shares: 1n }], owner: carol }));
+    const split = splitClub(input({ holders: [{ wallet: alice, shares: 3n, points: 4 }, { wallet: bob, shares: 1n, points: 4 }], owner: carol }));
     assert.deepEqual(
       split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
       [[alice, "holder", (375n * ETH) / 100n], [bob, "holder", (125n * ETH) / 100n], [carol, "fund", (25n * ETH) / 10n]],
     );
     assert.deepEqual(split.carry, { holders: 0n, fund: 0n });
     assert.equal(split.holderCount, 2);
+  });
+
+  it("adds a sponsor's money to the Holder pool only: none to the fund, none to the protocol (ADR 0035)", () => {
+    assert.deepEqual(pools(10n * ETH, { holders: 0n, fund: 0n }, 7n * ETH), { holderPool: 12n * ETH, fundPool: (25n * ETH) / 10n });
+    const split = splitClub(input({ sponsored: 7n * ETH, holders: [{ wallet: alice, shares: 3n, points: 4 }, { wallet: bob, shares: 1n, points: 4 }], owner: carol }));
+    assert.equal(split.sponsored, 7n * ETH);
+    assert.deepEqual(
+      split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
+      [[alice, "holder", 9n * ETH], [bob, "holder", 3n * ETH], [carol, "fund", (25n * ETH) / 10n]],
+    );
+  });
+
+  it("rolls a sponsor's money into the next epoch when the Club has no Holders", () => {
+    const split = splitClub(input({ fees: 0n, sponsored: 4n * ETH }));
+    assert.deepEqual(split.payouts, []);
+    assert.deepEqual(split.carry, { holders: 4n * ETH, fund: 0n });
   });
 
   it("rolls the pools over when there are no Holders or no Owner", () => {
@@ -120,7 +137,7 @@ describe("splitClub", () => {
   });
 
   it("rolls rounding dust over and never pays more than the pool", () => {
-    const split = splitClub(input({ fees: 10n, holders: [{ wallet: alice, shares: 1n }, { wallet: bob, shares: 1n }, { wallet: carol, shares: 1n }] }));
+    const split = splitClub(input({ fees: 10n, holders: [{ wallet: alice, shares: 1n, points: 2 }, { wallet: bob, shares: 1n, points: 2 }, { wallet: carol, shares: 1n, points: 2 }] }));
     // A 5-wei pool over 3 equal Holders: 1 each, 2 left.
     assert.equal(split.holderPool, 5n);
     assert.equal(split.paidHolders, 3n);
@@ -128,7 +145,7 @@ describe("splitClub", () => {
   });
 
   it("leaves zero-share members out", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 0n }, { wallet: bob, shares: 2n }] }));
+    const split = splitClub(input({ holders: [{ wallet: alice, shares: 0n, points: 9 }, { wallet: bob, shares: 2n, points: 2 }] }));
     assert.deepEqual(split.payouts.map((p) => p.wallet), [bob]);
     assert.equal(split.holderCount, 1);
   });
@@ -137,10 +154,10 @@ describe("splitClub", () => {
 describe("the top Holders", () => {
   const club = NFT.toLowerCase();
   const w = (i: number) => `0x${i.toString(16).padStart(40, "0")}`;
-  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ wallet: w(i + 1), shares: BigInt(100 - i), joinedAt: i }));
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ wallet: w(i + 1), shares: BigInt(100 - i), points: 40 - i, joinedAt: i }));
   const base = { club, fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, owner: null };
 
-  it("pays only the biggest REWARDS.maxHolders, by shares", () => {
+  it("pays only the most active REWARDS.maxHolders, by points", () => {
     const split = splitClub({ ...base, holders: many(15).reverse() });
     const paid = split.payouts.map((p) => p.wallet);
     assert.equal(split.holderCount, REWARDS.maxHolders);
@@ -148,17 +165,29 @@ describe("the top Holders", () => {
     assert.equal(split.paidHolders + split.carry.holders, split.holderPool);
   });
 
-  it("breaks a tie at the cutoff for the earlier member, then the lower wallet", () => {
-    const tied = [...many(9), { wallet: w(50), shares: 1n, joinedAt: 5 }, { wallet: w(51), shares: 1n, joinedAt: 3 }, { wallet: w(40), shares: 1n, joinedAt: 3 }].map((h, i) => (i < 9 ? h : { ...h, shares: 1n }));
-    const split = splitClub({ ...base, holders: tied });
-    assert.ok(split.payouts.some((p) => p.wallet === w(40)), "earlier join, lower wallet wins the last place");
-    assert.ok(!split.payouts.some((p) => p.wallet === w(51) || p.wallet === w(50)));
+  it("breaks a tie at the cutoff for the bigger holding, then the earlier member, then the lower wallet", () => {
+    const tied = [
+      ...many(7),
+      { wallet: w(50), shares: 1n, points: 1, joinedAt: 5 },
+      { wallet: w(51), shares: 1n, points: 1, joinedAt: 3 },
+      { wallet: w(40), shares: 1n, points: 1, joinedAt: 3 },
+      { wallet: w(60), shares: 2n, points: 1, joinedAt: 9 },
+    ];
+    const paid = splitClub({ ...base, holders: tied }).payouts.map((p) => p.wallet);
+    assert.ok(paid.includes(w(60)), "more NFTs wins a tie on points");
+    assert.ok(paid.includes(w(40)) && paid.includes(w(51)), "then the earlier join, then the lower wallet");
+    assert.ok(!paid.includes(w(50)));
   });
 
-  it("lets the bonus change the split, never who is in", () => {
-    const holders = [...many(10), { wallet: w(99), shares: 1n, bonusBps: REWARDS.maxBonusBps, joinedAt: 0 }];
-    const split = splitClub({ ...base, holders });
-    assert.ok(!split.payouts.some((p) => p.wallet === w(99)));
+  it("never pays a Holder for holding alone, and a bigger bag can't buy a place", () => {
+    const whales = [{ wallet: w(98), shares: 10_000n, points: 0, joinedAt: 0 }, { wallet: w(99), shares: 10_000n, points: 1, joinedAt: 0 }];
+    const split = splitClub({ ...base, holders: [...many(10), ...whales] });
+    assert.ok(!split.payouts.some((p) => p.wallet === w(98) || p.wallet === w(99)));
+    // Alone in the Club and quiet: nothing is paid, and the pool rolls over.
+    const quiet = splitClub({ ...base, holders: [whales[0]!] });
+    assert.deepEqual(quiet.payouts, []);
+    assert.equal(quiet.carry.holders, quiet.holderPool);
+    assert.equal(quiet.holderCount, 0);
   });
 
   it("ranks Holders the way the split pays them", () => {
@@ -167,21 +196,23 @@ describe("the top Holders", () => {
     assert.deepEqual(new Set(rankHolders(holders).slice(0, REWARDS.maxHolders).map((h) => h.wallet)), paid);
   });
 
-  it("says how many more shares get a Holder into the paid places, with the tie rule", () => {
-    const ranked = rankHolders([...many(10), { wallet: w(70), shares: 88n, joinedAt: 20 }, { wallet: w(71), shares: 80n, joinedAt: 0 }]);
-    // The 10th place holds 91 (joined 9). w(70) joined later, so it needs one more than a tie.
-    assert.equal(entryGap(ranked, w(70)), 91n - 88n + 1n);
-    // w(71) joined earlier, so a tie is enough.
-    assert.equal(entryGap(ranked, w(71)), 91n - 80n);
-    assert.equal(entryGap(ranked, w(1)), 0n);
+  it("says how many more points get a Holder into the paid places, with the tie rule", () => {
+    const ranked = rankHolders([...many(10), { wallet: w(70), shares: 5n, points: 28, joinedAt: 20 }, { wallet: w(71), shares: 500n, points: 28, joinedAt: 0 }]);
+    // The 10th place has 31 points and 91 NFTs. w(70) holds less, so a tie isn't enough.
+    assert.equal(entryGap(ranked, w(70)), 3.01);
+    // w(71) holds more, so a tie is enough.
+    assert.equal(entryGap(ranked, w(71)), 3);
+    assert.equal(entryGap(ranked, w(1)), 0);
     assert.equal(entryGap(ranked, w(123)), null);
+    // With room left, any activity gets in.
+    assert.equal(entryGap(rankHolders([...many(3), { wallet: w(80), shares: 4n, points: 0, joinedAt: 1 }]), w(80)), 0.01);
   });
 
   it("adds the streak bonus on top of the activity bonus, each capped", () => {
     assert.deepEqual([0, 1, 2, 3, 5, 40].map(streakBps), [0, 0, 250, 500, 1_000, 1_000]);
     const holders = [
-      { wallet: w(1), shares: 1n, bonusBps: 99_999, streak: 99 },
-      { wallet: w(2), shares: 1n },
+      { wallet: w(1), shares: 1n, points: 1, bonusBps: 99_999, streak: 99 },
+      { wallet: w(2), shares: 1n, points: 1 },
     ];
     const split = splitClub({ ...base, holders });
     const top = split.payouts.find((p) => p.wallet === w(1))!;
@@ -240,15 +271,24 @@ describe("the weekly recap", () => {
 
   it("says who was paid and the week's fees, in a short post", () => {
     const text = recapText(recap);
-    assert.match(text, /^CHOG Club just paid its 10 biggest Holders 6 MON /);
+    assert.match(text, /^CHOG Club just paid its 10 most active Holders 6 MON /);
     assert.match(text, /12 MON in swap fees this week/);
     assert.ok(text.length + 24 <= 280, "with a link, within X's limit");
-    assert.match(recapText({ ...recap, paidHolders: 1234n * 10n ** 14n, holderCount: 1 }), /paid its biggest Holder 0\.12 MON/);
-    assert.match(recapText({ ...recap, paidHolders: 5n * 10n ** 15n }), /paid its 10 biggest Holders <0\.01 MON/);
+    assert.match(recapText({ ...recap, paidHolders: 1234n * 10n ** 14n, holderCount: 1 }), /paid its most active Holder 0\.12 MON/);
+    assert.match(recapText({ ...recap, paidHolders: 5n * 10n ** 15n }), /paid its 10 most active Holders <0\.01 MON/);
+  });
+
+  it("says who sponsored the week, and stays within X's limit with long names", () => {
+    assert.ok(!recapText(recap).includes("sponsored"));
+    assert.match(recapText({ ...recap, sponsored: 5n * ETH, sponsors: ["Monad Foundation"] }), /🎁 5 MON sponsored by Monad Foundation/);
+    assert.match(recapText({ ...recap, sponsored: 5n * ETH, sponsors: ["A", "B"] }), /sponsored by A and B/);
+    assert.match(recapText({ ...recap, sponsored: 5n * ETH, sponsors: ["A", "B", "C", "D"] }), /sponsored by A, B and 2 more/);
+    const long = "x".repeat(40);
+    assert.ok(recapText({ ...recap, sponsored: 5n * ETH, sponsors: [long, long, long] }).length + 24 <= 280);
   });
 
   it("leaves out the payout line when nobody was paid, and links the Club's page", () => {
-    assert.ok(!recapText({ ...recap, paidHolders: 0n, holderCount: 0 }).includes("biggest"));
+    assert.ok(!recapText({ ...recap, paidHolders: 0n, holderCount: 0 }).includes("most active"));
     assert.match(recapText({ ...recap, paidHolders: 0n, holderCount: 0 }), /^CHOG Club made 12 MON in swap fees/);
     assert.match(recapText({ ...recap, fees: 0n, paidHolders: 0n, holderCount: 0 }), /^A quiet week for the CHOG Club/);
     const link = new URL(recapLink(recap, "https://declub.app/clubs/0xabc"));
@@ -259,13 +299,13 @@ describe("the weekly recap", () => {
 
 describe("leavesOf", () => {
   it("sums one wallet across Clubs, keeps the breakdown, and orders by address", () => {
-    const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n }], owner: alice });
-    const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n }], owner: null });
+    const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n, points: 1 }], owner: alice });
+    const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n, points: 1 }], owner: null });
     const leaves = leavesOf([a, b]);
     assert.deepEqual(leaves.map((l) => [l.account, l.amount]), [[getAddress(alice), (25n * ETH) / 10n + (25n * ETH) / 10n], [getAddress(bob), 5n * ETH]]);
     assert.deepEqual(leaves[0]!.breakdown, [
       { club: "0x1", kind: "fund", amount: (25n * ETH) / 10n },
-      { club: "0x2", kind: "holder", amount: (25n * ETH) / 10n, shares: 1n, bonusBps: 0 },
+      { club: "0x2", kind: "holder", amount: (25n * ETH) / 10n, shares: 1n, bonusBps: 0, points: 1 },
     ]);
   });
 });
@@ -305,6 +345,13 @@ async function join(store: Store, club: Address, userId: string, wallets: string
 /** Balances by token, then by wallet. Anything unlisted holds nothing. */
 const holdingsOf = (table: Record<string, Record<string, bigint>>): Holdings => async (token, wallets) =>
   wallets.map((w) => table[token.toLowerCase()]?.[w.toLowerCase()] ?? 0n);
+
+/** A visible Board post, so the member has an active day (and so some points) in that epoch. */
+async function postOnBoard(store: Store, userId: string, wallet: string, at: number, club: Address = NFT) {
+  const p = { id: `p${at}-${userId}`, userId, wallet, kind: "note", text: "gm", at: at * 1000 };
+  await store.set(postKey(club.toLowerCase(), p.id), p);
+  await recordActive(store, club.toLowerCase(), p, GENESIS, WEEK);
+}
 
 describe("buildEpoch", () => {
   let store: Store;
@@ -386,7 +433,7 @@ describe("buildEpoch", () => {
     const holder = record.leaves.find((l) => l.account.toLowerCase() === alice)!.breakdown.find((b) => b.kind === "holder")!;
     assert.equal(holder.days, 4);
     assert.equal(holder.streak, 3);
-    assert.equal(holder.points, 4 * REWARDS.dayPoints);
+    assert.equal(holder.points, 4 * REWARDS.dayPoints + REWARDS.swapPoints, "four active days and the epoch's one swap");
     assert.deepEqual(await readStreaks(store, club), { ua: { n: 0, count: 3 }, ub: { n: 0, count: 1 } });
   });
 
@@ -410,6 +457,74 @@ describe("buildEpoch", () => {
     assert.equal(result.status === "built" && result.record.clubs[0]!.fees, (6n * ETH).toString());
   });
 
+  it("adds recorded sponsors to the Holder pool, publishes who gave what, and funds it in the total", async () => {
+    events.set(NFT, [swap()]);
+    await recordSponsor(store, 0, { club: NFT, amount: 10n * ETH, sponsor: "Monad Foundation", kind: "partner" });
+    await recordSponsor(store, 0, { club: NFT, amount: 2n * ETH, sponsor: "Chog team", kind: "owner" });
+    await recordSponsor(store, 0, { club: NFT, amount: 1n * ETH, sponsor: "Monad Foundation", kind: "partner" });
+    const result = await buildEpoch(store, 0, deps);
+    const record = result.status === "built" ? result.record : undefined!;
+    const line = record.clubs.find((c) => c.club === NFT.toLowerCase())!;
+    // 4 MON of fees: Holders 2, fund 1. Sponsors add 13 to the Holders.
+    assert.equal(line.sponsored, (13n * ETH).toString());
+    assert.deepEqual(line.sponsors, [
+      { sponsor: "Monad Foundation", kind: "partner", amount: (11n * ETH).toString() },
+      { sponsor: "Chog team", kind: "owner", amount: (2n * ETH).toString() },
+    ]);
+    assert.equal(line.holderPool, (15n * ETH).toString());
+    assert.equal(line.paidHolders, (15n * ETH).toString());
+    assert.equal(line.paidFund, (1n * ETH).toString());
+    assert.equal(record.total, (16n * ETH).toString(), "the total the operator funds covers the sponsors");
+    assert.equal(record.clubs.find((c) => c.club === OTHER.toLowerCase())!.sponsored, undefined, "a Club nobody sponsored has no line");
+  });
+
+  it("pays a sponsored epoch with no swaps to an active Holder, and carries it when the Club has no Holders", async () => {
+    await postOnBoard(store, "ua", alice, GENESIS + 10);
+    await recordSponsor(store, 0, { club: NFT, amount: 3n * ETH, sponsor: "A", kind: "partner" });
+    await recordSponsor(store, 0, { club: OTHER, amount: 5n * ETH, sponsor: "B", kind: "partner" });
+    const result = await buildEpoch(store, 0, deps);
+    const record = result.status === "built" ? result.record : undefined!;
+    assert.equal(record.clubs.find((c) => c.club === NFT.toLowerCase())!.paidHolders, (3n * ETH).toString());
+    assert.equal(record.total, (3n * ETH).toString(), "only what is paid is funded");
+    assert.deepEqual(await store.get(carryKey(OTHER)), { holders: (5n * ETH).toString(), fund: "0" });
+  });
+
+  it("drops the cached live standings when a sponsor is recorded or removed, so the pool shows it at once", async () => {
+    await store.set(standingsKey(NFT), { stale: true });
+    await recordSponsor(store, 0, { club: NFT, amount: ETH, sponsor: "A", kind: "partner", tx: "0xabc" });
+    assert.equal(await store.get(standingsKey(NFT)), null);
+    await store.set(standingsKey(NFT), { stale: true });
+    await removeSponsor(store, 0, "0xabc");
+    assert.equal(await store.get(standingsKey(NFT)), null);
+  });
+
+  it("refuses a sponsor once the epoch is built, or for nothing, or without a name", async () => {
+    assert.equal((await recordSponsor(store, 0, { club: NFT, amount: 0n, sponsor: "A", kind: "partner" })).status, "invalid");
+    assert.equal((await recordSponsor(store, 0, { club: NFT, amount: ETH, sponsor: "  \n ", kind: "partner" })).status, "invalid");
+    assert.equal((await recordSponsor(store, -1, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" })).status, "invalid");
+    await buildEpoch(store, 0, deps);
+    assert.deepEqual(await recordSponsor(store, 0, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" }), { status: "built" });
+    assert.equal((await recordSponsor(store, 1, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" })).status, "recorded", "the next epoch still takes it");
+  });
+
+  it("keeps sponsor names to one short line", async () => {
+    const result = await recordSponsor(store, 2, { club: NFT, amount: ETH, sponsor: `  Big\n\tSponsor ${"x".repeat(100)} `, kind: "partner" });
+    const [entry] = result.status === "recorded" ? result.entries : [];
+    assert.ok(entry!.sponsor.length <= 40);
+    assert.ok(!/[\n\t]/.test(entry!.sponsor));
+    assert.ok(entry!.sponsor.startsWith("Big Sponsor "));
+    assert.deepEqual([...sponsorsByClub([entry!]).keys()], [NFT.toLowerCase()]);
+  });
+
+  it("shows the running epoch's sponsors on the Club's view before it closes", async () => {
+    const genesis = 1_791_158_400;
+    await recordSponsor(store, 0, { club: NFT, amount: 6n * ETH, sponsor: "Monad Foundation", kind: "partner" });
+    const view = await clubRewards(store, NFT, genesis + 100);
+    assert.deepEqual(view.open, { n: 0, sponsored: (6n * ETH).toString(), sponsors: [{ sponsor: "Monad Foundation", kind: "partner", amount: (6n * ETH).toString() }] });
+    assert.equal((await clubRewards(store, OTHER, genesis + 100)).open, undefined);
+    assert.equal((await clubRewards(store, NFT, genesis + WEEK + 100)).open, undefined, "the next epoch has none");
+  });
+
   it("rolls what it can't pay into the next epoch, and pays it then", async () => {
     // Epoch 0: the Other Club has fees but no members and no Owner.
     events.set(OTHER, [swap({ tokens: [OTHER.toLowerCase()] })]);
@@ -419,6 +534,7 @@ describe("buildEpoch", () => {
     // Epoch 1: someone holding an Other NFT joins and is paid the rolled-over Holder pool.
     events.set(OTHER, []);
     await join(store, OTHER, "ud", [dave]);
+    await postOnBoard(store, "ud", dave, GENESIS + WEEK + 10, OTHER);
     const result = await buildEpoch(store, 1, { ...deps, now: () => GENESIS + 2 * WEEK, holdings: holdingsOf({ [OTHER.toLowerCase()]: { [dave]: 1n } }) });
     const record = result.status === "built" ? result.record : undefined!;
     assert.deepEqual(record.leaves.map((l) => [l.account.toLowerCase(), l.amount]), [[dave, (2n * ETH).toString()]]);

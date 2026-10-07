@@ -9,6 +9,9 @@ lives in the git log and the relevant ADRs.
 - [x] Local contract, matcher, web and e2e test suites
 - [x] Demo world and repeatable testnet seeding scripts
 - [x] Deploy `DeClubEscrow` and `DeClubRewards` to testnet (demo deployment, root `.env` set)
+- [x] Swaps count in the Holder bonus, capped ([ADR 0034](adr/0034-swaps-count-in-the-holder-bonus.md))
+- [x] Sponsored epochs ([ADR 0035](adr/0035-sponsored-epochs.md)), from the app with the payment checked on chain ([ADR 0036](adr/0036-sponsor-from-the-app.md)) or by the operator with `npm run rewards:sponsor`; either way before the epoch is built
+- [ ] Try a real sponsorship in a browser on testnet: send, sign, see it on the Rewards tab, build and publish the epoch
 - [ ] Deploy `DeClubIntents` to testnet: the retired `OnDealIntents` has a different EIP-712 domain, so `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` stays blank, which hides signed swaps, until it is deployed
 - [ ] Verify the deployments on Sourcify
 - [ ] Run the manual testnet pass with two real wallets
@@ -16,8 +19,15 @@ lives in the git log and the relevant ADRs.
 - [ ] Turn on X reach: set `X_BEARER_TOKEN` (the code is built; off by default)
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
 
+## Next: Club social
+
+- [ ] Club Pulse: a live activity strip on the Club page (listings, fills, joins, posts), built from data we already have, with no signing
+- [ ] Club challenges: a weekly prompt on the Board, answered with posts and picked by the Owner or a Holder vote; the winner gets a badge, never money
+- [ ] Member roles and titles: the Owner gives custom titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
+
 ## Deferred
 
+- [ ] On-chain `sponsor(club)` deposit with a `Sponsored` event, so sponsors don't have to trust the operator (needs a `DeClubRewards` change and redeploy)
 - [ ] Hold-time snapshot for Holder shares (lowest balance across the epoch), so buying just before an epoch closes earns nothing
 - [ ] Holder governance for Moderators and Club-fund grants
 - [ ] Trade-receipt badges

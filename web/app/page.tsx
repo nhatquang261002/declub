@@ -24,7 +24,7 @@ const STEPS = [
   {
     number: "03",
     title: "Own a share of the market",
-    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s ${REWARDS.maxHolders} biggest Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
+    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s ${REWARDS.maxHolders} most active Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
   },
 ];
 

@@ -20,13 +20,17 @@ const plural = (n: number | bigint, one: string, many = `${one}s`) => `${n} ${n 
 export function LiveStandings({ token, symbol, wallet, now }: { token: string; symbol: string; wallet?: string; now: number }) {
   const { standings: s } = useClubStandings(token, wallet);
   if (!s) return null;
-  const top = s.rows.slice(0, REWARDS.maxHolders);
-  const next = s.rows[REWARDS.maxHolders];
+  const sponsored = wei(s.sponsored);
+  // Ranked by activity, so the paid places are the first rows that have any points (ADR 0037).
+  const placed = Math.min(REWARDS.maxHolders, s.rows.filter((r) => r.points > 0).length);
+  const top = s.rows.slice(0, placed);
+  const next = s.rows[placed];
 
   return (
     <Panel title="This epoch · live">
-      <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+      <dl className={`grid grid-cols-2 gap-4 text-sm ${sponsored > 0n ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
         <Figure label="Fees so far" value={formatMon(wei(s.fees))} />
+        {sponsored > 0n && <Figure label="Sponsored" value={formatMon(sponsored)} hint="Added to the Holder pool" />}
         <Figure label="Holder pool" value={formatMon(wei(s.holderPool))} hint={`${plural(s.holders, "Holder")} in the race`} />
         <Figure label="Club fund" value={formatMon(wei(s.fundPool))} />
         <Closing endsAt={s.endsAt} now={now} />
@@ -86,7 +90,8 @@ function MyCard({ s, symbol }: { s: StandingsView; symbol: string }) {
 
   let hint: string;
   if (me.rank === null) hint = `Hold a ${symbol} NFT to join the race. Posting still builds your streak.`;
-  else if (BigInt(me.gap) > 0n) hint = `${plural(BigInt(me.gap), "more NFT")} would put you in the top ${REWARDS.maxHolders}.`;
+  else if (me.points === 0) hint = `You hold ${plural(BigInt(me.shares), "NFT")} but nothing counted yet. Post on the Board, share on X or swap to earn a place in the top ${REWARDS.maxHolders}.`;
+  else if (Number(me.gap) > 0) hint = `About ${me.gap} more activity points would put you in the top ${REWARDS.maxHolders}.`;
   else if (streak === 0 && carried > 0) hint = `${plural(REWARDS.streakMinDays - days, "more active day")} keeps your ${carried}-week streak.`;
   else if (days < 7) hint = `Post today to make it ${days + 1} of 7 days.`;
   else hint = "Every day this epoch counted. Keep it up.";
@@ -97,7 +102,7 @@ function MyCard({ s, symbol }: { s: StandingsView; symbol: string }) {
         <p className="text-sm font-black">{me.rank === null ? "You’re not in the race yet" : `You’re #${me.rank}`}</p>
         {me.rank !== null && (
           <p className="text-lg font-black tabular-nums">
-            {me.estimate ? `≈ ${formatMon(wei(me.estimate))}` : wei(s.holderPool) === 0n ? "No fees yet" : me.rank > REWARDS.maxHolders ? "Outside the paid places" : "—"}
+            {me.estimate ? `≈ ${formatMon(wei(me.estimate))}` : wei(s.holderPool) === 0n ? "No fees yet" : me.points === 0 ? "Not paid yet" : "Outside the paid places"}
           </p>
         )}
       </div>
@@ -136,6 +141,7 @@ function Row({ r, mine }: { r: StandingRow; mine: boolean }) {
       <span className="min-w-0 flex-1">
         <Who address={r.wallet as `0x${string}`} />
       </span>
+      <span className="text-xs tabular-nums text-muted">{r.points} pts</span>
       <span className="text-xs tabular-nums text-muted">{plural(BigInt(r.shares), "NFT")}</span>
       {r.streak >= 2 && (
         <span className="chip chip-peach" aria-label={`${plural(r.streak, "week")} streak`}>

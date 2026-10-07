@@ -37,8 +37,13 @@ describe("live standings", () => {
     store = memoryStore();
     reads = 0;
     now = GENESIS + 3 * 86_400;
-    // 12 Holders: member i holds 20 − i NFTs, so 11 and 12 are below the cut line.
+    // 12 Holders: member i holds 20 − i NFTs. The first 10 posted this epoch, so 11 and 12 are below the cut line.
     for (let i = 1; i <= 12; i++) await join(store, `u${i}`, w(i), i);
+    for (let i = 1; i <= 10; i++) {
+      const p = { id: `q${i}`, userId: `u${i}`, wallet: w(i), kind: "note", text: "gm", at: (GENESIS + 60) * 1000 };
+      await store.set(postKey(NFT, p.id), p);
+      await recordActive(store, NFT, p, GENESIS, WEEK);
+    }
     const holdings: Holdings = async (_token, wallets) => {
       reads++;
       return wallets.map((x) => BigInt(20 - Number(BigInt(x))));
@@ -65,8 +70,8 @@ describe("live standings", () => {
     await recordActive(store, NFT, p, GENESIS, WEEK);
     const view = standingsView((await clubStandings(store, club as ClubEntry, deps))!, w(11));
     assert.ok(view.me && view.me.rank === 11);
-    // 10th holds 10 and joined earlier, so 9 needs 2 more.
-    assert.equal("gap" in view.me ? view.me.gap : null, "2");
+    // Tied with the 10th on points, who holds more NFTs, so one more point.
+    assert.equal("gap" in view.me ? view.me.gap : null, "0.01");
     assert.equal("days" in view.me ? view.me.days : null, 1);
     assert.deepEqual(view.me.activity, { days: 1, streak: 0, carried: 0 });
     assert.equal(standingsView((await clubStandings(store, club as ClubEntry, deps))!, w(99)).me?.rank, null);

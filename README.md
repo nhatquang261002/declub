@@ -17,7 +17,7 @@ when a community creates the value, who captures it?
   gets a Club with its own market, board and ranked members, run by an Owner
   and Moderators.
 - **Participation turns into a stake.** Each week, 50% of the fees a Club's swaps
-  pay goes to its 10 biggest Holders, 25% to the Club fund the Owner collects and 25% to the
+  pay goes to its 10 most active Holders, 25% to the Club fund the Owner collects and 25% to the
   protocol. Holders' own X posts and active days raise their share. Trading and
   likes earn nothing, so fake accounts and wash trades don't pay, and every payout
   is a Merkle claim anyone can check on chain.

@@ -7,6 +7,7 @@ import { liveStreak, readStreaks, standingsKey, streakAt } from "./streaks";
 export { standingsKey };
 import { clubEvents } from "./clubs";
 import { allRows, viemHoldings, type Holdings } from "./members";
+import { readSponsors, sponsorsByClub } from "./sponsors";
 import { cachedSettlementFee, carryKey, holderInputs, ownerWallet, reachKey, swapFee, viemSettlementFee } from "./rewards";
 import type { Store } from "./store";
 
@@ -23,7 +24,7 @@ const lockKey = (club: string) => `declub:rewards:${CHAIN_ID}:standings-lock:${c
 
 export type StandingRow = {
   wallet: string;
-  /** 1-based, in the order the Holder pool reads them (`rankHolders`). */
+  /** 1-based, in the order the Holder pool reads them (`rankHolders`): most points first. Only rows with points, up to the paid places, get an estimate. */
   rank: number;
   /** Decimal strings. */
   shares: string;
@@ -51,6 +52,8 @@ export type ClubStandings = {
   /** Unix seconds. */
   computedAt: number;
   fees: string;
+  /** What sponsors have added to the Holder pool so far (ADR 0035); absent in copies cached before. */
+  sponsored?: string;
   holderPool: string;
   fundPool: string;
   rows: StandingRow[];
@@ -93,9 +96,11 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   const streaks = await readStreaks(store, key);
   const { holders, days } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks);
   const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
+  const sponsored = sponsorsByClub(await readSponsors(store, n)).get(key)?.total ?? 0n;
   const split = splitClub({
     club: key,
     fees,
+    sponsored,
     carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
     holders,
     owner: await ownerWallet(store, club),
@@ -135,6 +140,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     endsAt: window.end,
     computedAt: now,
     fees: fees.toString(),
+    sponsored: sponsored.toString(),
     holderPool: split.holderPool.toString(),
     fundPool: split.fundPool.toString(),
     rows,
@@ -182,8 +188,8 @@ export function standingsView(standings: ClubStandings, wallet?: string): Standi
     const row = rows.find((r) => r.wallet === w);
     const mine = activity[w] ?? null;
     if (row) {
-      const gap = entryGap(rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), joinedAt: r.joinedAt })), w) ?? 0n;
-      me = { ...row, gap: gap.toString(), activity: mine };
+      const gap = entryGap(rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), w) ?? 0;
+      me = { ...row, gap: String(gap), activity: mine };
     } else {
       me = { rank: null, activity: mine };
     }
