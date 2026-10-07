@@ -10,17 +10,6 @@ import type { Store } from "./store";
 const SPARE = 10;
 
 /**
- * The Clubs a timeline scope reads: the reader's own, or every other live one. Who belongs where is
- * the server's to say; the reader only names a scope.
- */
-export async function timelineClubs(store: Store, registry: Registry, viewer: { userId?: string; scope: TimelineScope }) {
-  const joined = new Set(viewer.userId ? (await clubsOf(store, viewer.userId)).map((token) => token.toLowerCase()) : []);
-  return registry
-    .clubs()
-    .filter((club) => (viewer.scope === "joined" ? joined.has(club.address.toLowerCase()) : !joined.has(club.address.toLowerCase()) && club.club !== "archived"));
-}
-
-/**
  * One page of posts from several Clubs' Boards as one list, newest first (ADR 0041), starting just
  * after `before` (the post the last page ended on). Nothing is capped: every page reads the next
  * slice of each Club's own ranking, so the list goes back as far as the Boards do, and a page costs
@@ -40,7 +29,12 @@ export async function listTimeline(
   registry: Registry,
   viewer: { userId?: string; scope: TimelineScope; before?: TimelineCursor; limit: number },
 ): Promise<{ posts: TimelinePost[]; next: string | null }> {
-  const tokens = (await timelineClubs(store, registry, viewer)).map((club) => club.address.toLowerCase());
+  // Who belongs where is the server's to say; the reader only names a scope.
+  const joined = new Set(viewer.userId ? (await clubsOf(store, viewer.userId)).map((token) => token.toLowerCase()) : []);
+  const tokens = registry
+    .clubs()
+    .filter((club) => (viewer.scope === "joined" ? joined.has(club.address.toLowerCase()) : !joined.has(club.address.toLowerCase()) && club.club !== "archived"))
+    .map((club) => club.address.toLowerCase());
 
   const fetched = viewer.limit + SPARE;
   const slices = await Promise.all(

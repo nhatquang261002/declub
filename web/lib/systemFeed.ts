@@ -1,18 +1,15 @@
 import type { ActivityEvent } from "./clubs";
 
 /**
- * System messages (ADR 0043): the Club speaking in the Board and the timeline, in a line between
- * posts. Each is something that happened and anyone can already see: a swap that completed, a deal
+ * System messages (ADR 0043): the Club speaking on its Board, in a line between posts. Each is something that happened and anyone can already see: a swap that completed, a deal
  * that was listed, a member who joined. They are read from the activity log and the member list
  * when asked, never stored, and never signed or moderated, since nobody wrote them.
  */
 export type SystemKind = "swap" | "listing" | "join";
 
 export type SystemEvent = {
-  /** Unique within a Club: the activity event's id, or `join:<wallet>`. */
+  /** The activity event's id, or `join:<wallet>`. */
   id: string;
-  /** Lowercase token of the Club it happened in. */
-  club: string;
   kind: SystemKind;
   /** Unix seconds. */
   at: number;
@@ -45,14 +42,18 @@ export function newest(events: readonly SystemEvent[], now: number, max = SYSTEM
   return { events: kept, since: kept.at(-1)!.at };
 }
 
-/** One row of a feed: a post, or a system message between posts. */
-export type FeedItem<P> = { type: "post"; post: P } | { type: "system"; event: SystemEvent };
+/** How many lines of a run of system messages show before "more". */
+export const SYSTEM_GROUP_SHOWN = 3;
+
+/** One row of a feed: a post, or the run of system messages between two posts, newest first. */
+export type FeedItem<P> = { type: "post"; post: P } | { type: "system"; events: SystemEvent[] };
 
 /**
  * Posts (as listed, `pinned` ones first and the rest newest first) with system messages set among
  * them by time. A message older than the oldest post loaded is held back while more posts are to
  * come (`complete` false), so it can't jump ahead of posts that haven't loaded; one older than
- * `since` is never drawn, since the list isn't complete that far back. Pinned posts stay on top.
+ * `since` is never drawn, since the list isn't complete that far back. Pinned posts stay on top,
+ * and the messages between two posts come as one item.
  */
 export function weave<P extends { at: number; pinned?: boolean }>(posts: readonly P[], events: readonly SystemEvent[], options: { since: number; complete: boolean }): FeedItem<P>[] {
   // Posts' `at` is epoch ms; events' is unix seconds.
@@ -66,10 +67,16 @@ export function weave<P extends { at: number; pinned?: boolean }>(posts: readonl
 
   const items: FeedItem<P>[] = pinned.map((post) => ({ type: "post", post }));
   const queue = [...shown].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1));
+  // Messages between two posts go in one item, so a busy hour reads as one block, not a wall.
+  const flush = (until: number) => {
+    const run: SystemEvent[] = [];
+    while (queue.length > 0 && queue[0]!.at > until) run.push(queue.shift()!);
+    if (run.length > 0) items.push({ type: "system", events: run });
+  };
   for (const post of rest) {
-    while (queue.length > 0 && queue[0]!.at > seconds(post)) items.push({ type: "system", event: queue.shift()! });
+    flush(seconds(post));
     items.push({ type: "post", post });
   }
-  for (const event of queue) items.push({ type: "system", event });
+  flush(Number.NEGATIVE_INFINITY);
   return items;
 }

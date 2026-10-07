@@ -8,7 +8,7 @@ import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
 import { PostItem } from "@/components/PostItem";
 import { Spinner } from "@/components/Spinner";
-import { SystemMessage } from "@/components/SystemMessage";
+import { SystemGroup } from "@/components/SystemMessage";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
@@ -52,7 +52,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const page = useClubPage(token);
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
-  const system = useSystemMessages({ club: token });
+  const system = useSystemMessages(token);
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
   // and holds everything: another lens or "Looking for" is a question about posts.
   const byTime = active.id === "newest";
@@ -114,7 +114,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         <ul className="club-panel club-list">
           {items.map((item) =>
             item.type === "system" ? (
-              <SystemMessage key={`system:${item.event.id}`} event={item.event} now={now} />
+              <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} />
             ) : (
               <PostItem
                 key={item.post.id}

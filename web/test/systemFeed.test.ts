@@ -14,10 +14,11 @@ const A = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const registry = makeRegistry(parseAssets([{ chainId: 10143, address: A, kind: "erc721", name: "A", symbol: "A", status: "verified", note: "Why." }]));
 const wallet = (n: number) => `0x${n.toString(16).padStart(40, "0")}`;
 
-const event = (id: string, at: number, kind: SystemEvent["kind"] = "swap"): SystemEvent => ({ id, club: A.toLowerCase(), kind, at, wallets: [wallet(1)] });
+const event = (id: string, at: number, kind: SystemEvent["kind"] = "swap"): SystemEvent => ({ id, kind, at, wallets: [wallet(1)] });
 /** A post made at `at` seconds (the posts' own clock is milliseconds). */
 const post = (id: string, at: number, pinned = false) => ({ id, at: at * 1000, pinned });
-const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) => items.map((i) => (i.type === "post" ? i.post.id : i.event.id));
+/** The feed as ids, a run of system messages between two posts as one bracketed group. */
+const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) => items.map((i) => (i.type === "post" ? i.post.id : `[${i.events.map((e) => e.id).join(" ")}]`));
 
 describe("newest", () => {
   it("keeps the window, newest first, and says it is complete from the window's start", () => {
@@ -38,32 +39,37 @@ describe("weave", () => {
   const since = 0;
   it("sets each message among the posts by time", () => {
     const items = weave([post("p3", 300), post("p2", 200), post("p1", 100)], [event("e250", 250), event("e150", 150)], { since, complete: true });
-    assert.deepEqual(order(items), ["p3", "e250", "p2", "e150", "p1"]);
+    assert.deepEqual(order(items), ["p3", "[e250]", "p2", "[e150]", "p1"]);
   });
 
   it("puts messages newer than every post first, and older ones last when the posts are all loaded", () => {
     const items = weave([post("p2", 200), post("p1", 100)], [event("new", 400), event("old", 50)], { since, complete: true });
-    assert.deepEqual(order(items), ["new", "p2", "p1", "old"]);
+    assert.deepEqual(order(items), ["[new]", "p2", "p1", "[old]"]);
   });
 
   it("holds back what is older than the oldest post while more posts are to come", () => {
     const items = weave([post("p2", 200), post("p1", 100)], [event("e150", 150), event("e50", 50)], { since, complete: false });
-    assert.deepEqual(order(items), ["p2", "e150", "p1"]);
+    assert.deepEqual(order(items), ["p2", "[e150]", "p1"]);
   });
 
   it("leaves out what is older than the messages are complete from", () => {
     const items = weave([post("p1", 100)], [event("e300", 300), event("e150", 150)], { since: 200, complete: true });
-    assert.deepEqual(order(items), ["e300", "p1"]);
+    assert.deepEqual(order(items), ["[e300]", "p1"]);
+  });
+
+  it("puts the messages between two posts in one group, newest first", () => {
+    const items = weave([post("p2", 500), post("p1", 100)], [event("a", 200), event("b", 400), event("c", 300), event("top", 600)], { since, complete: true });
+    assert.deepEqual(order(items), ["[top]", "p2", "[b c a]", "p1"]);
   });
 
   it("keeps pinned posts on top, and doesn't let an old pin set the floor", () => {
     const items = weave([post("pin", 10, true), post("p2", 200), post("p1", 100)], [event("e150", 150), event("e50", 50)], { since, complete: false });
-    assert.deepEqual(order(items), ["pin", "p2", "e150", "p1"]);
+    assert.deepEqual(order(items), ["pin", "p2", "[e150]", "p1"]);
   });
 
   it("shows nothing before any unpinned post has loaded, while more are to come", () => {
     assert.deepEqual(order(weave([], [event("e", 100)], { since, complete: false })), []);
-    assert.deepEqual(order(weave([], [event("e", 100)], { since, complete: true })), ["e"]);
+    assert.deepEqual(order(weave([], [event("e", 100)], { since, complete: true })), ["[e]"]);
   });
 });
 
@@ -86,7 +92,7 @@ describe("listSystem", () => {
     await store.setMembers(userWalletsKey("u7"), [w]);
     assert.ok((await joinClub(store, registry.clubFor(A)!, "u7", [w], { holdings: async () => [0n], now: () => (NOW - 250) * 1000 })).ok);
 
-    const r = await listSystem(store, [registry.clubFor(A)!], deps);
+    const r = await listSystem(store, registry.clubFor(A)!, deps);
     assert.deepEqual(r.events.map((e) => [e.id, e.kind]), [
       ["2:0", "listing"],
       [`join:${w}`, "join"],
@@ -100,6 +106,6 @@ describe("listSystem", () => {
   });
 
   it("is empty for a Club with nothing logged", async () => {
-    assert.deepEqual((await listSystem(memoryStore(), [registry.clubFor(A)!], deps)).events, []);
+    assert.deepEqual((await listSystem(memoryStore(), registry.clubFor(A)!, deps)).events, []);
   });
 });

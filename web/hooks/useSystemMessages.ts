@@ -1,9 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useAccessToken } from "@/hooks/useAccessToken";
 import { read } from "@/hooks/useClubBoard";
-import type { TimelineScope } from "@/lib/timeline";
 import type { SystemEvent } from "@/lib/systemFeed";
 
 const REFRESH_MS = 30_000;
@@ -11,18 +9,14 @@ const REFRESH_MS = 30_000;
 type Answer = { enabled: boolean; events: SystemEvent[]; since: number };
 
 /**
- * The system messages of one Club (`{ club }`) or of a timeline scope (`{ scope }`), for
- * `weave` to set among the posts (lib/systemFeed.ts). Without them the feed is only posts, so a
- * failure is quiet: there is nothing to retry or to tell the reader.
+ * A Club's system messages, for `weave` to set among its Board's posts (lib/systemFeed.ts).
+ * Without them the Board is only posts, so a failure is quiet: there is nothing to retry or to
+ * tell the reader.
  */
-export function useSystemMessages(from: { club: string } | { scope: TimelineScope }) {
-  const getToken = useAccessToken();
-  const idle = "scope" in from && from.scope === "joined" && !getToken;
-  const path = "club" in from ? `/api/clubs/${from.club}/system` : `/api/timeline/system?scope=${from.scope}`;
+export function useSystemMessages(club: string) {
   const query = useQuery({
-    queryKey: ["system", "club" in from ? from.club.toLowerCase() : from.scope, !!getToken],
-    enabled: !idle,
-    queryFn: () => read<Answer>(path, "scope" in from ? getToken : undefined),
+    queryKey: ["system", club.toLowerCase()],
+    queryFn: () => read<Answer>(`/api/clubs/${club}/system`),
     refetchInterval: REFRESH_MS,
     retry: 1,
   });

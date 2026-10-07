@@ -57,6 +57,3 @@ export function estimateHeight(post: Pick<TimelinePost, "text" | "link" | "x">):
   // 190: the cover, the author row, the footer and the card's padding and gaps.
   return 190 + text + attached;
 }
-
-/** About how tall a system message's card is, in px (ADR 0043): one or two lines of text and its padding. */
-export const SYSTEM_HEIGHT = 64;

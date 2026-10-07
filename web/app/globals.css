@@ -1581,31 +1581,20 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 .club-panel a.post-link { color: #111318; }
 .club-panel a.post-link:hover { color: #111318; transform: translate(-1px, -1px); }
 
-/* A system message (ADR 0043): the Club speaking between posts. One colour and icon per kind. */
-.sys {
-  --sys-bg: #e3f5ec;
-  --sys-edge: #1f7a55;
-  --sys-ink: #14573b;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--sys-bg);
-  color: var(--sys-ink);
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1.2rem;
-}
-.sys-listing { --sys-bg: #e8eefb; --sys-edge: #315ea8; --sys-ink: #24467f; }
-.sys-join { --sys-bg: #ffeadb; --sys-edge: #c4682a; --sys-ink: #7a3a10; }
-.sys-row { border-left: 4px solid var(--sys-edge); padding: 0.55rem 1rem 0.55rem 0.9rem; }
-.sys-card { border: 2px solid var(--sys-edge); border-radius: 0.85rem; padding: 0.6rem 0.8rem; }
-.sys-icon { display: grid; flex: none; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 9999px; background: var(--sys-edge); color: white; }
-.sys-text { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-.sys-text a { color: inherit; }
-.sys-meta { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.15rem 0.7rem; font-size: 0.72rem; }
-.sys-time { opacity: 0.75; font-weight: 600; }
-.sys a.sys-open, .club-panel a.sys-open { display: inline-flex; align-items: center; gap: 0.2rem; font-weight: 800; color: var(--sys-ink); text-decoration: underline; text-underline-offset: 2px; }
-@media (max-width: 40rem) { .sys { flex-wrap: wrap; } .sys-meta { margin-left: 2.2rem; justify-content: flex-start; } }
+/* System messages (ADR 0043): what happened between two posts, a quiet line each. Only the icon carries the kind's colour. */
+.sys { display: flex; flex-direction: column; gap: 0.35rem; background: rgb(17 19 24 / 0.025); padding: 0.6rem 1rem; color: #4b5563; font-size: 0.78rem; line-height: 1.15rem; }
+.sys-line { --sys-edge: #1f7a55; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.sys-listing { --sys-edge: #315ea8; }
+.sys-join { --sys-edge: #c4682a; }
+.sys-icon { display: grid; flex: none; place-items: center; width: 1.2rem; height: 1.2rem; border-radius: 9999px; background: var(--sys-edge); color: white; }
+.sys-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sys a.sys-name { font-weight: 700; color: #111318; }
+.sys a.sys-name:hover { text-decoration: underline; }
+.sys a.sys-action { font-weight: 700; color: var(--sys-edge); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--sys-edge) 35%, transparent); text-underline-offset: 2px; }
+.sys a.sys-action:hover { text-decoration-color: var(--sys-edge); }
+.sys-time { flex: none; font-size: 0.7rem; color: #6b7280; }
+.sys-more { align-self: flex-start; margin-left: 1.7rem; font-size: 0.72rem; font-weight: 800; color: #4b5563; text-decoration: underline; text-underline-offset: 2px; }
+.sys-more:hover { color: #111318; }
 
 /* A shared X post (ADR 0024): the post as plain text, opening on X. */
 .x-card {
