@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CheckIcon, SwapIcon, UsersIcon } from "@/components/Icons";
+import { CheckIcon, SwapIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 
 // The Guide has two bases side by side, Deals (/guide) and Clubs (/guide/clubs), and both share this
 // frame: a hero with the switch between them, a numbered contents list, and sections that read like a short manual. Button names
@@ -210,7 +211,10 @@ export function GuideFooter({ other }: { other: { href: string; title: string; b
       </Link>
       <div className={`${CARD} flex flex-col justify-center gap-3 p-6`}>
         <p className="font-black">Still stuck?</p>
-        <a href="mailto:support@declub.app" className="btn-secondary">Contact support</a>
+        <a href={SUPPORT_MAILTO} className="btn-secondary">Contact support</a>
+        <a href={X_URL} target="_blank" rel="noreferrer" className="btn-secondary">
+          <XLogoIcon /> @{X_HANDLE}
+        </a>
       </div>
     </div>
   );

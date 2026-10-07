@@ -3,8 +3,10 @@ import Image from "next/image";
 import { DeClubArt } from "@/components/ChogArt";
 import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
+import { XLogoIcon } from "@/components/Icons";
 import { LogoMark, Wordmark } from "@/components/Logo";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 import { NETWORK } from "@/lib/network";
 import { REWARDS, percent } from "@/lib/rewards";
 
@@ -114,14 +116,14 @@ export default function HomePage() {
               </p>
             </div>
             <a
-              href="mailto:support@declub.app"
+              href={SUPPORT_MAILTO}
               className="rounded-xl border border-[#f0b735] px-4 py-3 font-semibold text-[#f0b735] transition-colors hover:bg-[#f0b735] hover:text-[#111318]"
             >
               Need a hand? Contact support <span aria-hidden>↗</span>
             </a>
           </div>
 
-          <div className="grid gap-8 pt-8 sm:grid-cols-3">
+          <div className="grid gap-8 pt-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Explore</p>
               <nav className="mt-3 grid gap-2 text-white/70">
@@ -141,6 +143,15 @@ export default function HomePage() {
                 )}
                 <span>{NETWORK.name}</span>
                 <span className="font-mono text-xs text-white/50">Chain ID {NETWORK.chainId}</span>
+              </nav>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Contact</p>
+              <nav className="mt-3 grid gap-2 text-white/70">
+                <a href={SUPPORT_MAILTO} className="break-all hover:text-white">{SUPPORT_EMAIL}</a>
+                <a href={X_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-white">
+                  <XLogoIcon className="size-3.5" /> @{X_HANDLE} <span aria-hidden>↗</span>
+                </a>
               </nav>
             </div>
             <div>

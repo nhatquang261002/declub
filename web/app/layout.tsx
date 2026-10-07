@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/Header";
 import { Providers } from "@/components/Providers";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS, SITE_URL } from "@/lib/config";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 import { NETWORK } from "@/lib/network";
 import "./globals.css";
 
@@ -41,6 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </>
             )}
             assets only move in transactions or signatures you approve, and the fee is a small amount per NFT, capped and only charged when a deal completes
+            <div className="mt-2">
+              <a href={SUPPORT_MAILTO} className="underline hover:text-white">{SUPPORT_EMAIL}</a> ·{" "}
+              <a href={X_URL} target="_blank" rel="noreferrer" className="underline hover:text-white">@{X_HANDLE} on X</a>
+            </div>
           </footer>
         </Providers>
       </body>
