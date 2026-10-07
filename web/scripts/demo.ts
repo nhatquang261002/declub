@@ -119,12 +119,35 @@ async function main() {
   const mirrorAbi = parseAbi(MIRROR_ABI);
   const clientOf = (key: Hex) => createWalletClient({ account: privateKeyToAccount(key), chain, transport: http(RPC_URL) });
 
+  /**
+   * Monad reverts (and still bills) a wallet's transaction when the wallet holds under 10 MON and sent another one in the last
+   * few blocks (its reserve balance rule), so a wallet's transactions are spaced out: the approval, then the trade.
+   */
+  const lastSent = new Map<string, number>();
+  const SPACING_MS = 3_000;
+  const spaced = async (address: Address) => {
+    const wait = (lastSent.get(address) ?? 0) + SPACING_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  };
+
   /** Sends one transaction and waits for it, failing loudly on a revert. */
   const send = async (key: Hex, request: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }) => {
     // The estimate can come in a hair under what a fill really uses, and Monad bills the limit: triple the estimate, since Monad prices cold storage reads above the estimate.
-    const gas = await pub.estimateContractGas({ ...request, account: privateKeyToAccount(key).address } as never);
-    const hash = await clientOf(key).writeContract({ ...request, gas: gas * 3n } as never);
+    // But a wallet must afford the whole limit at the max fee (or the transaction fails and still pays), so the max fee is set here
+    // (1.3x the base fee, plus the tip) and the limit is capped at what the wallet can cover at that fee.
+    const from = privateKeyToAccount(key).address;
+    await spaced(from);
+    const estimate = await pub.estimateContractGas({ ...request, account: from } as never);
+    const wanted = (estimate * BigInt(process.env.DEMO_GAS_PCT || 300)) / 100n;
+    const tip = 2_000_000_000n;
+    const maxFeePerGas = ((await pub.getBlock()).baseFeePerGas ?? 100_000_000_000n) * 13n / 10n + tip;
+    const balance = await pub.getBalance({ address: from });
+    const affordable = (((balance - (request.value ?? 0n)) / maxFeePerGas) * 95n) / 100n;
+    if (affordable < estimate) throw new Error(`${from} can't afford ${request.functionName}: ${formatEther(balance)} MON`);
+    const gas = wanted < affordable ? wanted : affordable;
+    const hash = await clientOf(key).writeContract({ ...request, gas, maxFeePerGas, maxPriorityFeePerGas: tip } as never);
     const receipt = await pub.waitForTransactionReceipt({ hash });
+    lastSent.set(from, Date.now());
     if (receipt.status !== "success") throw new Error(`${request.functionName} reverted: ${hash}`);
     return receipt;
   };
