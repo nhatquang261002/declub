@@ -14,7 +14,7 @@ import {
 } from "../challenges";
 import type { StoredPost } from "../clubPosts";
 import { isOwnerOrAdmin } from "../clubRoles";
-import { epochAt } from "../rewards";
+import { epochAt, epochWindow } from "../rewards";
 import type { AssetEntry } from "../verifiedAssets";
 import { getPost, likesKey, postKey, roleIn, type Actor, type Deps } from "./board";
 import { ALL, appendLog, loadBans } from "./clubState";
@@ -36,7 +36,7 @@ const toEpoch = (ms: number, deps: Pick<Deps, "epochs">) => Math.max(0, epochAt(
 
 export type ChallengeRefusal =
   | "archived" | "forbidden" | "not_found" | "invalid" | "not_member" | "banned" | "reward_banned" | "closed"
-  | "too_many_open" | "owner_entry" | "bad_post" | "already_entered" | "full" | "not_judging" | "no_entry" | "busy";
+  | "holders_only" | "too_many_open" | "owner_entry" | "bad_post" | "already_entered" | "full" | "not_judging" | "no_entry" | "busy";
 
 async function load(store: Store, token: string, id: string) {
   return /^[0-9a-f-]{36}$/.test(id) ? store.get<StoredChallenge>(challengeKey(token, id)) : null;
@@ -67,12 +67,19 @@ export async function createChallenge(
   const open = all.filter((c): c is StoredChallenge => !!c && phaseOf(c, now) === "open");
   if (open.length >= CHALLENGE_RULES.maxOpen) return { ok: false, reason: "too_many_open" };
 
-  const { hours, ...rest } = checked.challenge;
+  // It ends when an epoch does, so its points count in that epoch (ADR 0045).
+  const { epochs, ...rest } = checked.challenge;
+  const g = deps.epochs?.genesis;
+  const l = deps.epochs?.length;
+  const endsAt = epochWindow(toEpoch(now, deps) + epochs - 1, g, l).end * 1000;
+  if (endsAt - now < CHALLENGE_RULES.minHours * 3_600_000) {
+    return { ok: false, reason: "invalid", message: "Less than an hour is left in this epoch: let it run to the end of the next one." };
+  }
   const id = randomUUID();
-  const challenge: StoredChallenge = { id, ...rest, startsAt: now, endsAt: now + Math.round(hours * 3_600_000), by: actor.wallet, state: "live" };
+  const challenge: StoredChallenge = { id, ...rest, startsAt: now, endsAt, by: actor.wallet, state: "live" };
   await store.set(challengeKey(token, id), challenge);
   await store.rank(challengesKey(token), [{ member: id, score: now }], CHALLENGE_RULES.kept);
-  await appendLog(store, token, { actor: actor.wallet, action: "create_challenge", target: id, detail: `${challenge.title} · ${challenge.prizes.join("/")} points · judged by ${challenge.judging}` }, now);
+  await appendLog(store, token, { actor: actor.wallet, action: "create_challenge", target: id, detail: `${challenge.title} · ${challenge.prizes.join("/")} points · judged by ${challenge.judging}${challenge.holdersOnly ? " · Holders only" : ""}` }, now);
   return { ok: true, id };
 }
 
@@ -134,7 +141,8 @@ async function finish(store: Store, token: string, c: StoredChallenge, winners: 
 /** The epoch a settlement's points count in: the one a likes-judged challenge ended in, if it isn't closed yet, else the running one. */
 async function awardEpoch(store: Store, token: string, c: StoredChallenge, now: number, deps: Pick<Deps, "epochs">) {
   if (c.judging === "likes") {
-    const ended = toEpoch(c.endsAt, deps);
+    // `endsAt` is the first instant of the next epoch: it ended in the one before.
+    const ended = toEpoch(c.endsAt - 1, deps);
     if (!(await store.get(closingKey(token, ended)))) return ended;
   }
   return toEpoch(now, deps);
@@ -192,6 +200,7 @@ export async function enterChallenge(
   if (phaseOf(c, now) !== "open") return { ok: false, reason: "closed" };
   const row = await getMember(store, token, userId);
   if (!row) return { ok: false, reason: "not_member" };
+  if (c.holdersOnly && !row.holder) return { ok: false, reason: "holders_only" };
   const [here, everywhere] = await Promise.all([loadBans(store, token), loadBans(store, ALL)]);
   if (userId in here || userId in everywhere) return { ok: false, reason: "banned" };
   if (userId in (await rewardBans(store, token))) return { ok: false, reason: "reward_banned" };
@@ -294,6 +303,7 @@ export async function listChallenges(store: Store, entry: AssetEntry, viewer: { 
       brief: c.brief,
       judging: c.judging,
       prizes: c.prizes,
+      holdersOnly: c.holdersOnly === true,
       startsAt: c.startsAt,
       endsAt: c.endsAt,
       by: c.by,

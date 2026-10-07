@@ -12,20 +12,13 @@ import { useClubActions } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { CHALLENGE_RULES, prizeText, type Judging, type Phase, type PublicChallenge, type PublicEntry } from "@/lib/challenges";
 import { POST_MAX } from "@/lib/clubPosts";
+import { REWARDS_EPOCH_SECONDS, REWARDS_GENESIS } from "@/lib/config";
 import { ago, countdown, untilLabel } from "@/lib/format";
+import { epochAt, epochWindow } from "@/lib/rewards";
 import { Empty, Loading } from "./parts";
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
 const PLACES = ["1st", "2nd", "3rd"];
-/** How long a challenge can run, as the Owner picks it. */
-const LENGTHS = [
-  { hours: 24, label: "1 day" },
-  { hours: 72, label: "3 days" },
-  { hours: 168, label: "1 week" },
-  { hours: 336, label: "2 weeks" },
-  { hours: 720, label: "30 days" },
-];
-
 const PHASE: Record<Phase, { label: string; chip: string }> = {
   open: { label: "Open", chip: "chip-mint" },
   closing: { label: "Counting likes", chip: "chip-blue" },
@@ -62,7 +55,7 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
           </button>
         )}
       </div>
-      {starting && owner && <StartForm token={token} onDone={() => setStarting(false)} />}
+      {starting && owner && <StartForm token={token} now={now} onDone={() => setStarting(false)} />}
 
       {isLoading ? (
         <Loading label="Loading the challenges" />
@@ -73,7 +66,7 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
           {active.length > 0 && (
             <ul className="flex flex-col gap-4">
               {active.map((c) => (
-                <Card key={c.id} c={c} token={token} now={now} owner={owner} member={!!me.member} wallet={me.wallet} archived={archived} />
+                <Card key={c.id} c={c} token={token} now={now} owner={owner} member={!!me.member} holder={!!me.holder} wallet={me.wallet} archived={archived} />
               ))}
             </ul>
           )}
@@ -82,7 +75,7 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
               <h2 className="kicker">Past challenges</h2>
               <ul className="flex flex-col gap-4">
                 {past.map((c) => (
-                  <Card key={c.id} c={c} token={token} now={now} owner={owner} member={!!me.member} wallet={me.wallet} archived={archived} />
+                  <Card key={c.id} c={c} token={token} now={now} owner={owner} member={!!me.member} holder={!!me.holder} wallet={me.wallet} archived={archived} />
                 ))}
               </ul>
             </section>
@@ -94,13 +87,17 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
 }
 
 /** The Owner's form: what to do, who decides, how many places pay and how much, and for how long. */
-function StartForm({ token, onDone }: { token: string; onDone: () => void }) {
+function StartForm({ token, now, onDone }: { token: string; now: number; onDone: () => void }) {
   const { create } = useChallengeActions(token);
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
   const [judging, setJudging] = useState<Judging>("likes");
   const [prizes, setPrizes] = useState<string[]>(["10", "", ""]);
-  const [hours, setHours] = useState(168);
+  const [epochs, setEpochs] = useState(1);
+  const [holdersOnly, setHoldersOnly] = useState(false);
+  // It ends when an epoch does: this one, or one of the next few.
+  const current = Math.max(0, epochAt(now, REWARDS_GENESIS, REWARDS_EPOCH_SECONDS));
+  const endOf = (k: number) => epochWindow(current + k - 1, REWARDS_GENESIS, REWARDS_EPOCH_SECONDS).end;
   const paid = prizes.map(Number).filter((_, i) => prizes[i]!.trim() !== "");
   const ok = paid.length > 0 && paid.every((p, i) => Number.isInteger(p) && p >= 1 && p <= CHALLENGE_RULES.maxPoints && (i === 0 || p <= paid[i - 1]!));
   // A gap ("1st: 10, 2nd: blank, 3rd: 5") isn't a list of places in order.
@@ -112,7 +109,7 @@ function StartForm({ token, onDone }: { token: string; onDone: () => void }) {
       className="club-panel flex flex-col gap-4 p-5"
       onSubmit={(event) => {
         event.preventDefault();
-        create.mutate({ title, brief, judging, prizes: paid, hours }, { onSuccess: onDone });
+        create.mutate({ title, brief, judging, prizes: paid, epochs, holdersOnly }, { onSuccess: onDone });
       }}
     >
       <label className="flex flex-col gap-1">
@@ -168,14 +165,22 @@ function StartForm({ token, onDone }: { token: string; onDone: () => void }) {
         </p>
       </div>
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-bold">Runs for</span>
-        <select className={field} value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-          {LENGTHS.map((l) => (
-            <option key={l.hours} value={l.hours}>
-              {l.label}
+        <span className="text-sm font-bold">Ends with</span>
+        <select className={field} value={epochs} onChange={(e) => setEpochs(Number(e.target.value))}>
+          {Array.from({ length: CHALLENGE_RULES.maxEpochs }, (_, i) => i + 1).map((k) => (
+            <option key={k} value={k} disabled={endOf(k) - now < CHALLENGE_RULES.minHours * 3600}>
+              {k === 1 ? "This epoch" : k === 2 ? "The next epoch" : `Epoch ${current + k - 1}`} · in {countdown(endOf(k) - now)}
             </option>
           ))}
         </select>
+        <span className="text-xs text-muted">A challenge ends when an epoch does, and likes-judged winners’ points count in that epoch.</span>
+      </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={holdersOnly} onChange={(e) => setHoldersOnly(e.target.checked)} />
+        <span>
+          <b>Only Holders can enter</b>
+          <span className="block text-xs text-muted">Members who hold the Club’s asset (the Holder badge). Anyone can still like.</span>
+        </span>
       </label>
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" className="btn-primary" aria-busy={create.isPending} disabled={!valid || create.isPending}>
@@ -188,7 +193,7 @@ function StartForm({ token, onDone }: { token: string; onDone: () => void }) {
   );
 }
 
-function Card({ c, token, now, owner, member, wallet, archived }: { c: PublicChallenge; token: string; now: number; owner: boolean; member: boolean; wallet?: string; archived: boolean }) {
+function Card({ c, token, now, owner, member, holder, wallet, archived }: { c: PublicChallenge; token: string; now: number; owner: boolean; member: boolean; holder: boolean; wallet?: string; archived: boolean }) {
   const { withdraw, pick, cancel } = useChallengeActions(token);
   const [picks, setPicks] = useState<Record<string, number>>({});
   const phase = PHASE[c.phase];
@@ -212,6 +217,7 @@ function Card({ c, token, now, owner, member, wallet, archived }: { c: PublicCha
         <div className="flex flex-wrap items-center gap-2">
           <span className={`chip px-2.5 py-1 text-xs ${phase.chip}`}>{phase.label}</span>
           <span className="chip px-2.5 py-1 text-xs">{prizeText(c.prizes)}</span>
+          {c.holdersOnly && <span className="chip chip-blue px-2.5 py-1 text-xs">Holders only</span>}
         </div>
       </div>
       <p className="text-xs text-muted">
@@ -236,7 +242,10 @@ function Card({ c, token, now, owner, member, wallet, archived }: { c: PublicCha
         </p>
       )}
 
-      {open && member && !owner && !archived && (
+      {open && member && !owner && !archived && c.holdersOnly && !holder && (
+        <p className="text-sm text-muted">This challenge is for Holders. You can still like entries.</p>
+      )}
+      {open && member && !owner && !archived && (!c.holdersOnly || holder) && (
         <Entering c={c} token={token} wallet={wallet} onWithdraw={() => withdraw.mutate(c.id)} withdrawing={withdraw.isPending} />
       )}
       {open && !member && <p className="text-sm text-muted">Join the Club to enter.</p>}

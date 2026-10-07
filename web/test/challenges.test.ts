@@ -49,9 +49,10 @@ async function world() {
   await saveRoles(store, token, { owner: "own", moderators: ["mod"] });
   return store;
 }
-const input = (over: Record<string, unknown> = {}) => ({ title: "Best Chog meme", brief: "Post your funniest Chog.", judging: "likes", prizes: [10, 5], hours: 24, ...over });
+const input = (over: Record<string, unknown> = {}) => ({ title: "Best Chog meme", brief: "Post your funniest Chog.", judging: "likes", prizes: [10, 5], epochs: 1, ...over });
 const START = 10;
-const END = START + DAY;
+/** A challenge started in epoch 0 ends with it. */
+const END = WEEK;
 
 async function start(store: Store, over: Record<string, unknown> = {}, s = START) {
   const r = await createChallenge(store, club, actor("own", 1), input(over), at(s));
@@ -76,8 +77,10 @@ describe("a challenge's rules", () => {
     bad({ prizes: [CHALLENGE_RULES.maxPoints + 1] });
     bad({ prizes: [2.5] });
     bad({ prizes: [0] });
-    bad({ hours: 0 });
-    bad({ hours: CHALLENGE_RULES.maxHours + 1 });
+    bad({ epochs: 0 });
+    bad({ epochs: CHALLENGE_RULES.maxEpochs + 1 });
+    bad({ epochs: 1.5 });
+    bad({ holdersOnly: "yes" });
     assert.equal(checkChallenge(null).ok, false);
     assert.equal(prizeText([10, 5, 2]), "10, 5 and 2 points");
     assert.equal(prizeText([1]), "1 point");
@@ -136,6 +139,48 @@ describe("starting and calling off a challenge", () => {
   });
 });
 
+describe("a challenge runs in epochs", () => {
+  it("ends when an epoch does", async () => {
+    const store = await world();
+    const one = await start(store);
+    const two = await start(store, { epochs: 2 });
+    const view = await listChallenges(store, club, {}, at(20));
+    assert.equal(view.find((c) => c.id === one)!.endsAt, (GENESIS + WEEK) * 1000);
+    assert.equal(view.find((c) => c.id === two)!.endsAt, (GENESIS + 2 * WEEK) * 1000);
+    // From the middle of epoch 1, "this epoch" ends with epoch 1.
+    const later = await createChallenge(store, club, actor("own", 1), input({ title: "Later", epochs: 1 }), at(WEEK + 100));
+    assert.ok(later.ok);
+    assert.equal((await listChallenges(store, club, {}, at(WEEK + 101))).find((c) => c.id === later.id)!.endsAt, (GENESIS + 2 * WEEK) * 1000);
+  });
+
+  it("can't start with less than an hour left, but can run to the next epoch", async () => {
+    const store = await world();
+    const short = await createChallenge(store, club, actor("own", 1), input(), at(WEEK - 600));
+    assert.equal(short.ok || short.reason, "invalid");
+    assert.ok((await createChallenge(store, club, actor("own", 1), input({ epochs: 2 }), at(WEEK - 600))).ok);
+  });
+});
+
+describe("a challenge for Holders only", () => {
+  it("takes entries from Holders, and from nobody else", async () => {
+    const store = await world();
+    const w = wallet(7);
+    await store.set(profileKey(w), { provider: "twitter", handle: "h7", userId: "h", updatedAt: 1 });
+    await store.setMembers(userWalletsKey("h"), [w]);
+    assert.ok((await joinClub(store, club, "h", [w], { holdings: async () => [1n] })).ok);
+    const id = await start(store, { holdersOnly: true });
+    assert.equal((await listChallenges(store, club, {}, at(20)))[0]!.holdersOnly, true);
+    const mine = await post(store, "h", 60);
+    const theirs = await post(store, "a", 61);
+    assert.deepEqual(await enterChallenge(store, club, "a", id, theirs, at(62)), { ok: false, reason: "holders_only" });
+    assert.ok((await enterChallenge(store, club, "h", id, mine, at(62))).ok);
+    // Everyone may like, and an open one takes anyone.
+    assert.ok((await likePost(store, club, "a", mine, true, at(63))).ok);
+    const open = await start(store, { title: "Open" });
+    assert.ok((await enterChallenge(store, club, "a", open, theirs, at(64))).ok);
+  });
+});
+
 describe("entering a challenge", () => {
   it("takes a member's own post made while it's open, one entry each", async () => {
     const store = await world();
@@ -176,8 +221,8 @@ describe("entering a challenge", () => {
     const gs = await post(store, "g", 65);
     assert.deepEqual(await enterChallenge(store, club, "g", id, gs, at(END + 1)), { ok: false, reason: "closed" });
     const lateId = await start(store, { title: "Late" }, 100);
-    const late = await post(store, "g", END + 50);
-    assert.deepEqual(await enterChallenge(store, club, "g", lateId, late, at(END + 51)), { ok: true });
+    const late = await post(store, "g", 3 * DAY);
+    assert.deepEqual(await enterChallenge(store, club, "g", lateId, late, at(3 * DAY + 1)), { ok: true });
   });
 });
 
@@ -255,29 +300,18 @@ describe("a challenge judged by likes", () => {
     assert.ok((await readLog(store, token)).some((l) => l.action === "settle_challenge" && l.target === id));
   });
 
-  it("counts the points in the standings, the frozen epoch and the published ledger", async () => {
-    const { store } = await played();
+  const rewardsDeps = (over: Partial<RewardsDeps> = {}): RewardsDeps => {
     const holdings: Holdings = async (_t, ws) => ws.map((w) => ({ [wallet(1)]: 1n, [wallet(3)]: 4n, [wallet(4)]: 2n })[w.toLowerCase()] ?? 0n);
     const swap: ActivityEvent = { id: "0x1:0", kind: "swapped", contract: "0xswap", deal: "1", block: 1, at: GENESIS + 100, parties: [wallet(8), wallet(9)], tokens: [token], fee: (4n * 10n ** 18n).toString() };
-    const deps: RewardsDeps = {
-      now: () => GENESIS + WEEK + 60,
-      clubs: [club],
-      events: async () => [swap],
-      holdings,
-      chainId: 10143,
-      contract: getAddress(wallet(0xee)),
-      genesis: GENESIS,
-      length: WEEK,
-    };
+    return { now: () => GENESIS + WEEK + 60, clubs: [club], events: async () => [swap], holdings, chainId: 10143, contract: getAddress(wallet(0xee)), genesis: GENESIS, length: WEEK, ...over };
+  };
 
-    // The running epoch's standings settle what has ended, and count it.
-    const live = await computeStandings(store, club, { ...deps, now: () => GENESIS + END + 60, clubs: [club] });
-    const g = live!.rows.find((r) => r.wallet === wallet(3))!;
-    assert.equal(g.challengePoints, 10);
-    assert.ok(g.points >= 10);
-
-    await closeEpoch(store, 0, deps);
-    const built = await buildEpoch(store, 0, deps);
+  it("counts the points in the frozen epoch it ended in, and in the published ledger", async () => {
+    const { store } = await played();
+    // The close job settles what has ended before it freezes the epoch.
+    assert.equal(await settleDue(store, club, at(WEEK + 1)), 1);
+    await closeEpoch(store, 0, rewardsDeps());
+    const built = await buildEpoch(store, 0, rewardsDeps());
     assert.equal(built.status, "built");
     const ledger = (await store.get<Record<string, PublishedLedger>>(pointsKey(0)))![token]!;
     const row = (w: string) => ledger.rows.find((r) => r.wallet === w)!;
@@ -291,6 +325,17 @@ describe("a challenge judged by likes", () => {
         { challenge: ledger.challenges!.wins[0]!.challenge, title: "Best Chog meme", wallet: wallet(4), place: 2, points: 5 },
       ],
     });
+  });
+
+  it("counts in the running epoch's standings when the epoch it ended in was already closed", async () => {
+    const { store } = await played();
+    await closeEpoch(store, 0, rewardsDeps());
+    const live = await computeStandings(store, club, rewardsDeps({ now: () => GENESIS + WEEK + 120 }));
+    assert.equal(live!.n, 1);
+    const g = live!.rows.find((r) => r.wallet === wallet(3))!;
+    assert.equal(g.challengePoints, 10);
+    assert.ok(g.points >= 10);
+    assert.equal((await readAwards(store, token, 0))["g"], undefined);
   });
 
   it("leaves out a hidden entry, and a member banned from rewards", async () => {
@@ -335,15 +380,15 @@ describe("a challenge judged by likes", () => {
 
   it("counts in the epoch it ended in until that epoch is closed, then in the next", async () => {
     const store = await world();
-    const id = await start(store, { hours: 48 });
+    const id = await start(store);
     const g = await post(store, "g", 60);
     assert.ok((await enterChallenge(store, club, "g", id, g, at(61))).ok);
     assert.ok((await likePost(store, club, "a", g, true, at(62))).ok);
     // Nobody looked until epoch 0 had closed: its points can't move, so they count in epoch 1.
     const holdings: Holdings = async (_t, ws) => ws.map((w) => ({ [wallet(3)]: 4n })[w.toLowerCase()] ?? 0n);
     const deps: RewardsDeps = { now: () => GENESIS + WEEK + 60, clubs: [club], events: async () => [], holdings, chainId: 10143, contract: getAddress(wallet(0xee)), genesis: GENESIS, length: WEEK };
-    // The challenge ended inside epoch 0, but the close ran before anyone settled it.
-    await closeEpoch(store, 0, { ...deps, now: () => GENESIS + 2 * DAY + 5 + WEEK });
+    // The challenge ended with epoch 0, but the close ran before anyone settled it.
+    await closeEpoch(store, 0, deps);
     const view = (await listChallenges(store, club, {}, { ...at(WEEK + 100) }))[0]!;
     assert.equal(view.settled!.epoch, 1);
     assert.equal((await readAwards(store, token, 0))["g"], undefined);
@@ -377,7 +422,7 @@ describe("a challenge the Owner judges", () => {
     assert.ok(picked.ok);
     assert.deepEqual(picked.ok && picked.winners.map((w) => [w.wallet, w.points]), [[wallet(4), 8], [wallet(3), 3]]);
     assert.deepEqual(await pickWinners(store, club, actor("own", 1), id, [a], at(END + 4)), { ok: false, reason: "not_judging" }, "settled");
-    assert.deepEqual(Object.values(await readAwards(store, token, 0)).map((x) => [x.userId, x.points]).sort(), [["a", 8], ["g", 3]]);
+    assert.deepEqual(Object.values(await readAwards(store, token, 1)).map((x) => [x.userId, x.points]).sort(), [["a", 8], ["g", 3]], "an Owner's pick counts in the epoch it's made in");
     const log = await readLog(store, token);
     assert.equal(log.find((l) => l.action === "settle_challenge")!.actor, wallet(1), "the Owner's pick is logged under them");
   });

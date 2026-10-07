@@ -421,7 +421,7 @@ export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
 
 /**
  * Club challenges (ADR 0045). GET (public) lists them, settling the ones that ended; POST (the Owner
- * or an app admin) starts one: `{ title, brief, judging: "likes" | "owner", prizes: [points…], hours }`.
+ * or an app admin) starts one: `{ title, brief, judging: "likes" | "owner", prizes: [points…], epochs, holdersOnly? }`.
  */
 export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
@@ -470,6 +470,7 @@ export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
                 ? await cancelChallenge(f.store, f.entry, f.actor, id, deps)
                 : null;
       if (!result) return refuse("invalid", "Send { action: \"enter\" | \"withdraw\" | \"pick\" | \"cancel\" }.");
+      if (!result.ok && result.reason === "holders_only") return refuse("holders_only", "This challenge is for Holders: you need to hold the Club’s asset to enter.");
       return result.ok ? json({ enabled: true }) : refuse(result.reason, "message" in result && typeof result.message === "string" ? result.message : undefined);
     },
   };

@@ -12,9 +12,10 @@ export const CHALLENGE_RULES = {
   maxPlaces: 3,
   /** The most points one place can pay. */
   maxPoints: 20,
-  /** How long a challenge may run: an hour to a month. */
+  /** A challenge ends when an epoch does: it runs to the end of the current one, or of one of the next `maxEpochs - 1`. */
+  maxEpochs: 4,
+  /** It can't start with less than this left in the epoch it would end with (hours). */
   minHours: 1,
-  maxHours: 24 * 30,
   /** Open at once, so a Club's Board isn't buried. */
   maxOpen: 3,
   /** The title and the brief, in characters. */
@@ -46,16 +47,18 @@ export type ChallengeInput = {
   judging: Judging;
   /** Points per place, best first. */
   prizes: number[];
-  /** How long it runs from now, in hours. */
-  hours: number;
+  /** How many epochs it runs, the current one included: 1 ends it when this epoch does. */
+  epochs: number;
+  /** Only Holders (the Holder badge) can enter. */
+  holdersOnly: boolean;
 };
 
-export type CheckedChallenge = Omit<ChallengeInput, "hours"> & { hours: number };
+export type CheckedChallenge = ChallengeInput;
 
 /** Checks what an Owner sent to start a challenge. */
 export function checkChallenge(input: unknown): { ok: true; challenge: CheckedChallenge } | { ok: false; message: string } {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return { ok: false, message: "Send the challenge as an object." };
-  const { title, brief, judging, prizes, hours } = input as Record<string, unknown>;
+  const { title, brief, judging, prizes, epochs, holdersOnly } = input as Record<string, unknown>;
   const t = cleanLine(title, CHALLENGE_RULES.titleMax);
   if (!t.ok) return { ok: false, message: t.reason === "empty" ? "Give the challenge a title." : `The title is at most ${CHALLENGE_RULES.titleMax} characters.` };
   const b = cleanLine(brief, CHALLENGE_RULES.briefMax);
@@ -72,10 +75,11 @@ export function checkChallenge(input: unknown): { ok: true; challenge: CheckedCh
     if (p > last) return { ok: false, message: "A lower place can't pay more than a higher one." };
     last = p;
   }
-  if (typeof hours !== "number" || !Number.isFinite(hours) || hours < CHALLENGE_RULES.minHours || hours > CHALLENGE_RULES.maxHours) {
-    return { ok: false, message: `It runs for ${CHALLENGE_RULES.minHours} hour to ${CHALLENGE_RULES.maxHours / 24} days.` };
+  if (typeof epochs !== "number" || !Number.isInteger(epochs) || epochs < 1 || epochs > CHALLENGE_RULES.maxEpochs) {
+    return { ok: false, message: `It runs for 1 to ${CHALLENGE_RULES.maxEpochs} epochs.` };
   }
-  return { ok: true, challenge: { title: t.text, brief: b.text, judging, prizes: prizes as number[], hours } };
+  if (holdersOnly !== undefined && typeof holdersOnly !== "boolean") return { ok: false, message: "holdersOnly is true or false." };
+  return { ok: true, challenge: { title: t.text, brief: b.text, judging, prizes: prizes as number[], epochs, holdersOnly: holdersOnly === true } };
 }
 
 /** What the server keeps for one challenge. `userId`s never leave the server. */
@@ -85,7 +89,9 @@ export type StoredChallenge = {
   brief: string;
   judging: Judging;
   prizes: number[];
-  /** Epoch ms. Entries must be posted in `[startsAt, endsAt)`. */
+  /** Only Holders could enter. Absent in challenges started before. */
+  holdersOnly?: boolean;
+  /** Epoch ms. Entries must be posted in `[startsAt, endsAt)`; `endsAt` is the end of an epoch. */
   startsAt: number;
   endsAt: number;
   /** The Owner's (or admin's) wallet when they started it. */
@@ -139,6 +145,7 @@ export type PublicChallenge = {
   brief: string;
   judging: Judging;
   prizes: number[];
+  holdersOnly: boolean;
   startsAt: number;
   endsAt: number;
   by: string;
