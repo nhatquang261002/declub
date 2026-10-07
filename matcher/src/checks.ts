@@ -1,6 +1,7 @@
 import type { Address } from "viem";
 import { isAddressEqual } from "viem";
 import { erc20Abi, erc721Abi, intentsAbi } from "./abi.ts";
+import { feeUnits } from "./intent.ts";
 import type { Reader } from "./chain.ts";
 import { isRevert } from "./errors.ts";
 import { type Asset, AssetType, type Intent } from "./types.ts";
@@ -86,8 +87,8 @@ async function assetProblem(
  * The protocol fee comes out of the maker's wallet after the gives move, in the same token a give
  * may use, so the fee is checked on top of whatever the maker gives of that token. (Anything the
  * maker receives in the same cycle is ignored: that makes this check conservative, never wrong
- * the other way.) `fee` is the contract's current `fee()`: that is what is charged, and the
- * intent's `maxFee` must cover it (ADR 0018).
+ * the other way.) `fee` is the contract's current `fee()`, per NFT the maker gives: that is what
+ * is charged, and the intent's `maxFee` must cover it (ADR 0018, 0033).
  */
 async function feeProblem(
   reader: Reader,
@@ -103,7 +104,9 @@ async function feeProblem(
   const alsoGiven = intent.give
     .filter((a) => a.assetType === AssetType.ERC20 && isAddressEqual(a.token, token))
     .reduce((sum, a) => sum + a.amount, 0n);
-  const needed = fee + alsoGiven;
+  // The fee is charged per NFT the maker gives, at least once (ADR 0033).
+  const totalFee = fee * feeUnits(intent.give);
+  const needed = totalFee + alsoGiven;
   const [balance, allowance] = await Promise.all([
     read(reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [intent.maker] })),
     read(
@@ -119,10 +122,10 @@ async function feeProblem(
     return { code: "bad_token", detail: `fee token ${token} is not an ERC-20` };
   }
   if (balance < needed) {
-    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${fee})` };
+    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${totalFee})` };
   }
   if (allowance < needed) {
-    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${fee})` };
+    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${totalFee})` };
   }
   return null;
 }

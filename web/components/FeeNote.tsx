@@ -7,18 +7,23 @@ import { formatDate, formatFee, type FeeUnit } from "@/lib/format";
  * comes out of, and that nobody pays for a deal that doesn't complete. Renders nothing when the
  * deployment charges no fee and none is coming.
  *
+ * `amount` is the fee for one NFT and `units` how many it is paid for (ADR 0033: one per NFT the
+ * person moves, one if they move none). The note shows the total and, for more than one, the sum.
+ *
  * `pending` is a raise the fee admin has queued (ADR 0018), and `pendingNote` says what it means
  * for what the person is about to do. Only pass them for something new (a listing, a signature),
  * never for an existing escrow deal, whose fee is fixed.
  */
 export function FeeNote({
   amount,
+  units = 1n,
   unit = "MON",
   pending,
   pendingNote,
   children,
 }: {
   amount: bigint;
+  units?: bigint;
   unit?: FeeUnit;
   pending?: PendingFee;
   pendingNote?: ReactNode;
@@ -30,12 +35,17 @@ export function FeeNote({
     <div className="fee-note space-y-1">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
         <span className="text-xs font-extrabold tracking-[0.1em] text-muted uppercase">Protocol fee</span>
-        <span className="font-black tabular-nums">{formatFee(amount, unit)}</span>
+        <span className="font-black tabular-nums">{formatFee(amount * units, unit)}</span>
       </div>
+      {units > 1n && amount > 0n && (
+        <p className="text-xs text-muted">
+          {formatFee(amount, unit)} for each of your {units.toString()} NFTs.
+        </p>
+      )}
       <p className="text-xs text-muted">{children}</p>
       {raise && (
         <p className="text-xs text-muted">
-          Scheduled to rise to <span className="font-semibold">{formatFee(raise.amount, unit)}</span> from{" "}
+          Scheduled to rise to <span className="font-semibold">{formatFee(raise.amount * units, unit)}</span> from{" "}
           {formatDate(raise.at)}. {pendingNote}
         </p>
       )}

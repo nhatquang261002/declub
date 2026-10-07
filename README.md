@@ -90,7 +90,7 @@ DeClub runs on Monad testnet (chain `10143`); the same code builds for mainnet (
 [flavor](#flavors-testnet-and-mainnet), but nothing is deployed there.
 
 - **`DeClubEscrow`** settles a swap of NFTs, tokens and MON between two wallets in one
-  atomic transaction, and takes a fee per side in MON.
+  atomic transaction, and takes a fee in MON for each NFT a side moves.
 - **`DeClubRewards`** is a Merkle distributor. Each week the operator publishes one root of
   everyone's share of the fees, and a Holder claims in one transaction.
 - **Why Monad.** The product turns a swap into a social action that happens many times a
@@ -136,7 +136,7 @@ On Monad testnet (chain `10143`):
 
 | Contract | State |
 | --- | --- |
-| `DeClubEscrow` | Deployed for the [demo world](docs/12-demo.md) (fixed 0.05 MON fee per side) |
+| `DeClubEscrow` | Deployed for the [demo world](docs/12-demo.md) (fixed 0.05 MON fee per side). The source now charges per NFT ([ADR 0033](docs/adr/0033-fee-per-nft.md)); redeploy to get it |
 | `DeClubRewards` | Deployed for the demo world, the bank wallet is the operator |
 | `DeClubIntents` | **Not deployed.** The retired `OnDealIntents` signs with an older EIP-712 domain, so the app can't use it. Leave `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` blank and the app hides signed swaps until this is deployed |
 

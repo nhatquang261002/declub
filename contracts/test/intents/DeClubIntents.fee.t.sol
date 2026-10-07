@@ -9,8 +9,9 @@ import {IFeeAdmin} from "../../src/interfaces/IFeeAdmin.sol";
 import {DeClubIntentsBase} from "./DeClubIntentsBase.sol";
 
 /// @dev The protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
-///      every maker in a settled cycle pays `fee()` of `FEE_TOKEN` (WMON) from their wallet to
-///      the recipient, the intent signs the most it will pay (`maxFee`), and a cycle that
+///      every maker in a settled cycle pays `fee()` of `FEE_TOKEN` (WMON) for each NFT they give
+///      (once if none) from their wallet to the recipient, the intent signs the most it will pay
+///      per NFT (`maxFee`, ADR 0033), and a cycle that
 ///      doesn't settle charges nobody. The fixture deploys with 2 WMON (ceiling 8). The admin
 ///      functions themselves are in `FeeAdmin.t.sol`.
 contract DeClubIntentsFeeTest is DeClubIntentsBase {
@@ -132,6 +133,101 @@ contract DeClubIntentsFeeTest is DeClubIntentsBase {
         assertEq(wmon.balanceOf(alice), START_TOKEN + 10 ether - FEE);
         assertEq(wmon.balanceOf(bob), START_TOKEN - 10 ether - FEE);
         assertEq(wmon.balanceOf(treasury), 2 * FEE);
+    }
+
+    // ───────────────────────────────────────────── the fee is per NFT (ADR 0033)
+
+    function _bundle(uint256 from, uint256 count)
+        internal
+        view
+        returns (IDeClubIntents.Asset[] memory r)
+    {
+        r = new IDeClubIntents.Asset[](count);
+        for (uint256 i; i < count; ++i) {
+            r[i] = _chog(from + i);
+        }
+    }
+
+    function test_aMakerPaysTheFeeForEveryNftTheyGive() public {
+        // alice gives three Chogs and bob two, so they pay 3 and 2 fees.
+        IDeClubIntents.Intent memory a = _intent(alice, _bundle(A1, 3), _bundle(B1, 2), 0);
+        IDeClubIntents.Intent memory b = _intent(bob, _bundle(B1, 2), _bundle(A1, 3), 0);
+
+        vm.expectEmit(true, true, false, true, address(swap));
+        emit IDeClubIntents.FeeCharged(treasury, address(wmon), 5 * FEE);
+        swap.settle(_cycle2(a, b), _sigs2(_sign(aliceKey, a), _sign(bobKey, b)));
+
+        assertEq(wmon.balanceOf(alice), START_TOKEN - 3 * FEE);
+        assertEq(wmon.balanceOf(bob), START_TOKEN - 2 * FEE);
+        assertEq(wmon.balanceOf(treasury), 5 * FEE);
+    }
+
+    function test_aMakerWhoGivesNoNftPaysOneFee() public {
+        IDeClubIntents.Intent memory a =
+            _intent(alice, _list(_erc20(address(usdc), 20 ether)), _bundle(B1, 1), 0);
+        IDeClubIntents.Intent memory b =
+            _intent(bob, _bundle(B1, 1), _list(_erc20(address(usdc), 20 ether)), 0);
+        swap.settle(_cycle2(a, b), _sigs2(_sign(aliceKey, a), _sign(bobKey, b)));
+
+        assertEq(wmon.balanceOf(alice), START_TOKEN - FEE);
+        assertEq(wmon.balanceOf(bob), START_TOKEN - FEE);
+    }
+
+    function test_tokensDontAddToTheFee() public {
+        IDeClubIntents.Intent memory a = _intent(
+            alice,
+            _list(_chog(A1), _erc20(address(weth), 5 ether)),
+            _list(_chog(B1), _erc20(address(usdc), 20 ether)),
+            0
+        );
+        IDeClubIntents.Intent memory b = _intent(
+            bob,
+            _list(_chog(B1), _erc20(address(usdc), 20 ether)),
+            _list(_chog(A1), _erc20(address(weth), 5 ether)),
+            0
+        );
+        swap.settle(_cycle2(a, b), _sigs2(_sign(aliceKey, a), _sign(bobKey, b)));
+        assertEq(wmon.balanceOf(treasury), 2 * FEE);
+    }
+
+    function test_aBundleRingChargesEachMakerForTheirOwnNfts() public {
+        // alice → bob → carol → alice, with 2, 1 and 3 NFTs given.
+        IDeClubIntents.Intent memory a = _intent(alice, _bundle(A1, 2), _bundle(C1, 3), 0);
+        IDeClubIntents.Intent memory b = _intent(bob, _bundle(B1, 1), _bundle(A1, 2), 0);
+        IDeClubIntents.Intent memory c = _intent(carol, _bundle(C1, 3), _bundle(B1, 1), 0);
+        swap.settle(
+            _cycle3(a, b, c), _sigs3(_sign(aliceKey, a), _sign(bobKey, b), _sign(carolKey, c))
+        );
+
+        assertEq(wmon.balanceOf(alice), START_TOKEN - 2 * FEE);
+        assertEq(wmon.balanceOf(bob), START_TOKEN - FEE);
+        assertEq(wmon.balanceOf(carol), START_TOKEN - 3 * FEE);
+        assertEq(wmon.balanceOf(treasury), 6 * FEE);
+    }
+
+    function test_theSignedMaxFeeIsPerNft() public {
+        // A maxFee equal to the fee is enough for a bundle: it caps the per-NFT fee, and the
+        // NFT count is signed in `give`.
+        IDeClubIntents.Intent memory a = _intent(alice, _bundle(A1, 3), _bundle(B1, 1), 0);
+        IDeClubIntents.Intent memory b = _intent(bob, _bundle(B1, 1), _bundle(A1, 3), 0);
+        assertEq(a.maxFee, FEE);
+        swap.settle(_cycle2(a, b), _sigs2(_sign(aliceKey, a), _sign(bobKey, b)));
+        assertEq(wmon.balanceOf(treasury), 4 * FEE);
+    }
+
+    function test_aMakerWithTooLittleWmonForTheBundleFeeRevertsTheCycle() public {
+        // Three NFTs cost 3 fees: leave alice with only 2.
+        vm.prank(alice);
+        wmon.transfer(dave, START_TOKEN - 2 * FEE);
+        IDeClubIntents.Intent memory a = _intent(alice, _bundle(A1, 3), _bundle(B1, 1), 0);
+        IDeClubIntents.Intent memory b = _intent(bob, _bundle(B1, 1), _bundle(A1, 3), 0);
+        bytes[] memory sigs = _sigs2(_sign(aliceKey, a), _sign(bobKey, b));
+
+        vm.expectRevert();
+        swap.settle(_cycle2(a, b), sigs);
+
+        _assertOwner(A1, alice); // nothing moved
+        assertEq(wmon.balanceOf(treasury), 0);
     }
 
     // ───────────────────────────────────────────── the signed fee is a maximum

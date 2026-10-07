@@ -20,11 +20,12 @@ import {FeeAdmin} from "./FeeAdmin.sol";
 ///      so a failed transfer reverts the whole settlement instead of needing a claim path.
 ///      Every nonce in a cycle is consumed before any asset moves, and `settle` is nonReentrant.
 ///
-///      Protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
-///      when a cycle settles, every maker in it pays `fee()` of `FEE_TOKEN` (wrapped MON)
+///      Protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md,
+///      docs/adr/0033-fee-per-nft.md): when a cycle settles, every maker in it pays `fee()` of
+///      `FEE_TOKEN` (wrapped MON) for each NFT they give, and for one if they give none,
 ///      straight from their wallet to `FEE_RECIPIENT`, so the contract still holds nothing. Each
-///      intent signs the fee token and the most its maker will pay, and `settle` refuses an
-///      intent with another token or a `maxFee` below `fee()`. A cut by the fee admin keeps
+///      intent signs the fee token and the most its maker will pay per NFT, and `settle` refuses
+///      an intent with another token or a `maxFee` below `fee()`. A cut by the fee admin keeps
 ///      every signed intent valid; a raise makes the ones signed below it stale. A cycle that
 ///      does not settle charges nobody.
 contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
@@ -32,6 +33,7 @@ contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
 
     uint256 public constant MAX_CYCLE = 4;
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
+    uint256 public constant MAX_NFTS_PER_SIDE = 5;
 
     /// @notice The token every maker pays the fee in: the chain's wrapped MON.
     address public immutable FEE_TOKEN;
@@ -200,6 +202,7 @@ contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
         uint256 n = assets.length;
         if (n == 0) revert EmptySide(intent, give);
         if (n > MAX_ASSETS_PER_SIDE) revert TooManyAssets(intent, give, n);
+        uint256 nfts;
 
         for (uint256 i; i < n; ++i) {
             Asset calldata a = assets[i];
@@ -211,6 +214,7 @@ contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
                 if (a.token.code.length == 0 || a.amount != 1 || !_isNft(a.token)) {
                     revert InvalidAsset(intent, give, i);
                 }
+                ++nfts;
             } else {
                 // Native (not pullable from a wallet).
                 revert InvalidAsset(intent, give, i);
@@ -219,6 +223,7 @@ contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
                 if (_same(assets[j], a)) revert DuplicateAsset(intent, give, i);
             }
         }
+        if (nfts > MAX_NFTS_PER_SIDE) revert TooManyNfts(intent, give, nfts);
     }
 
     /// @dev Every asset in `want` must be in `gives`: ERC-20 with at least that amount, an NFT
@@ -259,16 +264,27 @@ contract DeClubIntents is IDeClubIntents, FeeAdmin, EIP712, ReentrancyGuard {
     // the signature covers the fee token and the most they agreed to pay.
     // forge-lint: disable-next-item(require-revert-in-loop, calls-loop, arbitrary-send-erc20)
     function _chargeFees(Intent[] calldata cycle) private {
-        uint256 share = _fee;
-        if (share == 0) return;
+        uint256 perNft = _fee;
+        if (perNft == 0) return;
         IERC20 token = IERC20(FEE_TOKEN);
         address to = FEE_RECIPIENT;
         uint256 n = cycle.length;
+        uint256 total;
         for (uint256 i; i < n; ++i) {
+            uint256 share = perNft * _feeUnits(cycle[i].give);
+            total += share;
             token.safeTransferFrom(cycle[i].maker, to, share);
         }
         // forge-lint: disable-next-line(reentrancy-events)
-        emit FeeCharged(to, address(token), share * n);
+        emit FeeCharged(to, address(token), total);
+    }
+
+    /// @dev The NFTs a maker gives, at least one: what the per-NFT fee is multiplied by.
+    function _feeUnits(Asset[] calldata give) private pure returns (uint256 nfts) {
+        for (uint256 i; i < give.length; ++i) {
+            if (give[i].assetType == AssetType.ERC721) ++nfts;
+        }
+        if (nfts == 0) nfts = 1;
     }
 
     // forge-lint: disable-next-item(require-revert-in-loop)

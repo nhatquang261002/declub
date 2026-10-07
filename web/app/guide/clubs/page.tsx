@@ -204,7 +204,7 @@ export default function ClubsGuidePage() {
               </span>
               <h3 className="mt-4 text-lg font-black">Where the fee goes</h3>
               <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-                Every completed swap pays a small flat fee per side. Each week, for each Club whose asset was traded:
+                Every completed swap pays a small fee for each NFT on each side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
                 <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} biggest Holders, by how many NFTs they hold, up to {percent(REWARDS.maxBonusBps)} more for the active ones</li>

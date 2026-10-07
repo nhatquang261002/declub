@@ -24,6 +24,7 @@ const COPY: Record<string, string> = {
   WrongNativeAmount: "The MON sent doesn't match the deal plus the protocol fee.",
   WrongFee: "The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token.",
   TooManyAssets: "Up to 10 assets per side.",
+  TooManyNfts: "Up to 5 NFTs per side.",
   InvalidAsset: "One of the assets in this deal isn't valid.",
   DuplicateAsset: "The same asset is listed twice on one side.",
   SameAssetBothSides: "The same asset can't be on both sides of a deal.",

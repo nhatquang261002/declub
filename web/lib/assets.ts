@@ -77,6 +77,28 @@ export function formatAsset(asset: Asset, info?: TokenInfo): string {
   return `${amount} ${info?.symbol ?? `${asset.token.slice(0, 6)}…`}`;
 }
 
+/**
+ * How many NFTs a side moves: one for each ERC-721 and, for a trait request, as many as it asks
+ * for. MON and tokens are not NFTs.
+ */
+export function nftCount(assets: readonly { kind: AssetKind; amount: bigint }[]): number {
+  let n = 0;
+  for (const a of assets) {
+    if (a.kind === "erc721") n += 1;
+    else if (a.kind === "trait") n += Number(a.amount);
+  }
+  return n;
+}
+
+/**
+ * What a side's protocol fee is multiplied by (`DeClubEscrow.feeUnits`, ADR 0033): its NFTs, or one
+ * if it moves none, so a side with only MON or tokens still pays once.
+ */
+export const feeUnits = (assets: readonly { kind: AssetKind; amount: bigint }[]): bigint => BigInt(Math.max(nftCount(assets), 1));
+
+/** The protocol fee a side pays: `perNft` for each of its fee units. */
+export const sideFee = (perNft: bigint, assets: readonly { kind: AssetKind; amount: bigint }[]): bigint => perNft * feeUnits(assets);
+
 /** Same asset regardless of amount: (kind, token, id). The contract's duplicate rule. */
 export const sameAsset = (a: Asset, b: Asset) =>
   a.kind === b.kind && a.token.toLowerCase() === b.token.toLowerCase() && a.id === b.id;

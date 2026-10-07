@@ -94,8 +94,8 @@ contract DeClubEscrowFuzzTest is DeClubEscrowBase {
 
     /// Any n ≤ MAX distinct NFTs per side round-trip through create and fill.
     function testFuzz_bundleSizes(uint8 offeredCount, uint8 requestedCount) public {
-        uint256 offeredN = bound(offeredCount, 1, 10);
-        uint256 requestedN = bound(requestedCount, 1, 10);
+        uint256 offeredN = bound(offeredCount, 1, 5);
+        uint256 requestedN = bound(requestedCount, 1, 5);
         chog.mint(alice, 10); // 16–25
         chog.mint(bob, 10); // 26–35
 

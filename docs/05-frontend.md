@@ -369,6 +369,7 @@ Where errors show up:
 | `NotMaker` | Only the creator of this deal can do that. |
 | `EmptySide` | Add at least one asset or some MON to each side. |
 | `TooManyAssets` | Up to 10 assets per side. |
+| `TooManyNfts` | Up to 5 NFTs per side. |
 | `ExpiryInPast` | Pick an expiry in the future. |
 | `InvalidAsset` | One of the assets in this deal isn't valid. |
 | `DuplicateAsset` | The same asset is listed twice on one side. |
@@ -424,10 +425,10 @@ All three kinds use `DeClubEscrow` ([ADR 0006](adr/0006-trait-requests-in-v2.md)
 
 ### Protocol fee in the app
 
-[ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md). The fee is read from the contracts, never from config. The fee admin can change it, so it is re-read every minute rather than cached for good (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `DeClubEscrow.fee()`, `useIntentFee()` reads `DeClubIntents.FEE_TOKEN()` and `fee()`, and both read `pendingFee()` / `pendingFeeAt()` for a queued raise). The buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0 and no raise is queued) wherever it is paid, saying it is only charged if the deal completes. On the create and signing steps a queued raise adds "Scheduled to rise to X from <date>" and what that means for what is being made.
+[ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md), [ADR 0033](adr/0033-fee-per-nft.md). The fee is per NFT: `feeUnits(assets)` in `lib/assets.ts` (an NFT is 1, a trait request counts its amount, at least 1) mirrors the contract's, and `sideFee(fee, assets)` is what a side sends. `FeeNote` takes the per-NFT `amount` and the `units`, shows the total and, for more than one NFT, "X for each of your N NFTs". The fee is read from the contracts, never from config. The fee admin can change it, so it is re-read every minute rather than cached for good (`hooks/useProtocolFee.ts`: `useEscrowFee()` reads `DeClubEscrow.fee()`, `useIntentFee()` reads `DeClubIntents.FEE_TOKEN()` and `fee()`, and both read `pendingFee()` / `pendingFeeAt()` for a queued raise). The buttons that need it stay off until it is known. It shows as a "Protocol fee" line (`components/FeeNote.tsx`, hidden when the fee is 0 and no raise is queued) wherever it is paid, saying it is only charged if the deal completes. On the create and signing steps a queued raise adds "Scheduled to rise to X from <date>" and what that means for what is being made.
 
-- **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): create sends `native amount + fee()`. A fill or a proposal sends `native amount + deal.fee`, the fee the deal was listed with (`getTrade(id).fee`, `DealV2.fee`), never the current one. The deal page also checks for a native `claimable` credit when the deal has a fee, because a refused fee refund is credited as MON.
-- **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads `fee()` at the moment of signing and signs it as `maxFee`, with `feeToken`, in the `Intent` (EIP-712 domain version `1`, `lib/intents.ts`; `test/intents.test.ts` pins the hashing to the contract's type string). The intent page shows the fee charged now when a cut has brought it below `maxFee`. `useIntentReadiness` counts the fee on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.
+- **Locked deals** (`MultiFlow` review step, `app/v2/deal/[id]` for a taker and for the maker, `ProposalForm`): create sends `native amount + fee() × the NFTs offered`. A fill or a proposal sends `native amount + deal.fee × the NFTs it hands over`, the fee the deal was listed with (`getTrade(id).fee`, `DealV2.fee`), never the current one. The deal page also checks for a native `claimable` credit when the deal has a fee, because a refused fee refund is credited as MON.
+- **Signed swaps** (`SignedFlow` review step, `/intent/[hash]`): `useSignFlow.post` reads `fee()` at the moment of signing and signs it as `maxFee` (per NFT given), with `feeToken`, in the `Intent` (EIP-712 domain version `1`, `lib/intents.ts`; `test/intents.test.ts` pins the hashing to the contract's type string). The intent page shows the fee charged now when a cut has brought it below `maxFee`. `useIntentReadiness` counts the fee times the NFTs given on top of any give of the same token, and adds a "Wrap X MON into WMON" step (the token's `deposit()`) before the approval when the wallet holds enough MON but too little WMON.
 
 Pool rejections `wrong_fee`, `fee_balance` and `fee_allowance` and the stale reasons of the same names have their own copy (`lib/pool.ts`, `lib/intents.ts`).
 
@@ -444,10 +445,10 @@ Files: `app/create/page.tsx` (stepper, kind picker, shared `Terms`), `components
 Rules enforced by the V2 asset editor (client-side):
 
 - At least one asset on each side, and MON on only one side.
-- Up to 10 assets per side, no duplicate assets, and no asset on both sides.
+- Up to 10 assets per side, at most 5 of them NFTs (`MAX_NFTS_PER_SIDE`; the NFT picker stops at the fifth, and a trait request counts the NFTs it asks for), no duplicate assets, and no asset on both sides.
 - NFTs come from `NftPicker`, for any collection. Offered ones are picked from the wallet; requested ones are browsed or typed, and `ownerOf` blocks ids that don't exist.
 - The "only this wallet" field (**Only this wallet can accept**, or **Only this wallet can send offers** on an open offer) must be empty or a valid address that isn't your own (`takerError` in `lib/createFlow.ts`). Nothing checks what the taker holds.
 - That field also takes an X or Discord handle when Privy is on: **Find** calls `/api/profiles/lookup` and lists the wallets that trader shares under it; picking one fills in the address. A handle left unresolved blocks the step. The review shows the taker with `<Who>` ([ADR 0017](adr/0017-deal-by-handle.md)).
-- A trait request works for any collection whose traits the server scan can read (up to 10,000 tokens, `lib/server/collectionScan.ts`): up to 5 values, any-of or all-of, a count of 1 to 10, and it must match at least one NFT (`lib/traitSpec.ts`).
+- A trait request works for any collection whose traits the server scan can read (up to 10,000 tokens, `lib/server/collectionScan.ts`): up to 5 values, any-of or all-of, a count of 1 to 5, and it must match at least one NFT (`lib/traitSpec.ts`).
 - Approvals cover what is offered: an ERC-20 for the exact amount, an NFT collection with `setApprovalForAll`, one per step, the button reading "(1 of N)" while more remain (`hooks/useAssetApprovals.ts`). MON needs none.
 - On confirm, read the new id from the receipt's `TradeCreated` log (trait requests and open offers emit it too) and go to `/v2/deal/<id>`.

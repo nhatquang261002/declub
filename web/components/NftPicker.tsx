@@ -10,6 +10,7 @@ import { useRecentCollections } from "@/hooks/useRecentCollections";
 import { CopyAddress } from "@/components/CopyAddress";
 import { AssetSearch } from "@/components/AssetSearch";
 import type { SearchHit } from "@/lib/search";
+import { MAX_NFTS_PER_SIDE } from "@/lib/config";
 import { registry } from "@/lib/verifiedAssets";
 
 const PAGE = 12;
@@ -256,7 +257,7 @@ function TokenStep({
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/50 pt-4">
         <span className="text-sm text-muted">
           {selected.length === 0 ? "Nothing selected" : `${selected.length} selected`}
-          {room < 10 && ` · room for ${room}`}
+          {room < MAX_NFTS_PER_SIDE && ` · room for ${room}`}
         </span>
         <button type="button" className="btn-primary" disabled={selected.length === 0} onClick={onConfirm}>
           {confirmLabel ?? (selected.length <= 1 ? "Add NFT" : `Add ${selected.length} NFTs`)}

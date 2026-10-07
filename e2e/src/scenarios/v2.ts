@@ -6,6 +6,12 @@ import { ERC721_TRAIT, ProposalStatus, Status, type Asset, type World } from "..
 const USD = (n: number) => parseEther(String(n));
 const MON = (n: string) => parseEther(n);
 
+/** What a side's fee is multiplied by (ADR 0033): its NFTs, a trait set counting its amount, and at least one. */
+const feeUnits = (assets: Asset[]) => {
+  const nfts = assets.reduce((n, a) => n + (a.assetType === 2 ? 1n : a.assetType === ERC721_TRAIT ? a.amount : 0n), 0n);
+  return nfts === 0n ? 1n : nfts;
+};
+
 /** Create a deal and return its id (from `TradeCreated`). */
 async function create(
   w: World,
@@ -15,15 +21,15 @@ async function create(
   offered: Asset[],
 ) {
   const fee = await w.v2Fee();
-  const value = offered.filter((a) => a.assetType === 0).reduce((s, a) => s + a.amount, 0n) + fee;
+  const value = offered.filter((a) => a.assetType === 0).reduce((s, a) => s + a.amount, 0n) + fee * feeUnits(offered);
   const receipt = await w.send(who, w.v2, w.abi.v2, fn, args, value);
   const [ev] = w.events<{ tradeId: bigint }>(receipt, w.abi.v2, "TradeCreated", w.v2);
   assert.ok(ev, "no TradeCreated event");
   return { id: ev.tradeId, receipt, fee };
 }
 
-/** MON owed by the side paying `assets`, plus the deal's fee share. */
-const owed = (assets: Asset[], fee: bigint) => assets.filter((a) => a.assetType === 0).reduce((s, a) => s + a.amount, 0n) + fee;
+/** MON owed by the side paying `assets`, plus the deal's fee share: its fee per NFT, once for each. */
+const owed = (assets: Asset[], fee: bigint) => assets.filter((a) => a.assetType === 0).reduce((s, a) => s + a.amount, 0n) + fee * feeUnits(assets);
 
 async function expiry(w: World, sec = 3600) {
   return (await w.now()) + BigInt(sec);
@@ -233,6 +239,11 @@ export const v2Cases: Case<World>[] = [
       const { id, fee, receipt: created } = await create(w, w.alice, "createTrade", [offered, requested, zeroAddress, await expiry(w)], offered);
       const filled = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [id], owed(requested, fee));
       note(`trade ${id}, create gas ${created.gasUsed}, fill gas ${filled.gasUsed}`);
+      if (fee > 0n) {
+        // Alice gave 3 NFTs and Bob 2, and each pays the fee for every NFT (ADR 0033).
+        const [charged] = w.events<{ amount: bigint }>(filled, w.abi.v2, "FeeCharged", w.v2);
+        assert.equal(charged?.amount, 5n * fee, "fee should be 5 NFTs × fee");
+      }
       for (const i of aliceIds) assert.equal(await w.ownerOf(i), w.bob.address);
       for (const i of bobIds) assert.equal(await w.ownerOf(i), w.alice.address);
     },
@@ -267,6 +278,34 @@ export const v2Cases: Case<World>[] = [
         "plain MON transfer to DeClubEscrow should revert",
       );
       await w.send(w.alice, w.v2, w.abi.v2, "cancelTrade", [id]);
+    },
+  },
+  {
+    id: "V2-09",
+    title: "Fee is per NFT: a bundle pays for every NFT, a side with none pays once, and a 6th NFT is refused",
+    async run(w, note) {
+      const aliceIds = await w.mintNfts(w.alice, 6);
+      await w.approveAll(w.alice, w.v2);
+      const fee = await w.v2Fee();
+      const requested = [w.monAsset(MON("0.001"))];
+
+      // Five NFTs is the cap, and the maker sends five fees with them.
+      const five = aliceIds.slice(0, 5).map((i) => w.nftAsset(i));
+      if (fee > 0n) await w.expectRevert(w.alice, w.v2, w.abi.v2, "createTrade", [five, requested, zeroAddress, 0n], "WrongNativeAmount", fee);
+      const { id } = await create(w, w.alice, "createTrade", [five, requested, zeroAddress, await expiry(w)], five);
+      assert.equal((await w.trade(id)).fee, fee, "the deal records the fee per NFT");
+
+      // The taker's side has no NFT, so it pays one share, not five.
+      const filled = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [id], owed(requested, fee));
+      if (fee > 0n) {
+        const [charged] = w.events<{ amount: bigint }>(filled, w.abi.v2, "FeeCharged", w.v2);
+        assert.equal(charged?.amount, 6n * fee, "fee should be 5 NFTs + 1 for the MON side");
+      }
+      note(`5-NFT deal ${id}: fee ${w.fmt(fee)} MON per NFT, ${w.fmt(6n * fee)} in all`);
+
+      // A sixth NFT is refused whatever fee comes with it.
+      const six = aliceIds.map((i) => w.nftAsset(i));
+      await w.expectRevert(w.alice, w.v2, w.abi.v2, "createTrade", [six, requested, zeroAddress, 0n], "TooManyNfts", 6n * fee);
     },
   },
 ];

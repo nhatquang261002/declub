@@ -5,7 +5,7 @@ import { isAddress, type Address } from "viem";
 import { NftPicker } from "@/components/NftPicker";
 import { TokenPicker } from "@/components/TokenPicker";
 import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
-import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
+import { CHOG_ADDRESS, MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
 import { newRow, type DraftRow } from "@/lib/assetDraft";
 import type { TokenInfo } from "@/lib/assets";
 import { collectionLabel } from "@/lib/collections";
@@ -47,7 +47,10 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
   // A row with no NFT chosen yet is a placeholder: the picker fills it instead of adding another.
   const isPlaceholder = (row: DraftRow) => row.kind === "erc721" && row.token.trim() === "" && row.value.trim() === "";
   const kept = rows.filter((row) => !isPlaceholder(row) && row.key !== picker?.replace);
-  const room = MAX_TOKENS_PER_SIDE - kept.length;
+  // NFTs are capped below the asset count: each one pays the protocol fee (ADR 0033).
+  const keptNfts = kept.filter((row) => row.kind === "erc721").length;
+  const room = Math.min(MAX_TOKENS_PER_SIDE - kept.length, MAX_NFTS_PER_SIDE - keptNfts);
+  const nftsFull = rows.filter((row) => row.kind === "erc721" && !isPlaceholder(row)).length >= MAX_NFTS_PER_SIDE;
   const taken = new Set(
     kept.flatMap((row) => (row.kind === "erc721" && isAddress(row.token.trim()) && /^\d+$/.test(row.value.trim()) ? [`${row.token.trim().toLowerCase()}:${BigInt(row.value.trim())}`] : [])),
   );
@@ -143,7 +146,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
         <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc20")])}>
           + Token
         </button>
-        <button type="button" className="btn-secondary btn-sm" disabled={full && !rows.some(isPlaceholder)} onClick={() => openPicker({})}>
+        <button type="button" className="btn-secondary btn-sm" disabled={(full || nftsFull) && !rows.some(isPlaceholder)} onClick={() => openPicker({})}>
           + NFT
         </button>
         {MOCK_ERC20_ADDRESS && (
@@ -151,7 +154,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
             + Test token
           </button>
         )}
-        <button type="button" className="btn-secondary btn-sm" disabled={full && !rows.some(isPlaceholder)} onClick={() => openPicker({ collection: CHOG_ADDRESS })}>
+        <button type="button" className="btn-secondary btn-sm" disabled={(full || nftsFull) && !rows.some(isPlaceholder)} onClick={() => openPicker({ collection: CHOG_ADDRESS })}>
           + Chog
         </button>
       </div>

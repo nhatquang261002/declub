@@ -3,7 +3,7 @@
 import { isAddress } from "viem";
 import { Tabs } from "@/components/Tabs";
 import { statusOf, type CatalogStatus } from "@/hooks/useCollectionTraits";
-import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE } from "@/lib/config";
+import { CHOG_ADDRESS, MAX_NFTS_PER_SIDE } from "@/lib/config";
 import { newTraitDraft, type TraitDraft } from "@/lib/traitDraft";
 import {
   describePicks,
@@ -90,7 +90,7 @@ function TraitRequestRow({
 }) {
   const collection = draft.collection.trim();
   const matches = resolved?.ids.length ?? 0;
-  const maxAmount = Math.min(MAX_TOKENS_PER_SIDE, Math.max(matches, 1));
+  const maxAmount = Math.min(MAX_NFTS_PER_SIDE, Math.max(matches, 1));
 
   const toggle = (pick: TraitPick) => {
     const has = draft.picks.some((p) => samePick(p, pick));

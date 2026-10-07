@@ -119,7 +119,7 @@ Pure functions in `web/lib/momentum.ts`, computed from the Club's activity log o
 
 | Event | Weight | Why |
 |---|---|---|
-| Completed swap containing the asset (V2 fill, accepted proposal, settled intent) | 10 per side | Each side pays the flat protocol fee ([ADR 0015](adr/0015-protocol-fee.md)), so faking it costs real money |
+| Completed swap containing the asset (V2 fill, accepted proposal, settled intent) | 10 per side | Each side pays the protocol fee for every NFT it gives ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)), so faking it costs real money. A swap counts once however many NFTs it moves; the fee is what scales with them |
 | New deal, open offer or intent naming the asset | 2, at most 3 per wallet per day | Cheap to make, so capped |
 | A Holder's own X post about the Club, shared on its Board ([X posts](#x-posts)) | 3 (1.5 if it only matches a tag), at most one a day per member per Club | Attention is part of a Club's life; capped low and limited to Holders so it can't outweigh trading |
 | Any other Board post | 0 | Giving plain posts no weight means spam doesn't pay |
@@ -238,7 +238,7 @@ This is the first user-written content in the app. Every post is signed by its a
 - **Claiming:** the screens read each leaf's epoch and `isClaimed` on chain and show it as on its way (not published or not open yet), ready, claimed or expired; **Claim** sends `claimMany` for every ready leaf. Anyone may claim for an account; the MON goes to the account.
 - **Reads:** `GET /api/rewards/epochs/[n]` (the whole epoch, cacheable for ever), `GET /api/rewards/me?account=` (an account's leaves with proofs), `GET /api/clubs/[token]/rewards` (the Club's line in the latest epochs, its carry and top earners).
 
-What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, and at most 75% comes back, shared by the Club's 10 biggest Holders.
+What rewards don't say: that an asset is good, or that a big earner is trustworthy. Faking volume to earn them loses money: each side pays the whole fee, for every NFT it gives, and at most 75% comes back, shared by the Club's 10 biggest Holders.
 
 ## Data (Upstash)
 

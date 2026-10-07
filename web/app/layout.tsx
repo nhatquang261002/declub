@@ -40,7 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 ·{" "}
               </>
             )}
-            assets only move in transactions or signatures you approve, and the fee is flat, capped and only charged when a deal completes
+            assets only move in transactions or signatures you approve, and the fee is a small amount per NFT, capped and only charged when a deal completes
           </footer>
         </Providers>
       </body>

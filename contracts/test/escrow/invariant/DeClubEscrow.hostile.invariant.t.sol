@@ -88,14 +88,19 @@ contract DeClubEscrowHostileInvariantTest is Test {
     function invariant_fungiblesAreFullyAccounted() public view {
         (IDeClubEscrow.Asset[][] memory sides, uint256 n) = _escrowed();
         uint256 usdcHeld;
+        uint256 shares;
         for (uint256 s; s < n; ++s) {
+            uint256 nfts;
             for (uint256 i; i < sides[s].length; ++i) {
                 if (sides[s][i].token == address(usdc)) usdcHeld += sides[s][i].amount;
+                if (sides[s][i].assetType == IDeClubEscrow.AssetType.ERC721) ++nfts;
             }
+            shares += nfts == 0 ? 1 : nfts;
         }
         assertEq(usdc.balanceOf(address(swap)), usdcHeld, "usdc");
-        // Every open trade and Active proposal holds one fee share; every fee here is FEE.
-        assertEq(address(swap).balance, n * FEE, "native");
+        // Every open trade and Active proposal holds a fee share per NFT it moves (one if none);
+        // every fee here is FEE.
+        assertEq(address(swap).balance, shares * FEE, "native");
     }
 
     function invariant_hostileCallsNeverLand() public view {

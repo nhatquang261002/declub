@@ -18,6 +18,7 @@ import { useSignFlow } from "@/hooks/useSignFlow";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, type DraftRow } from "@/lib/assetDraft";
+import { feeUnits } from "@/lib/assets";
 import { MOCK_ERC20_ADDRESS, POOL_URL } from "@/lib/config";
 import type { Step } from "@/lib/createFlow";
 import { DEADLINES, DEFAULT_DEADLINE, deadlineSeconds, intentProblem, type DeadlineKey } from "@/lib/intents";
@@ -66,7 +67,9 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const giveError = give.errors[0] ?? intentProblem(give.assets, want.assets);
 
   // Reads the chain only once the draft is sound, so typing doesn't fire a read per keystroke.
+  // The readiness check multiplies the per-NFT fee by the NFTs given (ADR 0033).
   const readiness = useIntentReadiness(address, wantError || giveError ? [] : give.assets, info, scope, fee);
+  const giveUnits = feeUnits(give.assets);
   const poolDown = !!pool.error || pool.mismatch;
   const feeBlocker = fee ? null : feeLoading ? "Reading the protocol fee from the contract…" : "Couldn't read the protocol fee from the contract.";
   const blocker = wantError ?? giveError ?? readiness.problems[0] ?? feeBlocker;
@@ -204,13 +207,15 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
       {fee && (
         <FeeNote
           amount={fee.amount}
+          units={giveUnits}
           unit="WMON"
           pending={pendingFee}
           pendingNote="A swap signed now can't settle after that unless you sign it again at the new fee."
         >
-          Signed with your swap as the most you&apos;ll pay, and taken from your wallet only if it settles, in WMON (wrapped
-          MON). If the fee is cut before then, you pay less. Every wallet in the match pays the same. If it never settles,
-          you pay nothing. Holding only MON is fine: the first step wraps what you need.
+          Signed with your swap as the most you&apos;ll pay for each NFT you give, and taken from your wallet only if it
+          settles, in WMON (wrapped MON). If the fee is cut before then, you pay less. Every wallet in the match pays the
+          same for each NFT it gives. If it never settles, you pay nothing. Holding only MON is fine: the first step wraps
+          what you need.
         </FeeNote>
       )}
       <ConsentNotice />

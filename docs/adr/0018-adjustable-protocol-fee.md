@@ -1,6 +1,6 @@
 # ADR 0018: An adjustable protocol fee, capped at deploy, with raises on a delay
 
-**Status:** Accepted · 2026-10-02 · Supersedes the "fixed at deploy" parts of [ADR 0015](0015-protocol-fee.md). Changes `OnDealV2` and `OnDealIntents` before their mainnet deploy; `OnDeal` (v1) is not deployed to mainnet. Who pays the fee, when it is paid, and in which token stay as ADR 0015 decided.
+**Status:** Accepted · 2026-10-02 · Supersedes the "fixed at deploy" parts of [ADR 0015](0015-protocol-fee.md). Changes `OnDealV2` and `OnDealIntents` before their mainnet deploy; `OnDeal` (v1) is not deployed to mainnet. Who pays the fee, when it is paid, and in which token stay as ADR 0015 decided. The amount is per NFT a side moves from [ADR 0033](0033-fee-per-nft.md) on.
 
 ## Context
 

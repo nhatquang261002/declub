@@ -19,11 +19,12 @@ import {FeeAdmin} from "./FeeAdmin.sol";
 ///      to `claim` instead.
 ///      Moving the *taker's* assets to the maker does revert on failure, so a fill is atomic.
 ///
-///      Protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
-///      every side of a completed deal pays the same share in native MON, to `FEE_RECIPIENT`.
-///      A trade records `fee()` when it is created, and both sides pay that recorded `fee`, so
-///      a later change by the fee admin never touches a deal already listed. Each side sends its
-///      share with its own assets (`msg.value` = native amount + share), and the contract only
+///      Protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md,
+///      docs/adr/0033-fee-per-nft.md): every side of a completed deal pays `fee` in native MON
+///      for each NFT it moves, and for one if it moves none, to `FEE_RECIPIENT`. A trade records
+///      `fee()` when it is created, and both sides pay that recorded `fee` per NFT, so a later
+///      change by the fee admin never touches a deal already listed. Each side sends its share
+///      with its own assets (`msg.value` = native amount + share), and the contract only
 ///      *holds* it: both shares are released together when the deal completes (a fill or an
 ///      accepted proposal) and refunded with that side's escrow on cancel, reclaim, reject and
 ///      withdraw.
@@ -31,6 +32,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_ASSETS_PER_SIDE = 10;
+    uint256 public constant MAX_NFTS_PER_SIDE = 5;
     uint256 public constant MAX_NOTE_BYTES = 280;
     uint256 public constant MAX_SPEC_BYTES = 1024;
     uint256 public tradeCount;
@@ -43,7 +45,8 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
     ///      up; an NFT credit is 1.
     mapping(address account => mapping(bytes32 assetKey => uint256 amount)) internal _credits;
 
-    /// @param initialFee Per-side fee in wei for deals created from now on. 0 charges nothing.
+    /// @param initialFee Fee in wei per NFT (at least one per side) for deals created from now
+    ///        on. 0 charges nothing.
     /// @param maxFee Ceiling the fee admin can never go above, at most `MAX_FEE_LIMIT`.
     /// @param feeRecipient Receives the fees. Required when `maxFee` is not 0.
     /// @param admin May change the fee within `maxFee`. Zero fixes it for good.
@@ -88,7 +91,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         uint64 expiry,
         string calldata note
     ) external payable nonReentrant returns (uint256 tradeId) {
-        uint256 expectedValue = _validateSide(offered, false) + _fee;
+        uint256 expectedValue = _sidePayment(offered, _fee);
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // forge-lint: disable-next-line(block-timestamp)
         if (expiry != 0 && expiry <= block.timestamp) revert ExpiryInPast(expiry);
@@ -124,7 +127,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == t.maker) revert SelfPropose(tradeId);
 
-        uint256 expectedValue = _validateSide(assets, false) + t.fee;
+        uint256 expectedValue = _sidePayment(assets, t.fee);
         _validateNoOverlap(t.offered, assets);
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
 
@@ -152,7 +155,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         emit ProposalWithdrawn(tradeId, proposalId);
 
         _payoutAll(p.assets, msg.sender);
-        _refundFee(msg.sender, _trades[tradeId].fee);
+        _refundFee(msg.sender, _trades[tradeId].fee * _units(p.assets));
     }
 
     /// @inheritdoc IDeClubEscrow
@@ -168,7 +171,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
 
         address proposer = p.proposer;
         _payoutAll(p.assets, proposer);
-        _refundFee(proposer, t.fee);
+        _refundFee(proposer, t.fee * _units(p.assets));
     }
 
     /// @inheritdoc IDeClubEscrow
@@ -190,7 +193,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         // rejected one is credited for `claim`.
         _payoutAll(p.assets, msg.sender);
         _payoutAll(t.offered, proposer);
-        _chargeFee(tradeId, t.fee);
+        _chargeFee(tradeId, t.fee * (_units(t.offered) + _units(p.assets)));
     }
 
     /// @inheritdoc IDeClubEscrow
@@ -217,7 +220,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         emit TradeCancelled(tradeId, t.maker);
 
         _payoutAll(t.offered, t.maker);
-        _refundFee(t.maker, t.fee);
+        _refundFee(t.maker, t.fee * _units(t.offered));
     }
 
     /// @inheritdoc IDeClubEscrow
@@ -230,7 +233,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         emit TradeReclaimed(tradeId, t.maker, msg.sender);
 
         _payoutAll(t.offered, t.maker);
-        _refundFee(t.maker, t.fee);
+        _refundFee(t.maker, t.fee * _units(t.offered));
     }
 
     /// @inheritdoc IDeClubEscrow
@@ -300,6 +303,15 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
     }
 
     /// @inheritdoc IDeClubEscrow
+    function feeUnits(Asset[] calldata assets) external pure returns (uint256) {
+        uint256 nfts;
+        for (uint256 i; i < assets.length; ++i) {
+            nfts += _nftCount(assets[i].assetType, assets[i].amount);
+        }
+        return nfts == 0 ? 1 : nfts;
+    }
+
+    /// @inheritdoc IDeClubEscrow
     function claimable(address account, AssetType assetType, address token, uint256 id)
         external
         view
@@ -311,17 +323,19 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
     // ─────────────────────────────────────────────────────────────── Validation
 
     /// @dev Checks size, field rules and duplicates. `allowTrait` admits `ERC721Trait` assets (the
-    ///      requested side of a trait trade only). Returns the native amount on the side.
+    ///      requested side of a trait trade only). Returns the native amount on the side and its
+    ///      fee units: the NFTs it moves (a trait set counts its `amount`), at least one.
     // Reverting on the first bad asset is the point of this loop.
     // forge-lint: disable-next-item(require-revert-in-loop)
     function _validateSide(Asset[] calldata assets, bool allowTrait)
         private
         view
-        returns (uint256 native)
+        returns (uint256 native, uint256 units)
     {
         uint256 n = assets.length;
         if (n == 0) revert EmptySide();
         if (n > MAX_ASSETS_PER_SIDE) revert TooManyAssets(n, MAX_ASSETS_PER_SIDE);
+        uint256 nfts;
 
         for (uint256 i; i < n; ++i) {
             Asset calldata a = assets[i];
@@ -336,17 +350,23 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
                 if (a.token.code.length == 0 || a.amount != 1 || !_isNft(a.token)) {
                     revert InvalidAsset(i);
                 }
+                ++nfts;
             } else {
                 // A trait set is only ever something a taker can hand over.
                 if (
                     !allowTrait || a.token.code.length == 0 || a.id == 0 || a.amount == 0
-                        || a.amount > MAX_ASSETS_PER_SIDE || !_isNft(a.token)
+                        || !_isNft(a.token)
                 ) revert InvalidAsset(i);
+                // Checked before it is added, so a huge `amount` can't overflow the sum.
+                if (a.amount > MAX_NFTS_PER_SIDE) revert TooManyNfts(a.amount, MAX_NFTS_PER_SIDE);
+                nfts += a.amount;
             }
             for (uint256 j; j < i; ++j) {
                 if (_same(assets[j], a)) revert DuplicateAsset(i);
             }
         }
+        if (nfts > MAX_NFTS_PER_SIDE) revert TooManyNfts(nfts, MAX_NFTS_PER_SIDE);
+        units = nfts == 0 ? 1 : nfts;
     }
 
     /// @dev An asset on both sides can never be filled: the maker's copy is in escrow and the
@@ -400,7 +420,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         // Only `createTraitTrade` passes a spec (it rejects an empty one), and only it admits
         // trait assets.
         bool trait = bytes(spec).length != 0;
-        uint256 expectedValue = _validateSide(offered, false) + _fee;
+        uint256 expectedValue = _sidePayment(offered, _fee);
         _validateSide(requested, trait);
         if (trait && _countTrait(requested) == 0) revert NoTraitAsset();
         _validateNoOverlap(offered, requested);
@@ -433,7 +453,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         address taker = t.taker;
         if (taker != address(0) && msg.sender != taker) revert NotAllowedTaker(tradeId);
         if (msg.sender == maker) revert SelfFill(tradeId);
-        uint256 expectedValue = _nativeAmount(t.requested) + t.fee;
+        uint256 expectedValue = _nativeAmount(t.requested) + t.fee * _units(t.requested);
         if (msg.value != expectedValue) revert WrongNativeAmount(expectedValue, msg.value);
         // Every proof is checked before anything changes or moves.
         _verifyTraitFills(tradeId, t.requested, fills);
@@ -462,7 +482,7 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
             }
         }
         _payoutAll(t.offered, msg.sender);
-        _chargeFee(tradeId, t.fee);
+        _chargeFee(tradeId, t.fee * (_units(t.offered) + _units(t.requested)));
     }
 
     /// @dev `fills[k]` must answer the k-th trait asset: `amount` distinct ids, each with a
@@ -549,6 +569,30 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         return keccak256(abi.encode(assetType, token, id));
     }
 
+    /// @dev Validates a side (a maker's, or a proposal's) and returns what `msg.value` must be: its
+    ///      native amount plus `perNft` for each NFT on it (at least one).
+    function _sidePayment(Asset[] calldata assets, uint256 perNft) private view returns (uint256) {
+        (uint256 native, uint256 units) = _validateSide(assets, false);
+        return native + perNft * units;
+    }
+
+    /// @dev How many NFTs an asset moves: one for an ERC-721, `amount` for a trait set, none for
+    ///      the rest.
+    function _nftCount(AssetType assetType, uint256 amount) private pure returns (uint256) {
+        if (assetType == AssetType.ERC721) return 1;
+        if (assetType == AssetType.ERC721Trait) return amount;
+        return 0;
+    }
+
+    /// @dev A stored side's fee units: its NFTs, at least one. It was validated when stored, so
+    ///      the sum can't overflow.
+    function _units(Asset[] storage assets) private view returns (uint256 nfts) {
+        for (uint256 i; i < assets.length; ++i) {
+            nfts += _nftCount(assets[i].assetType, assets[i].amount);
+        }
+        if (nfts == 0) nfts = 1;
+    }
+
     function _nativeAmount(Asset[] storage assets) private view returns (uint256) {
         for (uint256 i; i < assets.length; ++i) {
             if (assets[i].assetType == AssetType.Native) return assets[i].amount;
@@ -612,11 +656,11 @@ contract DeClubEscrow is IDeClubEscrow, FeeAdmin, ReentrancyGuard {
         emit AssetCredited(to, token, assetType, id, amount);
     }
 
-    /// @dev A deal completed: both sides' shares (held since each side's own call) go to the
-    ///      recipient in one send. Never reverts: a recipient that rejects MON gets a credit.
-    function _chargeFee(uint256 tradeId, uint256 share) private {
-        if (share == 0) return;
-        uint256 amount = 2 * share;
+    /// @dev A deal completed: both sides' shares (held since each side's own call), `amount` in
+    ///      all, go to the recipient in one send. Never reverts: a recipient that rejects MON
+    ///      gets a credit.
+    function _chargeFee(uint256 tradeId, uint256 amount) private {
+        if (amount == 0) return;
         address to = FEE_RECIPIENT;
         // forge-lint: disable-next-line(reentrancy-events)
         emit FeeCharged(tradeId, to, amount);

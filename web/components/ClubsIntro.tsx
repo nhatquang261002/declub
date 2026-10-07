@@ -14,7 +14,7 @@ const WHAT = [
 ];
 
 const HOW = [
-  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. Each side pays the fee, so faking it costs real money.` },
+  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. Each side pays the fee for every NFT it gives, so faking it costs real money.` },
   { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points for each new deal or signed swap, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
   { title: "Attention counts a little", body: `${MOMENTUM.xShareWeight} points when a Holder shares their own X post about the Club, one a day.` },
   { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by staying busy.` },

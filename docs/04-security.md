@@ -31,7 +31,7 @@ The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow
 | `reentrancy-eth` ×8 | High | `DeClubEscrow` fill, accept, reject, withdraw, cancel, reclaim | **False positive**: every entry point is `nonReentrant` (Slither doesn't model OZ 5's storage-slot guard), and the only state written after a call is a credit for a send that *failed*. Covered by the re-entry tests in `DeClubEscrow.tokens.t.sol` and `DeClubEscrow.offers.t.sol`. |
 | `uninitialized-state` | High | `DeClubEscrow._proposals` | **False positive.** A mapping; entries are written in `propose`. |
 | `missing-zero-check` | Low | `FeeAdmin.transferFeeAdmin` | Intended: a zero `next` cancels a pending handover. |
-| `calls-loop` ×53, `timestamp` ×8 | Low | loops over a capped side; expiries and deadlines | Intended: sides are capped at 10 assets, one failing transfer must revert the whole deal, and deadlines are hours long. |
+| `calls-loop` ×53, `timestamp` ×8 | Low | loops over a capped side; expiries and deadlines | Intended: sides are capped at 10 assets and 5 NFTs, one failing transfer must revert the whole deal, and deadlines are hours long. |
 | `naming-convention` ×16, `low-level-calls` ×3, `cyclomatic-complexity` ×3 | Info | | `UPPER_CASE` immutables and constants, the deliberate `call`s in payouts, `_validateSide`. |
 
 **Slither 0.11.6 on `DeClubRewards`** (`slither src/DeClubRewards.sol --filter-paths lib/`, run 2026-10-06) returned 15 results, none of them a bug:
@@ -74,7 +74,7 @@ Recomputed from the trades themselves in `test/escrow/invariant/`, over native, 
 | V8 | `fillTrade` never settles an open offer, and every valid proposal call succeeds. |
 | Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
 
-**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)). The invariant suite starts with a 3 MON fee (ceiling 12), a fee recipient that sometimes rejects MON, and a fee admin that changes the fee during the run, so trades carry different fees. V1 becomes `balance == Σ native offered by Open trades + each Open trade's own fee, once for the trade and once per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × the trade's fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler, at the trade's own fee. The fee suite (`DeClubEscrow.fee.t.sol`, 37 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a deal listed before a raise or a cut that fills, proposes and refunds at its own fee, a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
+**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)). The invariant suite starts with a 3 MON fee (ceiling 12), a fee recipient that sometimes rejects MON, and a fee admin that changes the fee during the run, so trades carry different fees. V1 becomes `balance == Σ native offered by Open trades + each Open trade's own fee × its side's NFTs (at least one), for the trade and for each Active proposal + Σ native credits` ([ADR 0033](adr/0033-fee-per-nft.md)) (the recipient's credit included), and **V9** says the recipient holds exactly the trade's fee per NFT, both sides together (one unit for a side with none), per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler, at the trade's own fee. The fee suite (`DeClubEscrow.fee.t.sol`, 37 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a deal listed before a raise or a cut that fills, proposes and refunds at its own fee, a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
 
 **Fee admin** (`FeeAdmin.t.sol`, 24 tests, run against both contracts): a cut applies at once and drops a queued raise, a raise only applies through `applyFee` after exactly 7 days and within the 7 days after that (`FeeRaiseExpired` once stale, so an old notice can't be used months on), a newer one restarts the clock, never above the ceiling, the two-step handover and its cancellation, renounce dropping any queued raise or handover, a zero admin at deploy, and everything a stranger or the recipient is refused. A fuzz test checks that the fee never exceeds the ceiling and never rises without the full delay.
 
@@ -101,7 +101,7 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 | **USDT-style token with no return value** | `SafeERC20` | `test_noReturnTokenWorksOnBothSides` |
 | **Unfillable trade** (same asset both sides, duplicates) | Rejected at creation | `test_revertsSameAssetOnBothSides`, `test_revertsDuplicateAssetOnOneSide` |
 | **Partial fill** | One asset failing reverts the whole fill | `test_fillIsAtomic` |
-| **Unbounded gas per trade** | `MAX_ASSETS_PER_SIDE = 10`; worst case measured at 2.2M create / 0.9M fill | `test_worstCaseGas` |
+| **Unbounded gas per trade** | `MAX_ASSETS_PER_SIDE = 10`, `MAX_NFTS_PER_SIDE = 5`; worst case measured at 1.24M create / 0.58M fill | `test_worstCaseGas` |
 
 ### Accepted limitations
 
@@ -110,7 +110,7 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 - **A permanently blocked recipient** (the token itself blacklists them) keeps the credit in the escrow forever. The escrow can't do more than offer the claim.
 - **Gas-burning token or receiver.** One that burns all forwarded gas can make fills of *its own* trades fail. Takers lose gas, nobody loses assets.
 - **Approvals.** The app approves each ERC-20 to `DeClubEscrow` for the exact amount of the deal, not unlimited, and each NFT collection with `setApprovalForAll` (the only way to cover several ids in one transaction; `web/hooks/useAssetApprovals.ts`). For signed swaps it approves `DeClubIntents` for the exact ERC-20 amount (plus the fee), and each NFT on its own with `approve(id)` unless the maker chooses to approve the whole collection (`web/hooks/useIntentReadiness.ts`). The app has no revoke button.
-- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON), and the deploy scripts take whatever `PROTOCOL_FEE_MAX_WEI` says (they refuse to guess one), so check `MAX_FEE()` on the deployed contract. It can't touch a deal already listed, charge an intent more than its `maxFee`, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
+- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON), and the deploy scripts take whatever `PROTOCOL_FEE_MAX_WEI` says (they refuse to guess one), so check `MAX_FEE()` on the deployed contract. The ceiling is per NFT, so a deal of 5 NFTs a side can be charged up to 5 × `MAX_FEE` by each side ([ADR 0033](adr/0033-fee-per-nft.md)); the delay and the notice are the same. It can't touch a deal already listed, charge an intent more than its `maxFee` for each NFT it gives, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
 - No external review yet.
 
 ### Test suite
@@ -148,7 +148,7 @@ contracts/test/intents/
 ├── DeClubIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
 ├── DeClubIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
 ├── DeClubIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
-├── DeClubIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
+├── DeClubIntents.gas.t.sol        worst-case ring (4 × 5 NFTs), with and without the fee
 ├── DeClubIntents.fee.t.sol        the protocol fee (ADR 0015), signed as a maximum (ADR 0018)
 ├── DeployIntents.t.sol            deploy script: fee from config and env, MockWMON vs a given fee token, WMON check, refusals, other chains
 ├── invariant/                       handler + invariants N1, N2, N5, N6 and conservation;

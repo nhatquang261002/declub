@@ -190,8 +190,8 @@ contract DeClubEscrowFillTest is DeClubEscrowBase {
     function test_worstCaseGas() public {
         chog.mint(alice, 10); // 16–25
         chog.mint(bob, 10); // 26–35
-        IDeClubEscrow.Asset[] memory offered = _chogs(16, 10);
-        IDeClubEscrow.Asset[] memory requested = _chogs(26, 10);
+        IDeClubEscrow.Asset[] memory offered = _chogs(16, 5);
+        IDeClubEscrow.Asset[] memory requested = _chogs(26, 5);
 
         vm.prank(alice);
         uint256 createGas = gasleft();
@@ -203,8 +203,8 @@ contract DeClubEscrowFillTest is DeClubEscrowBase {
         swap.fillTrade(id);
         fillGas -= gasleft();
 
-        emit log_named_uint("create gas, 10 NFTs vs 10 NFTs", createGas);
-        emit log_named_uint("fill gas, 10 NFTs vs 10 NFTs", fillGas);
+        emit log_named_uint("create gas, 5 NFTs vs 5 NFTs", createGas);
+        emit log_named_uint("fill gas, 5 NFTs vs 5 NFTs", fillGas);
         assertLt(createGas, 5_000_000);
         assertLt(fillGas, 3_000_000);
     }

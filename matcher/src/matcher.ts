@@ -24,7 +24,7 @@ export interface MatcherConfig {
   gasBufferPct: bigint;
   /**
    * Refuse to send a cycle that needs more gas than this. The matcher pays for settlements that
-   * succeed too, and a token can burn gas on purpose. The contract's worst case is 3.4M (with the fee).
+   * succeed too, and a token can burn gas on purpose. The contract's worst case is 1.8M (with the fee): four makers, five NFTs each way.
    */
   maxGas: bigint;
   /** Edges the cycle search may look at per pass (`MAX_SEARCH_STEPS`). */

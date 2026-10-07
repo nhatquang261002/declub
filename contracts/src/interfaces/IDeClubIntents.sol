@@ -15,7 +15,8 @@ import {IFeeAdmin} from "./IFeeAdmin.sol";
 ///      reused, but only `ERC20` and `ERC721` are valid here: native MON can't be pulled from a
 ///      wallet (use WMON) and trait sets are not supported yet.
 ///      The fee amount can change (IFeeAdmin, docs/adr/0018-adjustable-protocol-fee.md), so a
-///      maker signs the most they will pay, and `settle` charges the fee in force.
+///      maker signs the most they will pay per NFT, and `settle` charges the fee in force for
+///      each NFT they give (docs/adr/0033-fee-per-nft.md).
 interface IDeClubIntents is IFeeAdmin {
     // ─────────────────────────────────────────────────────────────── Types
 
@@ -42,8 +43,9 @@ interface IDeClubIntents is IFeeAdmin {
     ///      amount, extra assets) goes to the maker. `deadline` is required (non-zero).
     ///      `nonce` is unordered: bit `nonce & 0xff` of word `nonce >> 8`.
     ///      `feeToken` and `maxFee` bound the protocol fee the maker agrees to pay if the cycle
-    ///      settles. They are part of what is signed: `settle` requires `feeToken` to equal
-    ///      `FEE_TOKEN` and `maxFee` to be at least `fee()`, and charges `fee()`.
+    ///      settles: `maxFee` is the most per NFT in `give` (once, if it has none). They are part
+    ///      of what is signed: `settle` requires `feeToken` to equal `FEE_TOKEN` and `maxFee` to
+    ///      be at least `fee()`, and charges `fee()` times the NFTs in `give`, at least one.
     struct Intent {
         address maker;
         Asset[] give;
@@ -62,8 +64,8 @@ interface IDeClubIntents is IFeeAdmin {
     );
 
     /// @notice A cycle settled and every maker in it paid the fee: `amount` is the total sent to
-    ///         `recipient` (`fee()` at settlement times the cycle size). Not emitted when the fee
-    ///         is 0.
+    ///         `recipient`: `fee()` at settlement times each maker's NFTs given (at least one
+    ///         each). Not emitted when the fee is 0.
     event FeeCharged(address indexed recipient, address indexed token, uint256 amount);
 
     /// @notice A maker invalidated unordered nonces without settling them.
@@ -78,6 +80,8 @@ interface IDeClubIntents is IFeeAdmin {
     error IntentExpired(uint256 intent);
     error EmptySide(uint256 intent, bool give);
     error TooManyAssets(uint256 intent, bool give, uint256 count);
+    /// @notice A side moves more NFTs than `MAX_NFTS_PER_SIDE`.
+    error TooManyNfts(uint256 intent, bool give, uint256 count);
     error InvalidAsset(uint256 intent, bool give, uint256 index);
     error DuplicateAsset(uint256 intent, bool give, uint256 index);
     error SameAssetBothSides(uint256 intent);
@@ -98,7 +102,8 @@ interface IDeClubIntents is IFeeAdmin {
 
     /// @notice Settle a cycle of 2..`MAX_CYCLE` intents atomically. Anyone may call. Reverts if
     ///         anything about any intent or transfer is off, leaving everyone as they were. Every
-    ///         maker needs `fee()` of `FEE_TOKEN` and an allowance for it, besides their `give`.
+    ///         maker needs `fee()` of `FEE_TOKEN` per NFT they give (at least one) and an
+    ///         allowance for it, besides their `give`.
     /// @param cycle `cycle[i].give` goes to `cycle[(i + 1) % n].maker`.
     /// @param signatures `signatures[i]` is `cycle[i].maker`'s EIP-712 signature (ECDSA, or
     ///        ERC-1271 for contract wallets).
@@ -112,6 +117,8 @@ interface IDeClubIntents is IFeeAdmin {
 
     function MAX_CYCLE() external view returns (uint256);
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
+    /// @notice The most NFTs one side can move.
+    function MAX_NFTS_PER_SIDE() external view returns (uint256);
     /// @notice The token the fee is paid in (wrapped MON). Fixed at deploy.
     function FEE_TOKEN() external view returns (address);
 

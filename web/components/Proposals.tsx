@@ -12,7 +12,7 @@ import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
-import { toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
+import { feeUnits, sideFee, toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
 import type { ProposalStatus, ProposalV2 } from "@/lib/proposals";
 import { sameAddress } from "@/lib/deals";
@@ -178,8 +178,8 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
     if (problems.length > 0) return setValidation(problems[0]);
     if (overlap) return setValidation(overlap);
     setValidation(null);
-    // The native amount in the offer, plus this wallet's share of the protocol fee.
-    const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
+    // The native amount in the offer, plus this wallet's share of the protocol fee: one per NFT it offers.
+    const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, draft.assets);
     const receipt = await tx.run({
       ...swapV2!,
       functionName: "propose",
@@ -206,9 +206,9 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
           </Alert>
         )}
         {problems.length > 0 && !validation && <p className="text-xs text-muted">{problems[0]}</p>}
-        <FeeNote amount={fee}>
-          Sent with your offer and held with it. It&apos;s only charged if the maker accepts. If you withdraw it, or the
-          maker rejects it, it comes back to you.
+        <FeeNote amount={fee} units={feeUnits(draft.assets)}>
+          Sent with your offer and held with it, once for each NFT in it. It&apos;s only charged if the maker accepts. If you
+          withdraw it, or the maker rejects it, it comes back to you.
         </FeeNote>
         {nextApproval ? (
           <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>

@@ -56,12 +56,31 @@ contract DeClubEscrowCreateTest is DeClubEscrowBase {
         assertEq(uint8(_status(0)), uint8(IDeClubEscrow.Status.None));
     }
 
-    function test_maxAssetsPerSide() public {
-        uint256 max = swap.MAX_ASSETS_PER_SIDE();
+    function test_maxNftsPerSide() public {
+        uint256 max = swap.MAX_NFTS_PER_SIDE();
+        assertEq(max, 5);
         chog.mint(alice, 10); // alice: 1–5 and 16–25
         IDeClubEscrow.Asset[] memory offered = _chogs(16, max);
         uint256 id = _create(alice, offered, _chogs(B1, 5));
         assertEq(swap.getTrade(id).offered.length, max);
+    }
+
+    function test_revertsTooManyNfts() public {
+        uint256 max = swap.MAX_NFTS_PER_SIDE();
+        chog.mint(alice, 10);
+        chog.mint(bob, 10);
+        IDeClubEscrow.Asset[] memory tooMany = _chogs(16, max + 1);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.TooManyNfts.selector, max + 1, max));
+        swap.createTrade(tooMany, _list(_chog(B1)), address(0), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.TooManyNfts.selector, max + 1, max));
+        swap.createTrade(_list(_chog(A1)), _chogs(26, max + 1), address(0), 0);
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.TooManyNfts.selector, max + 1, max));
+        swap.createOpenOffer(tooMany, address(0), 0, "");
     }
 
     // ───────────────────────────────────────────── validation

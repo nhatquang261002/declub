@@ -5,6 +5,7 @@ import {
   cancelDigest,
   covers,
   feeProblem,
+  feeUnits,
   intentDigest,
   intentHash,
   shapeProblem,
@@ -17,6 +18,7 @@ import { privateKeyToAccount } from "viem/accounts";
 const A = getAddress("0x00000000000000000000000000000000000000a1");
 const T = getAddress("0x00000000000000000000000000000000000000b2");
 const U = getAddress("0x00000000000000000000000000000000000000c3");
+const V = getAddress("0x00000000000000000000000000000000000000d4");
 const nft = (id: bigint, token = T): Asset => ({ assetType: AssetType.ERC721, token, id, amount: 1n });
 const erc20 = (amount: bigint, token = U): Asset => ({
   assetType: AssetType.ERC20,
@@ -74,6 +76,23 @@ describe("shapeProblem", () => {
     assert.match(bad({ give: [nft(1n), nft(1n)] })!, /duplicate/);
     assert.match(bad({ want: [nft(1n)] })!, /both sides/);
     assert.match(bad({ maker: "0x0000000000000000000000000000000000000000" })!, /zero/);
+  });
+
+  it("caps the NFTs on a side at five, whatever else rides along", () => {
+    const nfts = (n: number) => Array.from({ length: n }, (_, i) => nft(BigInt(i + 1)));
+    assert.equal(shapeProblem({ ...base, give: nfts(5) }), null);
+    assert.equal(shapeProblem({ ...base, give: [...nfts(5), erc20(1n, V)] }), null);
+    assert.match(shapeProblem({ ...base, give: nfts(6) })!, /give has more than 5 NFTs/);
+    assert.match(shapeProblem({ ...base, want: nfts(6), give: [erc20(1n, T)] })!, /want has more than 5 NFTs/);
+  });
+});
+
+describe("feeUnits", () => {
+  it("is one per NFT given, and one for a side without any", () => {
+    assert.equal(feeUnits([nft(1n)]), 1n);
+    assert.equal(feeUnits([nft(1n), nft(2n), nft(3n)]), 3n);
+    assert.equal(feeUnits([nft(1n), nft(2n), erc20(9n)]), 2n);
+    assert.equal(feeUnits([erc20(9n)]), 1n);
   });
 });
 

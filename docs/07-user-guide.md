@@ -19,7 +19,7 @@ Press **Create deal**. The form has three steps: **Deal type**, **Your assets**,
    - **Open offer:** post what you give, with an optional note of up to 280 bytes (plain text, so about 280 characters), and let people send you offers. You pick the one you like.
    - **Request exact assets:** name what you want back. Whoever holds it can accept in one transaction.
    - **Request by trait:** ask for NFTs with a trait, like "any 2 Chogs with a Crown hat". Paste a collection's address (or tap **Chog**), pick up to five trait values, choose *any of* or *all of*, and set how many. You can add several trait requests, and exact assets beside them.
-2. **Your assets.** Add what you give with **+ MON**, **+ Token** or **+ NFT**. The NFT picker shows what your wallet holds, or you can paste a collection address and an id. Then decide who can take it (anyone, or **Only this wallet can accept**) and when it expires: 1 hour, 24 hours (the default), 7 days or Never. A side holds up to 10 assets.
+2. **Your assets.** Add what you give with **+ MON**, **+ Token** or **+ NFT**. The NFT picker shows what your wallet holds, or you can paste a collection address and an id. Then decide who can take it (anyone, or **Only this wallet can accept**) and when it expires: 1 hour, 24 hours (the default), 7 days or Never. A side holds up to 10 assets, and at most 5 of them NFTs.
 3. **Confirm.** Check the summary, then approve and create:
    - **Approve** each asset you offer, one at a time ("1 of 3"). An NFT collection is approved once for all its NFTs. A token is approved for the exact amount in this deal.
    - **Create deal** (or **Post open offer**) locks your side in the contract. The MON you send includes the protocol fee, which is held with your deal.
@@ -74,9 +74,9 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 
 ## Fees
 
-- Every completed deal charges a small flat protocol fee per side, so both people pay the same. Nobody pays it if a deal is cancelled, expires, or an offer is rejected or withdrawn. The screens show the exact amount before you confirm.
+- Every completed deal charges a small protocol fee for each NFT a side gives (one if it gives none), so a bundle of NFTs pays what the same NFTs pay one by one. Nobody pays it if a deal is cancelled, expires, or an offer is rejected or withdrawn. The screens show the exact amount before you confirm.
 - **Locked deals** take it in MON with your side, hold it, and refund it if the deal doesn't complete. A deal keeps the fee it was listed with, for both sides.
-- **Signed swaps** take it in WMON from your wallet when the swap settles. You sign the most you'll pay; if the fee is cut before then, you pay less.
+- **Signed swaps** take it in WMON from your wallet when the swap settles, for each NFT you give. You sign the most you'll pay per NFT; if the fee is cut before then, you pay less.
 - The fee can be lowered at any time, or raised with a week's notice, and the screens say when a raise is coming. It can never go above a ceiling set when the contract was deployed ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)).
 - **Where it goes:** each week, 50% of the fees a Club's swaps paid goes back to that Club's 10 biggest Holders and 25% to its Club fund ([Clubs, Rewards](#rewards)); the rest stays with the protocol.
 - You also pay Monad's network gas.

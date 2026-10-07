@@ -15,8 +15,8 @@ import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
-import { toRawAsset, traitAsset } from "@/lib/assets";
-import { MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
+import { feeUnits, nftCount, sideFee, toRawAsset, traitAsset } from "@/lib/assets";
+import { MAX_NFTS_PER_SIDE, MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
 import { swapV2, swapV2Abi } from "@/lib/contracts";
 import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from "@/lib/createFlow";
 import { noteBytes } from "@/lib/dealsV2";
@@ -87,7 +87,12 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
     }
     const clauses = traitDrafts.map((d) => draftClause(d)!);
     const ready = resolved.filter((r): r is NonNullable<typeof r> => r !== null);
-    return clausesError(clauses, ready) ?? (clauses.length + plain.assets.length > MAX_TOKENS_PER_SIDE ? `Up to ${MAX_TOKENS_PER_SIDE} requests and assets on this side.` : null);
+    const nfts = clauses.reduce((sum, c) => sum + c.amount, 0) + nftCount(plain.assets);
+    return (
+      clausesError(clauses, ready) ??
+      (clauses.length + plain.assets.length > MAX_TOKENS_PER_SIDE ? `Up to ${MAX_TOKENS_PER_SIDE} requests and assets on this side.` : null) ??
+      (nfts > MAX_NFTS_PER_SIDE ? `Up to ${MAX_NFTS_PER_SIDE} NFTs on this side, counting the ones a trait request asks for.` : null)
+    );
   })();
   const clauses = useMemo<TraitClause[]>(() => traitDrafts.flatMap((d) => draftClause(d) ?? []), [traitDrafts]);
   // What the contract is asked for: trait assets first (the spec lists them in this order), then the rest.
@@ -117,8 +122,8 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
 
   async function create() {
     if (!address || !swapV2 || askError || offerError || fee === undefined) return;
-    // The native amount in the offer, plus this side's share of the protocol fee.
-    const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
+    // The native amount in the offer, plus this side's share of the protocol fee: one per NFT it gives.
+    const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, offered.assets);
     const expiry = expiryTimestamp(terms.expiry);
     const to = takerAddress(terms.taker);
     const receipt = isOpen
@@ -257,11 +262,12 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
       {fee !== undefined && (
         <FeeNote
           amount={fee}
+          units={feeUnits(offered.assets)}
           pending={pendingFee}
           pendingNote="A deal listed before then keeps today's fee, for both sides, until it completes or ends."
         >
           Sent with your {isOpen ? "offer" : "deal"} and held with it. It&apos;s only charged if the deal completes, and the
-          other side pays the same. If you cancel it, or it expires, it comes back to you with your assets.
+          other side pays the same for each NFT it gives. If you cancel it, or it expires, it comes back to you with your assets.
         </FeeNote>
       )}
       <ConfirmCard

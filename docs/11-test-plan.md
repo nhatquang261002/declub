@@ -169,7 +169,8 @@ What each ID checks, so the cross-references below make sense:
 | V2-04 | Private deal, named taker |
 | V2-05 | Open offer: propose, reject, accept, withdraw |
 | V2-06 | Trait trade with a Merkle proof; a bad proof is rejected |
-| V2-07 | Multi-asset deal, gas recorded |
+| V2-07 | Multi-asset deal, gas recorded; the fee is 5 NFTs × the per-NFT fee |
+| V2-09 | The fee is per NFT: a 5-NFT bundle pays for every NFT, a side with none pays once, a 6th NFT is refused |
 | V2-08 | Guards: self-fill, wrong `msg.value` (including a missing fee share), duplicate asset, past expiry, empty side, direct MON send. Non-maker cancel and fill-after-cancel are in V2-02, `fillTrade` on an open offer in V2-05 |
 | IN-01 | EIP-712 domain and hash agree with the contract |
 | IN-02 | Pair settled by a third-party relayer, WMON fee per maker |
@@ -194,7 +195,7 @@ What each ID checks, so the cross-references below make sense:
 | DEP-05 | Intents domain `("DeClubIntents", "1")` |
 | DEP-06 | Both contracts charge the same fee |
 | DEP-07 | Matcher `/info` agrees with the chain; its gas wallet is funded |
-| DEP-08 | Constants |
+| DEP-08 | Constants (assets per side, NFTs per side, max cycle) |
 | DEP-09 | App env: a real Chog collection, `FILL_WATCHER_START_BLOCK` set |
 | WEB-01 | Pages render |
 | WEB-02 | Security headers |
@@ -233,7 +234,7 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 | M-CRE-02 | P0 | Maker gives MON and an ERC-20 | — | 1. Exact deal: A gives 1 MON + 20 mUSD, asks for `#b1`. 2. Approve and create. | The mUSD approval prompt is for exactly 20 mUSD, not unlimited. The create prompt's value is 1 MON + the fee. After create, 20 mUSD and 1 MON + fee sit in `DeClubEscrow`. | Automated: V2-01 |
 | M-CRE-03 | P0 | Open offer | — | 1. **Open offer**. 2. Type a note; then paste text over 280 bytes. 3. Shorten it, **Continue**, give `#a2`, **Post open offer**. | The counter shows bytes / 280 and turns red over the limit, with "The note is N bytes; the limit is 280." blocking **Continue**. Review's want side reads "You're looking for … Not enforced". After posting, the deal page stamp says "taking offers". | Automated: V2-05 |
 | M-CRE-04 | P0 | Private deal by address | — | 1. Exact deal; in **Only this wallet can accept (optional)** type A's own address, then garbage, then B's address. 2. Create. | Own address: "You cannot make a private offer to yourself." Garbage: "Enter a valid wallet address, or leave it empty." B's address: "Only <B>". Review "Who can accept" shows B. `getTrade(id).taker` is B. | Automated: V2-04 |
-| M-CRE-05 | P1 | Form rules | — | Try in turn: an empty side; MON on both sides; the same NFT twice on one side; the same asset on both sides; 11 assets on one side; an amount with more decimals than the token has; a non-token address in a **+ Token** row. | Each blocks **Continue** with a reason, for example "Add at least one asset.", "The same asset is listed twice on one side. Combine the amounts into one row.", "The same asset can't be on both sides. Offer and request different assets.", "Up to 10 assets per side.", "Row N: that address is not a readable token." **+ MON** is disabled once a side has MON. | Automated: V2-08 |
+| M-CRE-05 | P1 | Form rules | — | Try in turn: an empty side; MON on both sides; the same NFT twice on one side; the same asset on both sides; 11 assets on one side; 6 NFTs on one side; an amount with more decimals than the token has; a non-token address in a **+ Token** row. | Each blocks **Continue** with a reason, for example "Add at least one asset.", "The same asset is listed twice on one side. Combine the amounts into one row.", "The same asset can't be on both sides. Offer and request different assets.", "Up to 10 assets per side.", "Row N: that address is not a readable token." **+ MON** is disabled once a side has MON. | Automated: V2-08 |
 | M-CRE-06 | P1 | Stepper and drafts | — | 1. Fill steps 1 and 2. 2. **Back** twice, switch Exact ⇄ Open offer, go forward again. 3. Try to jump forward on the stepper. | Typed rows survive going back and switching between kinds. The stepper only goes back. | — |
 | M-CRE-07 | P1 | Expiry options | — | Create one deal each with **1 hour**, **7 days**, **Never**. | Review says "In 1 hour" / "In 7 days" / "Never"; the deal page's Expires fact matches (Never for 0). | — |
 | M-CRE-08 | P1 | NFT picker | A on step 2 | 1. **+ NFT**: check **Featured**, **Recent**, **In open deals**. 2. Paste mUSD's address. 3. Pick MockChog, type an id A doesn't own, then one that doesn't exist. 4. On the ask side, browse the collection. | Pasting a non-NFT shows "Not an NFT collection". Typed ids: "Your wallet doesn't own this token." / "That token doesn't exist in this collection." The ask side shows holders under each token. Multi-select adds "Add N NFTs" at once. | — |
@@ -328,7 +329,8 @@ The fee admin's transactions go through the admin Safe (or the dedicated EOA on 
 | M-FEE-03 | P0 | Raise is queued, shown, and can be cancelled | — | 1. Admin calls `setFee(higher)` on both. 2. Open Create, the deal dock and the signing review. 3. Admin calls `setFee(fee())` on both. | `fee()` is unchanged; `pendingFee` and `pendingFeeAt` (7 days on) are set. The app shows the queued raise beside the current fee. After step 3 nothing is pending and the notice is gone. | Automated: FA-02 |
 | M-FEE-04 | P1 | Raise prices out live swaps | Local or a dedicated testnet deploy only (needs 7 days) | Queue a raise, wait 7 days, `applyFee` on both. | Open swaps whose `maxFee` is below the new fee go **Paused** in the pool (stale), not deleted, and settle again after a cut. | Automated: FA-04 |
 | M-FEE-05 | P1 | Only the admin; never above the ceiling | — | From wallet A, call `setFee`; from the admin, try `MAX_FEE() + 1`. | Both revert (`NotFeeAdmin`, `FeeTooHigh`). | Automated: FA-01 |
-| M-FEE-06 | P1 | Recipient receives MON and WMON | After M-DEAL-01 and M-SIG-02 | Check the recipient on MonadVision. | MON from the V2 fill and WMON from the settle, each 2 × the fee. Nothing for cancels, rejects, withdrawals or reclaims. | Automated: V2-01, V2-02, IN-02 |
+| M-FEE-06 | P1 | Recipient receives MON and WMON | After M-DEAL-01 and M-SIG-02 | Check the recipient on MonadVision. | MON from the V2 fill and WMON from the settle, each the fee once for every NFT on both sides (2 × the fee for one NFT a side). Nothing for cancels, rejects, withdrawals or reclaims. | Automated: V2-01, V2-02, IN-02 |
+| M-FEE-07 | P0 | The fee is per NFT | A holds 3 Chogs; B holds 2 | 1. A lists 3 Chogs for B's 2 on Create. 2. Read the **Protocol fee** line on review, then on the deal dock as B. 3. B accepts. | Review shows 3 × the fee ("for each of your 3 NFTs"); B's dock shows 2 ×. The create value, B's fill value and the recipient's total are 3×, 2× and 5× `fee()`. Cancelling instead refunds all of A's 3 shares. A sixth NFT can't be added (the picker stops at 5). | Automated: V2-07, V2-09 |
 
 ### 4.11 Privy, profiles and @handle (PRV)
 
@@ -429,7 +431,7 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 - [ ] A mainnet deploy path exists and was reviewed. Built: `DeployEscrow` and `DeployIntents` accept chain 143 and, there only, refuse mocks, demo wallets, a zero fee or ceiling, `FEE_FIXED`, a missing or shared recipient/admin, and any `FEE_TOKEN` but the canonical WMON (`script/FeeConfig.sol`, tested). Dry-run against the real mainnet RPC passes; the reviewer still has to sign it off.
 - [ ] Canonical WMON address confirmed (`FEE_TOKEN`); the deploy script's wrap/unwrap check passed against it.
 - [ ] Fee recipient Safe and a separate fee admin Safe exist, with signers and threshold recorded.
-- [ ] `PROTOCOL_FEE_WEI` set from the agreed dollar amount ($5 per side, [ADR 0018](adr/0018-adjustable-protocol-fee.md)) at a recorded MON price; `PROTOCOL_FEE_MAX_WEI` about 4× that; both contracts deployed with the same values.
+- [ ] `PROTOCOL_FEE_WEI` set from the agreed dollar amount ($5 per NFT a side moves, [ADR 0018](adr/0018-adjustable-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)) at a recorded MON price; `PROTOCOL_FEE_MAX_WEI` about 4× that; both contracts deployed with the same values.
 - [ ] The fee covers the matcher's worst-case settlement gas at mainnet gas prices.
 - [ ] A runbook for re-pricing the fee (who decides, how both contracts are changed together, the 7-day notice for a raise).
 - [ ] Contracts source-verified on the explorer.

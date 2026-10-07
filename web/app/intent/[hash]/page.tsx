@@ -20,7 +20,7 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { explorerAddress, SHOW_INTENTS } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { sameAddress } from "@/lib/deals";
-import { erc20Asset, formatAsset } from "@/lib/assets";
+import { erc20Asset, feeUnits, formatAsset } from "@/lib/assets";
 import { formatDate } from "@/lib/format";
 import {
   isLive,
@@ -81,7 +81,9 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
   const received = settlement ? ringLegs(settlement.cycle).find((l) => l.row.hash === row.hash)?.received : undefined;
 
   const why = mine && status === "stale" ? reasonText(row.reason) : null;
-  const feeText = (amount: bigint) => formatAsset(erc20Asset(intent.feeToken, amount), info.get(intent.feeToken.toLowerCase()));
+  // The fee is charged for each NFT the maker gives, at least once (ADR 0033); `maxFee` is per NFT.
+  const units = feeUnits(intent.give);
+  const feeText = (amount: bigint) => formatAsset(erc20Asset(intent.feeToken, amount * units), info.get(intent.feeToken.toLowerCase()));
 
   return (
     <div className="space-y-8">
@@ -135,7 +137,9 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
                     hint:
                       currentFee && currentFee.amount < intent.maxFee
                         ? `Signed for up to ${feeText(intent.maxFee)}. Maker pays, only if it settles`
-                        : "Maker pays, only if it settles",
+                        : units > 1n
+                          ? `${units.toString()} NFTs given, so the fee is paid ${units.toString()} times. Maker pays, only if it settles`
+                          : "Maker pays, only if it settles",
                   },
                 ]
               : []),
@@ -196,7 +200,7 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
     stale ? intent.give : [],
     info,
     "token",
-    // The maker needs WMON for the fee that would be charged now, never more than they signed.
+    // The maker needs WMON for the fee that would be charged now, never more than they signed, per NFT they give.
     useMemo(
       () => ({
         token: intent.feeToken,

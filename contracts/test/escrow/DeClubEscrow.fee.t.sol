@@ -10,9 +10,10 @@ import {DeClubEscrowBase} from "./DeClubEscrowBase.sol";
 import {MonReceiver, ReentrantReceiver} from "../utils/Actors.sol";
 
 /// @dev The protocol fee (docs/adr/0015-protocol-fee.md, docs/adr/0018-adjustable-protocol-fee.md):
-///      every side sends the trade's fee with its own call, the escrow holds it, and it is
-///      released to the recipient only when the deal completes and refunded otherwise. The
-///      fixture deploys with a 2 MON fee (ceiling 8), so a completed deal pays 4. The admin
+///      every side sends the trade's fee, once per NFT it moves (once if none), with its own
+///      call, the escrow holds it, and it is released to the recipient only when the deal
+///      completes and refunded otherwise (docs/adr/0033-fee-per-nft.md). The fixture deploys
+///      with a 2 MON fee (ceiling 8), so a completed one-NFT-a-side deal pays 4. The admin
 ///      functions themselves are in `FeeAdmin.t.sol`.
 contract DeClubEscrowFeeTest is DeClubEscrowBase {
     uint256 internal constant FEE = 2 ether;
@@ -550,6 +551,168 @@ contract DeClubEscrowFeeTest is DeClubEscrowBase {
             assertTrue(logs[i].topics[0] != IDeClubEscrow.FeeCharged.selector, "FeeCharged emitted");
         }
         assertEq(address(free).balance, 0);
+    }
+
+    // ───────────────────────────────────────────── the fee is per NFT (ADR 0033)
+
+    function test_feeUnitsCountsNftsAndAtLeastOne() public view {
+        assertEq(swap.feeUnits(_list(_chog(A1))), 1);
+        assertEq(swap.feeUnits(_chogs(A1, 4)), 4);
+        // MON and tokens don't count, and a side without an NFT still pays one unit.
+        assertEq(swap.feeUnits(_list(_native(1 ether), _erc20(address(usdc), 1 ether))), 1);
+        assertEq(swap.feeUnits(_list(_chog(A1), _native(1 ether), _erc20(address(usdc), 1))), 1);
+        // A trait set counts the NFTs it asks for.
+        IDeClubEscrow.Asset memory two =
+            IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721Trait, address(chog), 1, 2);
+        assertEq(swap.feeUnits(_list(two, _chog(A1))), 3);
+    }
+
+    function test_aBundlePaysTheFeeForEveryNft() public {
+        IDeClubEscrow.Asset[] memory offered = _chogs(A1, 3);
+        IDeClubEscrow.Asset[] memory requested = _chogs(B1, 2);
+
+        vm.startPrank(alice);
+        vm.expectRevert(_wrongAmount(3 * FEE, FEE)); // a flat share isn't enough any more
+        swap.createTrade{value: FEE}(offered, requested, address(0), 0);
+        vm.expectRevert(_wrongAmount(3 * FEE, 3 * FEE + 1));
+        swap.createTrade{value: 3 * FEE + 1}(offered, requested, address(0), 0);
+        vm.stopPrank();
+
+        uint256 id = _create(alice, offered, requested);
+        assertEq(address(swap).balance, 3 * FEE);
+        assertEq(swap.getTrade(id).fee, FEE); // the trade records the per-NFT fee
+
+        vm.startPrank(bob);
+        vm.expectRevert(_wrongAmount(2 * FEE, FEE));
+        swap.fillTrade{value: FEE}(id);
+        vm.stopPrank();
+
+        vm.expectEmit(true, true, false, true, address(swap));
+        emit IDeClubEscrow.FeeCharged(id, treasury, 5 * FEE);
+        _fill(bob, id);
+
+        assertEq(treasury.balance, 5 * FEE); // 3 NFTs from alice, 2 from bob
+        assertEq(alice.balance, START_MON - 3 * FEE);
+        assertEq(bob.balance, START_MON - 2 * FEE);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aBundleCostsTheSameAsTheSameNftsOneByOne() public {
+        // Three NFTs each way, in one deal or in three, pay the same in all.
+        uint256 id = _create(alice, _chogs(A1, 3), _chogs(B1, 3));
+        _fill(bob, id);
+        uint256 bundled = treasury.balance;
+
+        uint256 before = treasury.balance;
+        for (uint256 i; i < 3; ++i) {
+            uint256 one = _create(alice, _list(_chog(B1 + i)), _list(_chog(A1 + i)));
+            _fill(bob, one);
+        }
+        assertEq(treasury.balance - before, bundled);
+        assertEq(bundled, 6 * FEE);
+    }
+
+    function test_moneyAndTokensAreNotNftsForTheFee() public {
+        // One NFT and a pile of other assets: still one unit a side.
+        IDeClubEscrow.Asset[] memory offered =
+            _list(_chog(A1), _native(5 ether), _erc20(address(usdc), 10 ether));
+        uint256 id = _create(alice, offered, _list(_erc20(address(weth), 3 ether)));
+        assertEq(address(swap).balance, 5 ether + FEE);
+        _fill(bob, id);
+        assertEq(treasury.balance, 2 * FEE);
+    }
+
+    function test_aSideWithNoNftPaysOneUnit() public {
+        uint256 id = _create(alice, _list(_native(1 ether)), _chogs(B1, 4));
+        assertEq(address(swap).balance, 1 ether + FEE);
+        _fill(bob, id);
+        assertEq(treasury.balance, 5 * FEE); // alice one unit, bob four NFTs
+    }
+
+    function test_cancelRefundsTheWholeBundleShare() public {
+        uint256 id = _create(alice, _chogs(A1, 4), _list(_chog(B1)));
+        assertEq(alice.balance, START_MON - 4 * FEE);
+        vm.prank(alice);
+        swap.cancelTrade(id);
+        assertEq(alice.balance, START_MON);
+        assertEq(address(swap).balance, 0);
+        assertEq(treasury.balance, 0);
+    }
+
+    function test_reclaimRefundsTheWholeBundleShare() public {
+        uint256 id = _create(
+            alice, _chogs(A1, 4), _list(_chog(B1)), address(0), uint64(block.timestamp + 1)
+        );
+        vm.warp(block.timestamp + 2);
+        swap.reclaimExpired(id);
+        assertEq(alice.balance, START_MON);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_proposalsPayAndGetBackTheirOwnBundleShare() public {
+        uint256 id = _openOffer(alice, _chogs(A1, 2), "");
+        assertEq(address(swap).balance, 2 * FEE);
+
+        IDeClubEscrow.Asset[] memory three = _chogs(B1, 3);
+        vm.prank(bob);
+        vm.expectRevert(_wrongAmount(3 * FEE, FEE));
+        swap.propose{value: FEE}(id, three);
+
+        uint256 pid = _propose(bob, id, three);
+        assertEq(address(swap).balance, 5 * FEE);
+        assertEq(bob.balance, START_MON - 3 * FEE);
+
+        // Withdrawing gives back exactly the proposer's three shares, not the maker's.
+        vm.prank(bob);
+        swap.withdrawProposal(id, pid);
+        assertEq(bob.balance, START_MON);
+        assertEq(address(swap).balance, 2 * FEE);
+
+        // Rejecting does too.
+        uint256 pid2 = _propose(bob, id, three);
+        vm.prank(alice);
+        swap.rejectProposal(id, pid2);
+        assertEq(bob.balance, START_MON);
+        assertEq(address(swap).balance, 2 * FEE);
+    }
+
+    function test_acceptingAProposalPaysBothBundleShares() public {
+        uint256 id = _openOffer(alice, _chogs(A1, 2), "");
+        uint256 pid = _propose(bob, id, _chogs(B1, 3));
+
+        vm.expectEmit(true, true, false, true, address(swap));
+        emit IDeClubEscrow.FeeCharged(id, treasury, 5 * FEE);
+        vm.prank(alice);
+        swap.acceptProposal(id, pid);
+
+        assertEq(treasury.balance, 5 * FEE);
+        assertEq(address(swap).balance, 0);
+    }
+
+    function test_aRaiseNeverTouchesAListedBundle() public {
+        uint256 id = _create(alice, _chogs(A1, 3), _chogs(B1, 2));
+        vm.prank(feeAdmin);
+        swap.setFee(FEE + 1 ether);
+        vm.warp(block.timestamp + swap.FEE_RAISE_DELAY());
+        vm.prank(feeAdmin);
+        swap.applyFee();
+
+        // Bob still pays the fee the trade was listed with, for his two NFTs.
+        _fill(bob, id);
+        assertEq(treasury.balance, 5 * FEE);
+        // A new listing pays the new fee.
+        uint256 value = swap.fee() * 2;
+        assertEq(value, 2 * (FEE + 1 ether));
+        vm.prank(alice);
+        vm.expectRevert(_wrongAmount(value, FEE));
+        swap.createTrade{value: FEE}(_chogs(A1 + 3, 2), _list(_chog(B1 + 2)), address(0), 0);
+    }
+
+    function test_theWorstBundleIsFiveNftsASide() public {
+        uint256 id = _create(alice, _chogs(A1, 5), _chogs(B1, 5));
+        assertEq(address(swap).balance, 5 * FEE);
+        _fill(bob, id);
+        assertEq(treasury.balance, 10 * FEE);
     }
 
     // ───────────────────────────────────────────── fuzz

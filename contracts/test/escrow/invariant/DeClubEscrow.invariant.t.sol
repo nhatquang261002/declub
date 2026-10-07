@@ -13,7 +13,7 @@ import {Handler} from "./Handler.sol";
 /// @dev The escrow is always exactly what open trades and `Active` proposals hold plus what is
 ///      credited for `claim`, for native, every ERC-20 and every NFT, however the calls
 ///      interleave. Native also holds one fee share per open trade and per `Active` proposal, at
-///      that trade's own fee, and the fee recipient has received exactly 2 × the trade's fee for
+///      that trade's own fee, and the fee recipient has received exactly the trade's fee per NFT (once for a side with none), both sides, for
 ///      every deal that completed. The fee admin changes the fee during the run.
 contract DeClubEscrowInvariantTest is Test {
     uint256 internal constant FEE = 3 ether;
@@ -106,18 +106,27 @@ contract DeClubEscrowInvariantTest is Test {
         return false;
     }
 
-    /// @dev Fee shares the escrow holds, each at its trade's own fee: one per open trade (the
-    ///      maker's) and per `Active` proposal (the proposer's).
+    /// @dev Fee shares the escrow holds, each at its trade's own fee per NFT (one unit if the
+    ///      side has none): the maker's for each open trade, the proposer's for each `Active`
+    ///      proposal.
     function _heldShares() internal view returns (uint256 held) {
         for (uint256 id = 1; id <= swap.tradeCount(); ++id) {
             IDeClubEscrow.Trade memory t = swap.getTrade(id);
-            if (t.status == IDeClubEscrow.Status.Open) held += t.fee;
+            if (t.status == IDeClubEscrow.Status.Open) held += t.fee * _units(t.offered);
             for (uint256 pid; pid < swap.proposalCount(id); ++pid) {
-                if (swap.getProposal(id, pid).status == IDeClubEscrow.ProposalStatus.Active) {
-                    held += t.fee;
+                IDeClubEscrow.Proposal memory p = swap.getProposal(id, pid);
+                if (p.status == IDeClubEscrow.ProposalStatus.Active) {
+                    held += t.fee * _units(p.assets);
                 }
             }
         }
+    }
+
+    function _units(IDeClubEscrow.Asset[] memory assets) internal pure returns (uint256 nfts) {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == IDeClubEscrow.AssetType.ERC721) nfts++;
+        }
+        if (nfts == 0) nfts = 1;
     }
 
     /// I1: native balance == Σ open native offered + Σ fee shares held + Σ native credits
@@ -131,7 +140,7 @@ contract DeClubEscrowInvariantTest is Test {
         );
     }
 
-    /// V9: the recipient has received exactly 2 × the trade's own fee per completed deal, as MON
+    /// V9: the recipient has received exactly the trade's own fee per NFT, both sides, per completed deal, as MON
     ///     or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or
     ///     withdrawn.
     function invariant_feesAreOnlyTakenOnCompletion() public view {

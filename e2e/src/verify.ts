@@ -238,6 +238,10 @@ const cases: Case<Ctx>[] = [
     id: "DEP-08",
     title: "Protocol constants",
     async run(c, note) {
+      const [v2Nfts, inNfts] = await Promise.all([
+        read<bigint>(c, c.v2, c.v2Art.abi, "MAX_NFTS_PER_SIDE"),
+        read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_NFTS_PER_SIDE"),
+      ]);
       const [v2Assets, inAssets, cycle, note_, spec] = await Promise.all([
         read<bigint>(c, c.v2, c.v2Art.abi, "MAX_ASSETS_PER_SIDE"),
         read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_ASSETS_PER_SIDE"),
@@ -245,9 +249,11 @@ const cases: Case<Ctx>[] = [
         read<bigint>(c, c.v2, c.v2Art.abi, "MAX_NOTE_BYTES"),
         read<bigint>(c, c.v2, c.v2Art.abi, "MAX_SPEC_BYTES"),
       ]);
-      note(`assets per side ${v2Assets}/${inAssets}, max cycle ${cycle}, note ${note_} bytes, spec ${spec} bytes`);
+      note(`assets per side ${v2Assets}/${inAssets}, NFTs per side ${v2Nfts}/${inNfts}, max cycle ${cycle}, note ${note_} bytes, spec ${spec} bytes`);
       assert.equal(v2Assets, 10n);
       assert.equal(inAssets, 10n);
+      assert.equal(v2Nfts, 5n);
+      assert.equal(inNfts, 5n);
       assert.equal(cycle, 4n);
     },
   },

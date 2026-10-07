@@ -39,7 +39,7 @@ import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTraitFill } from "@/hooks/useTraitFill";
 import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
-import { ASSET_TYPE, erc20Tokens, formatAsset, nativeAsset, sameAsset, type Asset } from "@/lib/assets";
+import { ASSET_TYPE, erc20Tokens, feeUnits, formatAsset, nativeAsset, sameAsset, sideFee, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
 import { DECLUB_ESCROW_ADDRESS, SHOW_V2 } from "@/lib/config";
 import { Who } from "@/components/Who";
@@ -133,8 +133,8 @@ function DealDetailV2({ id }: { id: bigint }) {
 
   async function accept() {
     if (fee === undefined) return;
-    // What the maker asked for in MON, plus this wallet's share of the protocol fee.
-    const value = requestedNative + fee;
+    // What the maker asked for in MON, plus this wallet's share of the protocol fee: one per NFT it hands over.
+    const value = requestedNative + sideFee(fee, deal!.requested);
     const receipt = traitFill.hasTraits
       ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
       : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value });
@@ -238,12 +238,16 @@ function DealDetailV2({ id }: { id: bigint }) {
                 ])}
               />
               {fee !== undefined && (
-                <FeeNote amount={fee}>Sent with your payment. The maker pays the same, and neither is charged unless the swap completes.</FeeNote>
+                <FeeNote amount={fee} units={feeUnits(deal.requested)}>
+                  Sent with your payment, once for each NFT you hand over. The maker pays the same for theirs, and neither is charged unless the swap completes.
+                </FeeNote>
               )}
             </>
           )}
           {fee !== undefined && status === "open" && isMaker && (
-            <FeeNote amount={fee}>Held with your deal. Charged only if it completes; returned if you cancel or it expires.</FeeNote>
+            <FeeNote amount={fee} units={feeUnits(deal.offered)}>
+              Held with your deal, once for each NFT you offer. Charged only if it completes; returned if you cancel or it expires.
+            </FeeNote>
           )}
 
           {(status === "open" && isMaker) || status === "expired" || canFill || canPropose ? (

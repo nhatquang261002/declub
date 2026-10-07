@@ -10,6 +10,17 @@ import { type Asset, AssetType, type Intent } from "./types.ts";
 
 export const MAX_CYCLE = 4;
 export const MAX_ASSETS_PER_SIDE = 10;
+/** The most NFTs one side can move: the protocol fee is paid per NFT (ADR 0033). */
+export const MAX_NFTS_PER_SIDE = 5;
+
+/** The NFTs in `assets`. */
+export const nftCount = (assets: Asset[]): number => assets.filter((a) => a.assetType === AssetType.ERC721).length;
+
+/**
+ * What a maker's fee is multiplied by (`DeClubIntents`' per-NFT fee, ADR 0033): the NFTs they
+ * give, or one if they give none.
+ */
+export const feeUnits = (give: Asset[]): bigint => BigInt(Math.max(nftCount(give), 1));
 
 export const domain = (chainId: number, verifyingContract: Address) =>
   ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
@@ -112,6 +123,7 @@ export function shapeProblem(intent: Intent): string | null {
     if (assets.length > MAX_ASSETS_PER_SIDE) {
       return `${side} has more than ${MAX_ASSETS_PER_SIDE} assets`;
     }
+    if (nftCount(assets) > MAX_NFTS_PER_SIDE) return `${side} has more than ${MAX_NFTS_PER_SIDE} NFTs`;
     for (const [i, a] of assets.entries()) {
       if (a.assetType === AssetType.ERC20) {
         if (a.id !== 0n || a.amount === 0n) return `${side}[${i}]: ERC-20 needs id 0 and amount > 0`;

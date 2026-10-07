@@ -152,7 +152,7 @@ const AFTER: ReadonlyArray<{ title: string; body: ReactNode; signed?: boolean }>
 ];
 
 const FEES = [
-  "A small flat fee per side, so both people pay the same.",
+  "A small fee for each NFT a side gives (one if it gives none), so a bundle pays the same as the same NFTs traded one by one.",
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
@@ -160,8 +160,8 @@ const FEES = [
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [
-  ["Locked deals", "Paid in MON with your side, held with it, and refunded if the deal doesn't complete. The fee a deal was listed with is the fee both sides pay."],
-  ["Signed swaps", "Paid in WMON (wrapped MON) when the swap settles. You sign the most you'll pay; if the fee drops first, you pay less."],
+  ["Locked deals", "Paid in MON with your side, held with it, and refunded if the deal doesn't complete. The fee a deal was listed with is the fee both sides pay, for each NFT they give."],
+  ["Signed swaps", "Paid in WMON (wrapped MON) when the swap settles, for each NFT you give. You sign the most you'll pay per NFT; if the fee drops first, you pay less."],
 ];
 
 const SAFETY = [
@@ -267,7 +267,7 @@ export default function GuidePage() {
           <h3 className="mt-10 mb-4 text-lg font-black">Three kinds of deal</h3>
           <CardGrid items={KINDS} />
           <p className="mt-4 text-sm leading-6 text-muted">
-            Each side holds up to 10 assets: any mix of NFTs, tokens and MON. To make a deal for one person, put their
+            Each side holds up to 10 assets, at most 5 of them NFTs: any mix of NFTs, tokens and MON. To make a deal for one person, put their
             wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b> (<b>Only this wallet can send offers</b> on an open offer). A live or settled deal can be shared
             with <b>Share on X</b>, which shows a preview card first.
           </p>

@@ -126,8 +126,8 @@ export function ConsentNotice({ className = "" }: { className?: string }) {
           until it settles, expires, or you revoke it.
         </li>
         <li>
-          If it settles, the protocol fee comes out of the wallet that signed it, in WMON. If it doesn&apos;t, nobody
-          pays anything.
+          If it settles, the protocol fee comes out of the wallet that signed it, in WMON, for each NFT it gave. If it
+          doesn&apos;t, nobody pays anything.
         </li>
         <li>You can&apos;t edit it once signed. Removing it from the pool doesn&apos;t recall a signature that already left, so keep the deadline short.</li>
       </ul>

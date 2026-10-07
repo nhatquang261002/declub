@@ -118,6 +118,8 @@ export const PRIVY_APP_ID = env.privyAppId?.trim() || undefined;
 export const PRIVY_EMBEDDED_WALLETS = env.privyEmbedded === "true";
 
 export const MAX_TOKENS_PER_SIDE = 10;
+/** DeClubEscrow.MAX_NFTS_PER_SIDE: the fee is paid per NFT, so one deal can't move more than this many (ADR 0033). */
+export const MAX_NFTS_PER_SIDE = 5;
 /** DeClubEscrow.MAX_NOTE_BYTES: the limit is in bytes, not characters. */
 export const MAX_NOTE_BYTES = 280;
 /** DeClubEscrow.MAX_SPEC_BYTES: the stored description of a deal's trait requests. */

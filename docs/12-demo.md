@@ -30,7 +30,7 @@ Only the demo holdings are minted: 61 tokens over 13 wallets. Each mirror's `own
 
 The demo has its own DeClubEscrow and DeClubRewards, deployed by the demo's bank wallet:
 
-- **DeClubEscrow:** fee 0.05 MON a side, fixed (`FEE_FIXED`), paid to the bank. The older testnet escrow charges 2 MON a side, which would cost more for each swap than the demo budget allows.
+- **DeClubEscrow:** fee 0.05 MON a side, fixed (`FEE_FIXED`), paid to the bank. This is the deployment from before [ADR 0033](adr/0033-fee-per-nft.md); a redeploy charges that per NFT a side moves, which is the same for the demo's one-NFT swaps. The older testnet escrow charges 2 MON a side, which would cost more for each swap than the demo budget allows.
 - **DeClubRewards:** the bank is the operator, with no claim delay. Fees come back to the bank and fund the epochs.
 
 Epochs are a day long (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS=86400`). The genesis is set so that the first epoch closes just after the seeded swaps, so it can be built, published and claimed during the demo while the next one fills up.

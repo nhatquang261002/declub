@@ -34,7 +34,8 @@ Needs Node 24+, and `anvil` for the local run.
 | V2-04 | Private deal: only the named taker fills |
 | V2-05 | Open offer: two proposals, reject one, accept one, a third withdrawn; `fillTrade` refused |
 | V2-06 | Trait deal with the app's Merkle builder; a token outside the set is refused |
-| V2-07 | Multi-asset deal, gas recorded |
+| V2-07 | Multi-asset deal, gas recorded; the fee is 5 NFTs × the per-NFT fee |
+| V2-09 | The fee is per NFT: a 5-NFT bundle pays for every NFT, a side with none pays once, a 6th NFT is refused |
 | V2-08 | Guards: self-fill, wrong MON amount (and a missing fee share), duplicate asset, past expiry, empty side, MON sent straight to the contract |
 | IN-01 | EIP-712 domain, struct hash and digest agree with the contract |
 | IN-02 | Pair settled by a third party; each maker pays the fee in WMON |
@@ -65,7 +66,7 @@ npm run local -- --no-matcher      # skip the matcher (IN-08 skips)
 E2E_MATCHER_LOGS=1 npm run local   # show the matcher's log
 ```
 
-The local deployment uses anvil's public test mnemonic: accounts 1 to 5 trade, 7 is the fee admin, 8 the fee recipient, 9 the matcher. The fee is 2 MON per side with an 8 MON ceiling.
+The local deployment uses anvil's public test mnemonic: accounts 1 to 5 trade, 7 is the fee admin, 8 the fee recipient, 9 the matcher. The fee is 2 MON per NFT a side moves, with an 8 MON ceiling.
 
 ### Testnet
 
@@ -101,7 +102,7 @@ npm run verify -- --mainnet        # mainnet rules: warnings become failures, ev
 | DEP-05 | The intents EIP-712 domain is `("DeClubIntents", "1")`, as the app and matcher sign |
 | DEP-06 | Both contracts have the same fee, ceiling, recipient and admin |
 | DEP-07 | The matcher's `/info` agrees with the chain; its gas wallet holds at least `E2E_MATCHER_MIN_MON` (default 1) |
-| DEP-08 | Assets per side 10, max cycle 4 |
+| DEP-08 | Assets per side 10, NFTs per side 5, max cycle 4 |
 | DEP-09 | App env: `NEXT_PUBLIC_CHOG_ADDRESS` set and deployed, `FILL_WATCHER_START_BLOCK` set |
 
 Expectations, all optional except under `--mainnet`: `EXPECT_FEE_WEI`, `EXPECT_MAX_FEE_WEI`, `EXPECT_FEE_RECIPIENT`, `EXPECT_FEE_ADMIN`, `EXPECT_FEE_TOKEN`. Override the addresses with `VERIFY_V2_ADDRESS`, `VERIFY_INTENTS_ADDRESS` and `VERIFY_RPC_URL`.

@@ -17,7 +17,7 @@ import {BlocklistToken} from "../../utils/WeirdTokens.sol";
 ///      The swap charges a protocol fee: every create, proposal and fill sends it with the call,
 ///      and the fee recipient is a MON-rejecting contract at times, so its credit is exercised.
 ///      The fee admin changes the fee as the run goes, so trades carry different fees and every
-///      side must pay, and get back, its own trade's.
+///      side must pay, and get back, its own trade's, once for each NFT it moves (once if none).
 contract Handler is Test {
     DeClubEscrow public immutable swap;
     MockChog public immutable chog;
@@ -40,7 +40,7 @@ contract Handler is Test {
     uint256 public ghost_openOfferFilled; // V8: fillTrade must never settle an open offer
     uint256 public ghost_validProposalOpReverted; // valid propose / accept / reject / withdraw
     uint256 public ghost_completed; // deals that completed: a fill or an accepted proposal
-    uint256 public ghost_feesCharged; // V9: 2 × the trade's fee per completed deal
+    uint256 public ghost_feesCharged; // V9: the trade's fee per NFT, for both sides, per completed deal
 
     mapping(bytes32 => uint256) public calls;
 
@@ -108,7 +108,7 @@ contract Handler is Test {
         if (offered.length == 0 || requested.length == 0) return;
 
         // Read before the prank: any call, even a view, would spend it.
-        uint256 value = _sum(offered, 0) + swap.fee();
+        uint256 value = _sum(offered, 0) + swap.fee() * _units(offered);
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
         address taker = restrictTaker ? counterparty : address(0);
@@ -138,7 +138,7 @@ contract Handler is Test {
         uint256[3] memory makerBefore = _holdings(t.maker);
         uint256[3] memory takerBefore = _holdings(taker);
         vm.prank(taker);
-        try swap.fillTrade{value: _sum(t.requested, 0) + t.fee}(id) {
+        try swap.fillTrade{value: _sum(t.requested, 0) + t.fee * _units(t.requested)}(id) {
             if (expired) ghost_expiredFills++;
             expectedStatus[id] = IDeClubEscrow.Status.Filled;
             _checkNfts(t.offered, taker);
@@ -149,11 +149,13 @@ contract Handler is Test {
                 ghost_badSettlements++;
             }
             // The taker also sends its fee share; the maker's was sent when it created the trade.
-            if (!_gained(taker, takerBefore, t.offered, t.requested, 0, t.fee)) {
+            if (!_gained(
+                    taker, takerBefore, t.offered, t.requested, 0, t.fee * _units(t.requested)
+                )) {
                 ghost_badSettlements++;
             }
             ghost_completed++;
-            ghost_feesCharged += 2 * uint256(t.fee);
+            ghost_feesCharged += uint256(t.fee) * (_units(t.offered) + _units(t.requested));
             calls["fill"]++;
         } catch {
             if (!expired) ghost_validFillReverted++;
@@ -176,7 +178,7 @@ contract Handler is Test {
 
         uint64 expiry =
             expirySeed % 3 == 0 ? 0 : uint64(block.timestamp + bound(expirySeed, 1, 3 days));
-        uint256 value = _sum(offered, 0) + swap.fee();
+        uint256 value = _sum(offered, 0) + swap.fee() * _units(offered);
         vm.prank(maker);
         uint256 id = swap.createOpenOffer{value: value}(
             offered, restrictTaker ? counterparty : address(0), expiry, "note"
@@ -204,7 +206,9 @@ contract Handler is Test {
         if (assets.length == 0) return;
 
         vm.prank(proposer);
-        try swap.propose{value: _sum(assets, 0) + t.fee}(id, assets) returns (uint256 pid) {
+        try swap.propose{value: _sum(assets, 0) + t.fee * _units(assets)}(id, assets) returns (
+            uint256 pid
+        ) {
             if (pid != swap.proposalCount(id) - 1) ghost_validProposalOpReverted++;
             expectedProposal[id][pid] = IDeClubEscrow.ProposalStatus.Active;
             calls["propose"]++;
@@ -236,7 +240,7 @@ contract Handler is Test {
                 ghost_badSettlements++;
             }
             ghost_completed++;
-            ghost_feesCharged += 2 * uint256(t.fee);
+            ghost_feesCharged += uint256(t.fee) * (_units(t.offered) + _units(p.assets));
             calls["accept"]++;
         } catch {
             ghost_validProposalOpReverted++;
@@ -257,7 +261,14 @@ contract Handler is Test {
         try swap.rejectProposal(id, pid) {
             expectedProposal[id][pid] = IDeClubEscrow.ProposalStatus.Rejected;
             _checkNfts(p.assets, p.proposer);
-            if (!_gained(p.proposer, before, p.assets, new IDeClubEscrow.Asset[](0), t.fee, 0)) {
+            if (!_gained(
+                    p.proposer,
+                    before,
+                    p.assets,
+                    new IDeClubEscrow.Asset[](0),
+                    t.fee * _units(p.assets),
+                    0
+                )) {
                 ghost_badRefunds++;
             }
             calls["reject"]++;
@@ -275,7 +286,7 @@ contract Handler is Test {
         uint256 pid = proposalSeed % n;
         IDeClubEscrow.Proposal memory p = swap.getProposal(id, pid);
         if (p.status != IDeClubEscrow.ProposalStatus.Active) return;
-        uint256 share = swap.getTrade(id).fee;
+        uint256 share = swap.getTrade(id).fee * _units(p.assets);
 
         uint256[3] memory before = _holdings(p.proposer);
         vm.prank(p.proposer);
@@ -300,7 +311,14 @@ contract Handler is Test {
         try swap.cancelTrade(id) {
             expectedStatus[id] = IDeClubEscrow.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, before, t.offered, new IDeClubEscrow.Asset[](0), t.fee, 0)) {
+            if (!_gained(
+                    t.maker,
+                    before,
+                    t.offered,
+                    new IDeClubEscrow.Asset[](0),
+                    t.fee * _units(t.offered),
+                    0
+                )) {
                 ghost_badRefunds++;
             }
             calls["cancel"]++;
@@ -320,7 +338,14 @@ contract Handler is Test {
         try swap.reclaimExpired(id) {
             expectedStatus[id] = IDeClubEscrow.Status.Cancelled;
             _checkNfts(t.offered, t.maker);
-            if (!_gained(t.maker, makerBefore, t.offered, new IDeClubEscrow.Asset[](0), t.fee, 0)) {
+            if (!_gained(
+                    t.maker,
+                    makerBefore,
+                    t.offered,
+                    new IDeClubEscrow.Asset[](0),
+                    t.fee * _units(t.offered),
+                    0
+                )) {
                 ghost_badRefunds++;
             }
             // A caller who isn't the maker gets nothing.
@@ -433,6 +458,14 @@ contract Handler is Test {
         }
     }
 
+    /// @dev What a side's fee is multiplied by: its NFTs, or 1 if it has none.
+    function _units(IDeClubEscrow.Asset[] memory assets) internal pure returns (uint256 nfts) {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == IDeClubEscrow.AssetType.ERC721) nfts++;
+        }
+        if (nfts == 0) nfts = 1;
+    }
+
     /// @dev Bitmask (bit0 native, bit1 usdc, bit2 blk) of the fungibles in `assets`.
     function _maskOf(IDeClubEscrow.Asset[] memory assets) internal view returns (uint256 mask) {
         for (uint256 i; i < assets.length; ++i) {
@@ -481,7 +514,7 @@ contract Handler is Test {
         for (uint256 i; i < t.requested.length; ++i) {
             IDeClubEscrow.Asset memory a = t.requested[i];
             if (a.assetType == IDeClubEscrow.AssetType.Native) {
-                if (taker.balance < a.amount + t.fee) return false;
+                if (taker.balance < a.amount + t.fee * _units(t.requested)) return false;
             } else if (a.assetType == IDeClubEscrow.AssetType.ERC20) {
                 if (IERC20Like(a.token).balanceOf(taker) < a.amount) return false;
                 // A blocked maker can't receive the blocklist token, which reverts the fill.

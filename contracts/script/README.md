@@ -18,7 +18,7 @@ Deploys `DeClubEscrow` ([ADR 0005](../../docs/adr/0005-generic-asset-model.md)) 
 
 | Variable | |
 |---|---|
-| `PROTOCOL_FEE_WEI` | what each side pays per completed deal, in MON wei, until the fee admin changes it (default 0) |
+| `PROTOCOL_FEE_WEI` | what each side pays per NFT it moves in a completed deal (once if none), in MON wei, until the fee admin changes it (default 0; [ADR 0033](../../docs/adr/0033-fee-per-nft.md)) |
 | `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above, at most 500 MON; required when `PROTOCOL_FEE_WEI` is set |
 | `FEE_RECIPIENT` | who receives it (a Safe); required when the ceiling is not 0 |
 | `FEE_ADMIN` | who may change the fee (a different Safe); required when the ceiling is not 0, unless `FEE_FIXED` is set |

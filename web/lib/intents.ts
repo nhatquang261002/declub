@@ -1,6 +1,6 @@
 import { getAddress, hashStruct, isAddress, type Address, type Hex } from "viem";
-import { toAsset, toRawAsset, type Asset } from "./assets";
-import { CHAIN_ID, MAX_TOKENS_PER_SIDE } from "./config";
+import { nftCount, toAsset, toRawAsset, type Asset } from "./assets";
+import { CHAIN_ID, MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE } from "./config";
 import { sameAddress } from "./deals";
 import type { DealV2 } from "./dealsV2";
 
@@ -14,9 +14,9 @@ export type Intent = {
   give: Asset[];
   want: Asset[];
   /**
-   * The protocol fee token, and the most the maker agrees to pay if the cycle settles (ADR 0015,
-   * 0018). The contract charges its current `fee()`, and refuses the intent while that is above
-   * `maxFee`.
+   * The protocol fee token, and the most the maker agrees to pay for each NFT they give if the
+   * cycle settles (ADR 0015, 0018, 0033). The contract charges its current `fee()` for each of
+   * them (once if they give none), and refuses the intent while that is above `maxFee`.
    */
   feeToken: Address;
   maxFee: bigint;
@@ -279,6 +279,9 @@ export function intentProblem(give: readonly Asset[], want: readonly Asset[]): s
   if (give.length > MAX_TOKENS_PER_SIDE || want.length > MAX_TOKENS_PER_SIDE) {
     return `Up to ${MAX_TOKENS_PER_SIDE} assets per side.`;
   }
+  if (nftCount(give) > MAX_NFTS_PER_SIDE || nftCount(want) > MAX_NFTS_PER_SIDE) {
+    return `Up to ${MAX_NFTS_PER_SIDE} NFTs per side.`;
+  }
   const same = (a: Asset, b: Asset) => a.kind === b.kind && sameAddress(a.token, b.token) && a.id === b.id;
   if (give.some((g) => want.some((w) => same(g, w)))) {
     return "The same asset can't be on both sides. Give and ask for different assets.";
@@ -304,7 +307,7 @@ export const intentAsListing = (row: PoolIntent): SignedListing => ({
   taker: null,
   expiry: row.intent.deadline,
   status: isLive(row.status) ? "open" : row.status === "settled" ? "filled" : "cancelled",
-  // The most each side pays. What is charged is the contract's fee at settlement, never more.
+  // The most each side pays per NFT it gives. What is charged is the contract's fee at settlement, never more.
   fee: row.intent.maxFee,
   offered: row.intent.give,
   requested: row.intent.want,

@@ -12,7 +12,7 @@ import {MockERC20} from "../../src/mocks/MockERC20.sol";
 ///      The swap is deployed with no protocol fee, so a test reads as the plain deal; the
 ///      fee suite (`DeClubEscrow.fee.t.sol`) overrides `_fee` and the invariants run with one.
 ///      Every helper that sends native MON adds the right share (`swap.fee()` to create, the
-///      trade's own `fee` to propose or fill), so it works either way. `feeAdmin` may change
+///      trade's own `fee` to propose or fill, times the NFTs on the side), so it works either way. `feeAdmin` may change
 ///      the fee up to `_maxFee`.
 abstract contract DeClubEscrowBase is Test {
     uint256 internal constant START_MON = 100 ether;
@@ -46,7 +46,7 @@ abstract contract DeClubEscrowBase is Test {
         _onboard(carol);
     }
 
-    /// @dev The per-side protocol fee the fixture deploys with. 0 unless a suite overrides it.
+    /// @dev The per-NFT protocol fee the fixture deploys with. 0 unless a suite overrides it.
     function _fee() internal view virtual returns (uint256) {
         return 0;
     }
@@ -148,7 +148,7 @@ abstract contract DeClubEscrowBase is Test {
         uint64 expiry
     ) internal returns (uint256 id) {
         // Read the value before the prank: any call, even a view, would spend it.
-        uint256 value = _nativeOf(offered) + swap.fee();
+        uint256 value = _nativeOf(offered) + swap.fee() * _units(offered);
         vm.prank(maker);
         id = swap.createTrade{value: value}(offered, requested, taker, expiry);
     }
@@ -168,7 +168,7 @@ abstract contract DeClubEscrowBase is Test {
         address taker,
         uint64 expiry
     ) internal returns (uint256 id) {
-        uint256 value = _nativeOf(offered) + swap.fee();
+        uint256 value = _nativeOf(offered) + swap.fee() * _units(offered);
         vm.prank(maker);
         id = swap.createOpenOffer{value: value}(offered, taker, expiry, note);
     }
@@ -177,14 +177,14 @@ abstract contract DeClubEscrowBase is Test {
         internal
         returns (uint256 proposalId)
     {
-        uint256 value = _nativeOf(assets) + swap.getTrade(id).fee;
+        uint256 value = _nativeOf(assets) + swap.getTrade(id).fee * _units(assets);
         vm.prank(who);
         proposalId = swap.propose{value: value}(id, assets);
     }
 
     function _fill(address taker, uint256 id) internal {
         IDeClubEscrow.Trade memory t = swap.getTrade(id);
-        uint256 value = _nativeOf(t.requested) + t.fee;
+        uint256 value = _nativeOf(t.requested) + t.fee * _units(t.requested);
         vm.prank(taker);
         swap.fillTrade{value: value}(id);
     }
@@ -193,6 +193,19 @@ abstract contract DeClubEscrowBase is Test {
         for (uint256 i; i < assets.length; ++i) {
             if (assets[i].assetType == IDeClubEscrow.AssetType.Native) sum += assets[i].amount;
         }
+    }
+
+    /// @dev What a side's fee is multiplied by: its NFTs (a trait set counts its amount), or 1.
+    ///      Written out here, not read from `feeUnits`, so the tests don't lean on the contract.
+    function _units(IDeClubEscrow.Asset[] memory assets) internal pure returns (uint256 nfts) {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == IDeClubEscrow.AssetType.ERC721) {
+                nfts += 1;
+            } else if (assets[i].assetType == IDeClubEscrow.AssetType.ERC721Trait) {
+                nfts += assets[i].amount;
+            }
+        }
+        if (nfts == 0) nfts = 1;
     }
 
     function _status(uint256 id) internal view returns (IDeClubEscrow.Status) {

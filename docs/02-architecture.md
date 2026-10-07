@@ -30,7 +30,7 @@
  │  │ DeClubEscrow            │         │ DeClubIntents               │   │
  │  │ locked deals: exact,    │         │ signed swaps: pairs and     │   │
  │  │ trait, open offers;     │         │ rings, wallet to wallet;    │   │
- │  │ fee in MON per side     │         │ fee in WMON per maker       │   │
+ │  │ fee in MON per NFT      │         │ fee in WMON per NFT given   │   │
  │  └────────────┬────────────┘         └──────────────┬──────────────┘   │
  │               └─────── both inherit FeeAdmin ───────┘                  │
  │                                  │ transfers                           │
@@ -47,7 +47,7 @@ No indexer: deals are read from storage ([ADR 0003](adr/0003-no-indexer-in-v1.md
 
 ### DeClubEscrow (`contracts/src/DeClubEscrow.sol`)
 
-The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No upgrade proxy. A trade is two `Asset[]` (ERC-721, ERC-20, MON, or an `ERC721Trait` request), up to 10 per side.
+The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No upgrade proxy. A trade is two `Asset[]` (ERC-721, ERC-20, MON, or an `ERC721Trait` request), up to 10 per side and at most 5 NFTs.
 
 | Responsibility | How |
 |---|---|
@@ -55,11 +55,11 @@ The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No
 | Escrow | Holds the maker's offered assets, and each proposal's assets on an open offer |
 | Settlement | `fillTrade` / `fillTraitTrade` / `acceptProposal` pay both sides in one call |
 | Refunds | `cancelTrade` (maker), `reclaimExpired` (anyone, after expiry), `rejectProposal` / `withdrawProposal`, and `claim` (pull fallback when a push fails) |
-| Fee | A flat MON fee per side of a completed deal, recorded on the trade at creation ([ADR 0015](adr/0015-protocol-fee.md)) |
+| Fee | A MON fee for each NFT a side moves (once if none), up to 5 NFTs a side, recorded on the trade at creation ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)) |
 
 ### DeClubIntents (`contracts/src/DeClubIntents.sol`)
 
-Settles signed EIP-712 intents wallet to wallet, nothing escrowed ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). `settle(cycle, signatures)` takes a pair or a ring of up to 4 and re-checks every signature, nonce, deadline and transfer. Each maker pays the fee in WMON, capped by the `maxFee` they signed. Domain `("DeClubIntents", "1")`.
+Settles signed EIP-712 intents wallet to wallet, nothing escrowed ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). `settle(cycle, signatures)` takes a pair or a ring of up to 4 and re-checks every signature, nonce, deadline and transfer. Each maker pays the fee in WMON for each NFT they give, capped by the per-NFT `maxFee` they signed. Domain `("DeClubIntents", "1")`.
 
 ### DeClubRewards (`contracts/src/DeClubRewards.sol`)
 
@@ -100,7 +100,7 @@ Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`
 Maker                          Token contracts                 DeClubEscrow
   │ approve / setApprovalForAll(escrow) ────►│                      │  (once per token)
   │ createTrade(offered, requested, taker, expiry)                  │
-  │   {value: offered MON + fee}  (or createTraitTrade / createOpenOffer)
+  │   {value: offered MON + fee × NFTs offered}  (or createTraitTrade / createOpenOffer)
   │ ───────────────────────────────────────────────────────────────►│
   │                                          │◄── transferFrom(maker → escrow) × offered
   │                                          │                      │── emit TradeCreated
@@ -112,7 +112,7 @@ Maker                          Token contracts                 DeClubEscrow
 ```text
 Taker                          Token contracts                 DeClubEscrow              Maker
   │ approve requested tokens ───────────────►│                      │                   │
-  │ fillTrade(id) {value: requested MON + fee}  (fillTraitTrade with proofs)            │
+  │ fillTrade(id) {value: requested MON + fee × NFTs requested}  (fillTraitTrade with proofs)            │
   │ ───────────────────────────────────────────────────────────────►│                   │
   │                                          │   status = Filled (effects first)        │
   │                                          │◄── taker → maker  × requested ──────────►│

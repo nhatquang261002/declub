@@ -70,7 +70,7 @@ Neither party has to trust the other.
 | 4.1 | Chog #421 | Chog #812 | ✅ |
 | 4.2 | Chog #421 + 2 MON | Chog #812 | ✅ |
 | 4.3 | Chog #421 | Chog #812 + 3 MON | ✅ |
-| —   | Chog #421, #500 | Chog #812 | ✅ (up to 10 assets per side, any mix of ERC-721, ERC-20 and MON) |
+| —   | Chog #421, #500 | Chog #812 | ✅ (up to 10 assets per side, at most 5 of them NFTs; any mix of ERC-721, ERC-20 and MON) |
 | 4.4 | Chog #421 | *Any* Chog with Wizard Hat + Blue Eyes, plus 3 MON | ✅ trait request: `createTraitTrade` / `fillTraitTrade` in `DeClubEscrow` ([ADR 0006](adr/0006-trait-requests-in-v2.md)) |
 | 4.5 | Chog #421 | "Make me an offer" | ✅ open offer: takers lock proposals, the maker accepts one ([ADR 0007](adr/0007-open-offers.md)) |
 | 4.6 | Chog #421, nothing locked | Bob's NFT, or a ring of up to 4 | ✅ signed swap, settled by a matcher ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) |
@@ -127,7 +127,7 @@ The original "My Chogs" page is gone: the NFT picker in Create lists what a wall
 - ✅ Open offers ([ADR 0007](adr/0007-open-offers.md))
 - ✅ Trade intents and automated matching: signed swaps and the matcher ([ADR 0008](adr/0008-trade-intents.md), [`matcher/`](../matcher/README.md))
 - ✅ Multi-party (ring) swaps, up to 4 ([ADR 0009](adr/0009-ring-swaps.md))
-- ✅ Protocol fee, a flat amount per side of a completed deal, adjustable by a fee admin within a ceiling; raises wait 7 days ([ADR 0015](adr/0015-protocol-fee.md), [0018](adr/0018-adjustable-protocol-fee.md))
+- ✅ Protocol fee, an amount for each NFT a side moves (once if none) in a completed deal, adjustable by a fee admin within a ceiling; raises wait 7 days ([ADR 0015](adr/0015-protocol-fee.md), [0018](adr/0018-adjustable-protocol-fee.md), [0033](adr/0033-fee-per-nft.md))
 - ✅ Verified profiles and deal-by-@handle ([ADR 0011](adr/0011-verified-profiles.md), [0017](adr/0017-deal-by-handle.md), [10 · Privy](10-privy.md))
 - ✅ Clubs: a community per verified asset, with Momentum ([ADR 0016](adr/0016-clubs-and-momentum.md), [09 · Clubs](09-clubs.md))
 - Reputation (Momentum is the first step)
