@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ReactNode } from "react";
+import { SITE_URL } from "@/lib/config";
 
 /** What every share card (a deal, a Club's recap) is drawn with, so they read as one family. */
 export const CARD_SIZE = { width: 1200, height: 630 };
@@ -11,6 +12,9 @@ export const CREAM = "#fff8e6";
 export const BLUE = "#315ea8";
 export const GREEN = "#7bd8a4";
 export const PINK = "#d83b45";
+
+/** The host the card signs off with: wherever the app is served (NEXT_PUBLIC_SITE_URL), never a guess. */
+const SITE_HOST = new URL(SITE_URL).host;
 
 const FONT = "Bricolage";
 let font: Promise<Buffer> | undefined;
@@ -97,7 +101,7 @@ export function CardFrame({ badge, footer, children }: { badge: ReactNode; foote
         {children}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 26 }}>
           <span>{footer}</span>
-          <span style={{ display: "flex", color: BLUE }}>declub.app</span>
+          <span style={{ display: "flex", color: BLUE }}>{SITE_HOST}</span>
         </div>
       </div>
     </div>

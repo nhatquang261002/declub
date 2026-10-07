@@ -32,11 +32,15 @@ if (CHAIN_ID === 143 && (!env.rpcUrl?.trim() || !env.chog?.trim())) {
 }
 /**
  * Where the app is served, for the absolute links in a shared deal's preview. NEXT_PUBLIC_SITE_URL,
- * else the host Vercel gives the deployment, else the local dev server.
+ * else the host Vercel gives the deployment, else the live app (a production build), else the local dev server.
  */
 export const SITE_URL = (
   env.siteUrl?.trim() ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.NODE_ENV === "production"
+      ? "https://declub.vercel.app"
+      : "http://localhost:3000")
 ).replace(/\/+$/, "");
 export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
 export const EXPLORER_URL =
