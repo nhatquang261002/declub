@@ -21,7 +21,7 @@ lives in the git log and the relevant ADRs.
 
 ## Next: Club social
 
-- [ ] Club Pulse: a live activity strip on the Club page (listings, fills, joins, posts), built from data we already have, with no signing
+- [x] Club Pulse: swaps, new deals and new members as coloured system messages between posts on the Board and the timeline, built from the activity log and member list, with no signing (ADR 0043)
 - [ ] Club challenges: a weekly prompt on the Board, answered with posts and picked by the Owner or a Holder vote; the winner gets a badge, never money
 - [ ] Member roles and titles: the Owner gives custom titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
 

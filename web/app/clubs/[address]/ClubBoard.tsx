@@ -8,11 +8,14 @@ import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
 import { PostItem } from "@/components/PostItem";
 import { Spinner } from "@/components/Spinner";
+import { SystemMessage } from "@/components/SystemMessage";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
+import { useSystemMessages } from "@/hooks/useSystemMessages";
 import { isStaff } from "@/lib/clubRoles";
 import { LENSES, type LensId } from "@/lib/lenses";
+import { weave } from "@/lib/systemFeed";
 import { Empty, Loading } from "./parts";
 
 const FILTERS = [
@@ -49,7 +52,15 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const page = useClubPage(token);
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
-  const shown = useMemo(() => (filter === "all" ? posts : posts.filter((p) => p.kind === "looking")), [posts, filter]);
+  const system = useSystemMessages({ club: token });
+  // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
+  // and holds everything: another lens or "Looking for" is a question about posts.
+  const byTime = active.id === "newest";
+  const items = useMemo(() => {
+    const list = filter === "all" ? posts : posts.filter((p) => p.kind === "looking");
+    const withSystem = byTime && filter === "all";
+    return weave(list, withSystem ? system.events : [], { since: system.since, complete: !hasMore });
+  }, [posts, filter, byTime, system.events, system.since, hasMore]);
 
   if (error && posts.length === 0) return <LoadError title="Couldn’t load the board" error={error} />;
   if (!enabled) return <Empty title="No board on this server">This server isn’t keeping Club boards.</Empty>;
@@ -89,7 +100,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
 
       {isLoading ? (
         <Loading label="Loading the board" />
-      ) : shown.length === 0 ? (
+      ) : items.length === 0 ? (
         <Empty
           title={active.id === "following" ? "Nobody you follow has posted here" : filter === "looking" ? "Nobody is looking for anything yet" : "No posts yet"}
         >
@@ -101,28 +112,32 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         </Empty>
       ) : (
         <ul className="club-panel club-list">
-          {shown.map((post) => (
-            <PostItem
-              key={post.id}
-              post={post}
-              role={me.role}
-              now={now}
-              follows={follows}
-              thread={{
-                token,
-                wallet: me.wallet,
-                canReply: !!me.member && !archived && !holdersOnly,
-              }}
-              actions={{
-                report: (id) => report.mutate(id),
-                like: (id, on) => like.mutate({ id, like: on }),
-                remove: (id) => remove.mutate(id),
-                hide: (id, hidden) => hide.mutate({ id, hidden }),
-                pin: (id, pinned) => pin.mutate({ id, pinned }),
-                ban: (id) => ban.mutate({ post: id }),
-              }}
-            />
-          ))}
+          {items.map((item) =>
+            item.type === "system" ? (
+              <SystemMessage key={`system:${item.event.id}`} event={item.event} now={now} />
+            ) : (
+              <PostItem
+                key={item.post.id}
+                post={item.post}
+                role={me.role}
+                now={now}
+                follows={follows}
+                thread={{
+                  token,
+                  wallet: me.wallet,
+                  canReply: !!me.member && !archived && !holdersOnly,
+                }}
+                actions={{
+                  report: (id) => report.mutate(id),
+                  like: (id, on) => like.mutate({ id, like: on }),
+                  remove: (id) => remove.mutate(id),
+                  hide: (id, hidden) => hide.mutate({ id, hidden }),
+                  pin: (id, pinned) => pin.mutate({ id, pinned }),
+                  ban: (id) => ban.mutate({ post: id }),
+                }}
+              />
+            ),
+          )}
         </ul>
       )}
       {hasMore && (

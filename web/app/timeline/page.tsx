@@ -7,15 +7,18 @@ import { ClubAvatar } from "@/components/ClubArt";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
 import { Masonry } from "@/components/Masonry";
+import { SystemMessage } from "@/components/SystemMessage";
 import { TimelineCard } from "@/components/TimelineCard";
 import { TimelineComposer } from "@/components/TimelineComposer";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { useMyClubs } from "@/hooks/useClubMembership";
 import { useNow } from "@/hooks/useNow";
 import { useSignIn } from "@/hooks/useSignIn";
+import { useSystemMessages } from "@/hooks/useSystemMessages";
 import { useTimeline } from "@/hooks/useTimeline";
 import { toClubInfo, type ClubInfo } from "@/lib/clubs";
-import { estimateHeight, type TimelineScope } from "@/lib/timeline";
+import { weave, type FeedItem } from "@/lib/systemFeed";
+import { estimateHeight, SYSTEM_HEIGHT, type TimelinePost, type TimelineScope } from "@/lib/timeline";
 import { registry } from "@/lib/verifiedAssets";
 
 /** Every Club the app knows, by lowercase token: a post names its Club by token and the page draws it from here. */
@@ -37,23 +40,34 @@ function Section({ id, title, children, aside }: { id: string; title: string; ch
   );
 }
 
+const heightOf = (item: FeedItem<TimelinePost>) => (item.type === "post" ? estimateHeight(item.post) : SYSTEM_HEIGHT);
+
 /** One scope of the timeline: its posts as cards, endlessly (the next page loads as the end nears), and what to say when there are none. */
 function Feed({ scope, joined, now, empty }: { scope: TimelineScope; joined: boolean; now: number; empty: React.ReactNode }) {
   const feed = useTimeline(scope);
+  const system = useSystemMessages({ scope });
+  // System messages (ADR 0043) are set among the posts by time, down as far as the posts have loaded.
+  const items = useMemo(() => weave(feed.posts, system.events, { since: system.since, complete: !feed.hasMore }), [feed.posts, feed.hasMore, system.events, system.since]);
   if (feed.error && feed.posts.length === 0) return <LoadError title="Couldn’t load the timeline" error={feed.error} />;
   if (!feed.enabled) return <Empty title="No timeline on this server">This server isn’t keeping Club boards.</Empty>;
   if (feed.isLoading) return <Loading label="Loading the timeline" rows={3} />;
-  if (feed.posts.length === 0) return <>{empty}</>;
+  if (items.length === 0) return <>{empty}</>;
 
   return (
     <>
       <Masonry
         as="ul"
-        items={feed.posts}
-        height={estimateHeight}
-        render={(post) => {
-          const club = CLUBS.get(post.club);
-          return club ? <TimelineCard key={`${post.club}:${post.id}`} post={post} club={club} joined={joined} now={now} /> : null;
+        items={items}
+        height={heightOf}
+        render={(item) => {
+          const post = item.type === "post" ? item.post : null;
+          const club = CLUBS.get(post ? post.club : item.type === "system" ? item.event.club : "");
+          if (!club) return null;
+          return item.type === "system" ? (
+            <SystemMessage key={`system:${item.event.club}:${item.event.id}`} event={item.event} club={club} now={now} />
+          ) : (
+            <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined={joined} now={now} />
+          );
         }}
       />
       <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
