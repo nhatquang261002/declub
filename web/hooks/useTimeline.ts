@@ -9,7 +9,7 @@ const REFRESH_MS = 30_000;
 
 /**
  * One page at a time of the timeline (ADR 0041): Board posts from the Clubs the reader belongs to
- * (`joined`) or from every other Club (`others`). `joined` needs a signed-in reader and stays idle
+ * (`joined`), from every Club (`all`) or from every other Club (`others`). `joined` needs a signed-in reader and stays idle
  * without one. Posts and likes are the Boards' own, so a like or reply made here refreshes this.
  */
 export function useTimeline(scope: TimelineScope) {

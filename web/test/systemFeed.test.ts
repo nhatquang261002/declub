@@ -167,9 +167,9 @@ describe("listSystem across Clubs", () => {
 });
 
 describe("GET /api/timeline/system", () => {
-  const get = (headers: Record<string, string> = {}) =>
+  const get = (headers: Record<string, string> = {}, query = "") =>
     timelineSystemHandler(registry, { viewer: async (r) => (r.headers.get("authorization") ? { id: "t1" } : null), settlements: async () => [] })(
-      new Request("http://x/api/timeline/system", { headers: { "x-forwarded-for": "203.0.113.9", ...headers } }),
+      new Request(`http://x/api/timeline/system${query}`, { headers: { "x-forwarded-for": "203.0.113.9", ...headers } }),
     );
 
   it("has nothing for a reader who doesn't say who they are", async () => {
@@ -187,5 +187,17 @@ describe("GET /api/timeline/system", () => {
     const body = (await res.json()) as { events: { kind: string; clubs: string[] }[] };
     assert.ok(body.events.length > 0);
     assert.ok(body.events.every((e) => e.clubs.includes(A.toLowerCase())));
+  });
+
+  it("lists every Club's under scope=all, to anyone, cached", async () => {
+    const store = getStore()!;
+    const now = Math.floor(Date.now() / 1000);
+    await joined(store, "t3", 52, [A], now - 30);
+    await joined(store, "t4", 53, [B], now - 20);
+    const res = await get({}, "?scope=all");
+    assert.match(res.headers.get("cache-control")!, /s-maxage/);
+    const body = (await res.json()) as { events: { kind: string; clubs: string[] }[] };
+    for (const club of [A, B]) assert.ok(body.events.some((e) => e.clubs.includes(club.toLowerCase())));
+    assert.equal((await get({}, "?scope=everyone")).status, 400);
   });
 });

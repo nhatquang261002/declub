@@ -43,9 +43,9 @@ const say = async (store: Store, token: string, userId: string, text: string, at
 };
 const texts = (r: { posts: { text: string | null }[] }) => r.posts.map((p) => p.text);
 /** One big page, unless the test asks for less. */
-const list = (store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "others"; before?: { at: number; id: string }; limit?: number }) => listTimeline(store, reg, { limit: 100, ...v });
+const list = (store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "all" | "others"; before?: { at: number; id: string }; limit?: number }) => listTimeline(store, reg, { limit: 100, ...v });
 /** Every page of a list, one after another as the page would ask, and how many pages it took. */
-async function all(store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "others"; limit: number }) {
+async function all(store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "all" | "others"; limit: number }) {
   const posts: { id: string; text: string | null }[] = [];
   let before: { at: number; id: string } | undefined;
   let pages = 0;
@@ -87,6 +87,18 @@ describe("listTimeline", () => {
     const { store } = await world();
     assert.deepEqual(texts(await list(store, live, { scope: "others" })), ["a2", "c1", "b1", "a1"]);
     assert.deepEqual((await list(store, live, { scope: "joined" })).posts, []);
+  });
+
+  it("lists every Club under all, whoever asks", async () => {
+    const { store } = await world();
+    assert.deepEqual(texts(await list(store, live, { scope: "all" })), ["a2", "c1", "b1", "a1"]);
+    assert.deepEqual(texts(await list(store, live, { userId: "u2", scope: "all" })), ["a2", "c1", "b1", "a1"]);
+  });
+
+  it("leaves an archived Club out of all, but keeps it for a member", async () => {
+    const { store } = await world();
+    assert.deepEqual(texts(await list(store, frozen, { scope: "all" })), ["a2", "b1", "a1"]);
+    assert.deepEqual(texts(await list(store, frozen, { userId: "u1", scope: "all" })), ["a2", "c1", "b1", "a1"]);
   });
 
   it("leaves an archived Club out of others, but keeps it for a member", async () => {
@@ -192,7 +204,7 @@ describe("GET /api/timeline", () => {
     assert.equal((await get("?before=nonsense")).status, 400);
   });
 
-  it("answers others publicly and cached, and joined as the reader's own", async () => {
+  it("answers all (the default) publicly and cached, and joined as the reader's own", async () => {
     await member(store, "u1", 1, [A]);
     await member(store, "u2", 2, [B]);
     await say(store, A, "u1", "mine", 1_000);
@@ -203,6 +215,7 @@ describe("GET /api/timeline", () => {
     assert.match(anon.headers.get("cache-control")!, /s-maxage/);
     assert.deepEqual(texts(await anon.json()), ["theirs", "mine"]);
 
+    assert.deepEqual(texts(await (await get("?scope=all", { authorization: "Bearer t" })).json()), ["theirs", "mine"]);
     const signedIn = await get("?scope=others", { authorization: "Bearer t" });
     assert.equal(signedIn.headers.get("cache-control"), "private, no-store");
     assert.deepEqual(texts(await signedIn.json()), ["theirs"]);

@@ -10,18 +10,23 @@ const REFRESH_MS = 30_000;
 type Answer = { enabled: boolean; events: SystemEvent[]; since: number };
 
 /**
- * The system messages of one Club's Board (`{ club }`), or of the reader's own Clubs for the
- * timeline (`"timeline"`, which needs them signed in), for `weave` to set among the posts
- * (lib/systemFeed.ts). Without them the feed is only posts, so a failure is quiet: there is nothing
- * to retry or to tell the reader.
+ * The system messages of one Club's Board (`{ club }`), of the reader's own Clubs for the timeline
+ * (`"timeline"`, which needs them signed in), or of every live Club (`"everywhere"`, for the
+ * timeline's "All Clubs"), for `weave` to set among the posts (lib/systemFeed.ts). Without them the
+ * feed is only posts, so a failure is quiet: there is nothing to retry or to tell the reader.
  */
-export function useSystemMessages(from: { club: string } | "timeline") {
+export function useSystemMessages(from: { club: string } | "timeline" | "everywhere") {
   const getToken = useAccessToken();
   const timeline = from === "timeline";
   const query = useQuery({
-    queryKey: ["system", timeline ? "timeline" : from.club.toLowerCase(), timeline && !!getToken],
+    queryKey: ["system", typeof from === "string" ? from : from.club.toLowerCase(), timeline && !!getToken],
     enabled: !timeline || !!getToken,
-    queryFn: () => (timeline ? read<Answer>("/api/timeline/system", getToken) : read<Answer>(`/api/clubs/${from.club}/system`)),
+    queryFn: () =>
+      from === "timeline"
+        ? read<Answer>("/api/timeline/system", getToken)
+        : from === "everywhere"
+          ? read<Answer>("/api/timeline/system?scope=all")
+          : read<Answer>(`/api/clubs/${from.club}/system`),
     refetchInterval: REFRESH_MS,
     retry: 1,
   });

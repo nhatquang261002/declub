@@ -21,8 +21,8 @@ const SPARE = 10;
  *
  * Only what anyone may read is listed: hidden posts and replies are left out whoever asks, and
  * pins are ignored (a pin is the Club speaking on its own Board, not a reason to lead the timeline).
- * Archived Clubs are left out of `others` (a frozen Board has nothing new), but a reader's own
- * archived Club still shows under `joined`.
+ * Archived Clubs are left out of `others` and `all` (a frozen Board has nothing new), but a reader's
+ * own archived Club still shows under `joined` and `all`.
  */
 export async function listTimeline(
   store: Store,
@@ -33,7 +33,12 @@ export async function listTimeline(
   const joined = new Set(viewer.userId ? (await clubsOf(store, viewer.userId)).map((token) => token.toLowerCase()) : []);
   const tokens = registry
     .clubs()
-    .filter((club) => (viewer.scope === "joined" ? joined.has(club.address.toLowerCase()) : !joined.has(club.address.toLowerCase()) && club.club !== "archived"))
+    .filter((club) => {
+      const mine = joined.has(club.address.toLowerCase());
+      if (viewer.scope === "joined") return mine;
+      if (viewer.scope === "others") return !mine && club.club !== "archived";
+      return mine || club.club !== "archived";
+    })
     .map((club) => club.address.toLowerCase());
 
   const fetched = viewer.limit + SPARE;

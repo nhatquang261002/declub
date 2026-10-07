@@ -6,17 +6,18 @@ import { clientId, getStore, withinLimit } from "./store";
 import { listTimeline } from "./timeline";
 
 /**
- * GET /api/timeline?scope=joined|others&limit=&before=   { enabled, scope, posts, next }: a page of
- * Board posts from many Clubs, newest first (ADR 0041). `before` is the `next` of the page before
+ * GET /api/timeline?scope=joined|all|others&limit=&before=   { enabled, scope, posts, next }: a page
+ * of Board posts from many Clubs, newest first (ADR 0041). `before` is the `next` of the page before
  * (omit it for the first); `next` is null at the end, so the list is as long as the Boards are. Public like each Board; a reader who sends a
  * token also gets which posts they liked, and `joined` (the Clubs they belong to) is theirs alone.
- * `others` is every other live Club, so an anonymous reader gets all of them.
+ * `all` is every live Club (and the reader's own archived ones); `others` is every live Club the
+ * reader hasn't joined, so an anonymous reader gets the same from both.
  */
 export function timelineHandler(registry: Registry, deps: Pick<RouteDeps, "viewer"> = {}) {
   return async function GET(request: Request) {
     const url = new URL(request.url);
-    const asked = url.searchParams.get("scope") ?? "others";
-    if (!isScope(asked)) return fail(400, "bad_request", "scope is joined or others.");
+    const asked = url.searchParams.get("scope") ?? "all";
+    if (!isScope(asked)) return fail(400, "bad_request", "scope is joined, all or others.");
     const limit = url.searchParams.get("limit") === null ? TIMELINE_PAGE : Number(url.searchParams.get("limit"));
     const askedBefore = url.searchParams.get("before");
     const before = askedBefore === null ? undefined : parseCursor(askedBefore);
@@ -31,8 +32,8 @@ export function timelineHandler(registry: Registry, deps: Pick<RouteDeps, "viewe
 
     const viewer = await softViewer(request, deps);
     const { posts, next } = await listTimeline(store, registry, { userId: viewer?.id, scope: asked, limit, before });
-    // Everyone shares one cached answer to `others` unless they said who they are (their own Clubs
-    // come out of it, and their likes go into it); `joined` is theirs by definition.
+    // Everyone shares one cached answer to `all` and `others` unless they said who they are (their
+    // Clubs and likes change it); `joined` is theirs by definition.
     const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
     return Response.json({ enabled: true, scope: asked, posts, next }, { headers: { "Cache-Control": cache } });
   };

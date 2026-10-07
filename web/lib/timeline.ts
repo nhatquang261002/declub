@@ -3,10 +3,10 @@ import { SYSTEM_GROUP_SHOWN } from "./systemFeed";
 
 /**
  * The timeline (ADR 0041): posts from many Clubs' Boards in one list. `joined` is the Clubs the
- * reader belongs to; `others` is every other live Club, so the page can show a reader's own Clubs
- * first and then what is going on around them.
+ * reader belongs to; `all` is every live Club and the reader's own archived ones, which is what the
+ * page shows unless the reader filters to their Clubs; `others` is every live Club they haven't joined.
  */
-export type TimelineScope = "joined" | "others";
+export type TimelineScope = "joined" | "all" | "others";
 
 /** A Board post as the timeline shows it: the post, and the Club (lowercase token) it was made in. */
 export type TimelinePost = PublicPost & { club: string };
@@ -33,7 +33,7 @@ export function parseCursor(value: unknown): TimelineCursor | null {
 /** Whether `a` comes before `b` in the list: newer first, and the lower id first among posts of the same moment. */
 export const precedes = (a: TimelineCursor, b: TimelineCursor) => a.at > b.at || (a.at === b.at && a.id < b.id);
 
-export const isScope = (value: unknown): value is TimelineScope => value === "joined" || value === "others";
+export const isScope = (value: unknown): value is TimelineScope => value === "joined" || value === "all" || value === "others";
 
 /**
  * Splits `items` (newest first) over `count` columns for a masonry layout: each goes to the column
