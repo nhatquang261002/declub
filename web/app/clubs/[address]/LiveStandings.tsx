@@ -243,7 +243,7 @@ function PodiumCard({ r, mine, rules }: { r: StandingRow; mine: boolean; rules: 
         {r.rank}
       </span>
       <span className="sm:mt-1">
-        <WalletAvatar seed={r.wallet} size="2.75rem" />
+        <WalletAvatar seed={r.wallet} size="2.75rem" link />
       </span>
       <span className="min-w-0 flex-1 sm:w-full sm:flex-none">
         <span className={`flex min-w-0 items-center gap-1.5 text-sm sm:justify-center ${mine ? "font-black" : "font-bold"}`}>
@@ -297,7 +297,7 @@ function Row({ r, mine, paid = true, rules }: { r: StandingRow; mine: boolean; p
       >
         {r.rank}
       </span>
-      <WalletAvatar seed={r.wallet} />
+      <WalletAvatar seed={r.wallet} link />
       <span className="min-w-0">
         <span className={`flex min-w-0 items-center gap-1.5 text-sm ${mine ? "font-black" : "font-semibold"}`}>
           <span className="min-w-0 truncate">

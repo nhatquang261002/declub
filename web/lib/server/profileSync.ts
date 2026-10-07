@@ -27,7 +27,7 @@ export type SyncResult =
  * Brings a user's stored profile rows in line with their linked accounts (ADR 0011). Rows for
  * wallets that are no longer linked, or that have nothing left to show, go away; a renamed handle
  * is rewritten. `refresh` keeps an existing share up to date and never starts one, which is what a
- * webhook or a page load wants: only the owner, from `/account`, opts in.
+ * webhook or a page load wants: only the owner, from their profile page, opts in.
  *
  * Idempotent and based only on `accounts`, so running it twice, or out of order with another
  * sync that read newer accounts, converges on the latest state as long as `accounts` is current.

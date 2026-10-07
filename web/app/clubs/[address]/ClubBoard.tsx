@@ -78,10 +78,10 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         <p className="text-xs text-muted">{active.description}</p>
         {me.member && !archived && (
           <p className="text-xs text-muted">
-            Posting needs a linked X or Discord account with “Show my profile” turned on in your{" "}
-            <Link href="/account" className="font-bold underline">
-              Account
-            </Link>
+            Posting needs a linked X or Discord account with “Show my X or Discord handle” turned on in your{" "}
+            <Link href="/profile" className="font-bold underline">
+          Profile
+        </Link>
             .
           </p>
         )}

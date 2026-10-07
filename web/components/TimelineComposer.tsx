@@ -52,9 +52,9 @@ export function TimelineComposer({ clubs }: { clubs: ClubInfo[] }) {
         <PostComposer key={club.token} token={club.token} wallet={me.wallet} xHint={page?.x?.hint} picker={picker} />
       )}
       <p className="-mt-2 mb-5 text-xs text-muted">
-        Posting needs a linked X or Discord account with “Show my profile” turned on in your{" "}
-        <Link href="/account" className="font-bold underline">
-          Account
+        Posting needs a linked X or Discord account with “Show my X or Discord handle” turned on in your{" "}
+        <Link href="/profile" className="font-bold underline">
+          Profile
         </Link>
         .
       </p>

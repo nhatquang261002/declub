@@ -6,7 +6,7 @@
  ┌─────────────────────────────── Browser ────────────────────────────────┐
  │  Next.js (App Router, TypeScript, Tailwind)                            │
  │    ├─ pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash]     │
- │    │         /history · /clubs · /clubs/[address] · /account           │
+ │    │         /history · /clubs · /clubs/[address] · /profile/[address] · /settings           │
  │    │         /guide · /guide/clubs                                     │
  │    └─ hooks: useDealBook · useDealsV2 · useDealV2 · usePool            │
  │              useFills · useNotifications · useTxFlow · useSignFlow     │

@@ -4,7 +4,8 @@ import { profileKey, userWalletsKey } from "../lib/profiles";
 import { createPost, createReply, hidePost, likePost, postKey } from "../lib/server/board";
 import { saveRoles } from "../lib/server/clubState";
 import { joinClub } from "../lib/server/members";
-import { listTimeline } from "../lib/server/timeline";
+import { listTimeline, listWalletPosts } from "../lib/server/timeline";
+import { walletBoardHandler } from "../lib/server/profilePageRoutes";
 import type { Registry } from "../lib/verifiedAssets";
 import { timelineHandler } from "../lib/server/timelineRoutes";
 import { getStore, memoryStore, type Store } from "../lib/server/store";
@@ -237,5 +238,78 @@ describe("toColumns", () => {
     assert.ok(estimateHeight({ ...plain, text: "x".repeat(200) }) > estimateHeight(plain));
     assert.ok(estimateHeight({ ...plain, link: { kind: "deal", id: "1" } }) > estimateHeight(plain));
     assert.ok(estimateHeight({ ...plain, link: { kind: "x", id: "1" }, x: { id: "1", author: "a", text: "t", image: "https://pbs.twimg.com/x.jpg", own: false, counted: null } as never }) > estimateHeight({ ...plain, link: { kind: "deal", id: "1" } }));
+  });
+});
+
+describe("a wallet's Board posts (ADR 0042)", () => {
+  /** u1 (in A and C) wrote a1, c1, a2; u2 (in B) wrote b1. */
+  async function wallets() {
+    const store = memoryStore();
+    const w1 = await member(store, "u1", 1, [A, C]);
+    const w2 = await member(store, "u2", 2, [B]);
+    const a1 = await say(store, A, "u1", "a1", 1_000);
+    await say(store, B, "u2", "b1", 2_000);
+    const c1 = await say(store, C, "u1", "c1", 3_000);
+    const a2 = await say(store, A, "u1", "a2", 4_000);
+    return { store, w1, w2, ids: { a1, c1, a2 } };
+  }
+
+  it("lists only that wallet's posts, newest first, across Clubs", async () => {
+    const { store, w1, w2 } = await wallets();
+    assert.deepEqual(texts(await listWalletPosts(store, live, w1, { limit: 20 })), ["a2", "c1", "a1"]);
+    assert.deepEqual(texts(await listWalletPosts(store, live, w2, { limit: 20 })), ["b1"]);
+    assert.deepEqual((await listWalletPosts(store, live, wallet(99), { limit: 20 })).posts, []);
+  });
+
+  it("names each post's Club, and shows the reader's likes", async () => {
+    const { store, w1, ids } = await wallets();
+    await member(store, "u3", 3, [A]);
+    assert.ok((await likePost(store, club(A), "u3", ids.a2, true)).ok);
+    const anon = await listWalletPosts(store, live, w1, { limit: 20 });
+    assert.deepEqual(anon.posts.map((p) => p.club), [A, C, A].map((t) => t.toLowerCase()));
+    assert.equal(anon.posts[0]!.likes, 1);
+    assert.equal(anon.posts[0]!.liked, false);
+    assert.equal((await listWalletPosts(store, live, w1, { limit: 20, userId: "u3" })).posts[0]!.liked, true);
+  });
+
+  it("leaves out hidden posts and replies, and posts in Clubs that left the list", async () => {
+    const { store, w1, ids } = await wallets();
+    await member(store, "u3", 3, [A]);
+    await saveRoles(store, A.toLowerCase(), { owner: "u3", moderators: [] });
+    assert.ok((await hidePost(store, club(A), { userId: "u3", wallet: wallet(3) }, ids.a2, true)).ok);
+    assert.ok((await createReply(store, club(A), "u1", ids.a1, { text: "re" }, { now: () => 5_000 })).ok);
+    assert.deepEqual(texts(await listWalletPosts(store, live, w1, { limit: 20 })), ["c1", "a1"]);
+    const noC = makeRegistry(parseAssets(entries(false).filter((e) => e.address.toLowerCase() !== C.toLowerCase())));
+    assert.deepEqual(texts(await listWalletPosts(store, noC, w1, { limit: 20 })), ["a1"]);
+  });
+
+  it("pages with the timeline's cursor, each post once, to the end", async () => {
+    const { store, w1 } = await wallets();
+    const seen: (string | null)[] = [];
+    let before: { at: number; id: string } | undefined;
+    for (let pages = 0; pages < 20; pages++) {
+      const r = await listWalletPosts(store, live, w1, { limit: 1, before });
+      seen.push(...texts(r));
+      if (r.next === null) break;
+      before = parseCursor(r.next)!;
+    }
+    assert.deepEqual(seen, ["a2", "c1", "a1"]);
+  });
+
+  it("is served by the route, and refuses what isn't an address or a page", async () => {
+    const { store, w1 } = await wallets();
+    const get = walletBoardHandler(live, { store: () => store });
+    const ctx = (address: string) => ({ params: Promise.resolve({ address }) });
+    const res = await get(new Request("http://x?limit=2"), ctx(w1));
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("cache-control") ?? "", /s-maxage/);
+    const body = (await res.json()) as { enabled: boolean; posts: { text: string }[]; next: string | null };
+    assert.deepEqual(body.posts.map((p) => p.text), ["a2", "c1"]);
+    assert.ok(body.next);
+    assert.equal((await get(new Request("http://x"), ctx("nope"))).status, 400);
+    assert.equal((await get(new Request("http://x?limit=0"), ctx(w1))).status, 400);
+    assert.equal((await get(new Request("http://x?before=junk"), ctx(w1))).status, 400);
+    const off = await walletBoardHandler(live, { store: () => null })(new Request("http://x"), ctx(w1));
+    assert.deepEqual(await off.json(), { enabled: false, posts: [], next: null });
   });
 });

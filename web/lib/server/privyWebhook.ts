@@ -1,4 +1,5 @@
 import { linkedEthereumWallets } from "../profiles";
+import { syncAbout } from "./about";
 import { syncAvatar } from "./avatars";
 import { syncMemberships } from "./members";
 import { syncProfile } from "./profileSync";
@@ -53,6 +54,8 @@ export async function handlePrivyEvent(event: unknown, store: Store, load: LoadA
     await syncMemberships(store, userId, linkedEthereumWallets(accounts ?? []));
     // So does the avatar (ADR 0028): it leaves an unlinked wallet, and an NFT one leaves with its holder.
     await syncAvatar(store, userId, linkedEthereumWallets(accounts ?? []));
+    // And the name and bio on the profile page (ADR 0042) follow the wallets the same way.
+    await syncAbout(store, userId, linkedEthereumWallets(accounts ?? []));
   }
   return users;
 }

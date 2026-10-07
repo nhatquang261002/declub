@@ -10,6 +10,7 @@ import {
   CopyIcon,
   ExternalIcon,
   PlusIcon,
+  SettingsIcon,
   SignOutIcon,
   UserIcon,
   WalletIcon,
@@ -17,6 +18,7 @@ import {
 import { usePopover } from "@/components/Popover";
 import { useToast } from "@/components/Toast";
 import { WalletAvatar } from "@/components/WalletAvatar";
+import { profilePath } from "@/lib/about";
 import { linkedRows, signedInAs } from "@/lib/accounts";
 import { explorerAddress, PRIVY_APP_ID, PRIVY_EMBEDDED_WALLETS } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
@@ -79,7 +81,7 @@ export function ConnectedWallet({
   disconnectLabel: string;
   /** Privy mode: the email or handle the user signed in with. */
   signedInAs?: string;
-  /** Privy mode: show the link to the account screen. */
+  /** Privy mode: show the link to the account settings. */
   accountLink?: boolean;
 }) {
   const switchChain = useSwitchChain();
@@ -137,10 +139,14 @@ export function ConnectedWallet({
             </div>
             <span className="hdr-chip mt-2.5">{chain.name}</span>
           </div>
+          <Link href={profilePath(address)} className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+            <span className="hdr-pop-icon"><UserIcon /></span>
+            <span className="flex-1">Your profile</span>
+          </Link>
           {accountLink && (
-            <Link href="/account" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
-              <span className="hdr-pop-icon"><UserIcon /></span>
-              <span className="flex-1">Account &amp; linked accounts</span>
+            <Link href="/settings" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+              <span className="hdr-pop-icon"><SettingsIcon /></span>
+              <span className="flex-1">Account settings</span>
             </Link>
           )}
           <a

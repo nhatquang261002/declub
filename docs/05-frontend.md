@@ -77,7 +77,7 @@ web/
 
 - `next.config.ts` loads the **repo-root `.env`**, so the web app and the Foundry scripts share one file, but it copies only the `NEXT_PUBLIC_*` values from it. Server secrets (`PRIVY_APP_SECRET`, `UPSTASH_*`, `CRON_SECRET`, …) go in `web/.env.local` or the host's environment. `web/.env*` and real environment variables win over the root file.
 - Most values default to the testnet deployment, so `npm run dev` works with no `.env` at all. `NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS` and `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` have no default: without them there are no live deals or signed swaps.
-- With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (Google, X, Discord or a wallet), and `/account` manages linked accounts and active wallets ([ADR 0010](adr/0010-privy-sign-in.md)). Email is linkable from `/account` for recovery but is not currently a login method. Embedded wallets are **off by default**; set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` only after enabling them in the Privy dashboard. Without the app id, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963) are available. WalletConnect is not configured.
+- With `NEXT_PUBLIC_PRIVY_APP_ID` set, **Sign in** opens Privy (Google, X, Discord or a wallet), and `/settings` manages linked accounts and active wallets ([ADR 0010](adr/0010-privy-sign-in.md)); a wallet's public profile is `/profile/<address>` ([ADR 0042](adr/0042-profile-page.md)). Email is linkable from `/settings` for recovery but is not currently a login method. Embedded wallets are **off by default**; set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` only after enabling them in the Privy dashboard. Without the app id, only injected wallets (MetaMask, Rabby, Phantom, Backpack and anything else announcing via EIP-6963) are available. WalletConnect is not configured.
 
 ### Design tokens
 
@@ -96,7 +96,8 @@ scattering hex values through JSX or utility definitions.
 | Screen | Reads | Writes | Status |
 |---|---|---|---|
 | **Open Deals** `/deals` | `/api/deals` (the server reads `tradeCount` + multicall `getTrade`, and the pool) | — | ✓ |
-| **Account** `/account` | Privy user, linked accounts, linked wallets and shared-profile state | link/unlink accounts, connect/switch wallet, share/stop sharing profile | ✓ when Privy is configured |
+| **Account settings** `/settings` | Privy user, linked accounts, linked wallets, Club rewards | link/unlink accounts, connect/switch wallet, claim rewards | ✓ when Privy is configured |
+| **Profile** `/profile/[address]` | `/api/wallets/[address]/profile`, `/clubs`, `/board` and `/follows`; the owner also reads `/api/about`, `/api/avatar`, `/api/profile` | owner: save name and bio, set avatar, share/stop sharing the handle; anyone: follow (signed) | ✓ |
 | **Create** `/create` | one wizard, DeClubEscrow or a signed intent (see *Create wizard*) | approvals, `createTrade` / `createTraitTrade` / `createOpenOffer` | ✓ |
 | **History** `/history` | the newest 200 V2 deals, server-verified fills (or browser fallback), and the connected wallet's signed swaps | — | ✓ |
 
@@ -286,9 +287,9 @@ otherwise (canFill)                → "Take the deal": steps, fee note,
 | **Clubs** `/clubs` | the verified list (`web/data/assets.json`) at once; `/api/clubs` fills in Momentum and counts; `/api/me/clubs` for "Your Clubs" | — |
 | **Home** `/` (`#clubs`) | `ClubsIntro`: what Clubs are and how Momentum works; `ClubsTeaser` reads `/api/clubs` for the three busiest | — |
 | **Club** `/clubs/[address]` | `/api/clubs/[token]`, the Market from `useClubMarket` (`/api/deals?token=` + the pool's `token=` filter), `/members`, `/posts?lens=`, `/membership`, `/profile`, `/rewards`; `/api/rewards/me` and the rewards contract for Your share; `/api/wallets/[me]/follows` | join/leave, sign and post, follow, report, claim rewards, and the staff actions below |
-| **Account** `/account` | `/api/rewards/me` for the active wallet, then the rewards contract | claim rewards (`claimMany`) |
+| **Account settings** `/settings` | `/api/rewards/me` for the active wallet, then the rewards contract | claim rewards (`claimMany`) |
 
-**Without a store or Privy,** the routes return `{enabled:false}` and the screens show a read-only Club with a "not configured" note (like `NotConfigured` on the Account page). The cards still draw from the list; only the numbers are missing, and a note says so.
+**Without a store or Privy,** the routes return `{enabled:false}` and the screens show a read-only Club with a "not configured" note (like `NotConfigured` on the Account settings page). The cards still draw from the list; only the numbers are missing, and a note says so.
 
 **Explaining vs. using.** The home page explains Clubs (`components/ClubsIntro.tsx`: the three parts of a Club, the Momentum rules, the heat scale) and `/clubs` only works with them. `/clubs` is built for many Clubs: totals as chips, "Your Clubs", **Most active right now** (the top three by Momentum, as cards), **Rising this week** (biggest weekly gain) and **Most traded · 7 days** boards, then **All Clubs**: search by name, symbol or address, All / With a memecoin, six sorts (busiest, rising, most traded, most members, recently active, A–Z), a list view (`ClubRow`, the default) or cards, remembered per browser, and "Show more" by 12. Archived Clubs sort last.
 

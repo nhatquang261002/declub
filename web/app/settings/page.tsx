@@ -1,23 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useConnection } from "wagmi";
-import { XLogoIcon } from "@/components/Icons";
 import { PageHeader } from "@/components/Page";
 import { useToast } from "@/components/Toast";
 import { KIND_LABEL, SOCIAL_KINDS, linkedRows, type AccountKind, type LinkedRow, type SocialKind } from "@/lib/accounts";
 import { PRIVY_APP_ID } from "@/lib/config";
-import { PROFILE_LABEL, type Profile } from "@/lib/profiles";
 import { CopyAddress } from "@/components/CopyAddress";
 import { RewardsClaim } from "@/components/RewardsClaim";
-import { AvatarSection } from "./AvatarSection";
 
-export default function AccountPage() {
+export default function SettingsPage() {
   return (
     <>
-      <PageHeader title="Account" />
+      <PageHeader title="Account settings" />
       {PRIVY_APP_ID ? <Account /> : <NotConfigured />}
     </>
   );
@@ -82,8 +80,6 @@ function Account() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AvatarSection />
-
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Your Club rewards</h2>
         <p className="mt-1 mb-4 text-sm text-muted">
@@ -97,7 +93,7 @@ function Account() {
         <h2 className="text-lg font-semibold">Linked accounts</h2>
         <p className="mt-1 text-sm text-muted">
           Link a Google, X or Discord account to your wallet to sign in with it later, without opening
-          your wallet first. They are for signing in and recovery. You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders unless you turn it on below.
+          your wallet first. They are for signing in and recovery. You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders unless you turn it on in your <Link href="/profile" className="font-bold underline">profile</Link>.
         </p>
         <ul className="mt-4 flex flex-col gap-2">
           {socials.length === 0 && <li className="text-sm text-muted">Nothing linked yet.</li>}
@@ -164,125 +160,10 @@ function Account() {
           wallet itself.
         </p>
       </section>
-
-      <ShareProfile />
     </div>
   );
 }
 
-
-type ShareState =
-  | { enabled: false }
-  | { enabled: true; shared: boolean; profile?: Profile; available?: Profile; stale: boolean };
-
-/**
- * The signed-in user's shared profile (ADR 0011). The server reads their linked accounts from Privy
- * itself; the browser only sends its access token and says "share" or "stop".
- */
-function useSharedProfile() {
-  const { getAccessToken, user } = usePrivy();
-  const toast = useToast();
-  const [state, setState] = useState<ShareState>();
-  const [busy, setBusy] = useState(false);
-
-  const call = useCallback(
-    async (method: "GET" | "PUT" | "DELETE", body?: unknown) => {
-      const token = await getAccessToken();
-      const response = await fetch("/api/profile", {
-        method,
-        headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = (await response.json()) as ShareState & { message?: string };
-      if (!response.ok) throw new Error(data.message ?? "Couldn't update your profile.");
-      return data;
-    },
-    [getAccessToken],
-  );
-
-  // Re-read when the linked accounts change; when a shared profile has gone stale (a renamed X
-  // account, an unlinked wallet), bring it up to date without asking again.
-  const linkedKey = user?.linkedAccounts.map((a) => a.type).join(",");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        let next = await call("GET");
-        if (next.enabled && next.shared && next.stale) next = await call("PUT", { refresh: true }).then(() => call("GET"));
-        if (!cancelled) setState(next);
-      } catch {
-        // Profiles are optional: if the server can't say, the section stays hidden.
-        if (!cancelled) setState({ enabled: false });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [call, linkedKey]);
-
-  async function change(method: "PUT" | "DELETE") {
-    setBusy(true);
-    try {
-      await call(method);
-      setState(await call("GET"));
-    } catch (error) {
-      toast.error(error);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return { state, busy, share: () => change("PUT"), stop: () => change("DELETE") };
-}
-
-function ShareProfile() {
-  const { state, busy, share, stop } = useSharedProfile();
-  if (!state?.enabled) return null;
-
-  const { shared, profile, available } = state;
-  const label = (p: Profile) => (p.provider === "twitter" ? `@${p.handle}` : p.handle);
-
-  return (
-    <section className="page-section px-5 py-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        Show my profile to other traders
-        {shared && <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[0.65rem] font-normal text-mint">On</span>}
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        Next to your wallet on deals, others see the X or Discord account you linked here, so they know who they are
-        trading with, and signed-in traders can find your wallet by that handle to make you a private deal. It only
-        shows that the account and the wallet belong to the same person, not that either is trustworthy. Off until you
-        turn it on, and you can turn it off at any time.
-      </p>
-      {shared && profile ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/70 px-3 py-2.5">
-          <span className="flex items-center gap-2 text-sm">
-            {profile.provider === "twitter" && <XLogoIcon className="size-3.5" />}
-            <span className="font-semibold">{label(profile)}</span>
-            <span className="text-xs text-muted">on {PROFILE_LABEL[profile.provider]}</span>
-          </span>
-          <button className="btn-secondary" disabled={busy} onClick={stop}>
-            {busy ? "Working…" : "Stop showing"}
-          </button>
-        </div>
-      ) : available ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-muted">
-            Would show <span className="font-semibold text-[#111318]">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
-            every wallet linked to this sign-in.
-          </span>
-          <button className="btn-primary" disabled={busy} onClick={share}>
-            {busy ? "Working…" : "Show my profile"}
-          </button>
-        </div>
-      ) : (
-        <p className="mt-4 text-sm text-muted">
-          Link an X account above to turn this on. Discord works too; Google and email are never shown.
-        </p>
-      )}
-    </section>
-  );
-}
 
 function Row({
   row,

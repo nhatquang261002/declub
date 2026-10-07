@@ -152,7 +152,7 @@ export function PostItem({
 
   return (
     <li className={`post ${post.parent ? "post-reply" : ""} ${post.pinned ? "post-pinned" : ""} ${post.hidden ? "post-hidden" : ""}`}>
-      <WalletAvatar seed={post.wallet} size={post.parent ? "2rem" : "2.5rem"} />
+      <WalletAvatar seed={post.wallet} size={post.parent ? "2rem" : "2.5rem"} link />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">

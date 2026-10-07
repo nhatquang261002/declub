@@ -63,6 +63,7 @@ function useOwnAvatar() {
       const next = await call(method, body);
       setState(method === "DELETE" ? { enabled: true } : next);
       showOwnAvatar(queryClient, next.wallets ?? [], next.enabled ? (next.avatar ?? null) : null);
+      void queryClient.invalidateQueries({ queryKey: ["wallet-profile"] });
     } catch (error) {
       toast.error(error);
     } finally {

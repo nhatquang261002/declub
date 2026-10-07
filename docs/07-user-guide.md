@@ -28,9 +28,9 @@ You then land on the deal's page, which you can share.
 
 ## A deal for one person
 
-To lock a deal to the person you agreed it with, put their wallet in **Only this wallet can accept**. If they have shared their profile (Account page), you can type their X or Discord handle instead, like `@bob`, and press **Find**. You'll see the wallets they show under that handle; pick the one they'll accept from. The review shows the handle next to the address.
+To lock a deal to the person you agreed it with, put their wallet in **Only this wallet can accept**. If they have shown their handle (Profile page), you can type their X or Discord handle instead, like `@bob`, and press **Find**. You'll see the wallets they show under that handle; pick the one they'll accept from. The review shows the handle next to the address.
 
-Only people who turned on "Show my profile to other traders" can be found, and you need to be signed in. A handle tells you the X or Discord account and the wallet belong to the same person, not that they're honest, and lookalike handles exist: check the handle and the address against your conversation.
+Only people who turned on "Show my X or Discord handle" can be found, and you need to be signed in. A handle tells you the X or Discord account and the wallet belong to the same person, not that they're honest, and lookalike handles exist: check the handle and the address against your conversation.
 
 ## Take a deal
 
@@ -88,14 +88,23 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 - **The bell** tells you about a deal made for you, a deal of yours that was accepted, is about to expire or has expired, and a signed swap that settled, paused or was dropped. When signed in it also carries Club news: replies and likes on your posts, your pins, X posts that counted, rewards you earned, your rank in a running epoch and a nudge when an epoch is about to close. What you've read syncs across devices. You can also turn on browser alerts.
 - **Share on X.** On a live deal, or one that went through, press **Share on X** (or **Share the swap on X**). The app first shows a preview of the card; the button there opens X with the text and the deal's link.
 
-## Account
+## Profile
 
-The **Account** page (signed in with Privy) lets you:
+Every wallet has a public page at `/profile/<address>`. Click a wallet's name or avatar anywhere (a post, a Club's members, a standings row, a deal) to open it. It shows the wallet's avatar, name and bio, its verified X or Discord handle if the owner shows one, its full address, how many follow it, the Clubs it is in (the one its Members list shows), the posts it wrote on Club Boards (as cards you can like and reply to if you belong to that Club) and whom it follows. Press **Follow** there to follow it with a signature.
 
+Your own page (**Your profile** in the wallet menu) has **Edit profile**, signed in with Privy, to:
+
+- write a **display name** (up to 32 characters) and a **bio** (up to 160). They are plain text and unchecked, so they only appear on the profile page: deals and posts keep showing your verified handle and your address;
 - set **Your avatar**: pick an NFT one of your linked wallets holds (**Pick from my NFTs**) or upload a picture. It shows on your wallet everywhere, on every wallet linked to your sign-in, and an NFT avatar disappears while your wallets no longer hold it;
+- turn on **Show my X or Discord handle**, which shows your X or Discord handle beside your wallet on your deals and lets people find you by handle.
+
+## Account settings
+
+**Account settings** (in the wallet menu; signed in with Privy) lets you:
+
 - link or unlink email, Google, X and Discord;
 - link several wallets and choose the one you trade with (**Use this wallet**);
-- turn on **Show my profile to other traders**, which shows your X or Discord handle beside your wallet on your deals and lets people find you by handle;
+- claim your Club rewards;
 - export the key of an embedded wallet, if the deployment creates them.
 
 ## Clubs and Momentum
@@ -114,7 +123,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 
 **Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet; so does a Holder's own X post about the Club shared on its Board (see below), one a day. Other posts count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
 
-**Posting.** You need to be a member and to have linked an X or Discord account and turned on “Show my profile to other traders” (Account page; linking alone isn’t enough). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. A *Note* can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+**Posting.** You need to be a member and to have linked an X or Discord account and turned on “Show my X or Discord handle” (Profile page; linking alone isn’t enough). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. A *Note* can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
 
 **Sharing your X posts.** Any public X post can be shared as a card. Your **own** post (from the X account linked to your profile) counts for the Club, adding to your Momentum and your Holder bonus, when:
 

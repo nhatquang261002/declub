@@ -108,7 +108,7 @@ function TakerField({ label, value, onChange }: { label: string; value: string; 
     hint = note(
       found.data.self
         ? "That's your own handle."
-        : `Nobody shows a profile as ${text}. Ask them to turn on “Show my profile to other traders” on their Account page, or enter their wallet address.`,
+        : `Nobody shows a profile as ${text}. Ask them to turn on “Show my X or Discord handle” on their Profile page, or enter their wallet address.`,
     );
   } else hint = note(`Press Find to look up ${text.startsWith("@") ? text : `@${text}`}.`);
 

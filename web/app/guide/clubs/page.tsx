@@ -48,7 +48,7 @@ const MOMENTUM_RULES = [
 ];
 
 const POST_RULES = [
-  "Be a member, link an X or Discord account, and turn on “Show my profile to other traders” on the Account page.",
+  "Be a member, link an X or Discord account, and turn on “Show my X or Discord handle” on your Profile page.",
   "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
   `Plain text, up to ${POST_MAX} characters. No formatting, and links in the text aren't clickable.`,
   `A note can share one X post, shown as a card. A “Looking for” post can attach a deal${swapIntents ? " or a signed swap" : ""}.`,
@@ -96,7 +96,7 @@ const FAQ: ReadonlyArray<[string, string]> = [
   ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and have at least ${DEFAULT_CLUB_RULES.minPoints} activity points (by default), when the epoch is built. Holding alone doesn't earn a share: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
-  ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
+  ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my X or Discord handle” turned on (Profile page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
   ["How does someone become the Owner?", "The wallet that the collection's contract names as its owner presses Claim on the Club page. The app's admins can also pick an Owner."],
   ["What happens if I'm banned?", "You leave the Club, lose any role, and can't rejoin or post there. The app's admins can ban someone from every Club. Staff actions are written to a log that only staff can read."],
 ];
@@ -150,7 +150,7 @@ export default function ClubsGuidePage() {
               <b>Joining shows your wallet</b> on the Members list, so join with an account whose wallet you&apos;re happy
               to show.{!PRIVY_APP_ID && " Sign-in is off on this deployment, so joining and posting aren't available here."} Your <b>Club wallet</b> is
               the linked wallet shown next to your name on the Members list. The bell in the header tells you about replies, likes, pins, counted X posts,
-              rewards and your rank, and on the Account page you can set an avatar from an NFT you hold.
+              rewards and your rank, and on your Profile page you can set an avatar from an NFT you hold.
             </span>
           </p>
         </Section>
@@ -221,7 +221,7 @@ export default function ClubsGuidePage() {
               <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
                 Your share is paid to your Club wallet in MON. After an epoch is published, claims open a day later (the default delay); then press
                 <b className="text-[#111318]"> Claim</b> on a Club&apos;s <b className="text-[#111318]">Rewards</b> tab or on
-                your Account page. One claim collects every open epoch.
+                your Account settings. One claim collects every open epoch.
               </p>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
                 Every epoch&apos;s numbers and proofs are public, so anyone can check who was paid what.

@@ -30,6 +30,7 @@ export const ChevronIcon = (p: P) => (<Icon {...p}><path d="m6 9 6 6 6-6" /></Ic
 export const CopyIcon = (p: P) => (<Icon {...p}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></Icon>);
 export const CheckIcon = (p: P) => (<Icon {...p}><path d="m5 12.5 4.5 4.5L19 7.5" /></Icon>);
 export const ExternalIcon = (p: P) => (<Icon {...p}><path d="M14 4h6v6" /><path d="M20 4 10 14" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></Icon>);
+export const SettingsIcon = (p: P) => (<Icon {...p}><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></Icon>);
 export const UserIcon = (p: P) => (<Icon {...p}><circle cx="12" cy="8" r="3.5" /><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" /></Icon>);
 export const SignOutIcon = (p: P) => (<Icon {...p}><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" /><path d="M16 8l4 4-4 4" /><path d="M20 12H9" /></Icon>);
 export const PlusIcon = (p: P) => (<Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>);

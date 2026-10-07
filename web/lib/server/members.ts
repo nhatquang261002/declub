@@ -35,6 +35,19 @@ import type { Store } from "./store";
 export const membersKey = (token: string) => `declub:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
 export const memberKey = (token: string, userId: string) => `declub:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
 export const userClubsKey = (userId: string) => `declub:user-clubs:${userId}`;
+/**
+ * The memberships shown under a wallet (ADR 0042), as `token:userId`. Only a member's display wallet
+ * is indexed, the one the Members list already shows, so a profile says no more than the Clubs do:
+ * their other linked wallets are not tied to them here.
+ */
+export const walletMembershipsKey = (wallet: string) => `declub:wallet-clubs:${CHAIN_ID}:${wallet.toLowerCase()}`;
+
+/** Moves a membership's entry from the wallet it was shown under to the one it is shown under now. Idempotent. */
+async function reindex(store: Store, token: string, userId: string, from: string | undefined, to: string | undefined) {
+  const entry = `${token.toLowerCase()}:${userId}`;
+  if (from && from.toLowerCase() !== to?.toLowerCase()) await store.removeMember(walletMembershipsKey(from), entry);
+  if (to) await store.addMember(walletMembershipsKey(to), entry);
+}
 
 /**
  * One balance per wallet, in the same order, or `null` when the chain can't be read. The same
@@ -132,6 +145,7 @@ export async function joinClub(
   await store.set(memberKey(entry.address, userId), row);
   await store.addMember(membersKey(entry.address), userId);
   await store.addMember(userClubsKey(userId), entry.address.toLowerCase());
+  await reindex(store, entry.address, userId, existing?.displayWallet, row.displayWallet);
   return { ok: true, row };
 }
 
@@ -143,8 +157,10 @@ export async function joinClub(
 export async function leaveClub(store: Store, token: string, userId: string): Promise<void> {
   const roles = await loadRoles(store, token);
   if (roles.owner === userId || roles.moderators.includes(userId)) await saveRoles(store, token, withoutUser(roles, userId));
+  const row = await getMember(store, token, userId);
   await store.del(memberKey(token, userId));
   await store.removeMember(membersKey(token), userId);
+  await reindex(store, token, userId, row?.displayWallet, undefined);
   await store.removeMember(userClubsKey(userId), token.toLowerCase());
 }
 
@@ -171,8 +187,21 @@ export async function syncMemberships(store: Store, userId: string, wallets: rea
       if (!row) return store.removeMember(userClubsKey(userId), token);
       const next = withWallets(row, wallets, display);
       if (next !== row) await store.set(memberKey(token, userId), next);
+      // Also fills in memberships made before the index existed, the next time their owner is read.
+      await reindex(store, token, userId, row.displayWallet, next.displayWallet);
     }),
   );
+}
+
+/** A wallet's memberships as the Members lists show them: the Clubs it is listed in, with the member's row. */
+export async function membershipsOfWallet(store: Store, wallet: string): Promise<{ token: string; row: MemberRow }[]> {
+  const entries = (await store.members(walletMembershipsKey(wallet))).flatMap((entry) => {
+    const at = entry.indexOf(":");
+    return at > 0 ? [{ token: entry.slice(0, at), userId: entry.slice(at + 1) }] : [];
+  });
+  const rows = await store.getMany<MemberRow>(entries.map((e) => memberKey(e.token, e.userId)));
+  // The index can lag a change by a moment; only a row that still shows this wallet counts.
+  return entries.flatMap((e, i) => (rows[i]?.displayWallet === wallet.toLowerCase() ? [{ token: e.token, row: rows[i]! }] : []));
 }
 
 /** Every member's row. Ids with no row (a half-finished leave) are skipped. */

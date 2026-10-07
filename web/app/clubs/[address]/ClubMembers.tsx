@@ -117,7 +117,7 @@ function Podium({
               </span>
             )}
             <span className={`rank rank-${i + 1}`}>{i + 1}</span>
-            <WalletAvatar seed={m.wallet} size={i === 0 ? "3.5rem" : "3rem"} />
+            <WalletAvatar seed={m.wallet} size={i === 0 ? "3.5rem" : "3rem"} link />
             <span className="max-w-full truncate text-sm">
               <Who address={m.wallet} mine={mine === m.wallet} />
             </span>
@@ -223,7 +223,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                 return (
                   <li key={m.wallet} className={`flex items-center gap-3 px-4 py-3 sm:px-5 ${mine ? "bg-white/70" : ""}`}>
                     {sort === "momentum" && <span className={`rank ${rank <= 3 && m.momentum > 0 ? `rank-${rank}` : ""}`}>{rank}</span>}
-                    <WalletAvatar seed={m.wallet} size="2.25rem" />
+                    <WalletAvatar seed={m.wallet} size="2.25rem" link />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                         <Who address={m.wallet} mine={mine} />

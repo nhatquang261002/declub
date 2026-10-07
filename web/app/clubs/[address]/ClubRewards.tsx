@@ -190,7 +190,7 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
           <ul className="divide-y divide-[#111318]/10">
             {data.earners.map((e) => (
               <li key={`${e.account}-${e.kind}`} className="flex items-center gap-3 py-2.5">
-                <WalletAvatar seed={e.account} />
+                <WalletAvatar seed={e.account} link />
                 <span className="min-w-0 flex-1">
                   <Who address={e.account} />
                 </span>

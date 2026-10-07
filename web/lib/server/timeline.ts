@@ -2,7 +2,7 @@ import type { StoredPost } from "../clubPosts";
 import { viewPost } from "../clubPosts";
 import { formatCursor, precedes, type TimelineCursor, type TimelinePost, type TimelineScope } from "../timeline";
 import type { Registry } from "../verifiedAssets";
-import { likedKey, likesKey, postKey, postsKey, repliesKey } from "./board";
+import { likedKey, likesKey, postKey, postsKey, repliesKey, walletPostsKey } from "./board";
 import { clubsOf } from "./members";
 import type { Store } from "./store";
 
@@ -62,9 +62,15 @@ export async function listTimeline(
   // nothing in it (everything was hidden) moves on, to the edge.
   const next = eligible.length > viewer.limit ? page.at(-1)!.post : boundary;
 
+  return { posts: await present(store, page, viewer.userId), next: next ? formatCursor(next) : null };
+}
+
+type Listed = { token: string; post: StoredPost };
+
+/** Posts as `userId` (if any) sees them: with their like counts, reply counts and which ones the reader liked. */
+async function present(store: Store, page: Listed[], userId: string | undefined): Promise<TimelinePost[]> {
   const liked = new Map<string, Set<string>>();
-  if (viewer.userId) {
-    const userId = viewer.userId;
+  if (userId) {
     await Promise.all([...new Set(page.map((p) => p.token))].map(async (token) => liked.set(token, new Set(await store.members(likedKey(token, userId))))));
   }
   const counts = await Promise.all(
@@ -73,11 +79,41 @@ export async function listTimeline(
       return { likes, replies };
     }),
   );
-  return {
-    posts: page.map(({ token, post }, i) => ({
-      ...viewPost(post, { userId: viewer.userId, staff: false }, false, undefined, { count: counts[i]!.likes, liked: liked.get(token)?.has(post.id) ?? false }, counts[i]!.replies),
-      club: token,
-    })),
-    next: next ? formatCursor(next) : null,
-  };
+  return page.map(({ token, post }, i) => ({
+    ...viewPost(post, { userId, staff: false }, false, undefined, { count: counts[i]!.likes, liked: liked.get(token)?.has(post.id) ?? false }, counts[i]!.replies),
+    club: token,
+  }));
+}
+
+/**
+ * One page of the posts a wallet wrote on the Boards, newest first, for its profile (ADR 0042), in
+ * the same shape as the timeline and with the same rules: hidden posts and replies are left out
+ * whoever asks, Clubs that have left the list are skipped, and `before` / `next` page the same way.
+ * Signed and unsigned posts are both listed: they are what the Boards show everyone.
+ */
+export async function listWalletPosts(
+  store: Store,
+  registry: Registry,
+  wallet: string,
+  viewer: { userId?: string; before?: TimelineCursor; limit: number },
+): Promise<{ posts: TimelinePost[]; next: string | null }> {
+  const fetched = viewer.limit + SPARE;
+  const refs = await store.rankedBefore(walletPostsKey(wallet), viewer.before?.at ?? null, fetched);
+  const parsed = refs.flatMap((ref) => {
+    const at = ref.indexOf(":");
+    return at > 0 ? [{ token: ref.slice(0, at), id: ref.slice(at + 1) }] : [];
+  });
+  const rows = await store.getMany<StoredPost>(parsed.map((r) => postKey(r.token, r.id)));
+  const read = parsed.flatMap((r, i) => (rows[i] ? [{ token: r.token, post: rows[i]! }] : []));
+  // A post scored at the cursor's moment may be one the last page already showed.
+  const after = read.filter(({ post }) => !viewer.before || precedes(viewer.before, post));
+  const eligible = after
+    .filter(({ token, post }) => !post.hidden && !post.parent && registry.clubFor(token))
+    .sort((a, b) => b.post.at - a.post.at || (a.post.id < b.post.id ? -1 : 1));
+
+  const page = eligible.slice(0, viewer.limit);
+  // A full read may have older posts past its last one, so the next page starts there.
+  const edge = refs.length === fetched && read.length > 0 ? { at: read.at(-1)!.post.at, id: read.at(-1)!.post.id } : null;
+  const next = eligible.length > viewer.limit ? page.at(-1)!.post : edge;
+  return { posts: await present(store, page, viewer.userId), next: next ? formatCursor(next) : null };
 }

@@ -106,7 +106,7 @@ export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; 
 
       <div className="flex flex-col gap-3 px-4 pt-4 pb-3 sm:px-5">
         <div className="flex items-center gap-2.5">
-          <WalletAvatar seed={post.wallet} size="2.25rem" />
+          <WalletAvatar seed={post.wallet} size="2.25rem" link />
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-sm">
             <Who address={post.wallet} mine={post.mine} />
             <span className="text-xs text-muted">{ago(Math.floor(post.at / 1000), now)}</span>

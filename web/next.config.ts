@@ -36,6 +36,10 @@ const nextConfig: NextConfig = {
   // Each flavor builds into its own folder (scripts/flavorEnv.mjs), so testnet and mainnet can run at once.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: { root: __dirname },
+  // The account page is now the account settings, and the profile has a page of its own (ADR 0042).
+  async redirects() {
+    return [{ source: "/account", destination: "/settings", permanent: true }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
