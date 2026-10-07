@@ -20,14 +20,14 @@ import type { useFollows } from "@/hooks/useSocial";
 type AppLink = Exclude<PostLink, { kind: "x" }>;
 
 /** Where a linked deal or signed swap lives in the app. */
-const linkHref = (link: AppLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
-const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
+export const linkHref = (link: AppLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
+export const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
 
 /**
  * A shared X post (ADR 0024), drawn from what the server read: no X script, and the text is plain
  * text like a post's. It opens on X.
  */
-function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: number }) {
+export function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: number }) {
   const href = card ? `https://x.com/${card.author}/status/${card.id}` : `https://x.com/i/status/${id}`;
   return (
     <div className="x-card mt-1">
@@ -73,8 +73,6 @@ export type PostActions = {
   hide: (id: string, hidden: boolean) => void;
   pin: (id: string, pinned: boolean) => void;
   ban: (id: string) => void;
-  /** The post whose like is on its way to the server, if any. */
-  liking?: string;
 };
 
 // Reports no longer hide a post (ADR 0040); posts they hid before stay hidden until staff act.
@@ -209,8 +207,7 @@ export function PostItem({
               className={`post-like ${post.liked ? "post-like-on" : ""}`}
               aria-pressed={post.liked}
               aria-label={post.liked ? "Take back your like" : "Like this post"}
-              aria-busy={actions.liking === post.id}
-              disabled={post.mine || actions.liking === post.id}
+              disabled={post.mine}
               onClick={() => actions.like(post.id, !post.liked)}
             >
               <HeartIcon className="size-4" filled={post.liked} />
@@ -256,7 +253,7 @@ function ReplyToggle({ count, open, onToggle }: { count: number; open: boolean; 
  * A post's replies, one level deep (ADR 0032), and a box to add one. Replies use the same menu as
  * posts (like, report, delete, hide, ban) and are signed the same way. They count toward Club Rewards as backing (ADR 0038).
  */
-function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
+export function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
   const { replies, isLoading } = useClubReplies(context.token, parent, true);
   const { reply, replyStage, report, like, remove, hide, ban } = useClubActions(context.token);
   const [text, setText] = useState("");
@@ -267,7 +264,6 @@ function Thread({ parent, context, role, now }: { parent: string; context: Threa
     hide: (id, hidden) => hide.mutate({ id, hidden }),
     pin: () => {},
     ban: (id) => ban.mutate({ post: id }),
-    liking: like.isPending ? like.variables?.id : undefined,
   };
   const length = [...text].length;
 

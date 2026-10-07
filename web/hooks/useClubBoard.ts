@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
@@ -20,7 +20,7 @@ const REFRESH_MS = 30_000;
 /** Posts shown at first and added by each "Show more". */
 const POSTS_PAGE = 20;
 
-async function read<T>(path: string, getToken?: () => Promise<string | null>): Promise<T> {
+export async function read<T>(path: string, getToken?: () => Promise<string | null>): Promise<T> {
   const token = await getToken?.();
   const res = await fetch(path, { headers: token ? { authorization: `Bearer ${token}` } : undefined });
   const body: unknown = await res.json().catch(() => null);
@@ -29,6 +29,23 @@ async function read<T>(path: string, getToken?: () => Promise<string | null>): P
     throw new Error(typeof message === "string" ? message : `The server answered ${res.status}.`);
   }
   return body as T;
+}
+
+/** Where a post's like shows: the Board, a thread's replies and the timeline, which holds posts of many Clubs. */
+const LIKE_SHOWN_IN = ["club-posts", "club-replies", "timeline"];
+
+/**
+ * Sets whether the viewer likes `id` in every list already loaded, and the count with it, without
+ * asking the server. Safe to repeat: a post already in that state is left alone.
+ */
+function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, id: string, liked: boolean) {
+  const flip = <P extends PublicPost & { club?: string }>(p: P): P =>
+    p.id === id && (p.club === undefined || p.club === club) && p.liked !== liked ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p;
+  const board = (data: InfiniteData<{ posts: PublicPost[] }> | undefined) => data && { ...data, pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(flip) })) };
+  queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["club-posts", club] }, board);
+  // The timeline's key doesn't carry a Club: its posts say which one they are from.
+  queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["timeline"] }, board);
+  queryClient.setQueriesData<{ replies: PublicPost[] }>({ queryKey: ["club-replies", club] }, (data) => data && { ...data, replies: data.replies.map(flip) });
 }
 
 /**
@@ -123,6 +140,8 @@ export function useClubActions(token: string) {
 
   const refresh = (...names: string[]) => {
     for (const name of names) void queryClient.invalidateQueries({ queryKey: [name, key] });
+    // The timeline (ADR 0041) shows the same posts, across Clubs.
+    if (names.includes("club-posts")) void queryClient.invalidateQueries({ queryKey: ["timeline"] });
   };
   const useAct = <V, R = unknown>(run: (v: V) => Promise<R>, refreshes: string[], done?: string) =>
     useMutation({
@@ -183,7 +202,25 @@ export function useClubActions(token: string) {
     }, ["club-replies", "club-posts"]),
     remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log", "club-reported"]),
     report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies", "club-reported"], "Reported. Thank you."),
-    like: useAct((v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`), ["club-posts", "club-replies"]),
+    // A like shows at once and is taken back if the server refuses it (a heart that waits for the
+    // round trip feels broken). Likes in a Club go one at a time, so quick taps can't arrive out of order.
+    like: useMutation({
+      mutationKey: ["club-like", key],
+      scope: { id: `club-like:${key}` },
+      mutationFn: (v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`),
+      onMutate: async (v) => {
+        await Promise.all(LIKE_SHOWN_IN.map((name) => queryClient.cancelQueries({ queryKey: [name, key] })));
+        showLike(queryClient, key, v.id, v.like);
+      },
+      onError: (error, v) => {
+        showLike(queryClient, key, v.id, !v.like);
+        toast.error(error);
+      },
+      // Read the server's counts again, unless another like is still on its way (it would be undone for a moment).
+      onSettled: () => {
+        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1) refresh("club-posts", "club-replies");
+      },
+    }),
     hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log", "club-reported"]),
     pin: useAct((v: { id: string; pinned: boolean }) => send("POST", `/posts/${v.id}/pin`, { pinned: v.pinned }), ["club-posts", "club-log"]),
     ban: useAct((v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v), ["club-posts", "club-bans", "club-log", "club-members", "clubs"], "Banned."),

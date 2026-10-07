@@ -16,10 +16,11 @@ No deal contract, matcher rule or pool rule depends on a Club: a deal settles th
 
 | Route | What |
 |---|---|
+| `/timeline` | Board posts from the Clubs you joined, then from every other Club (see *Screens*) |
 | `/clubs` | The directory: totals, "Your Clubs", the Most active / Rising / Most traded boards, then All Clubs (see *Screens*) |
 | `/clubs/[address]` | One Club, with the tabs Market, Board, Members, Rewards, and Manage for staff |
 
-"Clubs" is added to the header's nav.
+"Timeline" and "Clubs" are in the header's nav.
 
 ## Which assets get a Club
 
@@ -106,6 +107,8 @@ Three views, switched with pills:
 
 - *Note*: plain text, 280 characters at most, plus an optional X post, shown as a card ([X posts](#x-posts)). Under the field, the composer says what makes an X post count for this Club.
 - *Looking for*: text, plus an optional deal id or intent hash, shown as its card. For example "WTB any Chog with a crown, 2 MON over floor".
+
+**Timeline** (`/timeline`, [ADR 0041](adr/0041-timeline.md)): Board posts from many Clubs in one list, newest first, in two sections. **From your Clubs** (signed in) is a masonry of the posts from Clubs you belong to, with a strip of those Clubs on top; you can like, reply and report there, exactly as on the Board. **Around the other Clubs** is the same masonry of posts from every other live Club (archived ones are left out). A post is a card under a cover in its Club's colours, with the author, the text (a short post with nothing attached is set large), its X card or deal link, and its counts; for a Club you haven't joined the card says "Join <symbol> to like and reply" and links to that Club's Board. Both lists are endless: the next page of 20 loads as the end nears (`InfiniteSentinel`), with no cap short of the Boards' own, and a failed load shows a retry button. Hidden posts, replies and pins are not shown, and moderation stays on the Board.
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
 
@@ -306,6 +309,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 | `GET` / `POST` / `DELETE /api/clubs/[token]/membership` | Your membership `{member, wallet?, holder?, joinedAt?, role}` / join / leave (gated). A `GET` also re-syncs your wallets. Built. |
 | `GET /api/me/club-inbox` | `{items}`: likes and replies on your posts (the key carries the count, so a new one is new), your pinned posts, your X posts that counted and the rewards you earned, from the last 14 days; and, for up to 5 of your Clubs, your place in the running epoch (`club-rank`, keyed in or out) and a nudge in its last day (`club-closing`) (gated; derived, nothing stored). The bell shows them. Built. |
 | `GET /api/me/clubs` | `{clubs}`: the Clubs you belong to, leaving out ones that no longer exist (gated). Built. |
+| `GET /api/timeline?scope=joined\|others&limit=&before=` | `{enabled, scope, posts, next}`: a page of Board posts across Clubs, newest first, each a Board post plus its Club's `club` token. `before` is the `next` of the page before (omit it for the first); `next` is `null` at the end, so the list goes as far back as the Boards do. `joined` is the Clubs the caller belongs to (empty without a token), `others` every other live Club. `limit` at most 50; 400 for another `scope`, a bad `limit` or a `before` that isn't a `next`. Public like each Board; cached 15 s for readers without a token. Hidden posts and replies are never listed. Built. |
 | `GET /api/clubs/[token]/posts` | `{enabled, posts, role}`: pinned first, then newest; hidden posts redacted. Public and cacheable for readers without a token; a reader who sends one gets a private answer that includes their own hidden posts (and, for staff, all of them with report counts). Built. |
 | `POST /api/clubs/[token]/posts` | `{message, signature}`: a `Post` signed by the member's Club wallet (gated; 201). With an X link, the answer's `xShare` says whether it counted and, if not, why. Built. |
 | `POST` / `DELETE /api/clubs/[token]/x` | Link the project's X account: `{action: "start", handle}` → `{code, text, until}`; `{action: "verify", handle, url}` → the profile; `DELETE {handle}` unlinks (Owner or admin). Built. |
@@ -336,6 +340,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - **Server:** `web/lib/server/activity.ts` (the log), `clubs.ts` (a Club's events from the log and the pool, its summary and detail), `clubRoutes.ts` (the read handlers, built over a registry so tests can use their own list), `members.ts` (membership, Holder checks, sync, the list) and `memberRoutes.ts` (its handlers, with the caller's gate injectable for tests), `board.ts` (posts, reports, bans, roles, the claim, the profile, the purge), `boardRoutes.ts` (its handlers), `clubState.ts` (roles, profile, bans and log documents; the admin list), the store ops (`addMember`, `removeMember`, `countMembers`), and the routes under `web/app/api/clubs/` and `web/app/api/activity/`.
 - **Shared:** `web/lib/momentum.ts` (the score), `web/lib/clubs.ts` (event and stats types, `summarize`, `settlementEvents`, `mergeEvents`) and `web/lib/members.ts` (`isHolder`, display wallet, stale-row picking, ranking), `clubRoles.ts` (the permission matrix, role changes) and `clubPosts.ts` (text cleaning, links, what each viewer sees, profile checks).
 - **Pages:** `web/app/clubs/page.tsx` (with `parts.tsx`) and `web/app/clubs/[address]/` with `page.tsx` and `ClubMarket.tsx`, `ClubBoard.tsx`, `ClubMembers.tsx`, `ClubManage.tsx` (the staff tab), `ClubRewards.tsx`, `LiveStandings.tsx`, `ClubDetails.tsx` and `parts.tsx`.
+- **Timeline:** `web/lib/timeline.ts` (scopes, page sizes), `web/lib/server/timeline.ts` (`listTimeline`) and `timelineRoutes.ts`, `web/hooks/useTimeline.ts`, `web/components/TimelineCard.tsx`, `TimelineComposer.tsx`, `PostComposer.tsx` (shared with the Board), `InfiniteSentinel.tsx` and `web/app/timeline/page.tsx`. `Masonry.tsx` (with `useColumns` and `toColumns`) fills a card list without gaps; the Deals, History and Market lists (`ListingGrid`) use it too.
 - **Hooks:** `useClubs`, `useClub`, `useClubMarket`, `useClubMembership` (with `useMyClubs`, `useClubMembers`), `useSignIn`, `useClubBoard` (`useClubPosts`, `useClubPage`, `useClubActions`, `useClubStaff`), on React Query and `useAccessToken`. Writes report errors through `useToast`; loads use `LoadError`.
 - **Components:** `ClubCard`, `ClubArt` (`clubTheme`, `ClubAvatar`, `ClubCover`), `ClubsIntro` and `ClubsTeaser` (the home page), `MomentumBadge` (with `HeatMeter`), `HolderBadge`, `JoinClubButton`, `PostItem`, `Pills`, `ActionMenu`. The directory's list row is `ClubRow` in `web/app/clubs/parts.tsx` (with `ClubListHeader` and `Leaderboard`); the Club page's collapsed details block is `ClubDetails.tsx`.
 - **Rewards:** `web/lib/rewards.ts` (the split, epochs, leaves), `web/lib/server/rewards.ts` (the builder and its reads), `rewardRoutes.ts`, `web/scripts/rewards-epoch.ts` (`npm run rewards:epoch`), `hooks/useRewards.ts`, `components/RewardsClaim.tsx` (Club tab and Account) and `app/clubs/[address]/ClubRewards.tsx`.
@@ -363,6 +368,7 @@ Each route is a thin wrapper over a function in `web/lib/server/clubs.ts` that t
 - The matcher's `token=` filter, in `matcher/test/server.test.ts`.
 - Rewards (`test/rewards.test.ts`): the Merkle tree, epochs, the leaf against the contract's encoding (and a root the contract verifies, `DeClubRewards.leafFixture.t.sol`), the split and carry, the builder (fees per Club, shares by holdings, a swap in two Clubs, signed-swap fees, order and idempotency, unreadable balances) and the routes.
 - Signed posts, follows and lenses (`test/social.test.ts`), with real signatures: what is refused and why, replay, the exports verifying, follow and unfollow, each lens alone and on the Board.
+- The timeline (`test/timeline.test.ts`): joined and others, archived Clubs, hidden posts and replies left out for everyone, likes and the reader's own like, cursor paging (no cap, no repeats, the same list at any page size, past a page of hidden posts), the masonry columns, and the route's cache and bad input.
 - X posts (`test/xPosts.test.ts`): link parsing and the canonical form, signals and their strength, the oEmbed and X API readers, each X-share rule, hide and delete, Momentum, linking the project's account by proof, the reach read and the Holder bonus (bounds, the cap, splitting accounts, the builder).
 
 By hand, with two wallets on Monad testnet:

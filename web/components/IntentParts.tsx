@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 import { AssetSide, DealCardV2 } from "@/components/DealCardV2";
 import { ExpiryCountdown, SettlementTag, SwapPanels } from "@/components/DealParts";
+import { Masonry } from "@/components/Masonry";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
 import { explorerTx } from "@/lib/config";
@@ -196,15 +197,21 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
  * its own page (it has no deal id); everything else is an ordinary deal card.
  */
 export function ListingGrid({ listings, now, me, info }: { listings: readonly DealV2[]; now: number; me?: string; info: Info }) {
+  // Two columns, filled without gaps: a card is as tall as its longer side (assets stack), so a
+  // plain grid leaves holes beside the cards with a bundle.
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {listings.map((listing) =>
+    <Masonry
+      items={listings}
+      maxColumns={2}
+      gap="gap-3"
+      height={(listing) => 150 + 56 * (isSignedListing(listing) ? Math.max(listing.signed.intent.give.length, listing.signed.intent.want.length) : Math.max(listing.offered.length, listing.requested.length, 1))}
+      render={(listing) =>
         isSignedListing(listing) ? (
           <IntentCard key={listing.signed.hash} row={listing.signed} now={now} me={me} info={info} />
         ) : (
           <DealCardV2 key={listing.id.toString()} deal={listing} now={now} me={me} info={info} tag={<SettlementTag signed={false} />} />
-        ),
-      )}
-    </div>
+        )
+      }
+    />
   );
 }

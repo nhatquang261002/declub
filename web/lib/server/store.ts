@@ -31,6 +31,8 @@ export type Store = {
   rank(key: string, entries: { member: string; score: number }[], cap: number): Promise<void>;
   /** The set's members, highest score first. */
   ranked(key: string, limit: number): Promise<string[]>;
+  /** Members scored `maxScore` or less (all of them when `null`), highest score first: the next page of an endless list. */
+  rankedBefore(key: string, maxScore: number | null, limit: number): Promise<string[]>;
   /** Counts a hit in a fixed window and returns the count so far, this one included. */
   hit(key: string, windowSec: number): Promise<number>;
 };
@@ -80,6 +82,11 @@ function upstash(redis: Redis): Store {
     // The client parses JSON members back into objects; callers get the strings they stored.
     async ranked(key, limit) {
       const rows = await redis.zrange<unknown[]>(key, 0, limit - 1, { rev: true });
+      return rows.map((row) => (typeof row === "string" ? row : JSON.stringify(row)));
+    },
+    async rankedBefore(key, maxScore, limit) {
+      // Walking down from the highest score: `max` first, then `min`.
+      const rows = await redis.zrange<unknown[]>(key, maxScore ?? "+inf", "-inf", { byScore: true, rev: true, offset: 0, count: limit });
       return rows.map((row) => (typeof row === "string" ? row : JSON.stringify(row)));
     },
     async hit(key, windowSec) {
@@ -142,6 +149,13 @@ export function memoryStore(): Store {
     },
     async ranked(key, limit) {
       return [...(ranks.get(key) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([member]) => member);
+    },
+    async rankedBefore(key, maxScore, limit) {
+      return [...(ranks.get(key) ?? [])]
+        .filter(([, score]) => maxScore === null || score <= maxScore)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([member]) => member);
     },
     async hit(key, windowSec) {
       const now = Date.now();

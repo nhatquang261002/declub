@@ -1606,6 +1606,32 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 }
 .club-panel a.x-card-open:hover, a.x-card-open:hover { color: #111318; text-decoration: underline; }
 
+/* A post on the timeline (ADR 0041): its own card, under a cover in its Club's colours. */
+.tl-card {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #111318;
+  border-radius: 1rem;
+  background: var(--chog-cream-500);
+  color: #111318;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.tl-card:hover { box-shadow: 0 4px 0 #111318; transform: translateY(-2px); }
+.tl-card:focus-within { box-shadow: 0 4px 0 #111318; }
+.tl-club { display: block; border-radius: calc(1rem - 2px) calc(1rem - 2px) 0 0; color: var(--club-ink); }
+.tl-club:focus-visible { outline: 3px solid var(--action-primary); outline-offset: -3px; }
+.tl-cover { border-radius: calc(1rem - 2px) calc(1rem - 2px) 0 0; color: var(--club-ink); }
+.tl-card a.post-link, .tl-card a.x-card-open { color: #111318; }
+/* A shared picture is a taste of the post, not the post: a tall one would leave a hole in the grid beside it. */
+.tl-card .x-card-media img { max-height: 15rem; }
+/* A short post with nothing attached, set as a line to quote. */
+.tl-quote { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.75rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-card { transition: none; }
+  .tl-card:hover { transform: none; }
+}
+
 /* The characters left in a post, as a ring that fills. */
 .char-ring {
   --p: 0;

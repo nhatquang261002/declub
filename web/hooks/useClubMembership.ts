@@ -52,6 +52,8 @@ export function useClubMembership(token: string) {
         void queryClient.invalidateQueries({ queryKey: ["clubs"] });
         void queryClient.invalidateQueries({ queryKey: ["club-members", token.toLowerCase()] });
         void queryClient.invalidateQueries({ queryKey: ["my-clubs"] });
+        // A Club moves between the timeline's "yours" and "others" with a join or a leave.
+        void queryClient.invalidateQueries({ queryKey: ["timeline"] });
       },
       onError: (error) => toast.error(error),
     });

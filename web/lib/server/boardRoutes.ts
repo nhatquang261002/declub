@@ -128,7 +128,7 @@ async function front(registry: Registry, ctx: Ctx, request: Request, deps: Route
   return { entry, store: g.store, user: g.user, actor };
 }
 
-async function softViewer(request: Request, deps: RouteDeps): Promise<{ id: string } | null> {
+export async function softViewer(request: Request, deps: Pick<RouteDeps, "viewer">): Promise<{ id: string } | null> {
   if (!request.headers.get("authorization")) return null;
   return deps.viewer ? deps.viewer(request) : authenticate(request);
 }

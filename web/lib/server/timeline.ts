@@ -1,0 +1,83 @@
+import type { StoredPost } from "../clubPosts";
+import { viewPost } from "../clubPosts";
+import { formatCursor, precedes, type TimelineCursor, type TimelinePost, type TimelineScope } from "../timeline";
+import type { Registry } from "../verifiedAssets";
+import { likedKey, likesKey, postKey, postsKey, repliesKey } from "./board";
+import { clubsOf } from "./members";
+import type { Store } from "./store";
+
+/** Posts read past a page from each Club, so posts that are hidden or gone from the list don't leave a page short. */
+const SPARE = 10;
+
+/**
+ * One page of posts from several Clubs' Boards as one list, newest first (ADR 0041), starting just
+ * after `before` (the post the last page ended on). Nothing is capped: every page reads the next
+ * slice of each Club's own ranking, so the list goes back as far as the Boards do, and a page costs
+ * a read per Club however far down it is.
+ *
+ * Each Club is read a little past a page. A Club whose slice was full may hold more posts older
+ * than the oldest it returned, so a post older than that is held back until the next page, which
+ * keeps the merged order exact. `next` is where that page starts, or `null` at the end.
+ *
+ * Only what anyone may read is listed: hidden posts and replies are left out whoever asks, and
+ * pins are ignored (a pin is the Club speaking on its own Board, not a reason to lead the timeline).
+ * Archived Clubs are left out of `others` (a frozen Board has nothing new), but a reader's own
+ * archived Club still shows under `joined`.
+ */
+export async function listTimeline(
+  store: Store,
+  registry: Registry,
+  viewer: { userId?: string; scope: TimelineScope; before?: TimelineCursor; limit: number },
+): Promise<{ posts: TimelinePost[]; next: string | null }> {
+  // Who belongs where is the server's to say; the reader only names a scope.
+  const joined = new Set(viewer.userId ? (await clubsOf(store, viewer.userId)).map((token) => token.toLowerCase()) : []);
+  const tokens = registry
+    .clubs()
+    .filter((club) => (viewer.scope === "joined" ? joined.has(club.address.toLowerCase()) : !joined.has(club.address.toLowerCase()) && club.club !== "archived"))
+    .map((club) => club.address.toLowerCase());
+
+  const fetched = viewer.limit + SPARE;
+  const slices = await Promise.all(
+    tokens.map(async (token) => {
+      const ids = await store.rankedBefore(postsKey(token), viewer.before?.at ?? null, fetched);
+      const rows = await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)));
+      // A post scored at the cursor's moment may be one the last page already showed.
+      const after = rows.flatMap((row) => (row && (!viewer.before || precedes(viewer.before, row)) ? [{ token, post: row }] : []));
+      // Where this Club's slice ended, if it was full: it may have older posts than this.
+      const last = after.at(-1)?.post;
+      return { after, edge: ids.length === fetched && last ? { at: last.at, id: last.id } : null };
+    }),
+  );
+
+  // Past the newest of those edges, some Club may have posts this read didn't reach.
+  const edges = slices.flatMap((slice) => (slice.edge ? [slice.edge] : []));
+  const boundary = edges.reduce<TimelineCursor | null>((a, b) => (a === null || precedes(b, a) ? b : a), null);
+  const eligible = slices
+    .flatMap((slice) => slice.after)
+    .filter(({ post }) => !post.hidden && !post.parent && (boundary === null || !precedes(boundary, post)))
+    .sort((a, b) => b.post.at - a.post.at || (a.post.id < b.post.id ? -1 : 1));
+
+  const page = eligible.slice(0, viewer.limit);
+  // More to read: posts held back in this read, or Clubs that may have older ones. Even a page with
+  // nothing in it (everything was hidden) moves on, to the edge.
+  const next = eligible.length > viewer.limit ? page.at(-1)!.post : boundary;
+
+  const liked = new Map<string, Set<string>>();
+  if (viewer.userId) {
+    const userId = viewer.userId;
+    await Promise.all([...new Set(page.map((p) => p.token))].map(async (token) => liked.set(token, new Set(await store.members(likedKey(token, userId))))));
+  }
+  const counts = await Promise.all(
+    page.map(async ({ token, post }) => {
+      const [likes, replies] = await Promise.all([store.countMembers(likesKey(token, post.id)), store.countMembers(repliesKey(token, post.id))]);
+      return { likes, replies };
+    }),
+  );
+  return {
+    posts: page.map(({ token, post }, i) => ({
+      ...viewPost(post, { userId: viewer.userId, staff: false }, false, undefined, { count: counts[i]!.likes, liked: liked.get(token)?.has(post.id) ?? false }, counts[i]!.replies),
+      club: token,
+    })),
+    next: next ? formatCursor(next) : null,
+  };
+}
