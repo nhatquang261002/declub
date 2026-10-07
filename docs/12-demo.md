@@ -34,7 +34,7 @@ The demo has its own DeClubEscrow, DeClubIntents and DeClubRewards, deployed by 
 - **DeClubIntents:** the same fee, paid in a `MockWMON` the same script deploys (`DEPLOY_MOCK_WMON`), since testnet has no canonical WMON. The mock only wraps 1:1 (`deposit`), so a wallet gets WMON by wrapping MON. The matcher (`matcher/README.md`) needs it.
 - **DeClubRewards:** the bank is the operator, with no claim delay. Fees come back to the bank and fund the epochs.
 
-Epochs are a day long (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS=86400`). The genesis is set so that the first epoch closes just after the seeded swaps, so it can be built, published and claimed during the demo while the next one fills up.
+Epoch 0 was a day long (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS=86400`), with the genesis set so that it closed just after the seeded swaps and could be built, published and claimed during the demo. From epoch 1 epochs are a week (`604800`): the genesis moved back to `1790666999` so epoch 1 starts where epoch 0 ended, Tuesday 2026-10-06 07:30 UTC, and each epoch closes Tuesday 07:30 UTC.
 
 ## Build it
 
