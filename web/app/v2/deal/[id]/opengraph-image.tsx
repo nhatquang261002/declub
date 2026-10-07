@@ -23,7 +23,7 @@ const TILT = [[], [-6], [-6, 5], [-6, 3, -4]];
 /** A polaroid like the home page's: a white frame, the picture, the name, and the token number in a pill. */
 function Polaroid({ item, art, mon, photo, tilt, overlap }: { item: CardItem; art: string | null; mon: string | null; photo: number; tilt: number; overlap: number }) {
     return (
-    <div style={{ display: "flex", flexDirection: "column", position: "relative", width: photo + 28, marginLeft: overlap, padding: "14px 14px 12px", borderRadius: 8, background: "white", boxShadow: "0 16px 34px #1b103d4d, 0 2px 6px #1b103d33", transform: `rotate(${tilt}deg)` }}>
+    <div style={{ display: "flex", flexDirection: "column", position: "relative", width: photo + 28, marginLeft: overlap, padding: "14px 14px 12px", borderRadius: 8, background: "white", transform: `rotate(${tilt}deg)` }}>
       <div style={{ display: "flex", position: "absolute", top: -12, left: "50%", marginLeft: -34, width: 68, height: 22, background: "#fdf6cdf2", border: `2px solid ${INK}33`, transform: "rotate(-3deg)" }} />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: photo, height: photo, overflow: "hidden", border: `2px solid ${INK}33`, borderRadius: 3, background: "#fff4cf" }}>
         {art ? (
@@ -48,7 +48,7 @@ function Polaroid({ item, art, mon, photo, tilt, overlap }: { item: CardItem; ar
 /** What an open offer asks for instead of assets: a card with the words. */
 function Words({ text, photo }: { text: string; photo: number }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", position: "relative", padding: "14px", borderRadius: 8, background: "white", boxShadow: "0 16px 34px #1b103d4d, 0 2px 6px #1b103d33", transform: "rotate(6deg)" }}>
+    <div style={{ display: "flex", flexDirection: "column", position: "relative", padding: "14px", borderRadius: 8, background: "white", transform: "rotate(6deg)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: photo, height: photo, padding: 24, textAlign: "center", border: `2px solid ${INK}33`, borderRadius: 3, background: "#ffe3d8", fontSize: 44, lineHeight: 1.1 }}>{text}</div>
     </div>
   );
@@ -80,7 +80,7 @@ function Side({ label, items, images, mon, words }: { label: string; items: Card
 /** Two round arrows, one each way, like the home page's swap: drawn, since the font has no arrows. */
 function Arrows() {
   const arrow = (d: string, tilt: number) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 64, height: 64, border: `4px solid ${INK}`, borderRadius: 999, background: PINK, boxShadow: `4px 4px 0 ${INK}`, transform: `rotate(${tilt}deg)` }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 64, height: 64, border: `4px solid ${INK}`, borderRadius: 999, background: PINK, transform: `rotate(${tilt}deg)` }}>
       <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
         <path d={d} />
       </svg>

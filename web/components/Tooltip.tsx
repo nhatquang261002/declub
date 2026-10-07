@@ -66,7 +66,7 @@ export function Tooltip({
         <span
           id={id}
           role="tooltip"
-          className={`absolute top-full z-30 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-lg border-2 border-[#111318] bg-[#fff4cf] p-3 text-left font-sans text-xs leading-5 font-medium tracking-normal text-[#111318] normal-case shadow-[0.2rem_0.2rem_0_#111318] ${
+          className={`absolute top-full z-30 mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-lg border-2 border-[#111318] bg-[#fff4cf] p-3 text-left font-sans text-xs leading-5 font-medium tracking-normal text-[#111318] normal-case ${
             alignEnd ? "right-0" : "left-0"
           }`}
         >

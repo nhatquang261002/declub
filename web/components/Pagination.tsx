@@ -113,7 +113,7 @@ function PageJump({
         }}
         title={`Type a page from 1 to ${totalPages} and press Enter`}
         aria-label={`Go to page, 1 to ${totalPages}`}
-        className="rounded-lg border-2 border-[#111318] bg-white px-1 py-0.5 text-center text-sm font-black tracking-normal text-[#111318] tabular-nums shadow-[0.12rem_0.12rem_0_#111318] outline-none focus:shadow-[0.12rem_0.12rem_0_var(--chog-pink-500)] disabled:opacity-60"
+        className="rounded-lg border-2 border-[#111318] bg-white px-1 py-0.5 text-center text-sm font-black tracking-normal text-[#111318] tabular-nums outline-none focus:border-[var(--chog-pink-500)] disabled:opacity-60"
         style={{ width: `${Math.max(2, String(totalPages).length) + 1.5}ch` }}
       />
       <span>of {totalPages}</span>

@@ -168,7 +168,7 @@ function Club({ entry }: { entry: ClubEntry }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <ClubAvatar
               club={info}
-              className="relative z-10 -mt-12 size-24 text-3xl shadow-[0.3rem_0.3rem_0_#111318] sm:-mt-16 sm:size-32 sm:text-4xl"
+              className="relative z-10 -mt-12 size-24 text-3xl sm:-mt-16 sm:size-32 sm:text-4xl"
               sizes="128px"
             />
             <div className="min-w-0 flex-1 sm:pb-1">

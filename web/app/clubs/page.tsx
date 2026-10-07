@@ -281,7 +281,7 @@ export default function ClubsPage() {
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
             <input
               type="search"
-              className="input border-2 border-[#111318] bg-white pl-9 shadow-[0.2rem_0.2rem_0_#111318] focus:border-[#111318]"
+              className="input border-2 border-[#111318] bg-white pl-9 focus:border-[#111318]"
               value={query}
               placeholder="Name, symbol or address"
               onChange={(e) => search(e.target.value)}

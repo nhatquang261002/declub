@@ -6,7 +6,7 @@ import { CheckIcon, SwapIcon, UsersIcon } from "@/components/Icons";
 // frame: a hero with the switch between them, a numbered contents list, and sections that read like a short manual. Button names
 // are in bold so they match the screens. docs/07-user-guide.md is the longer version of both.
 
-export const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf] shadow-[0.3rem_0.3rem_0_rgb(0_0_0/0.16)]";
+export const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf]";
 export const MUTED = "text-[#4e5968]";
 
 export type GuideSection = { id: string; label: string };

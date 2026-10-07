@@ -96,7 +96,7 @@ export default function HomePage() {
         <Link href="/guide/clubs" className="btn-secondary shrink-0">Read the field guide</Link>
       </section>
 
-      <footer className="relative mt-12 overflow-hidden rounded-2xl border-2 border-[#111318] bg-[#171a22] p-6 text-sm text-white shadow-[0.45rem_0.45rem_0_#d83b45] sm:p-9">
+      <footer className="relative mt-12 overflow-hidden rounded-2xl border-2 border-[#111318] bg-[#171a22] p-6 text-sm text-white sm:p-9">
         <div className="absolute -right-12 -top-16 size-44 rounded-full border-[18px] border-[#315ea8]/40" aria-hidden />
         <div className="absolute -bottom-20 left-1/3 size-40 rounded-full bg-[#d83b45]/10" aria-hidden />
         <div className="relative">

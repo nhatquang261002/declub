@@ -52,7 +52,7 @@ export function SettlementTag({ signed }: { signed: boolean }) {
 
 export function MonPill({ wei }: { wei: bigint }) {
   return (
-    <span className="inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-[#836ef9] bg-[#eeeaff] px-1.5 text-center font-semibold leading-tight text-[#111318] shadow-[0.18rem_0.18rem_0_#111318]">
+    <span className="inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-[#836ef9] bg-[#eeeaff] px-1.5 text-center font-semibold leading-tight text-[#111318]">
       <Image src="/brand/mon.svg" alt="" width={22} height={22} className="size-[22px]" />
       <span className="text-[11px]">
         <span className="text-[#836ef9]">+ </span>
@@ -98,7 +98,7 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
   return (
     <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
       <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-        <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
+        <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase">
           gives
         </span>
         {gives}
@@ -107,7 +107,7 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
         <SwapIcon />
       </span>
       <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-        <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
+        <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase">
           wants
         </span>
         {wants}

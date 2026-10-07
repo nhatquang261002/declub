@@ -32,8 +32,6 @@
   --radius-control: 0.75rem;
   --radius-card: 1rem;
   --radius-hero: 2rem;
-  --shadow-card: 0 1rem 2rem rgb(17 19 24 / 0.14);
-  --shadow-float: 0 1.5rem 3rem rgb(0 0 0 / 0.34);
 }
 
 @theme inline {
@@ -62,7 +60,6 @@ body {
 @utility card {
   @apply border border-line bg-panel;
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
 }
 
 .deal-card {
@@ -70,14 +67,12 @@ body {
   border-radius: 1rem;
   background: #fdf6cd;
   color: #111318;
-  box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 
 .deal-card:hover {
   border-color: #315ea8;
   background: #fff8dc;
-  box-shadow: 0.45rem 0.5rem 0 #315ea8;
   transform: translateY(-3px);
 }
 
@@ -122,7 +117,6 @@ body {
   border-radius: 0.75rem;
   background: var(--chog-cream-500);
   color: #111318;
-  box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
 }
 
 .page-section::before {
@@ -166,7 +160,6 @@ body {
   color: var(--content-inverse);
   background-image:
     linear-gradient(135deg, #fff4cf 0%, #ffe8b8 55%, #f4d9a6 100%);
-  box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
 }
 
 .hero-panel .text-muted {
@@ -217,7 +210,6 @@ body {
   border-radius: var(--radius-card);
   background:
     linear-gradient(135deg, #2b2530, #211d26);
-  box-shadow: var(--shadow-card);
 }
 
 .chog-board-header {
@@ -257,13 +249,11 @@ body {
   border: 1px solid rgb(27 16 61 / 0.22);
   background: var(--chog-cream-500);
   color: var(--chog-purple-950);
-  box-shadow: 0 0.8rem 1.2rem rgb(0 0 0 / 0.22);
-  transition: transform 300ms ease, box-shadow 300ms ease;
+  transition: transform 300ms ease;
 }
 
 .board-chog:hover {
   z-index: 10;
-  box-shadow: 0 1.2rem 2rem rgb(0 0 0 / 0.32);
   transform: rotate(0deg) scale(1.08) !important;
 }
 
@@ -372,7 +362,6 @@ body {
   border: 0.35rem solid #ffffff;
   border-radius: 0.35rem;
   background: #ffffff;
-  box-shadow: var(--shadow-float);
   transform-origin: center;
 }
 
@@ -451,7 +440,6 @@ body {
   font-size: 1.35rem;
   font-weight: 900;
   line-height: 1;
-  box-shadow: 0.15rem 0.15rem 0 var(--chog-purple-950);
 }
 
 .chog-art-token {
@@ -465,7 +453,6 @@ body {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 800;
-  box-shadow: 0.25rem 0.25rem 0 var(--chog-pink-500);
 }
 
 .chog-art-token-left {
@@ -517,23 +504,20 @@ body {
   }
 }
 /*
- * Buttons are stickers: a dark outline and a hard shadow that lifts and tilts on hover and
- * squashes when pressed. The variants only change colours (--btn-shadow drives the shadow).
+ * Buttons are stickers: a dark outline that lifts and tilts on hover and squashes when pressed.
+ * The variants only change colours.
  */
 @utility btn {
   @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-extrabold;
   border: 2px solid var(--chog-purple-950);
   border-radius: var(--radius-control);
-  box-shadow: 0.2rem 0.2rem 0 var(--btn-shadow, var(--chog-purple-950));
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition: transform 160ms ease, background-color 160ms ease;
 
   &:hover:not(:disabled) {
-    box-shadow: 0.32rem 0.32rem 0 var(--btn-shadow, var(--chog-purple-950));
     transform: translate(-0.1rem, -0.1rem) rotate(-1.5deg);
   }
 
   &:active:not(:disabled) {
-    box-shadow: 0 0 0 var(--btn-shadow, var(--chog-purple-950));
     transform: translate(0.2rem, 0.2rem);
   }
 
@@ -549,7 +533,6 @@ body {
 }
 @utility btn-primary {
   @apply btn;
-  --btn-shadow: var(--chog-pink-500);
   background: var(--chog-peach-500);
   color: var(--chog-purple-950);
 }
@@ -564,7 +547,6 @@ body {
 }
 @utility btn-danger {
   @apply btn;
-  --btn-shadow: var(--chog-pink-700);
   border-color: var(--chog-pink-700);
   background: var(--chog-white);
   color: var(--chog-pink-700);
@@ -616,8 +598,8 @@ body {
 }
 
 /*
- * Header controls: dark stickers that echo the Create deal button (outline, hard shadow, lift on
- * hover, squash on press). The wallet button, the bell and their dropdowns share these.
+ * Header controls: dark stickers that echo the Create deal button (outline, lift on hover,
+ * squash on press). The wallet button, the bell and their dropdowns share these.
  */
 .hdr-btn {
   position: relative;
@@ -633,19 +615,16 @@ body {
   font-size: 0.8rem;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0.2rem 0.2rem 0 rgb(0 0 0 / 0.5);
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .hdr-btn:hover:not(:disabled) {
   border-color: rgb(255 244 207 / 0.55);
   background: var(--chog-purple-700);
-  box-shadow: 0.3rem 0.3rem 0 rgb(0 0 0 / 0.5);
   transform: translate(-0.1rem, -0.1rem);
 }
 
 .hdr-btn:active:not(:disabled) {
-  box-shadow: 0 0 0 rgb(0 0 0 / 0.5);
   transform: translate(0.2rem, 0.2rem);
 }
 
@@ -784,7 +763,6 @@ body {
   border: 2px solid rgb(255 244 207 / 0.3);
   border-radius: 1.1rem;
   background: var(--chog-purple-900);
-  box-shadow: 0.35rem 0.4rem 0 rgb(0 0 0 / 0.5), var(--shadow-float);
   animation: pop-in 140ms ease-out;
   transform-origin: top right;
 }
@@ -936,7 +914,6 @@ body {
   border: 2px solid var(--chog-purple-950);
   border-radius: var(--radius-control);
   background: var(--chog-white);
-  box-shadow: 0.2rem 0.2rem 0 var(--chog-purple-950);
   scrollbar-width: none;
 }
 @utility tab {
@@ -955,7 +932,6 @@ body {
   &:is([aria-pressed="true"], [aria-current]) {
     border-color: var(--chog-purple-950);
     background: var(--chog-peach-500);
-    box-shadow: 0.12rem 0.12rem 0 var(--chog-pink-500);
     color: var(--chog-purple-950);
   }
   &:active:not(:disabled) { transform: scale(0.96); }
@@ -973,16 +949,14 @@ body {
   border: 2px solid var(--chog-purple-950);
   border-radius: var(--radius-control);
   background: var(--chog-white);
-  box-shadow: 0.2rem 0.2rem 0 var(--chog-purple-950);
   color: var(--chog-purple-950);
   font-size: 0.875rem;
   font-weight: 700;
   text-align: left;
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition: transform 160ms ease, background-color 160ms ease;
   &:hover:not(:disabled) { background: var(--chog-cream-500); }
   &[aria-expanded="true"] {
     background: var(--chog-cream-500);
-    box-shadow: 0.1rem 0.1rem 0 var(--chog-purple-950);
     transform: translate(0.1rem, 0.1rem);
   }
   &:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 3px; }
@@ -1002,7 +976,6 @@ body {
   border: 2px solid var(--chog-purple-950);
   border-radius: var(--radius-control);
   background: var(--chog-cream-500);
-  box-shadow: 0.3rem 0.3rem 0 var(--chog-purple-950);
   color: var(--chog-purple-950);
 }
 @utility select-option {
@@ -1139,7 +1112,6 @@ body {
 }
 
 .toast .alert {
-  box-shadow: 0.3rem 0.3rem 0 rgb(17 19 24 / 0.85), var(--shadow-float);
 }
 
 @keyframes toast-in {
@@ -1171,7 +1143,6 @@ body {
   border-radius: 999px;
   background: #fde8ea;
   color: #a9282f;
-  box-shadow: 0.2rem 0.2rem 0 #a9282f;
 }
 
 /* In the components layer, so a utility on the same element (a size, a padding) wins. */
@@ -1234,7 +1205,6 @@ body {
   border: 2px solid #111318;
   border-radius: 28%;
   background: linear-gradient(135deg, var(--club-a), var(--club-b));
-  box-shadow: 0.2rem 0.2rem 0 #111318;
   color: var(--club-ink);
   font-weight: 900;
   letter-spacing: -0.04em;
@@ -1269,7 +1239,6 @@ body {
   border-radius: 1rem;
   background: var(--chog-cream-500);
   color: #111318;
-  box-shadow: 0.35rem 0.35rem 0 rgb(0 0 0 / 0.18);
 }
 
 /* A list inside a panel. No overflow: hidden, so a row's menu or tooltip can hang past the panel's
@@ -1281,12 +1250,11 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease;
 }
 
 .club-card:hover {
   border-color: var(--action-primary);
-  box-shadow: 0.45rem 0.5rem 0 rgb(0 0 0 / 0.2);
   transform: translateY(-3px);
 }
 
@@ -1302,7 +1270,6 @@ body {
   border-radius: 1.5rem;
   background: var(--chog-cream-500);
   color: #111318;
-  box-shadow: 0.45rem 0.45rem 0 rgb(0 0 0 / 0.2);
 }
 
 .club-hero > .club-cover { border-radius: calc(1.5rem - 2px) calc(1.5rem - 2px) 0 0; }
@@ -1535,7 +1502,6 @@ a.chip:hover { border-color: #111318; background: white; }
   border: 2px solid #111318;
   border-radius: 0.75rem;
   background: var(--chog-cream-500);
-  box-shadow: 0.3rem 0.3rem 0 #111318;
   color: #111318;
   animation: pop-in 120ms ease-out;
   transform-origin: top right;
@@ -1609,12 +1575,11 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   padding: 0.35rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 800;
-  box-shadow: 0.15rem 0.15rem 0 #111318;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 140ms ease;
 }
 
 .club-panel a.post-link { color: #111318; }
-.club-panel a.post-link:hover { color: #111318; box-shadow: 0.25rem 0.25rem 0 #111318; transform: translate(-1px, -1px); }
+.club-panel a.post-link:hover { color: #111318; transform: translate(-1px, -1px); }
 
 /* A shared X post (ADR 0024): the post as plain text, opening on X. */
 .x-card {
@@ -1626,7 +1591,6 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border-radius: 0.75rem;
   background: white;
   padding: 0.65rem 0.8rem;
-  box-shadow: 0.15rem 0.15rem 0 #111318;
 }
 .x-card-text { font-size: 0.88rem; line-height: 1.35rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .x-card-media { display: block; overflow: hidden; border: 2px solid #111318; border-radius: 0.6rem; }
@@ -1682,7 +1646,7 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   font-variant-numeric: tabular-nums;
 }
 
-.rank-1, .rank-2, .rank-3 { border: 2px solid #111318; box-shadow: 0.12rem 0.12rem 0 #111318; color: #111318; }
+.rank-1, .rank-2, .rank-3 { border: 2px solid #111318; color: #111318; }
 .rank-1 { background: #f0b735; }
 .rank-2 { background: #dfe3ea; }
 .rank-3 { background: #e8a777; }
@@ -1730,7 +1694,6 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
     radial-gradient(circle at 1px 1px, rgb(17 19 24 / 0.07) 1px, transparent 0) 0 0 / 14px 14px,
     linear-gradient(160deg, #fff8dc 0%, #fff4cf 45%, #fbe7b4 100%);
   color: #111318;
-  box-shadow: 0.5rem 0.5rem 0 rgb(0 0 0 / 0.2);
 }
 
 .deal-sheet-head {
@@ -1828,12 +1791,11 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border: 2px solid #111318;
   border-radius: 1rem;
   background: rgb(255 255 255 / 0.72);
-  box-shadow: 0.3rem 0.3rem 0 var(--side);
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
 
 .deal-side[data-side="want"] { --side: #d83b45; --side-ink: #fff; }
-.deal-side[data-you] { box-shadow: 0.3rem 0.3rem 0 var(--side), 0 0 0 4px rgb(49 94 168 / 0.18); }
+.deal-side[data-you] { box-shadow: 0 0 0 4px rgb(49 94 168 / 0.18); }
 
 .deal-side-head {
   display: flex;
@@ -1893,7 +1855,6 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border-radius: 9999px;
   background: #111318;
   color: #f0b735;
-  box-shadow: 0.2rem 0.2rem 0 #d83b45;
 }
 
 .deal-seal-disc svg { width: 1.6rem; height: 1.6rem; transform: rotate(90deg); }
@@ -1912,9 +1873,9 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 }
 
 .deal-seal[data-live]::before { animation: seal-spin 14s linear infinite; }
-.deal-seal[data-status="filled"] .deal-seal-disc { background: #315ea8; color: #fff; box-shadow: 0.2rem 0.2rem 0 #111318; }
+.deal-seal[data-status="filled"] .deal-seal-disc { background: #315ea8; color: #fff; }
 .deal-seal[data-status="cancelled"] .deal-seal-disc,
-.deal-seal[data-status="expired"] .deal-seal-disc { background: #dfe3ea; color: #4e5968; box-shadow: 0.2rem 0.2rem 0 #9aa3b2; }
+.deal-seal[data-status="expired"] .deal-seal-disc { background: #dfe3ea; color: #4e5968; }
 
 @keyframes seal-spin { to { transform: rotate(360deg); } }
 
@@ -1970,7 +1931,6 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border-radius: 1.25rem;
   background: #fff;
   color: #111318;
-  box-shadow: 0.4rem 0.4rem 0 #111318;
 }
 
 .deal-dock::before {
@@ -2042,7 +2002,7 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 .deal-step-dot svg { width: 0.8rem; height: 0.8rem; }
 .deal-step[data-state="done"] { border-color: #1f7a55; background: #e3f5ec; color: #1f7a55; }
 .deal-step[data-state="done"] .deal-step-dot { border-color: #1f7a55; background: #1f7a55; color: #fff; }
-.deal-step[data-state="current"] { border-color: #111318; background: #f0b735; color: #111318; box-shadow: 0.12rem 0.12rem 0 #d83b45; }
+.deal-step[data-state="current"] { border-color: #111318; background: #f0b735; color: #111318; }
 .deal-step[data-state="current"] .deal-step-dot { border-color: #111318; background: #111318; color: #f0b735; }
 .deal-step-join { width: 1rem; height: 2px; background: rgb(17 19 24 / 0.2); }
 
@@ -2100,13 +2060,12 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border-radius: 1rem;
   background: var(--chog-cream-500);
   color: #111318;
-  box-shadow: 0.3rem 0.3rem 0 rgb(0 0 0 / 0.16);
 }
 
 .offer-card[data-status="active"] { background: #fff; }
-.offer-card[data-status="accepted"] { border-color: #315ea8; box-shadow: 0.3rem 0.3rem 0 #315ea8; }
+.offer-card[data-status="accepted"] { border-color: #315ea8; }
 .offer-card[data-status="withdrawn"],
-.offer-card[data-status="rejected"] { opacity: 0.7; box-shadow: none; }
+.offer-card[data-status="rejected"] { opacity: 0.7; }
 .offer-card .text-muted { color: #4e5968; }
 
 @media (prefers-reduced-motion: reduce) {

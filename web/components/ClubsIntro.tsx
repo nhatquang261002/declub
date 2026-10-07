@@ -37,7 +37,7 @@ export function ClubsIntro() {
           <ul className="mt-6 grid gap-4 sm:grid-cols-2">
             {WHAT.map((item) => (
               <li key={item.title}>
-                <span className="grid size-10 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735] shadow-[0.15rem_0.15rem_0_#111318]">
+                <span className="grid size-10 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735]">
                   {item.icon}
                 </span>
                 <p className="mt-2.5 font-extrabold">{item.title}</p>

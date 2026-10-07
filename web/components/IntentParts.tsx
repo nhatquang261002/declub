@@ -169,7 +169,7 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
 
       <ol className="space-y-3">
         {legs.map(({ row, to }) => (
-          <li key={row.hash} className="space-y-2 rounded-xl border-2 border-[#111318] bg-white p-3 shadow-[0.2rem_0.2rem_0_#f0b735]">
+          <li key={row.hash} className="space-y-2 rounded-xl border-2 border-[#111318] bg-white p-3">
             <p className="text-xs text-muted">
               <Maker address={row.intent.maker} me={me} /> gave to <Maker address={to} me={me} />
             </p>

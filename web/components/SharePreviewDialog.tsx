@@ -80,7 +80,7 @@ export function SharePreviewDialog({
             <CrossIcon />
           </button>
         </div>
-        <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-xl border-2 border-[#111318] bg-[#fff8e6] shadow-[0.35rem_0.35rem_0_#111318]">
+        <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-xl border-2 border-[#111318] bg-[#fff8e6]">
           {image !== "ready" && (
             <div className="absolute inset-0 grid place-items-center p-4 text-center text-sm text-muted" role="status">
               {image === "loading" ? "Drawing the preview…" : "The preview couldn’t be drawn. You can still share the post: X will try again when it expands."}

@@ -13,7 +13,7 @@ import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
 type Info = ReadonlyMap<string, TokenInfo>;
 
 const chip =
-  "inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-[#111318] bg-white px-1.5 text-center leading-tight text-[#111318] shadow-[0.18rem_0.18rem_0_#111318]";
+  "inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-[#111318] bg-white px-1.5 text-center leading-tight text-[#111318]";
 
 /**
  * An NFT from any collection: its art from the token's `tokenURI` (a plain square until, or unless,
@@ -26,7 +26,7 @@ function NftTile({ asset }: { asset: Asset }) {
   const collection = info?.name || info?.symbol;
   return (
     <div className="flex w-32 shrink-0 flex-col items-center gap-1.5 text-center">
-      <div className="relative grid size-20 place-items-center overflow-hidden rounded-lg border-2 border-[#111318] bg-white shadow-[0.18rem_0.18rem_0_#111318]">
+      <div className="relative grid size-20 place-items-center overflow-hidden rounded-lg border-2 border-[#111318] bg-white">
         {view?.image ? (
           // Arbitrary hosts from token metadata, so next/image's domain list doesn't apply.
           // eslint-disable-next-line @next/next/no-img-element

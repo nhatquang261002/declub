@@ -48,7 +48,7 @@ export function TraitRequests({ drafts, onChange, statuses, resolved, room }: Pr
 
       <ul className="space-y-4">
         {drafts.map((draft, i) => (
-          <li key={draft.key} className="space-y-3 rounded-xl border-2 border-[#111318] bg-white p-3 shadow-[0.2rem_0.2rem_0_#f0b735]">
+          <li key={draft.key} className="space-y-3 rounded-xl border-2 border-[#111318] bg-white p-3">
             <TraitRequestRow
               index={i}
               draft={draft}

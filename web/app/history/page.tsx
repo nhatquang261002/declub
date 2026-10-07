@@ -79,7 +79,7 @@ export default function HistoryPage() {
               Keep an eye on offers, swaps, and expired deals involving your wallet.
             </p>
           </div>
-          <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] shadow-[0.3rem_0.3rem_0_#111318] lg:min-w-56">
+          <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] lg:min-w-56">
             <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">
               {address ? "Wallet connected" : "Wallet required"}
             </p>
