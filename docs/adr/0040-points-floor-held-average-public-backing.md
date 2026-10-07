@@ -1,6 +1,6 @@
 # ADR 0040: A points floor, holdings averaged over the week, and public backing
 
-**Status:** Accepted · 2026-10-07 · Web only: no contract change. Amends [ADR 0037](0037-most-active-holders-are-paid.md) (the 10 paid places become a points floor), [ADR 0038](0038-points-from-backing.md) (what removes a post's backing, and when voice is read) and the report rule of [ADR 0016](0016-clubs-and-momentum.md) (reports no longer hide a post). The spec is [09 · Clubs](../09-clubs.md#rewards). The plan it came from is [plans/0040-hard-to-game-points.md](../plans/0040-hard-to-game-points.md).
+**Status:** Accepted · 2026-10-07 · The floor is replaced by a ramp, and the rules became the Owner's, in [ADR 0044](0044-owner-reward-settings.md). · Web only: no contract change. Amends [ADR 0037](0037-most-active-holders-are-paid.md) (the 10 paid places become a points floor), [ADR 0038](0038-points-from-backing.md) (what removes a post's backing, and when voice is read) and the report rule of [ADR 0016](0016-clubs-and-momentum.md) (reports no longer hide a post). The spec is [09 · Clubs](../09-clubs.md#rewards). The plan it came from is [plans/0040-hard-to-game-points.md](../plans/0040-hard-to-game-points.md).
 
 ## Context
 

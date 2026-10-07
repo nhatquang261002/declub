@@ -10,6 +10,7 @@ import { activityKey } from "../lib/server/activity";
 import { activeKey } from "../lib/server/activeDays";
 import { streaksKey } from "../lib/server/streaks";
 import { REWARDS_GENESIS } from "../lib/config";
+import { DEFAULT_CLUB_RULES } from "../lib/rewards";
 import { clubInbox, standingsNews } from "../lib/server/inbox";
 import { createReply } from "../lib/server/board";
 import type { ClubStandings, StandingRow } from "../lib/server/standings";
@@ -282,7 +283,7 @@ describe("the Club inbox: replies and standings", () => {
 
   const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: i <= 10 ? 12 : 2, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
   const standings = (over: Partial<ClubStandings> = {}): ClubStandings => ({
-    club: token, n: 3, start: 0, endsAt: 1_000_000, computedAt: 100, fees: "1", holderPool: "10", fundPool: "1",
+    club: token, n: 3, start: 0, endsAt: 1_000_000, computedAt: 100, fees: "1", holderPool: "10", fundPool: "1", rules: { ...DEFAULT_CLUB_RULES, maxPaid: 10 },
     rows: Array.from({ length: 12 }, (_, i) => row(i + 1)), activity: {}, ...over,
   });
 
@@ -292,8 +293,8 @@ describe("the Club inbox: replies and standings", () => {
     assert.match(inside!.title, /#4/);
     const [outside] = standingsNews(standings(), "N", new Set([wallet(12)]), 0);
     assert.equal(outside!.key, `club-rank:${token}:3:out`);
-    assert.match(outside!.body, /^About 8 more activity points and you’re paid/, "2 points against the floor of 10");
-    assert.match(outside!.title, /below 10 points/);
+    assert.match(outside!.body, /^About 10\.01 more activity points would put you in the paid places/, "the 10th has 12 points and holds more NFTs");
+    assert.match(outside!.title, /outside the paid places/);
     const [idle] = standingsNews(standings({ rows: standings().rows.map((r) => (r.wallet === wallet(12) ? { ...r, points: 0 } : r)) }), "N", new Set([wallet(12)]), 0);
     assert.match(idle!.title, /not earning in N yet/);
     assert.deepEqual(standingsNews(standings({ holderPool: "0" }), "N", new Set([wallet(4)]), 0), [], "no pool, no race");

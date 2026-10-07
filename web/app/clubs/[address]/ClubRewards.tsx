@@ -16,7 +16,7 @@ import { useSponsorInfo } from "@/hooks/useSponsorFlow";
 import { useClubRewards, useClubStandings } from "@/hooks/useRewards";
 import { formatMon, shortAddress } from "@/lib/format";
 import { recapLink } from "@/lib/recap";
-import { DEFAULT_CLUB_RULES, PROTOCOL, percent, type PublishedSponsor } from "@/lib/rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, percent, whoIsPaid, type PublishedSponsor } from "@/lib/rewards";
 import { LiveStandings } from "./LiveStandings";
 import { pts } from "./PointsMeter";
 import { Empty, Loading, Panel } from "./parts";
@@ -117,11 +117,13 @@ function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; t
         }
       >
         <p className="max-w-3xl text-sm">
-          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(PROTOCOL.holderBps)}</strong> of it goes to every Holder with at least{" "}
-          {rules.minPoints} points that week, split by the NFTs they held (on average over the week), and <strong>{percent(PROTOCOL.fundBps)}</strong> to the Club fund, which the Owner claims. Most points come from other people
+          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(PROTOCOL.holderBps)}</strong> of it goes to {whoIsPaid(rules)}, split by the NFTs they held
+          (on average over the week), and <strong>{percent(PROTOCOL.fundBps)}</strong> to the Club fund, which the Owner claims. Most points come from other people
           backing your posts and replies with their likes and answers: the Club’s Holders weigh most, and any verified account, even from another Club, adds a little.
-          Posting, replying and liking, sharing on X and swapping add a little more. A Holder below {rules.minPoints} points isn’t paid that week,
-          and {rules.fullBonusPoints} points raise your share by up to {percent(PROTOCOL.maxBonusBps)}.
+          Posting, replying and liking, sharing on X and swapping add a little more. A Holder with no points isn’t paid that week; your whole
+          share counts from {rules.rampPoints} points (less below that), and {rules.fullBonusPoints} points raise it by up to {percent(PROTOCOL.maxBonusBps)}.
+          {rules.nonHolderBps > 0 && ` Members without NFTs share ${percent(rules.nonHolderBps)} of the Holder pool by their points.`} The Owner sets these rules; a change
+          applies from the next week.
         </p>
       </Panel>
     </>

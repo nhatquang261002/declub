@@ -12,6 +12,8 @@ import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } fro
 import type { LogEntry, Ban } from "@/lib/server/clubState";
 import type { ReportedItem } from "@/lib/server/board";
 import type { XShareVerdict } from "@/lib/server/xPosts";
+import type { OwnerRules } from "@/lib/rewards";
+import type { RulesView, RewardBanView } from "@/lib/server/rewardSettings";
 
 // The board, the Club's page text and the staff tools (docs/09-clubs.md). Reads are public; a
 // signed-in reader sends their token so they also see their own hidden posts and, as staff, all.
@@ -227,6 +229,13 @@ export function useClubActions(token: string) {
     unban: useAct((v: { wallet: string; everywhere?: boolean }) => send("DELETE", "/bans", v), ["club-bans", "club-log"], "Ban lifted."),
     role: useAct((v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v), ["club-members", "club-membership", "club-log", "club-posts"], "Done."),
     claim: useAct(() => send("POST", "/claim"), ["club-members", "club-membership", "club-profile", "club-log"], "You’re the Owner of this Club."),
+    // The Club's reward rules and bans from rewards (ADR 0044): the Owner or an app admin.
+    rules: useAct((v: Partial<OwnerRules>) => send("PATCH", "/rules", v), ["club-rules", "club-log"], "Saved. The new rules apply from the next epoch."),
+    rewardBan: useAct(
+      (v: { wallet: string; ban: boolean }) => send(v.ban ? "POST" : "DELETE", "/reward-bans", { wallet: v.wallet }),
+      ["club-reward-bans", "club-log", "club-standings"],
+      "Done.",
+    ),
     profile: useAct(
       (v: { description?: string; links?: string[]; holdersOnlyPosts?: boolean; xTags?: string[]; coinHolders?: { on: boolean; min?: string } }) =>
         send("PATCH", "/profile", v),
@@ -268,4 +277,26 @@ export function useClubStaff(token: string, enabled: boolean) {
     retry: 1,
   });
   return { log: log.data?.log ?? [], ownership: log.data?.ownership ?? null, bans: bans.data, reported: reported.data?.reported ?? [], isLoading: log.isLoading };
+}
+
+/** The Club's reward rules now, any change waiting for the next epoch, and the bounds (public, ADR 0044). */
+export function useClubRules(token: string) {
+  const query = useQuery({
+    queryKey: ["club-rules", token.toLowerCase()],
+    queryFn: () => read<{ enabled: boolean } & Partial<RulesView>>(`/api/clubs/${token}/rules`),
+    retry: 1,
+  });
+  return query.data?.enabled && query.data.current ? (query.data as RulesView) : null;
+}
+
+/** Members banned from the Club's rewards (staff only, ADR 0044). */
+export function useRewardBans(token: string, enabled: boolean) {
+  const getToken = useAccessToken();
+  const query = useQuery({
+    queryKey: ["club-reward-bans", token.toLowerCase()],
+    queryFn: () => call<{ bans: RewardBanView[] }>(getToken!, "GET", `/api/clubs/${token}/reward-bans`),
+    enabled: enabled && !!getToken,
+    retry: 1,
+  });
+  return query.data?.bans ?? [];
 }

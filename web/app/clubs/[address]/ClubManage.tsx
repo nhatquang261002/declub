@@ -15,6 +15,7 @@ import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
 import { Panel } from "./parts";
+import { RewardSettings } from "./RewardSettings";
 import { CopyAddress } from "@/components/CopyAddress";
 
 /** What a log line says, in words. */
@@ -37,6 +38,9 @@ const ACTIONS: Record<string, string> = {
   edit_profile: "edited the Club page",
   link_x: "linked the X account",
   unlink_x: "unlinked the X account",
+  edit_rules: "changed the reward rules",
+  reward_ban: "banned from rewards:",
+  reward_unban: "lifted the rewards ban on",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
@@ -314,6 +318,10 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
           {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold the Club.
         </Alert>
       )}
+
+      <Panel title="Rewards">
+        <RewardSettings token={token} owner={owner} now={now} />
+      </Panel>
 
       {owner && (
         <Panel title="Club page">

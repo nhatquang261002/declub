@@ -3,6 +3,9 @@ import { describe, it } from "node:test";
 import { getAddress } from "viem";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import { DEFAULT_CLUB_RULES, backingPoints, type Voice } from "../lib/rewards";
+
+/** The default rules with the pair cap (ADR 0044) out of the way: these tests are about whole voices. */
+const UNCAPPED = { ...DEFAULT_CLUB_RULES, pairCap: 60 };
 import { backingRecordKey, type PublishedBacking } from "../lib/server/backing";
 import { createPost, likePost, type Deps } from "../lib/server/board";
 import { heldKey, readHeld, sampleHoldings } from "../lib/server/held";
@@ -85,7 +88,7 @@ describe("holdings sampling (ADR 0040)", () => {
     await likePost(store, club, "h", pb, true, at(120));
     await likePost(store, club, "s", pc, true, at(120));
 
-    const { holders, samples } = await holderInputs(store, club, 0, [], null, chain(table), {}, verifiedBy(GENESIS + WEEK));
+    const { holders, samples } = await holderInputs(store, club, 0, [], null, chain(table), {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
     assert.equal(samples, 7);
     const by = Object.fromEntries(holders.map((h) => [h.userId, h]));
     // Voices count the average over 8 reads: g 5, h 5/8, s 35/8 (sold at close, so sampled, so it still speaks).
@@ -103,7 +106,7 @@ describe("holdings sampling (ADR 0040)", () => {
     for (const [u, n] of [["g", 1], ["a", 2]] as const) await member(store, u, n);
     const p = await post(store, "a", 60);
     await likePost(store, club, "g", p, true, at(120));
-    const { holders, samples } = await holderInputs(store, club, 0, [], null, chain({ [wallet(1)]: 5n, [wallet(2)]: 1n }), {}, verifiedBy(GENESIS + WEEK));
+    const { holders, samples } = await holderInputs(store, club, 0, [], null, chain({ [wallet(1)]: 5n, [wallet(2)]: 1n }), {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
     assert.equal(samples, 0);
     assert.equal(holders.find((h) => h.userId === "g")!.held, 5n, "the average is the holding");
     assert.equal(holders.find((h) => h.userId === "a")!.backedPoints, 50 + 3);
@@ -126,7 +129,7 @@ describe("the published backing (ADR 0040)", () => {
     await store.set(`declub:club-post:10143:${token}:${px}`, { ...(await store.get<object>(`declub:club-post:10143:${token}:${px}`))!, hidden: "moderator" });
 
     const swap = { id: "0x1:0", kind: "swapped" as const, contract: "0xswap", deal: "1", block: 1, at: GENESIS + 100, parties: [wallet(1), wallet(9)], tokens: [token], fee: (4n * 10n ** 18n).toString() };
-    const rules = { ...DEFAULT_CLUB_RULES, minPoints: 1 };
+    const rules = UNCAPPED;
     const result = await buildEpoch(store, 0, {
       now: () => GENESIS + WEEK,
       clubs: [club],

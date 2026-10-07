@@ -520,9 +520,9 @@ describe("the Holder bonus", () => {
       owner: null,
     });
     const paid = Object.fromEntries(split.payouts.map((p) => [p.wallet, p.amount]));
-    // Weights 1.5 : 1 : 3 (the third is capped at +50%) over a pool of 5,001.
-    assert.equal(paid[wallet(1)], (5_001n * 15_000n) / 55_000n);
-    assert.equal(paid[wallet(3)], (5_001n * 30_000n) / 55_000n);
+    // Weights 1.25 : 1 : 2.5 (bonuses are capped at +25%) over a pool of 5,001.
+    assert.equal(paid[wallet(1)], (5_001n * 12_500n) / 47_500n);
+    assert.equal(paid[wallet(3)], (5_001n * 25_000n) / 47_500n);
     assert.equal(split.paidHolders + split.carry.holders, split.holderPool);
     assert.equal(split.payouts.find((p) => p.wallet === wallet(3))?.bonusBps, REWARDS.maxBonusBps);
   });

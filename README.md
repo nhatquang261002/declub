@@ -17,13 +17,14 @@ when a community creates the value, who captures it?
   gets a Club with its own market, board and ranked members, run by an Owner
   and Moderators.
 - **Participation turns into a stake.** Each week, 50% of the fees a Club's swaps
-  pay goes to its Holders with at least 10 points that week, 25% to the Club fund the Owner collects and 25% to the
+  pay goes to its active Holders, 25% to the Club fund the Owner collects and 25% to the
   protocol. Points come mostly from others backing your posts and replies: each
   Holder shares out a weekly voice, weighted by the NFTs they hold, over what they
   like and answer in their Club, and any verified account adds a small voice that
   works across Clubs. Outside voices are capped, holdings are averaged over the
-  week, and every Holder at the points floor is paid, so fake accounts and like
-  rings earn about what their NFTs would, and every payout is a Merkle claim anyone
+  week, and payouts follow the NFTs held, so fake accounts and like rings earn
+  about what their NFTs would. Each Club's Owner sets who is paid (all active
+  Holders, the most active, members without NFTs) within protocol bounds, and every payout is a Merkle claim anyone
   can check on chain.
 - **The social graph is yours.** Posts and follows are signed by the member's
   wallet and exported in full, so a Club's conversation can't be locked in or

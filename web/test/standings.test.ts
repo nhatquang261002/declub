@@ -17,8 +17,8 @@ const WEEK = 604_800;
 const NFT: Address = getAddress("0x220a2c52fd27252e7cd6163a7bf1b6ae159d26e4");
 const clubs = makeRegistry(parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" }])).clubs(10143);
 const club = clubs[0]!;
-/** The points floor these tests set. */
-const FLOOR = 2;
+/** The paid places these tests set (ADR 0044): the Owner limited them to 10. */
+const SEATS = 10;
 const w = (i: number) => `0x${i.toString(16).padStart(40, "0")}`;
 
 async function join(store: Store, userId: string, wallet: string, joinedAt: number) {
@@ -63,7 +63,7 @@ describe("live standings", () => {
       reads++;
       return wallets.map((x) => BigInt(20 - Number(BigInt(x))));
     };
-    deps = { now: () => now, clubs, events: async () => [swap(GENESIS + 100), swap(GENESIS - 100)], holdings, genesis: GENESIS, length: WEEK, rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: FLOOR }) };
+    deps = { now: () => now, clubs, events: async () => [swap(GENESIS + 100), swap(GENESIS - 100)], holdings, genesis: GENESIS, length: WEEK, rules: () => ({ ...DEFAULT_CLUB_RULES, maxPaid: SEATS }) };
   });
 
   it("ranks every Holder, estimates the paid places from the fees so far", async () => {
@@ -79,7 +79,7 @@ describe("live standings", () => {
     const paid = s.rows.filter((r) => r.estimate);
     assert.equal(paid.length, 10, "every Holder at the floor is paid, and nobody below it");
     assert.equal(s.paid, 10);
-    assert.equal(s.rules?.minPoints, FLOOR);
+    assert.equal(s.rules?.maxPaid, SEATS);
     assert.deepEqual(s.rows[0]!.held, 20 - 1, "no samples: the average is what they hold now");
     const total = paid.reduce((sum, r) => sum + BigInt(r.estimate!), 0n);
     assert.ok(total <= BigInt(s.holderPool) && BigInt(s.holderPool) - total < 100n);
@@ -92,7 +92,9 @@ describe("live standings", () => {
     const view = standingsView((await clubStandings(store, club as ClubEntry, deps))!, w(11));
     assert.ok(view.me && view.me.rank === 11);
     // One point against a floor of two.
-    assert.equal("gap" in view.me ? view.me.gap : null, String(FLOOR - 1));
+    // One point against the 10th's two, who holds more NFTs: two more points tie, and a tie isn't enough.
+    assert.equal("gap" in view.me ? view.me.gap : null, "1.01");
+    assert.equal("toFull" in view.me ? view.me.toFull : null, String(DEFAULT_CLUB_RULES.rampPoints - 1));
     assert.equal("days" in view.me ? view.me.days : null, 1);
     assert.deepEqual(
       "points" in view.me ? [view.me.points, view.me.xPoints, view.me.swapPoints, view.me.backedPoints, view.me.backers] : null,

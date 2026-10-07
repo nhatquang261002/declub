@@ -55,7 +55,8 @@ const deps = (over: Partial<RewardsDeps> = {}): RewardsDeps => ({
   contract: getAddress(wallet(0xee)),
   genesis: GENESIS,
   length: WEEK,
-  rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
+  // Whole voices: these tests are about the freeze, not the pair cap (ADR 0044).
+  rules: () => ({ ...DEFAULT_CLUB_RULES, pairCap: 60 }),
   ...over,
 });
 const ledgerOf = async (store: Store) => (await store.get<Record<string, PublishedLedger>>(pointsKey(0)))![token]!;
@@ -111,8 +112,8 @@ describe("closing an epoch (ADR 0040)", () => {
     const { store } = await world();
     await buildEpoch(store, 0, { ...deps(), events: async () => [] });
     const ledger = await ledgerOf(store);
-    assert.deepEqual(ledger.rules, { ...DEFAULT_CLUB_RULES, minPoints: 1 });
-    assert.deepEqual(ledger.rows.map((r) => [r.wallet, r.paid]), [[wallet(2), true], [wallet(1), true], [wallet(3), false]], "ranked by points; the idle Holder is listed, unpaid");
+    assert.deepEqual(ledger.rules, { ...DEFAULT_CLUB_RULES, pairCap: 60 });
+    assert.deepEqual(ledger.rows.map((r) => [r.wallet, r.holder, r.paid]), [[wallet(2), true, true], [wallet(1), true, true], [wallet(3), true, false]], "ranked by points; the idle Holder is listed, unpaid");
     const q = row(ledger, 3);
     assert.deepEqual([q.points, q.days, q.bonusBps, q.shares, q.held], [0, 0, 0, "1", 1]);
     assert.ok(!JSON.stringify(ledger).includes("did:") && !JSON.stringify(ledger).includes('"g"'), "no user ids");

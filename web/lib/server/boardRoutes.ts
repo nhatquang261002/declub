@@ -40,6 +40,7 @@ import { clientId, getStore, withinLimit, type Store } from "./store";
 import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
+import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
@@ -378,6 +379,54 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
       const result = await updateProfile(f.store, f.entry, f.actor, await bodyOf(request), deps);
       return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason, result.message);
     },
+  };
+}
+
+/**
+ * GET /api/clubs/[token]/rules: the Club's reward rules now, any change waiting for the next epoch,
+ * and the bounds (public). PATCH, the Owner or an app admin: change some of them, from the next
+ * epoch (ADR 0044).
+ */
+export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const entry = await clubOf(registry, ctx);
+      if (entry instanceof Response) return entry;
+      const store = getStore();
+      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
+      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      return Response.json({ enabled: true, ...(await clubRulesView(store, entry, deps)) }, { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } });
+    },
+    async PATCH(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await updateRules(f.store, f.entry, f.actor, await bodyOf(request), deps);
+      return result.ok ? json({ enabled: true, ...result.view }) : refuse(result.reason, result.message);
+    },
+  };
+}
+
+/**
+ * Bans from rewards (ADR 0044). GET lists them (staff); POST `{ wallet }` bans a member by their Club
+ * wallet and DELETE `{ wallet }` lifts it (the Owner or an app admin).
+ */
+export function rewardBansHandlers(registry: Registry, deps: RouteDeps = {}) {
+  const act = (ban: boolean) =>
+    async function (request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const result = await setRewardBan(f.store, f.entry, f.actor, (await bodyOf(request)).wallet, ban, deps);
+      return result.ok ? json({ enabled: true, wallet: result.wallet }) : refuse(result.reason, result.reason === "invalid" ? "Give the member's Club wallet (not your own)." : undefined);
+    };
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const bans = await listRewardBans(f.store, f.entry, f.user.id, deps);
+      return bans ? json({ enabled: true, bans }) : refuse("forbidden");
+    },
+    POST: act(true),
+    DELETE: act(false),
   };
 }
 

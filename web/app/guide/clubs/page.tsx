@@ -92,8 +92,8 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(PROTOCOL.holderBps)} is split between its Holders: members who hold at least one NFT of the collection when the epoch is built and earned at least ${DEFAULT_CLUB_RULES.minPoints} points that epoch (by default), most of them from other people backing their posts and replies, the rest from active days, sharing on X and swapping. Each one's share is the NFTs they held on average over the week, plus up to the activity bonus; ${percent(PROTOCOL.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and have at least ${DEFAULT_CLUB_RULES.minPoints} activity points (by default), when the epoch is built. Holding alone doesn't earn a share: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
+  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(PROTOCOL.holderBps)} is split between its active Holders: members who hold at least one NFT of the collection when the epoch is built and earned points that epoch, most of them from other people backing their posts and replies, the rest from active days, sharing on X and swapping. Each one's share is the NFTs they held on average over the week, counted in full from ${DEFAULT_CLUB_RULES.rampPoints} points (by default), plus up to the activity bonus. The Owner can limit it to the most active Holders (a number or a percentage), give members without NFTs a slice, and ban a member from rewards; ${percent(PROTOCOL.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and have some activity points (and be among the paid places, if the Owner limited them) when the epoch is built. Holding alone doesn't earn a share: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my X or Discord handle” turned on (Profile page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
@@ -207,7 +207,7 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small fee for each NFT on each side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(PROTOCOL.holderBps)}</b> to the Club&apos;s Holders who earned at least {DEFAULT_CLUB_RULES.minPoints} points that week, split by the NFTs they held, up to {percent(PROTOCOL.maxBonusBps)} more for the most active</li>
+                <li><b>{percent(PROTOCOL.holderBps)}</b> to the Club&apos;s active Holders, split by the NFTs they held, up to {percent(PROTOCOL.maxBonusBps)} more for the most active</li>
                 <li><b>{percent(PROTOCOL.fundBps)}</b> to the Club fund, claimed by the Owner</li>
                 <li><b>{percent(PROTOCOL.protocolBps)}</b> stays with the protocol</li>
               </ul>
@@ -237,8 +237,8 @@ export default function ClubsGuidePage() {
               The activity bonus
             </h3>
             <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-              You have to hold an NFT of the collection to be paid, and every Holder with at least <b className="text-[#111318]">{DEFAULT_CLUB_RULES.minPoints} activity points</b> that week is paid
-              (by default), so nobody is pushed out by another Holder: a payout is split by one share per NFT. Those shares count up to{" "}
+              You have to hold an NFT of the collection to be paid, and every Holder with activity that week is paid (by default): a payout is split by one share per NFT,
+              counted in full from <b className="text-[#111318]">{DEFAULT_CLUB_RULES.rampPoints} points</b> and in part below (half at half the points), so there is no cliff to game. Those shares count up to{" "}
               <b className="text-[#111318]">{percent(PROTOCOL.maxBonusBps)} more</b> for their points. Most points come from other people:
               each Holder has a weekly <b className="text-[#111318]">voice</b> of {DEFAULT_CLUB_RULES.voicePerNft} points per NFT (counting up to {DEFAULT_CLUB_RULES.voiceCapNfts}) in their own Club,
               and every verified account (a shared X or Discord profile) has {PROTOCOL.baseVoice} more to spend on any Club&apos;s Board. A voice is shared out over the posts and
@@ -253,9 +253,16 @@ export default function ClubsGuidePage() {
                 {DEFAULT_CLUB_RULES.firstReplyWeight}, so a Holder who backs one post gives it their whole voice and one who likes fifty gives each a little. Voice not given in a
                 week is lost. A verified account&apos;s {PROTOCOL.baseVoice} is shared over every Club it engages with, counts only once the profile has been shared for{" "}
                 {PROTOCOL.verifiedDays} days, and at most {PROTOCOL.baseCapPerReceiver} of anyone&apos;s points can come from it, so outsiders can lift a member but the Club&apos;s
-                Holders carry the most. Nobody can back themselves; two people who back each other get half each way; a like taken back, a deleted post, or a post a moderator hid
+                Holders carry the most. Nobody can back themselves; two people who back each other get half each way; one person gives another at most {DEFAULT_CLUB_RULES.pairCap} points a week; a like taken back, a deleted post, or a post a moderator hid
                 counts for nothing. Backing is public once an epoch closes: who backed whom, the voices they gave it with, and what a moderator&apos;s hide removed, so anyone can
                 recompute the points (<code>/api/rewards/epochs/&lt;n&gt;/backing</code>), which also means likes are no longer private after that.
+              </li>
+              <li>
+                <b className="text-[#111318]">Each Club&apos;s rules:</b> who is paid is the Owner&apos;s choice, within set limits: only the most active
+                Holders (a number, a percentage, or both), the points for a whole share, and a slice of the pool for members without NFTs (up to 30%, split by
+                their points). How points are counted is the same in every Club. A change applies from the next epoch, and every epoch publishes the rules it
+                used. The Owner can also ban a member from rewards: they aren&apos;t paid, and their likes and replies give nobody points. Both are written to the
+                Club&apos;s log.
               </li>
               <li>
                 <b className="text-[#111318]">Holdings are averaged:</b> the NFTs you hold are read once a day through the week and once more when the epoch is built, and your

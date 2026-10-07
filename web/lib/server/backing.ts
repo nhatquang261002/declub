@@ -176,7 +176,8 @@ export async function voicesFor(
 export type PublishedBacking = {
   voices: Record<string, Voice>;
   actions: { from: string; to: string; kind: BackingAction["kind"] }[];
-  removed: { from: string; to: string; kind: BackingAction["kind"]; by: "moderator" }[];
+  /** Taken out by a moderator's hide, or because the giver was banned from rewards (ADR 0044). */
+  removed: { from: string; to: string; kind: BackingAction["kind"]; by: "moderator" | "reward_ban" }[];
 };
 
 /** Epoch `n`'s published backing, by Club. Kept apart from the epoch record so that stays small. */
@@ -196,7 +197,7 @@ export async function publicWallet(store: Store, userId: string, members: Readon
 /** Publishes one Club's epoch backing: who gave whom what, the voices they gave it with, and what a moderator's hide removed. */
 export async function publishBacking(
   store: Store,
-  backing: { actions: readonly BackingAction[]; removed: readonly BackingAction[] },
+  backing: { actions: readonly BackingAction[]; removed: readonly (BackingAction & { by?: "moderator" | "reward_ban" })[] },
   voices: ReadonlyMap<string, Voice>,
   members: ReadonlyMap<string, string>,
 ): Promise<PublishedBacking> {
@@ -208,6 +209,6 @@ export async function publishBacking(
   const out: PublishedBacking = { voices: {}, actions: [], removed: [] };
   for (const [userId, voice] of voices) out.voices[await nameOf(userId)] = voice;
   for (const a of backing.actions) out.actions.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind });
-  for (const a of backing.removed) out.removed.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, by: "moderator" });
+  for (const a of backing.removed) out.removed.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, by: a.by ?? "moderator" });
   return out;
 }

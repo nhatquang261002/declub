@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { StoredPost } from "../lib/clubPosts";
 import { profileKey, userWalletsKey, type StoredProfile } from "../lib/profiles";
-import { REWARDS, backingPoints, voiceOf, type BackingAction, type Voice } from "../lib/rewards";
+import { DEFAULT_CLUB_RULES, REWARDS, backingPoints, voiceOf, type BackingAction, type Voice } from "../lib/rewards";
 import { activeDays, dayOf } from "../lib/server/activeDays";
 import { backingKey, givenEverywhere, readBacking, verifiedSince } from "../lib/server/backing";
 import { createPost, createReply, likePost, postKey, type Deps } from "../lib/server/board";
@@ -58,6 +58,8 @@ const sorted = (actions: BackingAction[]) => [...actions].sort((a, b) => `${a.gi
 
 /** A giver's voices: their NFT voice in this Club, and a base voice shared over `given` weight everywhere. */
 const v = (club: number, base = 0, given?: number): Voice => ({ club, base, ...(given !== undefined ? { given } : {}) });
+/** The default rules with the pair cap out of the way (ADR 0044), for the tests about everything else. */
+const UNCAPPED = { ...DEFAULT_CLUB_RULES, pairCap: 60 };
 
 describe("backing points (ADR 0038)", () => {
   it("works the ADR's example: voices shared by weight, the first reply weighs most, mutual backing halved", () => {
@@ -74,7 +76,7 @@ describe("backing points (ADR 0038)", () => {
       { giver: "D", receiver: "A", kind: "like" },
       { giver: "D", receiver: "C", kind: "like" },
     ];
-    assert.deepEqual(Object.fromEntries(backingPoints(actions, voices)), {
+    assert.deepEqual(Object.fromEntries(backingPoints(actions, voices, UNCAPPED)), {
       A: { points: 25, backers: 2, base: 0 },
       B: { points: 4, backers: 1, base: 0 },
       C: { points: 37, backers: 2, base: 0 },
@@ -93,8 +95,20 @@ describe("backing points (ADR 0038)", () => {
         { giver: "x", receiver: "whale", kind: "like" },
       ],
       new Map([["whale", v(voiceOf(100n))]]),
+      UNCAPPED,
     );
     assert.deepEqual(Object.fromEntries(out), { x: { points: 50, backers: 1, base: 0 } }, "a reply to oneself takes no share of the voice");
+  });
+
+  it("caps what one member gives another in an epoch, both voices together (ADR 0044)", () => {
+    const voices = new Map([["whale", v(voiceOf(5n), REWARDS.baseVoice)]]);
+    const one: BackingAction[] = [{ giver: "whale", receiver: "friend", kind: "first" }];
+    assert.deepEqual(backingPoints(one, voices).get("friend"), { points: REWARDS.pairCap, backers: 1, base: 1.13 }, "53 points of voice, capped at 20, scaled down together");
+    // Spread over several members, nothing is capped.
+    const spread = ["a", "b", "c"].map((receiver): BackingAction => ({ giver: "whale", receiver, kind: "like" }));
+    assert.equal(backingPoints(spread, voices).get("a")!.points, 53 / 3 > REWARDS.pairCap ? REWARDS.pairCap : Number((53 / 3).toFixed(2)));
+    // The Club sets its own cap.
+    assert.equal(backingPoints(one, voices, { ...DEFAULT_CLUB_RULES, pairCap: 5 }).get("friend")!.points, 5);
   });
 
   it("spreads a voice thin over many likes", () => {
@@ -113,7 +127,7 @@ describe("base voices (ADR 0039)", () => {
   });
 
   it("adds a Holder's base voice to their NFT voice in their own Club", () => {
-    const out = backingPoints([{ giver: "h", receiver: "x", kind: "like" }], new Map([["h", v(voiceOf(2n), REWARDS.baseVoice)]]));
+    const out = backingPoints([{ giver: "h", receiver: "x", kind: "like" }], new Map([["h", v(voiceOf(2n), REWARDS.baseVoice)]]), UNCAPPED);
     assert.deepEqual(out.get("x"), { points: voiceOf(2n) + REWARDS.baseVoice, backers: 1, base: REWARDS.baseVoice });
   });
 
@@ -236,7 +250,7 @@ describe("recording backing", () => {
     const p = await post(store, "m1", 60);
     await likePost(store, club, "m2", p, true, at(120));
 
-    const { holders } = await holderInputs(store, club, 0, [], null, holdings, {}, verifiedBy(GENESIS + WEEK));
+    const { holders } = await holderInputs(store, club, 0, [], null, holdings, {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
     const by = Object.fromEntries(holders.map((h) => [h.userId, [h.points, h.backedPoints, h.backers, h.basePoints, h.days]]));
     const backed = 3 * REWARDS.voicePerNft + REWARDS.baseVoice;
     assert.deepEqual(by, {
@@ -265,7 +279,7 @@ describe("recording backing", () => {
     await store.set(profileKey(wallet(3)), { provider: "twitter", handle: "h3", userId: "late", updatedAt: 1, since: (GENESIS + WEEK - 2 * DAY) * 1000 });
 
     assert.equal(await givenEverywhere(store, 0, "fan"), 2 * REWARDS.likeWeight);
-    const { holders } = await holderInputs(store, club, 0, [], null, holdings, {}, verifiedBy(GENESIS + WEEK));
+    const { holders } = await holderInputs(store, club, 0, [], null, holdings, {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
     const m1 = holders.find((h) => h.userId === "m1")!;
     assert.deepEqual([m1.backedPoints, m1.backers, m1.basePoints], [REWARDS.baseVoice / 2, 1, REWARDS.baseVoice / 2], "half the fan's voice; late and anon give none");
   });

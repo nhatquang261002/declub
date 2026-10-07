@@ -1,6 +1,6 @@
 import type { ActivityEvent } from "../clubs";
 import { CHAIN_ID, DECLUB_INTENTS_ADDRESS } from "../config";
-import { averageHeld, entryGap, epochAt, epochWindow, qualifies, rankHolders, splitClub, type ClubRules, type ReachRecord } from "../rewards";
+import { PROTOCOL, averageHeld, entryGap, rampGap, rankMembers, epochAt, epochWindow, qualifies, rankHolders, splitClub, type ClubRules, type ReachRecord } from "../rewards";
 import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "./streaks";
 
@@ -25,7 +25,7 @@ const lockKey = (club: string) => `declub:rewards:${CHAIN_ID}:standings-lock:${c
 
 export type StandingRow = {
   wallet: string;
-  /** 1-based, in leaderboard order (`rankHolders`): most points first. Only rows with at least `rules.minPoints` get an estimate. */
+  /** 1-based, in leaderboard order (`rankHolders`, or `rankMembers` for members without NFTs): most points first. Only rows that would be paid get an estimate. */
   rank: number;
   /** Decimal strings. */
   shares: string;
@@ -70,8 +70,13 @@ export type ClubStandings = {
   fundPool: string;
   /** The Club's rules for this epoch (ADR 0040). Absent in copies cached before: the defaults. */
   rules?: ClubRules;
-  /** How many Holders have the points to be paid right now. */
+  /** How many Holders, and members without NFTs (ADR 0044), would be paid if the epoch closed now. */
   paid?: number;
+  paidMembers?: number;
+  /** Members without NFTs ranked for the Club's slice, when it pays them (ADR 0044). */
+  members?: StandingRow[];
+  /** Club wallets banned from rewards (ADR 0044). */
+  excluded?: string[];
   /** Daily holdings samples so far; `held` averages them with the read just made. */
   samples?: number;
   rows: StandingRow[];
@@ -115,7 +120,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   const reach = await store.get<ReachRecord>(reachKey(n));
   const streaks = await readStreaks(store, key);
   const rules = await (deps.rules ?? ((c: string, k: number) => rulesFor(store, c, k)))(key, n);
-  const { holders, days, samples } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks, verifiedBy(window.end), rules);
+  const { holders, members, excluded, days, samples } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks, verifiedBy(window.end), rules);
   const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
   const sponsored = sponsorsByClub(await readSponsors(store, n)).get(key)?.total ?? 0n;
   const split = splitClub({
@@ -124,13 +129,14 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     sponsored,
     carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
     holders,
+    ...(rules.nonHolderBps > 0 ? { members } : {}),
     owner: await ownerWallet(store, club),
     rules,
     samples,
   });
-  const paid = new Map(split.payouts.filter((p) => p.kind === "holder").map((p) => [p.wallet, p]));
+  const paid = new Map(split.payouts.filter((p) => p.kind !== "fund").map((p) => [p.wallet, p]));
 
-  const rows = rankHolders(holders).map((h, i): StandingRow => {
+  const rowOf = (h: (typeof holders)[number], i: number): StandingRow => {
     const own = new Set(h.wallets.map((w) => w.toLowerCase()));
     const payout = paid.get(h.wallet.toLowerCase());
     return {
@@ -151,7 +157,9 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       streak: h.streak,
       ...(payout ? { estimate: payout.amount.toString() } : {}),
     };
-  });
+  };
+  const rows = rankHolders(holders).map(rowOf);
+  const memberRows = rules.nonHolderBps > 0 ? rankMembers(members).map(rowOf) : [];
 
   const activity: Record<string, MemberActivity> = {};
   for (const row of await allRows(store, key)) {
@@ -174,6 +182,8 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     fundPool: split.fundPool.toString(),
     rules,
     paid: split.holderCount,
+    ...(rules.nonHolderBps > 0 ? { paidMembers: split.memberCount, members: memberRows } : {}),
+    ...(excluded.length ? { excluded } : {}),
     samples,
     rows,
     activity,
@@ -202,23 +212,34 @@ export async function clubStandings(store: Store, club: ClubEntry, deps: Standin
   }
 }
 
-/** How many rows the route serves: the leaderboard's top. Everyone with the floor's points is paid, however many that is. */
+/** How many rows the route serves: the leaderboard's top, and as many of the members without NFTs. */
 export const ROWS_SHOWN = 25;
 
 /** What one reader is shown: the top rows, and their own place if they gave a wallet. */
 export type StandingsView = Omit<ClubStandings, "rows" | "activity"> & {
   rows: StandingRow[];
   holders: number;
-  me: (StandingRow & { gap: string; activity: MemberActivity | null }) | { rank: null; activity: MemberActivity | null } | null;
+  me:
+    | (StandingRow & {
+        /** Points to be paid at all, and to be paid a whole share (the rest of the ramp, ADR 0044). */
+        gap: string;
+        toFull: string;
+        /** A Holder's row, or a member without NFTs' row in the Club's slice. */
+        holder: boolean;
+        activity: MemberActivity | null;
+      })
+    | { rank: null; activity: MemberActivity | null; excluded?: true }
+    | null;
 };
 
 export function standingsView(standings: ClubStandings, wallet?: string): StandingsView {
-  const { rows, activity, ...rest } = standings;
+  const { rows, activity, members, ...rest } = standings;
   let me: StandingsView["me"] = null;
   if (wallet) {
     const w = wallet.toLowerCase();
-    const row = rows.find((r) => r.wallet === w);
     const mine = activity[w] ?? null;
+    const row = rows.find((r) => r.wallet === w);
+    const memberRow = members?.find((r) => r.wallet === w);
     if (row) {
       const gap =
         entryGap(
@@ -226,10 +247,13 @@ export function standingsView(standings: ClubStandings, wallet?: string): Standi
           w,
           rest.rules,
         ) ?? 0;
-      me = { ...row, gap: String(gap), activity: mine };
+      me = { ...row, gap: String(gap), toFull: String(rampGap(row.points, rest.rules)), holder: true, activity: mine };
+    } else if (memberRow) {
+      const gap = Math.max(0, PROTOCOL.minPaidPoints - memberRow.points);
+      me = { ...memberRow, gap: String(gap), toFull: "0", holder: false, activity: mine };
     } else {
-      me = { rank: null, activity: mine };
+      me = { rank: null, activity: mine, ...(rest.excluded?.includes(w) ? { excluded: true as const } : {}) };
     }
   }
-  return { ...rest, rows: rows.slice(0, ROWS_SHOWN), holders: rows.length, me };
+  return { ...rest, rows: rows.slice(0, ROWS_SHOWN), ...(members ? { members: members.slice(0, ROWS_SHOWN) } : {}), holders: rows.length, me };
 }

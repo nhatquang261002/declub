@@ -3,14 +3,14 @@ import { DEFAULT_CLUB_RULES, bonusBps, percent, type ClubRules } from "@/lib/rew
 /** Points as the app writes them everywhere: "12 pts", or "2.5 pts" when swaps or reach left a fraction. */
 export const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} pts`;
 
-type Parts = { points: number; rules?: ClubRules; days: number; xPoints?: number; swapPoints?: number; xShares?: number; backedPoints?: number; backers?: number };
+type Parts = { points: number; rules?: ClubRules; /** False for a member without NFTs: no bonus to show. */ holder?: boolean; days: number; xPoints?: number; swapPoints?: number; xShares?: number; backedPoints?: number; backers?: number };
 
 /**
  * A member's activity points for the running epoch: the total against the points that earn the
  * whole bonus, and where each point came from, other people's backing first (ADR 0038). The bonus
  * on their shares is what the points turn into, so it is the last line, not the headline.
  */
-export function PointsMeter({ points, rules = DEFAULT_CLUB_RULES, days, xPoints, swapPoints, xShares, backedPoints, backers }: Parts) {
+export function PointsMeter({ points, rules = DEFAULT_CLUB_RULES, holder = true, days, xPoints, swapPoints, xShares, backedPoints, backers }: Parts) {
   const full = rules.fullBonusPoints;
   const dayPoints = days * rules.dayPoints;
   // Copies cached before the breakdown existed give only the total: say so by leaving the rows out.
@@ -49,7 +49,13 @@ export function PointsMeter({ points, rules = DEFAULT_CLUB_RULES, days, xPoints,
           <Part label="Swaps" note={`${rules.swapPoints} each, up to ${rules.swapCapPerEpoch}`} value={swapPoints} />
         </dl>
       )}
-      <p className="mt-2 text-xs text-muted">Your NFT shares count +{percent(bonusBps(points, rules))} for these points.</p>
+      {holder ? (
+        <p className="mt-2 text-xs text-muted">
+          Your NFT shares count {Math.min(100, Math.floor((points / rules.rampPoints) * 100))}% (whole from {rules.rampPoints} pts), +{percent(bonusBps(points, rules))} for these points.
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-muted">Members without NFTs share their slice by these points.</p>
+      )}
     </div>
   );
 }

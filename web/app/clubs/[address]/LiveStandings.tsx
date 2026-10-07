@@ -8,7 +8,7 @@ import { Who } from "@/components/Who";
 import { useClubStandings } from "@/hooks/useRewards";
 import { REWARDS_EPOCH_SECONDS } from "@/lib/config";
 import { countdown, formatMon } from "@/lib/format";
-import { DEFAULT_CLUB_RULES, PROTOCOL, type ClubRules } from "@/lib/rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, percent, seatsFor, whoIsPaid, type ClubRules } from "@/lib/rewards";
 import type { StandingRow, StandingsView } from "@/lib/server/standings";
 import { Panel } from "./parts";
 import { PointsMeter, pts } from "./PointsMeter";
@@ -21,17 +21,20 @@ const plural = (n: number | bigint, one: string, many = `${one}s`) => `${n} ${n 
 
 /**
  * The running epoch as if it closed now (ADR 0032): the Holder pool so far as the headline, the
- * reader's own place with the one thing that would move them up, then the leaderboard. Every Holder
- * with the Club's points floor is paid (ADR 0040), so the race is against a number, not each other.
+ * reader's own place with the one thing that would move them up, then the leaderboard. Who is paid
+ * and how much follows the Club's rules (ADR 0044): every active Holder, or the most active ones,
+ * with a whole share from `rampPoints`, and a slice for members without NFTs if the Owner pays them.
  */
 export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { token: string; symbol: string; wallet?: string; now: number; sponsoredBy?: string }) {
   const { standings: s } = useClubStandings(token, wallet);
   if (!s) return null;
   const sponsored = wei(s.sponsored);
   const rules = s.rules ?? DEFAULT_CLUB_RULES;
-  const isPaid = (r: StandingRow) => r.points >= rules.minPoints;
+  // Holders are ranked by points, so the paid ones are the first with any, up to the Club's seats.
+  const seats = seatsFor(s.holders, rules);
+  const isPaid = (r: StandingRow) => r.points >= PROTOCOL.minPaidPoints && r.rank <= seats;
+  const limited = seats < s.holders;
   const paid = s.paid ?? s.rows.filter(isPaid).length;
-  // The leaderboard: Holders with points, most first. The paid ones are those at or above the floor.
   const ranked = s.rows.filter((r) => r.points > 0);
   const podium = ranked.slice(0, 3);
   const rest = ranked.slice(3);
@@ -47,7 +50,8 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
           <p className="kicker">Holder pool so far</p>
           <p className="mt-1 text-4xl font-black tabular-nums">{formatMon(wei(s.holderPool))}</p>
           <p className="mt-1 text-sm text-muted">
-            For every Holder with {rules.minPoints}+ points · {paid} of {plural(s.holders, "Holder")} so far
+            For {whoIsPaid(rules)} · {paid} of {plural(s.holders, "Holder")} so far
+            {rules.nonHolderBps > 0 && ` · ${percent(rules.nonHolderBps)} to members without NFTs`}
           </p>
         </div>
         <Closing endsAt={s.endsAt} now={now} />
@@ -63,12 +67,12 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
       <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="kicker">Leaderboard</h3>
         <p className="text-xs text-muted">
-          Holders with {rules.minPoints}+ points are paid · bars fill toward {rules.fullBonusPoints} pts
+          A whole share from {rules.rampPoints} pts · bars fill toward {rules.fullBonusPoints} pts
         </p>
       </div>
       {ranked.length === 0 ? (
         <p className="mt-2 rounded-lg bg-[#111318]/5 px-3 py-4 text-center text-sm">
-          No Holder has points yet this epoch. Post, like and reply on the Board: a Holder with {rules.minPoints} points is paid, and the first one others back takes #1.
+          No Holder has points yet this epoch. Post, like and reply on the Board: active Holders are paid, a whole share from {rules.rampPoints} points, and the first one others back takes #1.
         </p>
       ) : (
         <>
@@ -93,7 +97,7 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
                     {i === firstBelow && (
                       <li className="flex items-center gap-2 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
                         <span className="flex-1 border-t-2 border-dashed border-[#111318]/25" />
-                        Paid from {rules.minPoints} points
+                        {limited ? "Paid places end here" : `Paid from ${PROTOCOL.minPaidPoints} point`}
                         <span className="flex-1 border-t-2 border-dashed border-[#111318]/25" />
                       </li>
                     )}
@@ -113,6 +117,8 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
           )}
         </>
       )}
+
+      {rules.nonHolderBps > 0 && s.members && <MembersSlice s={s} rules={rules} me={me} />}
 
       <p className="mt-4 text-xs text-muted">
         Points: each Holder shares out a weekly voice of {rules.voicePerNft} per NFT (up to {rules.voiceCapNfts * rules.voicePerNft}) over the posts and replies they like or
@@ -158,30 +164,42 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
   const me = s.me;
   if (!me) return null;
   const activity = me.activity;
-  const holder = me.rank !== null;
-  const days = holder ? me.days : (activity?.days ?? 0);
-  const streak = holder ? me.streak : (activity?.streak ?? 0);
+  const ranked = me.rank !== null;
+  const holder = ranked && me.holder;
+  const days = ranked ? me.days : (activity?.days ?? 0);
+  const streak = ranked ? me.streak : (activity?.streak ?? 0);
   const carried = activity?.carried ?? 0;
-  const paid = holder && me.points >= rules.minPoints;
+  const paid = ranked && me.estimate !== undefined;
+  const excluded = !ranked && me.excluded;
 
   let hint: string;
-  if (!holder) hint = `Hold a ${symbol} NFT to join the race. Posting, liking and replying still build your streak.`;
+  if (excluded) hint = "The Owner has banned you from this Club’s rewards. You can still post, and your streak still counts.";
+  else if (!ranked)
+    hint =
+      rules.nonHolderBps > 0
+        ? `Post, like or reply to earn part of the ${percent(rules.nonHolderBps)} that goes to members without NFTs, or hold a ${symbol} NFT for a full share.`
+        : `Hold a ${symbol} NFT to join the race. Posting, liking and replying still build your streak.`;
   else if (me.points === 0)
-    hint = `You hold ${plural(BigInt(me.shares), "NFT")} but nothing counted yet. Post, like or reply on the Board today, and write something others will back.`;
-  else if (Number(me.gap) > 0) hint = `About ${me.gap} more points and you’re paid: Holders with ${rules.minPoints}+ points share the pool. Posts and replies others back count the most.`;
+    hint = holder
+      ? `You hold ${plural(BigInt(me.shares), "NFT")} but nothing counted yet. Post, like or reply on the Board today, and write something others will back.`
+      : "Nothing counted yet. Post, like or reply on the Board today.";
+  else if (Number(me.gap) > 0) hint = `About ${me.gap} more points would put you in the paid places. Posts and replies others back count the most.`;
+  else if (holder && Number(me.toFull) > 0) hint = `${me.toFull} more points and your whole share counts: it’s ${Math.floor((me.points / rules.rampPoints) * 100)}% now.`;
   else if (me.backers === 0) hint = "Nobody has backed you yet this epoch. Answer someone on the Board: replies people like count the most.";
   else if (streak === 0 && carried > 0) hint = `${plural(rules.streakMinDays - days, "more active day")} keeps your ${carried}-week streak.`;
   else if (days < 7) hint = `Post, reply or like today to make it ${days + 1} of 7 days.`;
   else hint = "Every day this epoch counted. Keep it up.";
 
-  const status = !holder ? (
+  const status = excluded ? (
+    <span className="chip chip-danger">Banned from rewards</span>
+  ) : !ranked ? (
     <span className="chip">Not a Holder</span>
   ) : paid ? (
-    <span className="chip chip-mint">Paid</span>
+    <span className="chip chip-mint">{holder ? "Paid" : "Paid · member slice"}</span>
   ) : me.points === 0 ? (
     <span className="chip">No points yet</span>
   ) : (
-    <span className="chip chip-warn">Below {rules.minPoints} points</span>
+    <span className="chip chip-warn">Outside the paid places</span>
   );
 
   return (
@@ -189,9 +207,9 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
       <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
         <div className="flex flex-col items-start gap-2 sm:border-r-2 sm:border-[#111318]/10 sm:pr-4">
           <p className="kicker">Your place</p>
-          <p className="text-4xl leading-none font-black tabular-nums">{holder ? `#${me.rank}` : "—"}</p>
+          <p className="text-4xl leading-none font-black tabular-nums">{ranked ? `#${me.rank}` : "—"}</p>
           {status}
-          {holder && (
+          {ranked && (
             <div className="mt-1">
               <p className="kicker">If it closed now</p>
               <p className="mt-0.5 text-lg font-black tabular-nums">
@@ -211,18 +229,43 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
           </div>
         </div>
         <PointsMeter
-          points={holder ? me.points : 0}
+          points={ranked ? me.points : 0}
           rules={rules}
+          holder={holder}
           days={days}
-          xPoints={holder ? me.xPoints : undefined}
-          swapPoints={holder ? me.swapPoints : undefined}
-          xShares={holder ? me.xShares : undefined}
-          backedPoints={holder ? me.backedPoints : undefined}
-          backers={holder ? me.backers : undefined}
+          xPoints={ranked ? me.xPoints : undefined}
+          swapPoints={ranked ? me.swapPoints : undefined}
+          xShares={ranked ? me.xShares : undefined}
+          backedPoints={ranked ? me.backedPoints : undefined}
+          backers={ranked ? me.backers : undefined}
         />
       </div>
       <p className="mt-4 rounded-lg bg-[#f0b735]/25 px-3 py-2 text-sm font-semibold">{hint}</p>
     </section>
+  );
+}
+
+/** Members without NFTs, for a Club that pays them a slice of the Holder pool (ADR 0044). */
+function MembersSlice({ s, rules, me }: { s: StandingsView; rules: ClubRules; me?: string }) {
+  const members = (s.members ?? []).filter((r) => r.points > 0);
+  return (
+    <>
+      <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="kicker">Members without NFTs</h3>
+        <p className="text-xs text-muted">
+          {percent(rules.nonHolderBps)} of the Holder pool, split by points (counting up to {rules.fullBonusPoints})
+        </p>
+      </div>
+      {members.length === 0 ? (
+        <p className="mt-2 rounded-lg bg-[#111318]/5 px-3 py-3 text-center text-sm">No member without NFTs has points yet. Until one does, the slice stays with the Holders.</p>
+      ) : (
+        <ol className="mt-2">
+          {members.map((r) => (
+            <Row key={r.wallet} r={r} mine={r.wallet === me} paid={r.estimate !== undefined} rules={rules} />
+          ))}
+        </ol>
+      )}
+    </>
   );
 }
 

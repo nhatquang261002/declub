@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import { formatMon } from "../format";
-import { DEFAULT_CLUB_RULES, PROTOCOL, entryGap } from "../rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, entryGap, rampGap } from "../rewards";
 import { registry as defaultRegistry, type ClubEntry, type Registry } from "../verifiedAssets";
 import type { StoredPost } from "../clubPosts";
 import { strengthFactor } from "../xPosts";
@@ -158,12 +158,12 @@ export function standingsNews(s: ClubStandings, name: string, wallets: ReadonlyS
       key: `club-rank:${s.club}:${s.n}:${paid ? "in" : "out"}`,
       kind: "club-rank",
       at: s.computedAt * 1000,
-      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, below ${rules.minPoints} points` : `You’re not earning in ${name} yet`,
+      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, outside the paid places` : `You’re not earning in ${name} yet`,
       body: paid
-        ? `About ${formatMon(BigInt(row.estimate ?? "0"))} so far, if the epoch closed now.`
+        ? `About ${formatMon(BigInt(row.estimate ?? "0"))} so far, if the epoch closed now.${row.points < rules.rampPoints ? ` ${rampGap(row.points, rules)} more points pays your whole share.` : ""}`
         : row.points > 0
-          ? `About ${gap} more activity points and you’re paid: Holders with ${rules.minPoints}+ points share the pool. Posts and replies others back count the most.`
-          : `Post, like or reply on the Board to earn a share: every Holder with ${rules.minPoints}+ points is paid, and backing from others counts the most.`,
+          ? `About ${gap} more activity points would put you in the paid places. Posts and replies others back count the most.`
+          : `Post, like or reply on the Board to earn a share: active Holders are paid, a whole share from ${rules.rampPoints} points, and backing from others counts the most.`,
       href,
     });
   }

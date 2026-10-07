@@ -14,10 +14,10 @@
 |---|---|---|
 | **Gather** | A Club per verified NFT collection (its memecoin joins it): its Market, a Board, its Members ranked by Momentum, Holder badges, an Owner and Moderators | [09 · Clubs](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md) |
 | **Trade** | Members swap inside the Club, wallet to wallet or through escrow, with no trust between them | `DeClubEscrow`, `DeClubIntents` (sections 1–8 below) |
-| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its Holders with 10+ points that week, split by NFT count, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
+| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its active Holders (the Owner can limit it to the most active), split by NFT count, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
 | **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered | [ADR 0023](adr/0023-signed-posts-and-lenses.md) |
 
-**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared by the Club's Holders with 10+ points. You have to hold to be paid, and take part to reach the floor; there are no seats to push others out of, so a ring of small accounts earns about what its NFTs would. Holdings are averaged over the week; posting and swapping also raise the share by a capped bonus (up to 50%); swaps are worth at most 14 of the 35 points, and a repeat counterparty counts half.
+**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared by the Club's active Holders. You have to hold to be paid, and take part to reach the floor; payouts follow NFTs held, so a ring of small accounts earns about what its NFTs would. Holdings are averaged over the week; posting and swapping also raise the share by a capped bonus (up to 25%); swaps are worth at most 14 of the 35 points, and a repeat counterparty counts half.
 
 **What it isn't.** A rating of assets, or a promise that a Club is safe. Momentum and rewards say a market is busy; the Club still tells you to check every asset before you sign.
 
@@ -142,7 +142,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 2. Alice posts on the Board: *"WTB any Chog with a crown"*. Her wallet signs it; the post shows **Signed**. Bob **follows** her and switches the Board's lens to **Following**.
 3. Carol links the project's X account under **Manage → The Club on X** with a proof post: the Club page shows "@ChogNFT ✓". Alice posts on X about the Club, mentioning it, and shares the link in a note: the card says **Counts**, and her Momentum rises.
 4. Bob and Dave swap Chogs in the Club's Market. Each side pays the fee; the Club's Momentum goes up.
-5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to the Holders with 10+ points (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is built, and off until `X_BEARER_TOKEN` is set), 25% to the Club fund (Carol). The operator funds it on chain.
+5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to the active Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is built, and off until `X_BEARER_TOKEN` is set), 25% to the Club fund (Carol). The operator funds it on chain.
 6. Alice opens the **Rewards** tab and claims her MON. Carol sees "the Club fund is ready" and collects it.
 7. Open `/api/clubs/<Chog>/feed` and `/api/rewards/epochs/<n>`: every post and every payout is public and verifiable.
 
