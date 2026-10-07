@@ -105,7 +105,9 @@ DeClub runs on Monad testnet (chain `10143`); the same code builds for mainnet (
 
 | Contract | Address | Deployment transaction |
 | --- | --- | --- |
-| `DeClubEscrow` | `0xb8bB420CFf0dFB781cD6c1cF1569B137EFc3148f` | `0xd92da81efa343e96bdd4f2a18d26a0b03795d7fb55ceb6d0c6e5b78a28f25d35` |
+| `DeClubEscrow` | `0xcD0f7e49E636a040E7b03D5592334005e429893F` | `0x724b529367d26487c1a745aee8af6f3cf30034b02d8952994e57bb5ccfd12bd0` |
+| `DeClubIntents` | `0x57E02b63dFDEd9d5cF327C20328227Cf6877dE55` | `0x9d4e9ba380f94ee762485c5836175ef283a1b2f7ee936a51faa112c907236200` |
+| `MockWMON` (intents fee token) | `0x211Db89bDdAF9E7e945d6039AF5970C8642E9b96` | `0xbe91b1fa176113f7977cc7e8ce2d653c8eae5146818a7125e110251281e235cb` |
 | `DeClubRewards` | `0xfEC46AF05cAFe35B6b715982bCAf1DD02bb73E9a` | `0x16f552b69fb56e006dd35163a344dac061064df6dd2908c3c4af6423aea1397c` |
 | Chog Genesis mirror (demo) | `0xadca7be2cdf247a388a6fb4b19fdf0b436ad2584` | `0x0b7ef957000870b3d6b39f7d91c0e1221c3c2c2bd5213fcfc72d2e034ff04406` |
 | skrumpeys mirror (demo) | `0xa2545c8c2907cfdaccfc43774a04ffa5c3d174c2` | `0x69ee93540db7df39ba41436d2cd8fbab913502e799098fc8e004165fab61392d` |
@@ -117,10 +119,9 @@ The full records are in `contracts/broadcast/`.
 
 ## Status
 
-The protocol, web app, matcher and rewards flow are implemented. `DeClubEscrow`
-and `DeClubRewards` are deployed on Monad testnet. `DeClubIntents` is not yet,
-so signed swaps don't work on testnet until it is. The remaining release work is
-that deployment, a manual click-through with real wallets and a rewards epoch
+The protocol, web app, matcher and rewards flow are implemented. `DeClubEscrow`,
+`DeClubIntents` and `DeClubRewards` are deployed on Monad testnet. The remaining
+release work is a manual click-through with real wallets and a rewards epoch
 run end to end. See the [roadmap](docs/06-roadmap.md) and
 [test plan](docs/11-test-plan.md).
 
@@ -136,14 +137,14 @@ On Monad testnet (chain `10143`):
 
 | Contract | State |
 | --- | --- |
-| `DeClubEscrow` | Deployed for the [demo world](docs/12-demo.md) (fixed 0.05 MON fee per side). The source now charges per NFT ([ADR 0033](docs/adr/0033-fee-per-nft.md)); redeploy to get it |
+| `DeClubEscrow` | Deployed 2026-10-07 with the per-NFT fee ([ADR 0033](docs/adr/0033-fee-per-nft.md)): 0.05 MON per NFT a side moves, ceiling 0.2 MON, fixed, paid to the demo bank |
 | `DeClubRewards` | Deployed for the demo world, the bank wallet is the operator |
-| `DeClubIntents` | **Not deployed.** The retired `OnDealIntents` signs with an older EIP-712 domain, so the app can't use it. Leave `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` blank and the app hides signed swaps until this is deployed |
+| `DeClubIntents` | Deployed 2026-10-07 with the same fee in `MockWMON` (testnet has no canonical WMON), fixed, paid to the demo bank. Run the matcher against it (`matcher/README.md`) |
 
-Deploy `DeClubIntents` with the instructions in
-[contracts/script/README.md](contracts/script/README.md), then put the printed
-address and block in the root `.env`. The addresses are in the broadcast records
-under `contracts/broadcast/`.
+The addresses and deployment blocks are in the root `.env` and in the broadcast records
+under `contracts/broadcast/`. The demo's ten swaps were rerun on this escrow
+([docs/12-demo.md](docs/12-demo.md)). The previous escrow (`0xb8bB…148f`) is retired, but the Club
+activity recorded from it is still in the store.
 
 ## Repository map
 
@@ -232,6 +233,26 @@ Before mainnet can go live, it needs its contracts deployed (`DeployEscrow`, `De
 `DeployRewards` with Safes; see [docs/11-test-plan.md](docs/11-test-plan.md#6-mainnet)) and mainnet
 entries in `web/data/assets.json`. The file only lists testnet assets today, so mainnet starts with
 every asset unverified.
+
+### Host the testnet app on Vercel
+
+The free (Hobby) plan and the default `<project>.vercel.app` URL are enough for testnet.
+
+1. Import the repo in Vercel with **Root Directory** `web` and the default build (`next build`).
+2. `cd web && vercel link`, then `scripts/vercel-env.sh --dry-run` and `scripts/vercel-env.sh`. It pushes
+   an allowlist of the root `.env` and `web/.env.local` to Production, never the deploy or matcher
+   keys, and generates a `CRON_SECRET` if there is none. Redeploy afterwards: `NEXT_PUBLIC_*` values
+   are baked in at build time.
+3. In the Privy dashboard, add `https://<project>.vercel.app` to the app's allowed origins.
+4. The fill watcher ([ADR 0019](docs/adr/0019-fill-watcher.md)) needs something to call
+   `/api/cron/fills`. Hobby crons run once a day at most, so
+   [`.github/workflows/fill-watcher.yml`](.github/workflows/fill-watcher.yml) does it every 5
+   minutes. Add the repository secrets `SITE_URL` (the Vercel URL) and `CRON_SECRET` (the value Vercel has).
+
+Signed swaps need the matcher, which can't run on Vercel (a long-running process with a sqlite file).
+Run it somewhere with a disk and set `NEXT_PUBLIC_POOL_URL` to its HTTPS address; with
+`NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` blank the app hides signed swaps instead. Vercel's Hobby plan is
+for non-commercial use, so move to Pro before mainnet.
 
 ### Run checks
 
