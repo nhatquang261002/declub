@@ -52,7 +52,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const page = useClubPage(token);
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
-  const system = useSystemMessages(token);
+  const system = useSystemMessages({ club: token });
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
   // and holds everything: another lens or "Looking for" is a question about posts.
   const byTime = active.id === "newest";

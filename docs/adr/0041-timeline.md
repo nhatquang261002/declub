@@ -1,6 +1,6 @@
 # ADR 0041: A timeline of Board posts across Clubs
 
-**Status:** Accepted · 2026-10-07 · Web only: no contract change and no new records. Fulfils the timeline that [ADR 0039](0039-base-voice-for-verified-accounts.md) and [the 0040 plan](../plans/0040-hard-to-game-points.md) said would come. The spec is [09 · Clubs](../09-clubs.md#screens).
+**Status:** Accepted · 2026-10-07 · Web only: no contract change and no new records. Fulfils the timeline that [ADR 0039](0039-base-voice-for-verified-accounts.md) and [the 0040 plan](../plans/0040-hard-to-game-points.md) said would come. The spec is [09 · Clubs](../09-clubs.md#screens). **Amended 2026-10-07:** the "Around the other Clubs" section is removed from the page; the timeline is the reader's own Clubs only, with their system messages ([ADR 0043](0043-system-messages.md)). The API's `scope=others` is kept but no longer used by the page.
 
 ## Context
 

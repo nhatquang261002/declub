@@ -7,15 +7,18 @@ import { ClubAvatar } from "@/components/ClubArt";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
 import { Masonry } from "@/components/Masonry";
+import { SystemGroup } from "@/components/SystemMessage";
 import { TimelineCard } from "@/components/TimelineCard";
 import { TimelineComposer } from "@/components/TimelineComposer";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { useMyClubs } from "@/hooks/useClubMembership";
 import { useNow } from "@/hooks/useNow";
 import { useSignIn } from "@/hooks/useSignIn";
+import { useSystemMessages } from "@/hooks/useSystemMessages";
 import { useTimeline } from "@/hooks/useTimeline";
 import { toClubInfo, type ClubInfo } from "@/lib/clubs";
-import { estimateHeight, type TimelineScope } from "@/lib/timeline";
+import { weave, type FeedItem } from "@/lib/systemFeed";
+import { estimateHeight, systemHeight, type TimelinePost } from "@/lib/timeline";
 import { registry } from "@/lib/verifiedAssets";
 
 /** Every Club the app knows, by lowercase token: a post names its Club by token and the page draws it from here. */
@@ -37,23 +40,34 @@ function Section({ id, title, children, aside }: { id: string; title: string; ch
   );
 }
 
-/** One scope of the timeline: its posts as cards, endlessly (the next page loads as the end nears), and what to say when there are none. */
-function Feed({ scope, joined, now, empty }: { scope: TimelineScope; joined: boolean; now: number; empty: React.ReactNode }) {
-  const feed = useTimeline(scope);
+const heightOf = (item: FeedItem<TimelinePost>) => (item.type === "post" ? estimateHeight(item.post) : systemHeight(item.events.length));
+const clubOf = (token: string) => CLUBS.get(token);
+
+/**
+ * The reader's Clubs' posts as cards, endlessly (the next page loads as the end nears), with what
+ * happened in those Clubs set among them as system messages (ADR 0043), and what to say when there
+ * is nothing.
+ */
+function Feed({ now, empty }: { now: number; empty: React.ReactNode }) {
+  const feed = useTimeline("joined");
+  const system = useSystemMessages("timeline");
+  // Messages are set among the posts by time, down as far as the posts have loaded.
+  const items = useMemo(() => weave(feed.posts, system.events, { since: system.since, complete: !feed.hasMore }), [feed.posts, feed.hasMore, system.events, system.since]);
   if (feed.error && feed.posts.length === 0) return <LoadError title="Couldn’t load the timeline" error={feed.error} />;
   if (!feed.enabled) return <Empty title="No timeline on this server">This server isn’t keeping Club boards.</Empty>;
   if (feed.isLoading) return <Loading label="Loading the timeline" rows={3} />;
-  if (feed.posts.length === 0) return <>{empty}</>;
+  if (items.length === 0) return <>{empty}</>;
 
   return (
     <>
       <Masonry
         as="ul"
-        items={feed.posts}
-        height={estimateHeight}
-        render={(post) => {
-          const club = CLUBS.get(post.club);
-          return club ? <TimelineCard key={`${post.club}:${post.id}`} post={post} club={club} joined={joined} now={now} /> : null;
+        items={items}
+        height={heightOf}
+        render={(item) => {
+          if (item.type === "system") return <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} clubs={clubOf} />;
+          const club = CLUBS.get(item.post.club);
+          return club ? <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined now={now} /> : null;
         }}
       />
       <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
@@ -62,9 +76,8 @@ function Feed({ scope, joined, now, empty }: { scope: TimelineScope; joined: boo
 }
 
 /**
- * The timeline (ADR 0041): what people are saying on the Clubs' Boards, in one place. A reader's own
- * Clubs come first, set in a single column they can like and reply in; then the other Clubs'
- * posts, in cards that name the Club they came from, so there is a reason to open one.
+ * The timeline (ADR 0041): what people are saying on the Boards of the reader's Clubs, in one place,
+ * where they can like and reply. Other Clubs aren't listed: the Clubs page is where to find them.
  */
 export default function TimelinePage() {
   const now = useNow(30_000);
@@ -74,10 +87,6 @@ export default function TimelinePage() {
   const mineClubs = useMemo(() => mine.flatMap((token) => CLUBS.get(token.toLowerCase()) ?? []), [mine]);
   // An archived Club's Board is frozen, so it isn't somewhere to post.
   const postable = useMemo(() => mineClubs.filter((club) => !club.archived), [mineClubs]);
-  // The same query the "others" feed below runs, so this costs nothing. A member of every Club with
-  // posts has them all above, and an empty "other Clubs" section would only say there is nothing.
-  const others = useTimeline("others");
-  const showOthers = !signedIn || others.isLoading || others.posts.length > 0 || !!others.error;
   // Without Privy the app has no members, so there is no "your Clubs" to show.
   const hasAccounts = signedIn || !!signIn;
 
@@ -85,14 +94,7 @@ export default function TimelinePage() {
     <>
       <div className="mb-8">
         <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Timeline</h1>
-        <p className="mt-1 max-w-xl text-sm text-muted">What members are saying on the Clubs’ Boards, newest first. Yours come first, then the rest of the Clubs.</p>
-        {hasAccounts && showOthers && (
-          <p className="mt-2 text-sm">
-            <a href="#around" className="font-bold underline underline-offset-2">
-              Skip to the other Clubs ↓
-            </a>
-          </p>
-        )}
+        <p className="mt-1 max-w-xl text-sm text-muted">What members are saying on the Boards of your Clubs, and what is happening in them, newest first.</p>
       </div>
 
       {hasAccounts && (
@@ -135,8 +137,6 @@ export default function TimelinePage() {
                 </div>
               )}
               <Feed
-              scope="joined"
-              joined
               now={now}
               empty={
                 mine.length === 0 ? (
@@ -160,10 +160,8 @@ export default function TimelinePage() {
         </Section>
       )}
 
-      {showOthers && (
-        <Section id="around" title={hasAccounts ? "Around the other Clubs" : "Around the Clubs"}>
-          <Feed scope="others" joined={false} now={now} empty={<Empty title="No posts yet">When members post on a Club’s Board, it will show up here.</Empty>} />
-        </Section>
+      {!hasAccounts && (
+        <Empty title="No timeline on this server">The timeline shows the Clubs you’ve joined, and this server has no sign-in.</Empty>
       )}
     </>
   );

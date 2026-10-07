@@ -1,4 +1,5 @@
 import type { PublicPost } from "./clubPosts";
+import { SYSTEM_GROUP_SHOWN } from "./systemFeed";
 
 /**
  * The timeline (ADR 0041): posts from many Clubs' Boards in one list. `joined` is the Clubs the
@@ -57,3 +58,6 @@ export function estimateHeight(post: Pick<TimelinePost, "text" | "link" | "x">):
   // 190: the cover, the author row, the footer and the card's padding and gaps.
   return 190 + text + attached;
 }
+
+/** About how tall a run of system messages is, in px (ADR 0043): a line each, up to the few shown, and the "more" link. */
+export const systemHeight = (count: number) => 26 + Math.min(count, SYSTEM_GROUP_SHOWN) * 24 + (count > SYSTEM_GROUP_SHOWN ? 22 : 0);

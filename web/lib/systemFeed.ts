@@ -1,15 +1,18 @@
 import type { ActivityEvent } from "./clubs";
 
 /**
- * System messages (ADR 0043): the Club speaking on its Board, in a line between posts. Each is something that happened and anyone can already see: a swap that completed, a deal
+ * System messages (ADR 0043): the Club speaking on its Board and in the timeline, in a line between
+ * posts. Each is something that happened and anyone can already see: a swap that completed, a deal
  * that was listed, a member who joined. They are read from the activity log and the member list
  * when asked, never stored, and never signed or moderated, since nobody wrote them.
  */
 export type SystemKind = "swap" | "listing" | "join";
 
 export type SystemEvent = {
-  /** The activity event's id, or `join:<wallet>`. */
+  /** The activity event's id, or `join:<club>:<wallet>`. */
   id: string;
+  /** Lowercase tokens of the Clubs it happened in: a deal naming two Clubs' assets is one event in both. */
+  clubs: string[];
   kind: SystemKind;
   /** Unix seconds. */
   at: number;
@@ -40,6 +43,20 @@ export function newest(events: readonly SystemEvent[], now: number, max = SYSTEM
   if (live.length <= max) return { events: live, since: floor };
   const kept = live.slice(0, max);
   return { events: kept, since: kept.at(-1)!.at };
+}
+
+/**
+ * The same events read from several Clubs as one list: an event logged in each Club it names
+ * (lib/server/activity.ts) comes once, with all of them.
+ */
+export function mergeClubs(events: readonly SystemEvent[]): SystemEvent[] {
+  const byId = new Map<string, SystemEvent>();
+  for (const e of events) {
+    const seen = byId.get(e.id);
+    if (seen) seen.clubs = [...new Set([...seen.clubs, ...e.clubs])];
+    else byId.set(e.id, { ...e, clubs: [...e.clubs] });
+  }
+  return [...byId.values()];
 }
 
 /** How many lines of a run of system messages show before "more". */

@@ -7,7 +7,7 @@ A **Club** is the community for one verified NFT collection, and the heart of De
 - **Market:** the open deals and signed swaps that offer or want the asset, and its recent swaps.
 - **Board:** short posts from members: notes, and "Looking for" posts that can link a deal.
 - **Members:** a leaderboard ranked by member Momentum, with verified X or Discord handles ([ADR 0011](adr/0011-verified-profiles.md)) and a Holder badge.
-- **Pulse:** the Club speaking between posts. Swaps, new deals and new members of the last week show on the Board as one-line **system messages** with a coloured icon per kind, grouped between posts ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation. They are not on the timeline.
+- **Pulse:** the Club speaking between posts. Swaps, new deals and new members of the last week show on the Board, and on the timeline for the reader's own Clubs, as one-line **system messages** with a coloured icon per kind, grouped between posts ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
 - **Challenges:** tasks the Owner sets the Club at any time; members answer with a post and the winners earn activity points ([ADR 0045](adr/0045-club-challenges.md); [below](#challenges)).
 - **Rewards:** a share of the fees the Club's swaps paid, to its active Holders and its Owner, each week, by rules the Owner sets ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).
@@ -18,7 +18,7 @@ No deal contract, matcher rule or pool rule depends on a Club: a deal settles th
 
 | Route | What |
 |---|---|
-| `/timeline` | Board posts from the Clubs you joined, then from every other Club (see *Screens*) |
+| `/timeline` | Board posts and system messages from the Clubs you joined (see *Screens*) |
 | `/clubs` | The directory: totals, "Your Clubs", the Most active / Rising / Most traded boards, then All Clubs (see *Screens*) |
 | `/clubs/[address]` | One Club, with the tabs Market, Board, Challenges, Members, Rewards, and Manage for staff |
 
@@ -112,7 +112,7 @@ Three views, switched with pills:
 
 **Challenges tab** ([ADR 0045](adr/0045-club-challenges.md); `ClubChallenges.tsx`): open challenges first, then ones being judged, then past ones. Each card has the title, brief, a status chip (Open, Counting likes, Owner is picking, Done, Cancelled), the points per place, the time left, who judges, and the entries with their likes and, once settled, their place. A member writes an entry in the card ("Sign & enter": it is signed and posted to the Board like any note, then entered), likes other entries, and can withdraw. The Owner (or an app admin) sees **Start a challenge** (title, brief, who judges, points for up to three places, which epoch it ends with, and a "Only Holders can enter" box), and on a challenge they judge, a place picker and **Award the points** once it has ended; they can cancel a challenge until it is settled. The tab counts the open ones.
 
-**Timeline** (`/timeline`, [ADR 0041](adr/0041-timeline.md)): Board posts from many Clubs in one list, newest first, in two sections. **From your Clubs** (signed in) is a masonry of the posts from Clubs you belong to, with a strip of those Clubs on top; you can like, reply and report there, exactly as on the Board. **Around the other Clubs** is the same masonry of posts from every other live Club (archived ones are left out). A post is a card under a cover in its Club's colours, with the author, the text (a short post with nothing attached is set large), its X card or deal link, and its counts; for a Club you haven't joined the card says "Join <symbol> to like and reply" and links to that Club's Board. Both lists are endless: the next page of 20 loads as the end nears (`InfiniteSentinel`), with no cap short of the Boards' own, and a failed load shows a retry button. Hidden posts, replies and pins are not shown, and moderation stays on the Board.
+**Timeline** (`/timeline`, [ADR 0041](adr/0041-timeline.md)): Board posts from the Clubs you belong to (signed in) in one list, newest first: a masonry with a strip of those Clubs on top, where you can like, reply and report exactly as on the Board, and the Clubs' system messages ([ADR 0043](adr/0043-system-messages.md)) set among the posts as small cards that name their Club. There is no section for other Clubs any more: the Clubs page is where to find them. A post is a card under a cover in its Club's colours, with the author, the text (a short post with nothing attached is set large), its X card or deal link, and its counts. The list is endless: the next page of 20 loads as the end nears (`InfiniteSentinel`), with no cap short of the Boards' own, and a failed load shows a retry button. Hidden posts, replies and pins are not shown, and moderation stays on the Board.
 
 **Members tab**: the leaderboard. Each row shows `<Who>`, a **Follow** button, the Holder badge, join date and completed trades in this asset. A "Newest" sort is also available.
 
