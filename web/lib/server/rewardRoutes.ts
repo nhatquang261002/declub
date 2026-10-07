@@ -2,7 +2,8 @@ import { getAddress, isAddress } from "viem";
 import { DECLUB_REWARDS_ADDRESS } from "../config";
 import { epochAt, epochWindow } from "../rewards";
 import type { Registry } from "../verifiedAssets";
-import { claimableFor, clubRewards, readEpoch } from "./rewards";
+import { backingRecordKey, type PublishedBacking } from "./backing";
+import { claimableFor, clubRewards, pointsKey, readEpoch, type PublishedLedger } from "./rewards";
 import { clubStandings, standingsView } from "./standings";
 import { xApiConfigured } from "./xApi";
 import { clientId, getStore, withinLimit, type Store } from "./store";
@@ -43,6 +44,41 @@ export function epochHandler(deps: RouteDeps = {}) {
     if (!record) return fail(404, "not_found", "That epoch hasn't been built.");
     // A built epoch never changes.
     return Response.json(record, { headers: { "Cache-Control": "public, s-maxage=3600, immutable" } });
+  };
+}
+
+/**
+ * GET /api/rewards/epochs/[n]/backing: who backed whom in a built epoch, by Club and public wallet
+ * (ADR 0040): every like and reply that counted, the voices they were given with, and what a
+ * moderator's hide removed. With the epoch's rules, anyone can recompute each Holder's points.
+ */
+export function epochBackingHandler(deps: RouteDeps = {}) {
+  return async function GET(request: Request, { params }: { params: Promise<{ n: string }> }) {
+    const { n } = await params;
+    if (!/^\d{1,9}$/.test(n)) return fail(400, "bad_request", "Give an epoch number.");
+    const store = storeOf(deps);
+    if (!store) return fail(503, "disabled", "Rewards aren't running on this server.");
+    if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
+    const record = await store.get<Record<string, PublishedBacking>>(backingRecordKey(Number(n)));
+    if (!record) return fail(404, "not_found", "No backing was published for that epoch.");
+    return Response.json({ epoch: Number(n), clubs: record }, { headers: { "Cache-Control": "public, s-maxage=3600, immutable" } });
+  };
+}
+
+/**
+ * GET /api/rewards/epochs/[n]/points: every Holder's final points in a built epoch, by Club and
+ * public wallet, paid or not (ADR 0040), with the rules used and when the inputs were frozen.
+ */
+export function epochPointsHandler(deps: RouteDeps = {}) {
+  return async function GET(request: Request, { params }: { params: Promise<{ n: string }> }) {
+    const { n } = await params;
+    if (!/^\d{1,9}$/.test(n)) return fail(400, "bad_request", "Give an epoch number.");
+    const store = storeOf(deps);
+    if (!store) return fail(503, "disabled", "Rewards aren't running on this server.");
+    if (await limited(store, request)) return fail(429, "rate_limited", "Too many requests.");
+    const record = await store.get<Record<string, PublishedLedger>>(pointsKey(Number(n)));
+    if (!record) return fail(404, "not_found", "No points were published for that epoch.");
+    return Response.json({ epoch: Number(n), clubs: record }, { headers: { "Cache-Control": "public, s-maxage=3600, immutable" } });
   };
 }
 

@@ -77,6 +77,7 @@ export type PostActions = {
   liking?: string;
 };
 
+// Reports no longer hide a post (ADR 0040); posts they hid before stay hidden until staff act.
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
 
 /** What a post needs to open its thread (ADR 0032): the Club, and the reader's Club wallet to sign replies with. */
@@ -112,7 +113,7 @@ export function PostItem({
   const own: MenuAction[] = [];
   if (role !== undefined && !post.mine && !post.hidden) {
     own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post?",
-      confirmNote: "The Club’s moderators will be asked to look at it. If enough Holders report it, it is hidden until they decide.",
+      confirmNote: "The Club’s moderators will be asked to look at it. Nothing is hidden until one of them decides.",
       confirmLabel: "Report",
       onSelect: () => actions.report(post.id) });
   }
@@ -127,7 +128,7 @@ export function PostItem({
     });
   }
   const moderate: MenuAction[] = [];
-  // A post hidden by reports keeps its pin (a restore puts it back); the Owner may still take it off.
+  // A post an old report hid keeps its pin (a restore puts it back); the Owner may still take it off.
   if (owner && !post.parent && (!post.hidden || post.pinned)) {
     moderate.push({ label: post.pinned ? "Unpin" : "Pin to top", icon: <PinIcon />, onSelect: () => actions.pin(post.id, !post.pinned) });
   }
@@ -253,7 +254,7 @@ function ReplyToggle({ count, open, onToggle }: { count: number; open: boolean; 
 
 /**
  * A post's replies, one level deep (ADR 0032), and a box to add one. Replies use the same menu as
- * posts (like, report, delete, hide, ban) and are signed the same way. They earn nothing.
+ * posts (like, report, delete, hide, ban) and are signed the same way. They count toward Club Rewards as backing (ADR 0038).
  */
 function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
   const { replies, isLoading } = useClubReplies(context.token, parent, true);

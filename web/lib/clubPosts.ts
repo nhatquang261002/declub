@@ -10,8 +10,6 @@ export const POST_MAX = 280;
 export const POSTS_PER_HOUR = 5;
 export const POST_COOLDOWN_SEC = 30;
 export const REPORTS_PER_DAY = 20;
-/** This many reports from Holders or staff hide a post (never a staff member's) until a Moderator restores or deletes it. */
-export const REPORTS_TO_HIDE = 3;
 export const MAX_PINNED = 3;
 /** How many posts a Club keeps. Older ones fall off the list. */
 export const POSTS_KEPT = 500;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import type { UserGate } from "../lib/server/gate";
-import { claimHandler, bansHandlers, deletePostHandler, hideHandler, logHandler, pinHandler, postsHandlers, profileHandlers, purgeHandler, reportHandler, rolesHandler, xLinkHandlers } from "../lib/server/boardRoutes";
+import { claimHandler, bansHandlers, deletePostHandler, hideHandler, logHandler, pinHandler, postsHandlers, profileHandlers, purgeHandler, reportHandler, reportedHandler, rolesHandler, xLinkHandlers } from "../lib/server/boardRoutes";
 import { joinClub } from "../lib/server/members";
 import { membershipHandlers } from "../lib/server/memberRoutes";
 import { getStore } from "../lib/server/store";
@@ -145,7 +145,7 @@ describe("posting and reading", () => {
 
 describe("reports, hiding, pinning, deleting", () => {
   let id = "";
-  it("hides after three reports", async () => {
+  it("flags a post for the moderators after reports, and a moderator hides it", async () => {
     as("m1");
     await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:m1`);
     id = (await (await post("report me")).json()).post.id;
@@ -156,8 +156,20 @@ describe("reports, hiding, pinning, deleting", () => {
       as(who);
       const res = await report(req("POST"), item(id));
       assert.equal(res.status, 200);
-      if (who === "own") assert.equal((await res.json()).hidden, true);
+      assert.equal((await res.json()).hidden, false, "reports never hide a post");
     }
+    as("m2");
+    const visible = (await (await posts.GET(req("GET", undefined, { authorization: "Bearer t" }), ctx())).json()).posts.find((p: { id: string }) => p.id === id);
+    assert.equal(visible.text, "report me");
+
+    const reported = reportedHandler(reg, deps);
+    as("m2");
+    assert.equal((await reported(req("GET"), ctx())).status, 403, "members can't read the Reported list");
+    as("mod");
+    const list = (await (await reported(req("GET"), ctx())).json()) as { reported: { post: { id: string }; reports: number }[] };
+    assert.deepEqual(list.reported.map((r) => [r.post.id, r.reports]), [[id, 3]]);
+
+    assert.equal((await hideHandler(reg, deps)(req("POST", { hidden: true }), item(id))).status, 200);
     as("m2");
     const seen = (await (await posts.GET(req("GET", undefined, { authorization: "Bearer t" }), ctx())).json()).posts.find((p: { id: string }) => p.id === id);
     assert.equal(seen.text, null);

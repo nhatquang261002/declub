@@ -12,7 +12,7 @@ import { WalletAvatar } from "@/components/WalletAvatar";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
-import { POST_MAX, REPORTS_TO_HIDE, type PostKind } from "@/lib/clubPosts";
+import { POST_MAX, type PostKind } from "@/lib/clubPosts";
 import { isStaff } from "@/lib/clubRoles";
 import { LENSES, type LensId } from "@/lib/lenses";
 import { Empty, Loading } from "./parts";
@@ -277,7 +277,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         </div>
       )}
       {!isLoading && posts.length > 0 && (
-        <p className="mt-3 text-xs text-muted">Be kind: moderators can hide and remove posts, and {REPORTS_TO_HIDE} reports hide one at once.</p>
+        <p className="mt-3 text-xs text-muted">Be kind: reports go to the moderators, who can hide and remove posts.</p>
       )}
     </>
   );

@@ -13,7 +13,6 @@ import {
   REPLIES_PER_HOUR,
   REPLY_COOLDOWN_SEC,
   REPORTS_PER_DAY,
-  REPORTS_TO_HIDE,
   checkProfileEdit,
   cleanText,
   linkFor,
@@ -47,6 +46,8 @@ import {
 } from "../social";
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
 import { activeKey, recordActive } from "./activeDays";
+import { backingKey, recordBacking } from "./backing";
+import { heldKey } from "./held";
 import { activityKey, viemReader } from "./activity";
 import { clubEvents } from "./clubs";
 import { followingOf } from "./follows";
@@ -120,6 +121,8 @@ export const repliesKey = (token: string, id: string) => `declub:club-replies:${
 /** Every post and reply a wallet wrote, across Clubs, as `club:id`, newest first. */
 export const walletPostsKey = (wallet: string) => `declub:wallet-posts:${CHAIN_ID}:${wallet.toLowerCase()}`;
 /** The reports that count toward hiding a post: those filed by Holders and staff. */
+/** The posts and replies reported since they were posted or last restored, for the staff's "Reported" list. */
+export const reportedKey = (token: string) => `declub:club-reported:${CHAIN_ID}:${token.toLowerCase()}`;
 export const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
 /** The user's role in the Club, an app admin's outranking everything. */
@@ -435,7 +438,8 @@ async function lensContext(store: Store, entry: AssetEntry, lens: LensId, as: st
 // ---------------------------------------------------------------------------------------------
 // Replies (ADR 0032): one level under a top-level post, signed like posts. A reply is stored as a
 // post with a `parent`, so likes, reports, hiding, deleting and bans work on it unchanged; it isn't
-// on the Board list or in the lenses, and it earns nothing toward Club Rewards.
+// on the Board list or in the lenses. It makes its author's day active and gives the post's author
+// part of their voice toward Club Rewards (ADR 0038).
 
 export type ReplyRefusal = Exclude<PostRefusal, "bad_kind" | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable"> | "not_found" | "hidden" | "thread_full";
 
@@ -485,6 +489,7 @@ export async function createReply(
   await store.addMember(repliesKey(token, parent.id), id);
   // Indexed by wallet for the author's inbox; the wallet export leaves replies out.
   await store.rank(walletPostsKey(reply.wallet), [{ member: `${token}:${id}`, score: reply.at }], POSTS_KEPT);
+  await recordBacking(store, token, { kind: "reply", id, userId, at: reply.at }, deps.epochs?.genesis, deps.epochs?.length);
   return { ok: true, post: viewPost(reply, { userId, staff: isStaff(role) }, false) };
 }
 
@@ -593,9 +598,10 @@ export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, 
 }
 
 /**
- * A member likes a post, or takes the like back. Likes are a signal of attention, not a score: they
- * feed the author's notifications and nothing else, so there is nothing to farm. A member can't like
- * their own post or a hidden one, and must be in the Club.
+ * A member likes a post, or takes the like back. A like feeds the author's notifications, makes the
+ * liker's day active, and gives the author part of the liker's voice toward Club Rewards (ADR 0038);
+ * a like taken back counts for nothing when the epoch is read. A member can't like their own post or
+ * a hidden one, and must be in the Club.
  */
 export async function likePost(
   store: Store,
@@ -603,6 +609,7 @@ export async function likePost(
   userId: string,
   id: string,
   like: boolean,
+  deps: Pick<Deps, "now" | "epochs"> = {},
 ): Promise<{ ok: true; likes: number } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   if (entry.club === "archived") return { ok: false, reason: "archived" };
@@ -616,6 +623,7 @@ export async function likePost(
     if (!(await withinLimit(store, "club-like", userId, LIKES_PER_HOUR, 3_600))) return { ok: false, reason: "rate_limited" };
     await store.addMember(likesKey(token, id), userId);
     await store.addMember(likedKey(token, userId), id);
+    await recordBacking(store, token, { kind: "like", id, userId, at: nowOf(deps) }, deps.epochs?.genesis, deps.epochs?.length);
   } else {
     await store.removeMember(likesKey(token, id), userId);
     await store.removeMember(likedKey(token, userId), id);
@@ -624,12 +632,10 @@ export async function likePost(
 }
 
 /**
- * A member's report. Every report is kept and shown to staff, but only those from Holders and staff
- * count toward hiding: at `REPORTS_TO_HIDE` of those the post is hidden. Joining a Club is free, so
- * otherwise a handful of throwaway accounts could hide any post. A post by staff (Owner, Moderator
- * or app admin) is never hidden by reports: only someone who outranks its author may hide it.
- *
- * A hidden post stays pinned (it isn't shown as pinned while hidden), so a restore puts it back.
+ * A member's report. Every report is kept and the post is marked `reported`, so Moderators see it
+ * in the Club's "Reported" list; nothing is hidden until one of them acts (ADR 0040), because a
+ * hidden post's backing counts for nothing and a few throwaway accounts could otherwise strip a
+ * rival's points. Reports from Holders and staff are also counted apart, so staff can weigh them.
  */
 export async function reportPost(
   store: Store,
@@ -650,19 +656,34 @@ export async function reportPost(
 
   const roles = await loadRoles(store, token);
   const reporterStaff = isStaff(roleOf(roles, userId, isAdmin(deps, userId)));
-  const authorStaff = isStaff(roleOf(roles, post.userId, isAdmin(deps, post.userId)));
-
   await store.addMember(reportsKey(token, id), userId);
   if (row.holder || reporterStaff) await store.addMember(countedReportsKey(token, id), userId);
-  const counted = await store.countMembers(countedReportsKey(token, id));
-  if (counted >= REPORTS_TO_HIDE && !post.hidden && !authorStaff) {
-    await store.set(postKey(token, id), { ...post, reported: true, hidden: "reports" } satisfies StoredPost);
-    if (post.link?.kind === "x") await setXShareHidden(store, token, post.link.id, id, true);
-    await appendLog(store, token, { actor: "reports", action: "auto_hide", target: id, detail: `${counted} reports` }, nowOf(deps));
-    return { ok: true, hidden: true };
-  }
+  await store.addMember(reportedKey(token), id);
   if (!post.reported) await store.set(postKey(token, id), { ...post, reported: true } satisfies StoredPost);
   return { ok: true, hidden: !!post.hidden };
+}
+
+/** A reported post or reply, as staff see it in the "Reported" list. */
+export type ReportedItem = { post: PublicPost; reports: number; holderReports: number };
+
+/** The reported posts and replies, most reported first. Staff only (null otherwise). */
+export async function listReported(store: Store, entry: AssetEntry, userId: string, deps: Deps = {}): Promise<ReportedItem[] | null> {
+  const token = entry.address.toLowerCase();
+  const role = await roleIn(store, token, userId, deps);
+  if (!isStaff(role)) return null;
+  const ids = await store.members(reportedKey(token));
+  const rows = await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)));
+  const items: ReportedItem[] = [];
+  for (const [i, post] of rows.entries()) {
+    // A post that was deleted, or restored (which clears its reports), leaves the list.
+    if (!post?.reported) {
+      await store.removeMember(reportedKey(token), ids[i]!);
+      continue;
+    }
+    const [reports, holderReports] = await Promise.all([store.countMembers(reportsKey(token, post.id)), store.countMembers(countedReportsKey(token, post.id))]);
+    items.push({ post: viewPost(post, { userId, staff: true }, false, reports), reports, holderReports });
+  }
+  return items.sort((a, b) => b.holderReports - a.holderReports || b.reports - a.reports || b.post.at - a.post.at).slice(0, 100);
 }
 
 /** Takes a post off the pinned list. */
@@ -682,7 +703,7 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
   if (!mayActOn(mine, roleOf(roles, post.userId, isAdmin(deps, post.userId)))) return { ok: false, reason: "forbidden" };
 
   if (hide) {
-    // A deliberate hide by staff also unpins; a hide by reports doesn't (see `reportPost`).
+    // A deliberate hide by staff also unpins; posts the reports of old hid keep their pin.
     await store.set(postKey(token, id), { ...post, hidden: "moderator" } satisfies StoredPost);
     await unpin(store, token, id);
   } else {
@@ -691,6 +712,7 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
     delete visible.reported;
     await store.set(postKey(token, id), visible);
     await store.del(reportsKey(token, id), countedReportsKey(token, id));
+    await store.removeMember(reportedKey(token), id);
   }
   if (post.link?.kind === "x") await setXShareHidden(store, token, post.link.id, id, hide);
   await log(store, entry, actor, hide ? "hide_post" : "restore_post", id);
@@ -923,8 +945,8 @@ export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "n
   await store.del(...keys, postsKey(lower), ...ids.map((id) => likedKey(lower, id)));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
   await purgeXShares(store, lower);
-  // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days.
+  // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days and backing.
   const epochs = Math.max(0, epochAt(Math.floor(nowOf(deps) / 1000)) + 1);
-  await store.del(streaksKey(lower), standingsKey(lower), ...Array.from({ length: epochs }, (_, n) => activeKey(lower, n)));
+  await store.del(reportedKey(lower), streaksKey(lower), standingsKey(lower), ...Array.from({ length: epochs }, (_, n) => [activeKey(lower, n), backingKey(lower, n), heldKey(lower, n)]).flat());
   return { members: ids.length, posts: postIds.length };
 }

@@ -126,7 +126,7 @@ What the app already does, and should keep doing:
 - Name the money rule exactly: percentages and caps come from `REWARDS`, never rounded in copy.
 - Safety is a statement, not a disclaimer wall: “Assets move only in transactions or signatures you
   approve.”
-- Never promise returns. Rewards are a share of fees, paid in MON, to the 10 most active Holders.
+- Never promise returns. Rewards are a share of fees, paid in MON, to the Club's active Holders (those with enough points that week).
 - Say “swap” and “deal” for a trade, “Holder” for someone who owns a Club's NFT, “Owner” for the
   person who runs the Club.
 

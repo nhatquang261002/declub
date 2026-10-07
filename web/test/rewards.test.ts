@@ -5,7 +5,7 @@ import type { ActivityEvent } from "../lib/clubs";
 import { buildMerkleSet, buildMerkleTree } from "../lib/merkle";
 import type { MemberRow } from "../lib/members";
 import { recapLink, recapText } from "../lib/recap";
-import { REWARDS, entryGap, epochAt, epochWindow, leavesOf, pools, rankHolders, rewardLeaf, splitClub, streakBps, type ClubInput } from "../lib/rewards";
+import { CLUB_RULE_BOUNDS, DEFAULT_CLUB_RULES, REWARDS, entryGap, epochAt, epochWindow, leavesOf, pools, rankHolders, rewardLeaf, splitClub, streakBps, type ClubInput } from "../lib/rewards";
 import { activeDays, activeKey, recordActive } from "../lib/server/activeDays";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "../lib/server/streaks";
 import { postKey } from "../lib/server/board";
@@ -105,7 +105,7 @@ describe("splitClub", () => {
   });
 
   it("pays Holders by shares, and the fund to the Owner", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 3n, points: 4 }, { wallet: bob, shares: 1n, points: 4 }], owner: carol }));
+    const split = splitClub(input({ holders: [{ wallet: alice, shares: 3n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }], owner: carol }));
     assert.deepEqual(
       split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
       [[alice, "holder", (375n * ETH) / 100n], [bob, "holder", (125n * ETH) / 100n], [carol, "fund", (25n * ETH) / 10n]],
@@ -116,7 +116,7 @@ describe("splitClub", () => {
 
   it("adds a sponsor's money to the Holder pool only: none to the fund, none to the protocol (ADR 0035)", () => {
     assert.deepEqual(pools(10n * ETH, { holders: 0n, fund: 0n }, 7n * ETH), { holderPool: 12n * ETH, fundPool: (25n * ETH) / 10n });
-    const split = splitClub(input({ sponsored: 7n * ETH, holders: [{ wallet: alice, shares: 3n, points: 4 }, { wallet: bob, shares: 1n, points: 4 }], owner: carol }));
+    const split = splitClub(input({ sponsored: 7n * ETH, holders: [{ wallet: alice, shares: 3n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }], owner: carol }));
     assert.equal(split.sponsored, 7n * ETH);
     assert.deepEqual(
       split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
@@ -137,7 +137,7 @@ describe("splitClub", () => {
   });
 
   it("rolls rounding dust over and never pays more than the pool", () => {
-    const split = splitClub(input({ fees: 10n, holders: [{ wallet: alice, shares: 1n, points: 2 }, { wallet: bob, shares: 1n, points: 2 }, { wallet: carol, shares: 1n, points: 2 }] }));
+    const split = splitClub(input({ fees: 10n, holders: [{ wallet: alice, shares: 1n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }, { wallet: carol, shares: 1n, points: 12 }] }));
     // A 5-wei pool over 3 equal Holders: 1 each, 2 left.
     assert.equal(split.holderPool, 5n);
     assert.equal(split.paidHolders, 3n);
@@ -145,38 +145,37 @@ describe("splitClub", () => {
   });
 
   it("leaves zero-share members out", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 0n, points: 9 }, { wallet: bob, shares: 2n, points: 2 }] }));
+    const split = splitClub(input({ holders: [{ wallet: alice, shares: 0n, points: 12 }, { wallet: bob, shares: 2n, points: 12 }] }));
     assert.deepEqual(split.payouts.map((p) => p.wallet), [bob]);
     assert.equal(split.holderCount, 1);
   });
 });
 
-describe("the top Holders", () => {
+describe("the points floor (ADR 0040)", () => {
   const club = NFT.toLowerCase();
   const w = (i: number) => `0x${i.toString(16).padStart(40, "0")}`;
   const many = (n: number) => Array.from({ length: n }, (_, i) => ({ wallet: w(i + 1), shares: BigInt(100 - i), points: 40 - i, joinedAt: i }));
   const base = { club, fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, owner: null };
 
-  it("pays only the most active REWARDS.maxHolders, by points", () => {
-    const split = splitClub({ ...base, holders: many(15).reverse() });
+  it("pays every Holder with at least the floor, however many there are, and nobody below it", () => {
+    const below = [{ wallet: w(90), shares: 500n, points: REWARDS.minPoints - 0.5, joinedAt: 0 }, { wallet: w(91), shares: 500n, points: 0, joinedAt: 0 }];
+    const split = splitClub({ ...base, holders: [...many(15).reverse(), ...below] });
     const paid = split.payouts.map((p) => p.wallet);
-    assert.equal(split.holderCount, REWARDS.maxHolders);
-    assert.deepEqual(new Set(paid), new Set(many(REWARDS.maxHolders).map((h) => h.wallet)));
+    assert.equal(split.holderCount, 15);
+    assert.deepEqual(new Set(paid), new Set(many(15).map((h) => h.wallet)));
     assert.equal(split.paidHolders + split.carry.holders, split.holderPool);
+    const atFloor = splitClub({ ...base, holders: [{ wallet: w(1), shares: 1n, points: REWARDS.minPoints }] });
+    assert.equal(atFloor.holderCount, 1, "exactly the floor is enough");
   });
 
-  it("breaks a tie at the cutoff for the bigger holding, then the earlier member, then the lower wallet", () => {
+  it("ranks ties on points for the bigger holding, then the earlier member, then the lower wallet", () => {
     const tied = [
-      ...many(7),
       { wallet: w(50), shares: 1n, points: 1, joinedAt: 5 },
       { wallet: w(51), shares: 1n, points: 1, joinedAt: 3 },
       { wallet: w(40), shares: 1n, points: 1, joinedAt: 3 },
       { wallet: w(60), shares: 2n, points: 1, joinedAt: 9 },
     ];
-    const paid = splitClub({ ...base, holders: tied }).payouts.map((p) => p.wallet);
-    assert.ok(paid.includes(w(60)), "more NFTs wins a tie on points");
-    assert.ok(paid.includes(w(40)) && paid.includes(w(51)), "then the earlier join, then the lower wallet");
-    assert.ok(!paid.includes(w(50)));
+    assert.deepEqual(rankHolders(tied).map((h) => h.wallet), [w(60), w(40), w(51), w(50)]);
   });
 
   it("never pays a Holder for holding alone, and a bigger bag can't buy a place", () => {
@@ -190,29 +189,67 @@ describe("the top Holders", () => {
     assert.equal(quiet.holderCount, 0);
   });
 
-  it("ranks Holders the way the split pays them", () => {
-    const holders = many(15).reverse();
-    const paid = new Set(splitClub({ ...base, holders }).payouts.map((p) => p.wallet));
-    assert.deepEqual(new Set(rankHolders(holders).slice(0, REWARDS.maxHolders).map((h) => h.wallet)), paid);
+  it("leaves a ring of one-NFT accounts earning about what its NFTs would honestly, with nobody pushed out", () => {
+    const ring = Array.from({ length: 10 }, (_, i) => ({ wallet: w(200 + i), shares: 1n, points: 35, bonusBps: 5_000, joinedAt: 0 }));
+    const real = { wallet: w(1), shares: 12n, points: 35, bonusBps: 5_000, joinedAt: 0 };
+    const split = splitClub({ ...base, holders: [real, ...ring] });
+    assert.equal(split.holderCount, 11, "the real Holder is paid next to the ring");
+    const ringPaid = split.payouts.filter((p) => ring.some((r) => r.wallet === p.wallet));
+    assert.equal(ringPaid.length, 10);
+    // Equal bonus: each ring account holds 1 of 22 NFTs, so it gets what one honestly held NFT would.
+    for (const p of ringPaid) assert.equal(p.amount, (5n * ETH) / 22n);
+    assert.equal(split.payouts.find((p) => p.wallet === w(1))!.amount, (5n * ETH * 12n) / 22n);
   });
 
-  it("says how many more points get a Holder into the paid places, with the tie rule", () => {
-    const ranked = rankHolders([...many(10), { wallet: w(70), shares: 5n, points: 28, joinedAt: 20 }, { wallet: w(71), shares: 500n, points: 28, joinedAt: 0 }]);
-    // The 10th place has 31 points and 91 NFTs. w(70) holds less, so a tie isn't enough.
-    assert.equal(entryGap(ranked, w(70)), 3.01);
-    // w(71) holds more, so a tie is enough.
-    assert.equal(entryGap(ranked, w(71)), 3);
+  it("reads the floor from the Club's own rules", () => {
+    const holders = [
+      { wallet: w(1), shares: 3n, points: 25, joinedAt: 0 },
+      { wallet: w(2), shares: 3n, points: 15, joinedAt: 0 },
+    ];
+    assert.deepEqual(splitClub({ ...base, holders }).payouts.map((p) => p.wallet).sort(), [w(1), w(2)]);
+    const strict = splitClub({ ...base, holders, rules: { ...DEFAULT_CLUB_RULES, minPoints: 20 } });
+    assert.deepEqual(strict.payouts.map((p) => p.wallet), [w(1)]);
+    assert.equal(strict.rules.minPoints, 20);
+    assert.deepEqual(splitClub({ ...base, holders }).rules, DEFAULT_CLUB_RULES);
+    assert.equal(REWARDS.minPoints, DEFAULT_CLUB_RULES.minPoints, "REWARDS stays an alias of the defaults");
+    for (const [key, [least, most]] of Object.entries(CLUB_RULE_BOUNDS)) {
+      const value = DEFAULT_CLUB_RULES[key as keyof typeof DEFAULT_CLUB_RULES];
+      assert.ok(value >= least && value <= most, `${key} default is inside its bounds`);
+    }
+  });
+
+  it("says how many more points a Holder needs to be paid", () => {
+    const ranked = rankHolders([...many(3), { wallet: w(70), shares: 5n, points: 4.5, joinedAt: 20 }]);
+    assert.equal(entryGap(ranked, w(70)), 5.5);
     assert.equal(entryGap(ranked, w(1)), 0);
     assert.equal(entryGap(ranked, w(123)), null);
-    // With room left, any activity gets in.
-    assert.equal(entryGap(rankHolders([...many(3), { wallet: w(80), shares: 4n, points: 0, joinedAt: 1 }]), w(80)), 0.01);
+    assert.equal(entryGap(ranked, w(70), { ...DEFAULT_CLUB_RULES, minPoints: 20 }), 15.5);
+    assert.equal(entryGap(ranked, w(70), { ...DEFAULT_CLUB_RULES, minPoints: 3 }), 0);
+  });
+
+  it("splits by the NFTs held on average over the week, not the ones held at close", () => {
+    // Both hold 5 at close; one held 5 all week (7 samples + close = 40 NFT-reads), the other bought them on the last day (5 only at close).
+    const holders = [
+      { wallet: w(1), shares: 5n, held: 40n, points: 20, joinedAt: 0 },
+      { wallet: w(2), shares: 5n, held: 5n, points: 20, joinedAt: 0 },
+    ];
+    const split = splitClub({ ...base, holders, samples: 7 });
+    const [a, b] = ["1", "2"].map((i) => split.payouts.find((p) => p.wallet === w(Number(i)))!);
+    assert.equal(a!.amount, (5n * ETH * 40n) / 45n);
+    assert.equal(a!.held, 5);
+    assert.equal(b!.held, 0.63, "5 over 8 reads, to 2 decimals");
+    assert.equal(a!.shares, 5n, "what they hold now is still published");
+    assert.equal(split.samples, 7);
+    // Without samples, held is the holding and nothing changes.
+    const none = splitClub({ ...base, holders: [{ wallet: w(1), shares: 5n, points: 20 }, { wallet: w(2), shares: 5n, points: 20 }] });
+    assert.equal(none.payouts[0]!.amount, none.payouts[1]!.amount);
   });
 
   it("adds the streak bonus on top of the activity bonus, each capped", () => {
-    assert.deepEqual([0, 1, 2, 3, 5, 40].map(streakBps), [0, 0, 250, 500, 1_000, 1_000]);
+    assert.deepEqual([0, 1, 2, 3, 5, 40].map((n) => streakBps(n)), [0, 0, 250, 500, 1_000, 1_000]);
     const holders = [
-      { wallet: w(1), shares: 1n, points: 1, bonusBps: 99_999, streak: 99 },
-      { wallet: w(2), shares: 1n, points: 1 },
+      { wallet: w(1), shares: 1n, points: 10, bonusBps: 99_999, streak: 99 },
+      { wallet: w(2), shares: 1n, points: 10 },
     ];
     const split = splitClub({ ...base, holders });
     const top = split.payouts.find((p) => p.wallet === w(1))!;
@@ -299,13 +336,13 @@ describe("the weekly recap", () => {
 
 describe("leavesOf", () => {
   it("sums one wallet across Clubs, keeps the breakdown, and orders by address", () => {
-    const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n, points: 1 }], owner: alice });
-    const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n, points: 1 }], owner: null });
+    const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n, points: 12 }], owner: alice });
+    const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n, points: 12 }], owner: null });
     const leaves = leavesOf([a, b]);
     assert.deepEqual(leaves.map((l) => [l.account, l.amount]), [[getAddress(alice), (25n * ETH) / 10n + (25n * ETH) / 10n], [getAddress(bob), 5n * ETH]]);
     assert.deepEqual(leaves[0]!.breakdown, [
       { club: "0x1", kind: "fund", amount: (25n * ETH) / 10n },
-      { club: "0x2", kind: "holder", amount: (25n * ETH) / 10n, shares: 1n, bonusBps: 0, points: 1 },
+      { club: "0x2", kind: "holder", amount: (25n * ETH) / 10n, shares: 1n, bonusBps: 0, points: 12 },
     ]);
   });
 });
@@ -374,6 +411,8 @@ describe("buildEpoch", () => {
       contract: REWARDS_AT,
       genesis: GENESIS,
       length: WEEK,
+      // A floor of one point: most of these tests have a swap or a post, not ten points of backing.
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
     };
     // Alice holds 2 Chogs; Bob holds 250 coin in a second wallet, a Holder by the coin but with no
     // shares (ADR 0025); Carol is a member with nothing; Dave (1 Chog) isn't a member and earns nothing.
@@ -616,6 +655,7 @@ describe("rewards routes", () => {
       contract: REWARDS_AT,
       genesis: GENESIS,
       length: WEEK,
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
     });
   });
 

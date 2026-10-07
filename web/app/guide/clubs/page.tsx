@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BadgeCheckIcon, ChatIcon, CoinIcon, CrownIcon, FlagIcon, FlameIcon, ShieldIcon, TagIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
-import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR, REPORTS_TO_HIDE } from "@/lib/clubPosts";
+import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR } from "@/lib/clubPosts";
 import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { LENSES } from "@/lib/lenses";
 import { MOMENTUM } from "@/lib/momentum";
-import { REWARDS, percent } from "@/lib/rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, percent } from "@/lib/rewards";
 import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "../parts";
 
 // The Clubs guide, beside the Deals guide at /guide. The numbers come from the same constants the server enforces, so the
@@ -92,8 +92,8 @@ const SAFETY = [
 
 const FAQ: ReadonlyArray<[string, string]> = [
   ["Does a Club change how my deals work?", "No. A deal works the same whether or not you're in a Club, and leaving one doesn't touch your deals. What changes is where the fee goes afterwards: part of it comes back to the Club whose asset was traded."],
-  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(REWARDS.holderBps)} is split between the ${REWARDS.maxHolders} most active Holders: members who hold at least one NFT of the collection when the epoch is built, ranked by the points they earned that epoch for posting, sharing on X and swapping (a tie goes to whoever holds more NFTs, then whoever joined first). Each one's share is their NFTs, plus up to the activity bonus; ${percent(REWARDS.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
-  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and among the ${REWARDS.maxHolders} most active Holders, when the epoch is built. Holding alone doesn't earn a place: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
+  ["How are rewards worked out?", `Each epoch (one week, Monday to Monday UTC), the fees from the Club's completed swaps are added up. ${percent(PROTOCOL.holderBps)} is split between its Holders: members who hold at least one NFT of the collection when the epoch is built and earned at least ${DEFAULT_CLUB_RULES.minPoints} points that epoch (by default), most of them from other people backing their posts and replies, the rest from active days, sharing on X and swapping. Each one's share is the NFTs they held on average over the week, plus up to the activity bonus; ${percent(PROTOCOL.fundBps)} goes to the Owner's Club fund. Whatever can't be paid (no Holders yet, no Owner) rolls into the next epoch.`],
+  ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also have to be a member holding an NFT of the collection, and have at least ${DEFAULT_CLUB_RULES.minPoints} activity points (by default), when the epoch is built. Holding alone doesn't earn a share: you need some activity that epoch. Your share waits under Rewards until you claim it.`],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my profile to other traders” turned on (Account page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
@@ -116,7 +116,7 @@ export default function ClubsGuidePage() {
             Explore Clubs <span aria-hidden>→</span>
           </Link>
         }
-        summary={["Anyone signed in can join.", `The ${REWARDS.maxHolders} most active Holders share ${percent(REWARDS.holderBps)} of the fees.`, "Your posts are signed and yours."]}
+        summary={["Anyone signed in can join.", `Active Holders share ${percent(PROTOCOL.holderBps)} of the fees.`, "Your posts are signed and yours."]}
         sections={SECTIONS}
       />
 
@@ -207,9 +207,9 @@ export default function ClubsGuidePage() {
                 Every completed swap pays a small fee for each NFT on each side. Each week, for each Club whose asset was traded:
               </p>
               <ul className="mt-3 space-y-1.5 text-sm">
-                <li><b>{percent(REWARDS.holderBps)}</b> to the Club&apos;s {REWARDS.maxHolders} most active Holders, split by the NFTs they hold, up to {percent(REWARDS.maxBonusBps)} more for the most active</li>
-                <li><b>{percent(REWARDS.fundBps)}</b> to the Club fund, claimed by the Owner</li>
-                <li><b>{percent(REWARDS.protocolBps)}</b> stays with the protocol</li>
+                <li><b>{percent(PROTOCOL.holderBps)}</b> to the Club&apos;s Holders who earned at least {DEFAULT_CLUB_RULES.minPoints} points that week, split by the NFTs they held, up to {percent(PROTOCOL.maxBonusBps)} more for the most active</li>
+                <li><b>{percent(PROTOCOL.fundBps)}</b> to the Club fund, claimed by the Owner</li>
+                <li><b>{percent(PROTOCOL.protocolBps)}</b> stays with the protocol</li>
               </ul>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A swap that names two Clubs&apos; assets splits its fee between them.</p>
             </div>
@@ -237,22 +237,37 @@ export default function ClubsGuidePage() {
               The activity bonus
             </h3>
             <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>
-              You have to hold an NFT of the collection to be paid, and the {REWARDS.maxHolders} Holders with the most activity points are the ones paid; their payout is split by one share per NFT. Those shares count up to{" "}
-              <b className="text-[#111318]">{percent(REWARDS.maxBonusBps)} more</b> for their activity on its Board: each day they post earns{" "}
-              {REWARDS.dayPoints} points, and each of their own X posts about the Club shared there earns {REWARDS.xShareBase}.{" "}
-              Each completed swap with another wallet earns {REWARDS.swapPoints}, half for a wallet they already swapped with in the last {MOMENTUM.washDays} days, up to{" "}
-              {REWARDS.swapCapPerEpoch} an epoch. {REWARDS.fullBonusPoints} points earn the full bonus, so a Holder who posts every day and shares an X post each day gets all of it. Board
-              replies and Board likes earn nothing here, so they can&apos;t be farmed, and a big holding can&apos;t buy a place among the {REWARDS.maxHolders}. A Holder
-              who does nothing in an epoch isn&apos;t paid for it, however many NFTs they hold.
+              You have to hold an NFT of the collection to be paid, and every Holder with at least <b className="text-[#111318]">{DEFAULT_CLUB_RULES.minPoints} activity points</b> that week is paid
+              (by default), so nobody is pushed out by another Holder: a payout is split by one share per NFT. Those shares count up to{" "}
+              <b className="text-[#111318]">{percent(PROTOCOL.maxBonusBps)} more</b> for their points. Most points come from other people:
+              each Holder has a weekly <b className="text-[#111318]">voice</b> of {DEFAULT_CLUB_RULES.voicePerNft} points per NFT (counting up to {DEFAULT_CLUB_RULES.voiceCapNfts}) in their own Club,
+              and every verified account (a shared X or Discord profile) has {PROTOCOL.baseVoice} more to spend on any Club&apos;s Board. A voice is shared out over the posts and
+              replies its owner likes or answers that week, and what your posts and replies receive is your <b className="text-[#111318]">backing</b>. On top of that,
+              each active day earns {DEFAULT_CLUB_RULES.dayPoints}, each of your own X posts about the Club shared on its Board {PROTOCOL.xShareBase}, and each completed swap with another
+              wallet {DEFAULT_CLUB_RULES.swapPoints} (half for a wallet you already swapped with in the last {MOMENTUM.washDays} days, up to {DEFAULT_CLUB_RULES.swapCapPerEpoch} an epoch).{" "}
+              {DEFAULT_CLUB_RULES.fullBonusPoints} points earn the full bonus. A Holder who does nothing in an epoch isn&apos;t paid for it, however many NFTs they hold.
             </p>
             <ul className={`mt-3 space-y-1.5 text-sm leading-6 ${MUTED}`}>
               <li>
-                <b className="text-[#111318]">Active days:</b> a day (UTC) with at least one post of yours on the Board that is still up. At most 7 an
-                epoch; a deleted or hidden post doesn&apos;t count.
+                <b className="text-[#111318]">Backing:</b> a like weighs {DEFAULT_CLUB_RULES.likeWeight}, a reply {DEFAULT_CLUB_RULES.replyWeight}, and the first reply on a post{" "}
+                {DEFAULT_CLUB_RULES.firstReplyWeight}, so a Holder who backs one post gives it their whole voice and one who likes fifty gives each a little. Voice not given in a
+                week is lost. A verified account&apos;s {PROTOCOL.baseVoice} is shared over every Club it engages with, counts only once the profile has been shared for{" "}
+                {PROTOCOL.verifiedDays} days, and at most {PROTOCOL.baseCapPerReceiver} of anyone&apos;s points can come from it, so outsiders can lift a member but the Club&apos;s
+                Holders carry the most. Nobody can back themselves; two people who back each other get half each way; a like taken back, a deleted post, or a post a moderator hid
+                counts for nothing. Backing is public once an epoch closes: who backed whom, the voices they gave it with, and what a moderator&apos;s hide removed, so anyone can
+                recompute the points (<code>/api/rewards/epochs/&lt;n&gt;/backing</code>), which also means likes are no longer private after that.
               </li>
               <li>
-                <b className="text-[#111318]">Streaks:</b> {REWARDS.streakMinDays} or more active days in an epoch keep a streak going. From the second
-                epoch in a row it adds {percent(REWARDS.streakStepBps)} a week, up to {percent(REWARDS.maxStreakBps)}, on top of the bonus. The Rewards tab
+                <b className="text-[#111318]">Holdings are averaged:</b> the NFTs you hold are read once a day through the week and once more when the epoch is built, and your
+                voice and your share of the pool use the average. NFTs bought on the last day count for a fraction; a day before you joined counts as none.
+              </li>
+              <li>
+                <b className="text-[#111318]">Active days:</b> a day (UTC) when you posted on the Board, replied, or liked another member&apos;s post. At most 7
+                an epoch; a deleted post, or one a moderator hid, doesn&apos;t count. Liking the same post again doesn&apos;t add a day.
+              </li>
+              <li>
+                <b className="text-[#111318]">Streaks:</b> {DEFAULT_CLUB_RULES.streakMinDays} or more active days in an epoch keep a streak going. From the second
+                epoch in a row it adds {percent(DEFAULT_CLUB_RULES.streakStepBps)} a week, up to {percent(PROTOCOL.maxStreakBps)}, on top of the bonus. The Rewards tab
                 shows where you stand while the epoch runs.
               </li>
               <li>
@@ -269,9 +284,8 @@ export default function ClubsGuidePage() {
                   When switched on
                 </span>
                 until then, every counted post adds the same, however it does on X. Once the operator turns on the X read, likes, reposts, quotes
-                and replies on your X post add up to {REWARDS.reachCapPerEpoch} more points (capped, so one viral post can&apos;t take everything), and
-                a post that was deleted, or edited so it&apos;s no longer about the Club, counts for nothing. Likes and replies on the Board earn
-                nothing.
+                and replies on your X post add up to {PROTOCOL.reachCapPerEpoch} more points (capped, so one viral post can&apos;t take everything), and
+                a post that was deleted, or edited so it&apos;s no longer about the Club, counts for nothing.
               </li>
             </ul>
           </div>
@@ -301,11 +315,11 @@ export default function ClubsGuidePage() {
                 <FlagIcon className="size-4" /> Reporting
               </h3>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
-                Report a post that&apos;s spam or abuse, once per post and never your own. When {REPORTS_TO_HIDE} different
-                Holders (or staff) have reported it, the post is hidden from everyone except its author and the staff.
-                Every report reaches the staff, and posts by the Owner or a Moderator are never hidden by reports.
+                Report a post that&apos;s spam or abuse, once per post and never your own. Every report goes to the Club&apos;s
+                Moderators, who see it in the Reported list on the Manage tab. A report alone hides nothing: a hidden post&apos;s
+                backing counts for nothing, so only a Moderator (or the Owner) can hide one, and the points a hide removes are published after the epoch.
               </p>
-              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A moderator then restores it or deletes it.</p>
+              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>The moderator then hides it, deletes it, or dismisses the reports.</p>
             </div>
           </div>
           <div className={`${CARD} mt-4 p-5 sm:p-6`}>

@@ -1,6 +1,6 @@
 # ADR 0037: The most active Holders are paid, not the biggest
 
-**Status:** Accepted · 2026-10-07 · Web only: no contract change. Amends [ADR 0029](0029-top-holders-and-posts-only-bonus.md) (who is among the paid 10) and the "ranking is by shares" lines of [ADR 0032](0032-live-standings-active-days-and-replies.md) and [ADR 0034](0034-swaps-count-in-the-holder-bonus.md). The spec is [09 · Clubs](../09-clubs.md#rewards).
+**Status:** Accepted · 2026-10-07 · Amended by [ADR 0040](0040-points-floor-held-average-public-backing.md): the 10 paid places became a points floor (every Holder with 10+ points is paid), because seats made rings and split accounts worth building. Web only: no contract change. Amends [ADR 0029](0029-top-holders-and-posts-only-bonus.md) (who is among the paid 10) and the "ranking is by shares" lines of [ADR 0032](0032-live-standings-active-days-and-replies.md) and [ADR 0034](0034-swaps-count-in-the-holder-bonus.md). The spec is [09 · Clubs](../09-clubs.md#rewards).
 
 ## Context
 

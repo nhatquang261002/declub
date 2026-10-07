@@ -7,7 +7,7 @@ import { CheckIcon, ShieldIcon, SwapIcon, WalletIcon } from "@/components/Icons"
 import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { NETWORK } from "@/lib/network";
-import { REWARDS, percent } from "@/lib/rewards";
+import { PROTOCOL, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
 import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, type GuideSection } from "./parts";
 
@@ -156,7 +156,7 @@ const FEES = [
   "Only charged when a deal completes. Cancel, expire, reject or withdraw, and nobody pays.",
   "The exact amount is on screen before you confirm.",
   "It can be cut at any time, but a raise takes a week's notice, and never goes past a cap set at launch.",
-  `When a swap includes a verified Club's asset, ${percent(REWARDS.holderBps)} of the fee goes each week to that Club's ${REWARDS.maxHolders} most active Holders and ${percent(REWARDS.fundBps)} to its Club fund. The protocol keeps the rest.`,
+  `When a swap includes a verified Club's asset, ${percent(PROTOCOL.holderBps)} of the fee goes each week to that Club's active Holders and ${percent(PROTOCOL.fundBps)} to its Club fund. The protocol keeps the rest.`,
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [

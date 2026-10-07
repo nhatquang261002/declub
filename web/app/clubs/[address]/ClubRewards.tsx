@@ -13,11 +13,12 @@ import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useSponsorInfo } from "@/hooks/useSponsorFlow";
-import { useClubRewards } from "@/hooks/useRewards";
+import { useClubRewards, useClubStandings } from "@/hooks/useRewards";
 import { formatMon, shortAddress } from "@/lib/format";
 import { recapLink } from "@/lib/recap";
-import { REWARDS, percent, type PublishedSponsor } from "@/lib/rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, percent, type PublishedSponsor } from "@/lib/rewards";
 import { LiveStandings } from "./LiveStandings";
+import { pts } from "./PointsMeter";
 import { Empty, Loading, Panel } from "./parts";
 
 const wei = (s: string | undefined) => BigInt(s ?? "0");
@@ -27,7 +28,8 @@ function names(sponsors: readonly PublishedSponsor[] | undefined): string[] {
   // A name is free text, so a wallet that paid is shown with it: the wallet is what the chain vouches for.
   return (sponsors ?? []).map((s) => `${s.sponsor}${s.kind === "owner" ? " (Owner)" : ""}${s.by ? ` · ${shortAddress(s.by)}` : ""}`);
 }
-const sponsoredBy = (list: string[]) => (list.length === 0 ? "" : list.length === 1 ? list[0]! : list.length === 2 ? `${list[0]} and ${list[1]}` : `${list[0]}, ${list[1]} and ${list.length - 2} more`);
+const sponsoredBy = (list: string[]) =>
+  list.length === 0 ? "" : list.length === 1 ? list[0]! : list.length === 2 ? `${list[0]} and ${list[1]}` : `${list[0]}, ${list[1]} and ${list.length - 2} more`;
 
 type View = "overview" | "history";
 const VIEWS = [
@@ -89,27 +91,12 @@ type Data = ReturnType<typeof useClubRewards>["data"];
 
 /** The running epoch and what you can claim. */
 function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; token: string; symbol: string; wallet?: string; isOwner: boolean; now: number }) {
+  // The same read as the live standings (one request): the Club's own rules are what the copy states.
+  const { standings } = useClubStandings(token, wallet);
+  const rules = standings?.rules ?? DEFAULT_CLUB_RULES;
   return (
     <>
-      <Panel
-        title="How this Club earns"
-        action={
-          <Link href="/guide/clubs#rewards" className="text-xs font-semibold underline underline-offset-2">
-            How rewards work
-          </Link>
-        }
-      >
-        <p className="max-w-3xl text-sm">
-          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(REWARDS.holderBps)}</strong> of it goes to the Club’s {REWARDS.maxHolders} most active Holders, split by
-          the NFTs they hold, and <strong>{percent(REWARDS.fundBps)}</strong> to the Club fund, which the Owner claims. Posting, sharing on X and swapping earn you a place, and raise your share by up to{" "}
-          {percent(REWARDS.maxBonusBps)}. Hold an NFT and take part to be paid.
-        </p>
-        {data?.open && (
-          <p className="mt-3 max-w-3xl rounded-md bg-[#111318]/5 px-3 py-2 text-sm">
-            <strong>Epoch {data.open.n} is sponsored:</strong> {formatMon(wei(data.open.sponsored))} added to the Holder pool by {sponsoredBy(names(data.open.sponsors))}, on top of the swap fees.
-          </p>
-        )}
-      </Panel>
+      <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} sponsoredBy={data?.open ? sponsoredBy(names(data.open.sponsors)) || undefined : undefined} />
 
       <Panel title={wallet ? "Your share" : "Your share (join to earn)"}>
         <RewardsClaim account={wallet as Address | undefined} club={token} />
@@ -121,7 +108,22 @@ function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; t
         )}
       </Panel>
 
-      <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} />
+      <Panel
+        title="How this Club earns"
+        action={
+          <Link href="/guide/clubs#rewards" className="text-xs font-semibold underline underline-offset-2">
+            How rewards work
+          </Link>
+        }
+      >
+        <p className="max-w-3xl text-sm">
+          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(PROTOCOL.holderBps)}</strong> of it goes to every Holder with at least{" "}
+          {rules.minPoints} points that week, split by the NFTs they held (on average over the week), and <strong>{percent(PROTOCOL.fundBps)}</strong> to the Club fund, which the Owner claims. Most points come from other people
+          backing your posts and replies with their likes and answers: the Club’s Holders weigh most, and any verified account, even from another Club, adds a little.
+          Posting, replying and liking, sharing on X and swapping add a little more. A Holder below {rules.minPoints} points isn’t paid that week,
+          and {rules.fullBonusPoints} points raise your share by up to {percent(PROTOCOL.maxBonusBps)}.
+        </p>
+      </Panel>
     </>
   );
 }
@@ -136,8 +138,7 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
   if (!data?.enabled || data.epochs.length === 0) {
     return (
       <Empty title="No epoch paid out yet">
-        The first rewards land when an epoch closes after swaps in {symbol}.
-        {rolling > 0n && ` ${formatMon(rolling)} is already waiting to roll in.`}
+        The first rewards land when an epoch closes after swaps in {symbol}.{rolling > 0n && ` ${formatMon(rolling)} is already waiting to roll in.`}
       </Empty>
     );
   }
@@ -156,7 +157,7 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
 
       <Panel title="Share the week">
         <p className="text-sm">
-          Post this week’s numbers on X, then paste that post on the Board. It counts as your own X post about the Club (one a day), so it adds to your Holder bonus.
+          Post this week’s numbers on X, then paste that post on the Board. It counts as your own X post about the Club (one a day), so it adds to your points.
         </p>
         <button type="button" className="btn-secondary mt-3 inline-flex items-center gap-2" onClick={() => setShareOpen(true)}>
           <XLogoIcon className="size-3.5" />
@@ -193,7 +194,7 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
                 <span className="min-w-0 flex-1">
                   <Who address={e.account} />
                 </span>
-                {e.kind === "holder" && e.bonusBps !== undefined && e.bonusBps > 0 && <span className="chip chip-peach">+{percent(e.bonusBps)} bonus</span>}
+                {e.kind === "holder" && e.points !== undefined && <span className="chip chip-peach">{pts(e.points)}</span>}
                 {e.kind === "fund" && (
                   <span className="chip chip-dark">
                     <CrownIcon />

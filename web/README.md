@@ -77,3 +77,11 @@ See [docs/09-clubs.md](../docs/09-clubs.md) for Club behavior,
 
 Schedule `GET /api/cron/fills` with `CRON_SECRET` so fills and Club activity
 are recorded even when the app did not observe the transaction.
+
+Club Rewards also needs `GET /api/cron/holdings` and `GET /api/cron/close` once a
+day each with the same `CRON_SECRET` (`web/vercel.json` schedules them on
+Vercel). The first samples each Club's members' NFTs so the Holder pool counts
+holdings averaged over the week, not just at close; the second freezes the
+epoch's inputs just after it ends, so later deletes and hides can't change its
+points ([ADR 0040](../docs/adr/0040-points-floor-held-average-public-backing.md)).
+Without them the build samples and freezes at build time, as before.

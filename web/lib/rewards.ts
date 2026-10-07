@@ -9,11 +9,13 @@ import { strengthFactor, type SignalStrength } from "./xPosts";
  * Club's swaps paid goes back to the Club. Pure, so the builder, the routes, the screens and the
  * Guide share one set of numbers.
  */
-export const REWARDS = {
-  /** Of the fees a Club's swaps paid, in basis points: to its most active Holders, by holdings and activity. */
+/**
+ * Rules no Club's Owner can change, because they cross Clubs or the contract fixes them: how the
+ * fees are split, the bonus caps, and the base voice (ADR 0039).
+ */
+export const PROTOCOL = {
+  /** Of the fees a Club's swaps paid, in basis points: to its Holders, by holdings and activity. */
   holderBps: 5_000,
-  /** Only a Club's most active Holders share the Holder pool (ADR 0037): fewer claims, and you have to hold and take part. */
-  maxHolders: 10,
   /** To the Club fund, which the Club's Owner claims. */
   fundBps: 2_500,
   /** What the protocol keeps. The three add up to 10,000. */
@@ -23,24 +25,17 @@ export const REWARDS = {
    * their activity in the Club during the epoch. Holding stays the base: a quiet Holder keeps theirs.
    */
   maxBonusBps: 5_000,
-  /** Activity points that earn the whole bonus: a week of posting on the Board every day and sharing an own X post each day. */
-  fullBonusPoints: 35,
-  /** Points per active day (ADR 0032): a UTC day with a visible Board post by the member in the Club. */
-  dayPoints: 2,
-  /** An epoch with at least this many active days keeps a member's streak going. */
-  streakMinDays: 3,
-  /** The streak bonus (basis points) per qualifying epoch in a row after the first. */
-  streakStepBps: 250,
   /** At most this much streak bonus, on top of `maxBonusBps`. */
   maxStreakBps: 1_000,
   /**
-   * Points per completed swap with a counterparty who isn't the member's own wallet (ADR 0034). A
-   * swap with a wallet the member already swapped with in the epoch within `MOMENTUM.washDays`
-   * counts `MOMENTUM.washFactor` of it.
+   * The base voice (ADR 0039): every verified account (a shared X or Discord profile, linked at
+   * least `verifiedDays` before the epoch ends) has this much a week, Holder or not, shared over the
+   * likes and replies they gave in every Club. A Holder's NFT voice stays in their own Club.
    */
-  swapPoints: 2,
-  /** At most this many swap points per member per Club per epoch, so trading can't carry the bonus (7 full swaps). */
-  swapCapPerEpoch: 14,
+  baseVoice: 3,
+  verifiedDays: 7,
+  /** At most this many of a member's points an epoch come from base voices. */
+  baseCapPerReceiver: 10,
   /** Points per counted X share (halved when it's only weakly about the Club): Momentum's weight. */
   xShareBase: MOMENTUM.xShareWeight,
   /** Points per doubling of an X share's engagement (likes + reposts + quotes + replies). */
@@ -48,6 +43,85 @@ export const REWARDS = {
   /** At most this many reach points per member per Club per epoch, so a viral post can't take it all. */
   reachCapPerEpoch: 30,
 } as const;
+
+/**
+ * The thresholds a Club's Owner may set (ADR 0040), as data so the scoring code reads them from the
+ * Club and not from constants. `DEFAULT_CLUB_RULES` is what every Club uses until its Owner changes
+ * them, and `rulesFor` (lib/server/clubRules.ts) is the only place they come from.
+ */
+export type ClubRules = {
+  /** Every Holder with at least this many activity points is paid (ADR 0040). */
+  minPoints: number;
+  /** Activity points that earn the whole bonus. Most come from others' backing (ADR 0038, ADR 0039). */
+  fullBonusPoints: number;
+  /** Points per active day (ADR 0038): a UTC day with a visible post, a reply, or a like on another member's post in the Club. */
+  dayPoints: number;
+  /**
+   * Backing (ADR 0038): each Holder's weekly voice is `voicePerNft` per NFT held (on average over
+   * the week, ADR 0040), counting at most `voiceCapNfts`, shared over the likes and replies they gave
+   * in the epoch. Unused voice is lost.
+   */
+  voicePerNft: number;
+  voiceCapNfts: number;
+  /** How a voice is shared: a like, a reply, and the first reply on a post from anyone but its author. */
+  likeWeight: number;
+  replyWeight: number;
+  firstReplyWeight: number;
+  /** Two members who backed each other in an epoch: each direction counts this much. */
+  mutualFactor: number;
+  /**
+   * Points per completed swap with a counterparty who isn't the member's own wallet (ADR 0034). A
+   * swap with a wallet the member already swapped with in the epoch within `MOMENTUM.washDays`
+   * counts `MOMENTUM.washFactor` of it.
+   */
+  swapPoints: number;
+  /** At most this many swap points per member per Club per epoch, so trading can't carry the bonus (7 full swaps). */
+  swapCapPerEpoch: number;
+  /** An epoch with at least this many active days keeps a member's streak going. */
+  streakMinDays: number;
+  /** The streak bonus (basis points) per qualifying epoch in a row after the first. */
+  streakStepBps: number;
+};
+
+export const DEFAULT_CLUB_RULES: ClubRules = {
+  minPoints: 10,
+  fullBonusPoints: 35,
+  dayPoints: 1,
+  voicePerNft: 10,
+  voiceCapNfts: 5,
+  likeWeight: 1,
+  replyWeight: 2,
+  firstReplyWeight: 4,
+  mutualFactor: 0.5,
+  swapPoints: 2,
+  swapCapPerEpoch: 14,
+  streakMinDays: 3,
+  streakStepBps: 250,
+};
+
+/** The range each rule may take when an Owner sets it: `[least, most]`. */
+export const CLUB_RULE_BOUNDS: Record<keyof ClubRules, readonly [number, number]> = {
+  minPoints: [1, 100],
+  fullBonusPoints: [5, 200],
+  dayPoints: [0, 5],
+  voicePerNft: [1, 50],
+  voiceCapNfts: [1, 20],
+  likeWeight: [1, 10],
+  replyWeight: [1, 10],
+  firstReplyWeight: [1, 20],
+  mutualFactor: [0, 1],
+  swapPoints: [0, 10],
+  swapCapPerEpoch: [0, 50],
+  streakMinDays: [1, 7],
+  streakStepBps: [0, 500],
+};
+
+/**
+ * Club Rewards (ADR 0022, docs/09-clubs.md#rewards): each epoch, a share of the protocol fees a
+ * Club's swaps paid goes back to the Club. Pure, so the builder, the routes, the screens and the
+ * Guide share one set of numbers. `REWARDS` is the protocol rules with the default Club rules.
+ */
+export const REWARDS = { ...PROTOCOL, ...DEFAULT_CLUB_RULES } as const;
 
 export const percent = (bps: number) => `${bps / 100}%`;
 
@@ -141,17 +215,25 @@ export const SPONSOR_MIN_WEI = 10n ** 17n;
 export const sponsorMessage = (club: string, tx: string, name: string) =>
   `DeClub sponsorship\nClub: ${club.toLowerCase()}\nPayment: ${tx.toLowerCase()}\nName: ${name}`;
 
-export type Activity = { x: number; days: number; swaps: number; points: number; bonusBps: number };
+export type Activity = { x: number; days: number; swaps: number; backed: number; points: number; bonusBps: number };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * A member's activity in a Club over an epoch: their active days on the Board, each worth
- * `dayPoints` (ADR 0032), their own X shares, each worth `xShareBase` and its reach, and their
- * completed swaps (`swapPoints`, ADR 0034). At most 7 active days count. The reach read has the last
- * word on an X share: one that was deleted, or edited so it's no longer about the Club, counts for nothing.
+ * A member's activity in a Club over an epoch: the backing others gave them (`backingPoints`,
+ * ADR 0038), their active days, each worth `dayPoints`, their own X shares, each worth `xShareBase`
+ * and its reach, and their completed swaps (`swapPoints`, ADR 0034). At most 7 active days count.
+ * The reach read has the last word on an X share: one that was deleted, or edited so it's no longer
+ * about the Club, counts for nothing.
  */
-export function activityPoints(events: readonly ActivityEvent[], reach: ReachRecord | null, wallets: readonly string[], days = 0): Activity {
+export function activityPoints(
+  events: readonly ActivityEvent[],
+  reach: ReachRecord | null,
+  wallets: readonly string[],
+  days = 0,
+  backed = 0,
+  rules: ClubRules = DEFAULT_CLUB_RULES,
+): Activity {
   const own = new Set(wallets.map((w) => w.toLowerCase()));
   let base = 0;
   let reached = 0;
@@ -159,14 +241,72 @@ export function activityPoints(events: readonly ActivityEvent[], reach: ReachRec
     if (e.kind !== "xshare" || !own.has(e.parties[0] ?? "")) continue;
     const read = reach?.available ? reach.posts[e.deal] : undefined;
     const factor = read ? (read.ok ? strengthFactor(read.strength) : 0) : (e.weight ?? 1);
-    base += REWARDS.xShareBase * factor;
-    if (read?.ok) reached += REWARDS.reachWeight * Math.log2(1 + read.engagement) * factor;
+    base += PROTOCOL.xShareBase * factor;
+    if (read?.ok) reached += PROTOCOL.reachWeight * Math.log2(1 + read.engagement) * factor;
   }
-  const x = base + Math.min(REWARDS.reachCapPerEpoch, reached);
-  const swaps = swapActivity(events, own);
+  const x = base + Math.min(PROTOCOL.reachCapPerEpoch, reached);
+  const swaps = swapActivity(events, own, rules);
   const active = Math.max(0, Math.min(7, Math.floor(days)));
-  const points = x + swaps + active * REWARDS.dayPoints;
-  return { x: round2(x), days: active, swaps: round2(swaps), points: round2(points), bonusBps: bonusBps(points) };
+  const support = Math.max(0, backed);
+  const points = x + swaps + active * rules.dayPoints + support;
+  return { x: round2(x), days: active, swaps: round2(swaps), backed: round2(support), points: round2(points), bonusBps: bonusBps(points, rules) };
+}
+
+/** One like or reply a member gave another in a Club's epoch (ADR 0038), by user id. */
+export type BackingAction = { giver: string; receiver: string; kind: "like" | "reply" | "first" };
+
+/** A Holder's weekly voice in their own Club: `voicePerNft` per NFT, counting at most `voiceCapNfts`. */
+export const voiceOf = (shares: bigint | number, rules: ClubRules = DEFAULT_CLUB_RULES) =>
+  rules.voicePerNft * Math.min(rules.voiceCapNfts, Math.max(0, Number(shares)));
+
+/** What one like or reply weighs when a voice is shared out. */
+export const backingWeight = (kind: BackingAction["kind"], rules: ClubRules = DEFAULT_CLUB_RULES) =>
+  kind === "like" ? rules.likeWeight : kind === "reply" ? rules.replyWeight : rules.firstReplyWeight;
+
+/**
+ * A giver's voices for one Club (ADR 0039): `club`, their NFT voice there (`voiceOf`), shared over
+ * what they gave in this Club; `base`, their base voice, shared over what they gave in every Club, of
+ * which `given` is the total weight (this Club's when absent).
+ */
+export type Voice = { club: number; base: number; given?: number };
+
+/**
+ * What each member received from other members' voices (ADR 0038, ADR 0039). Each giver's NFT
+ * voice is shared over what they gave in this Club, by weight; their base voice over what they gave
+ * everywhere, so a like in one of twenty Clubs carries a twentieth of it. Actions on oneself carry
+ * nothing; two members who both have a voice and backed each other get `mutualFactor` of it each
+ * way; and at most `baseCapPerReceiver` of a member's points come from base voices. Gives, by user
+ * id, the points, how many gave them any, and how much of it came from base voices.
+ */
+export function backingPoints(actions: readonly BackingAction[], voices: ReadonlyMap<string, Voice>, rules: ClubRules = DEFAULT_CLUB_RULES): Map<string, { points: number; backers: number; base: number }> {
+  const given = actions.filter((a) => a.giver !== a.receiver);
+  const has = (user: string) => {
+    const v = voices.get(user);
+    return !!v && (v.club > 0 || v.base > 0);
+  };
+  // Only backing that carries a voice makes a pair: a like back from someone with none trades nothing.
+  const pairs = new Set(given.filter((a) => has(a.giver)).map((a) => `${a.giver}\n${a.receiver}`));
+  const totals = new Map<string, number>();
+  for (const a of given) totals.set(a.giver, (totals.get(a.giver) ?? 0) + backingWeight(a.kind, rules));
+  const out = new Map<string, { club: number; base: number; backers: Set<string> }>();
+  for (const a of given) {
+    const voice = voices.get(a.giver);
+    if (!voice || !has(a.giver)) continue;
+    const part = (backingWeight(a.kind, rules) * (pairs.has(`${a.receiver}\n${a.giver}`) ? rules.mutualFactor : 1)) / totals.get(a.giver)!;
+    // The base voice is shared over everything the giver gave, in every Club; never less than here.
+    const everywhere = Math.max(voice.given ?? 0, totals.get(a.giver)!) / totals.get(a.giver)!;
+    const entry = out.get(a.receiver) ?? { club: 0, base: 0, backers: new Set<string>() };
+    entry.club += voice.club * part;
+    entry.base += (voice.base * part) / everywhere;
+    entry.backers.add(a.giver);
+    out.set(a.receiver, entry);
+  }
+  return new Map(
+    [...out].map(([user, { club, base, backers }]) => {
+      const capped = Math.min(PROTOCOL.baseCapPerReceiver, base);
+      return [user, { points: round2(club + capped), backers: backers.size, base: round2(capped) }];
+    }),
+  );
 }
 
 /**
@@ -175,7 +315,7 @@ export function activityPoints(events: readonly ActivityEvent[], reach: ReachRec
  * counterparty within `MOMENTUM.washDays` counts `MOMENTUM.washFactor` of a swap, as in Momentum,
  * and the total is capped at `swapCapPerEpoch`.
  */
-function swapActivity(events: readonly ActivityEvent[], own: ReadonlySet<string>): number {
+function swapActivity(events: readonly ActivityEvent[], own: ReadonlySet<string>, rules: ClubRules): number {
   const swaps = events.filter((e) => e.kind === "swapped" && e.parties.some((p) => own.has(p.toLowerCase()))).sort((a, b) => a.at - b.at);
   const lastWith = new Map<string, number>();
   let points = 0;
@@ -187,24 +327,24 @@ function swapActivity(events: readonly ActivityEvent[], own: ReadonlySet<string>
       return previous !== undefined && e.at - previous <= MOMENTUM.washDays * DAY;
     });
     for (const o of others) lastWith.set(o, e.at);
-    points += REWARDS.swapPoints * (repeat ? MOMENTUM.washFactor : 1);
+    points += rules.swapPoints * (repeat ? MOMENTUM.washFactor : 1);
   }
-  return Math.min(REWARDS.swapCapPerEpoch, points);
+  return Math.min(rules.swapCapPerEpoch, points);
 }
 
 /** The bonus for `points`, in basis points: linear up to `fullBonusPoints`, then capped. */
-export const bonusBps = (points: number) =>
-  points <= 0 ? 0 : Math.floor(REWARDS.maxBonusBps * Math.min(1, points / REWARDS.fullBonusPoints));
+export const bonusBps = (points: number, rules: ClubRules = DEFAULT_CLUB_RULES) =>
+  points <= 0 ? 0 : Math.floor(PROTOCOL.maxBonusBps * Math.min(1, points / rules.fullBonusPoints));
 
 /**
  * The streak bonus for `streak` qualifying epochs in a row, this one included (ADR 0032): nothing
  * for the first, then `streakStepBps` more each epoch, up to `maxStreakBps`.
  */
-export const streakBps = (streak: number) =>
-  streak <= 1 ? 0 : Math.min(REWARDS.maxStreakBps, REWARDS.streakStepBps * (Math.floor(streak) - 1));
+export const streakBps = (streak: number, rules: ClubRules = DEFAULT_CLUB_RULES) =>
+  streak <= 1 ? 0 : Math.min(PROTOCOL.maxStreakBps, rules.streakStepBps * (Math.floor(streak) - 1));
 
 /** Whether an epoch with `days` active days keeps a streak going. */
-export const qualifies = (days: number) => days >= REWARDS.streakMinDays;
+export const qualifies = (days: number, rules: ClubRules = DEFAULT_CLUB_RULES) => days >= rules.streakMinDays;
 
 /** One Club's inputs to an epoch. Amounts are wei. */
 export type ClubInput = {
@@ -223,13 +363,33 @@ export type ClubInput = {
   holders: Holder[];
   /** Where the Club fund goes, or null with no Owner. */
   owner: string | null;
+  /** The Club's rules for this epoch (ADR 0040). The defaults when absent. */
+  rules?: ClubRules;
+  /** How many daily holdings samples the epoch's `held` totals add up (ADR 0040), not counting the read at close. */
+  samples?: number;
 };
 
 /**
  * One Holder member. `bonusBps` is the activity bonus and `streak` the qualifying epochs in a row;
  * `points` and `days` say how the bonus was earned.
  */
-export type Holder = { wallet: string; shares: bigint; bonusBps?: number; points?: number; days?: number; streak?: number; joinedAt?: number };
+export type Holder = {
+  wallet: string;
+  /** NFTs held when the epoch was built: being paid needs at least one. */
+  shares: bigint;
+  /**
+   * The NFTs held on every sampled day plus at close, added up (ADR 0040). Every Holder in a Club has
+   * the same number of samples, so this is what the Holder pool is split by, in place of `shares`.
+   */
+  held?: bigint;
+  bonusBps?: number;
+  points?: number;
+  days?: number;
+  streak?: number;
+  joinedAt?: number;
+  /** Of `points`, from others' backing (ADR 0038). */
+  backed?: number;
+};
 
 /** A holder payout also says how it was worked out: the shares held and the bonus they earned. */
 export type Payout = {
@@ -237,11 +397,15 @@ export type Payout = {
   kind: "holder" | "fund";
   amount: bigint;
   shares?: bigint;
+  /** The NFTs held on average over the epoch (ADR 0040), 2 decimals: what the share of the pool is worked out from. */
+  held?: number;
   /** The whole bonus: activity plus streak. */
   bonusBps?: number;
   points?: number;
   days?: number;
   streak?: number;
+  /** Of `points`, from others' backing: published, because likes aren't signed (ADR 0038). */
+  backed?: number;
 };
 
 export type ClubSplit = {
@@ -256,21 +420,24 @@ export type ClubSplit = {
   /** Rolls into the next epoch: no Holders or no Owner, plus rounding dust. */
   carry: { holders: bigint; fund: bigint };
   holderCount: number;
+  /** The rules the split used, and how many holdings samples went into `held`. */
+  rules: ClubRules;
+  samples: number;
   payouts: (Payout & { wallet: string })[];
 };
 
 /** A Club's pools for an epoch: its share of the fees, whatever rolled in, and what sponsors added to the Holder pool. */
 export function pools(fees: bigint, carried: { holders: bigint; fund: bigint }, sponsored = 0n) {
   return {
-    holderPool: (fees * BigInt(REWARDS.holderBps)) / 10_000n + carried.holders + sponsored,
-    fundPool: (fees * BigInt(REWARDS.fundBps)) / 10_000n + carried.fund,
+    holderPool: (fees * BigInt(PROTOCOL.holderBps)) / 10_000n + carried.holders + sponsored,
+    fundPool: (fees * BigInt(PROTOCOL.fundBps)) / 10_000n + carried.fund,
   };
 }
 
 /**
- * Holders in the order the Holder pool reads them (ADR 0037): most activity points first, then the
- * bigger holding, the earlier member, the lower wallet, so a rebuild gives the same order.
- * Zero-share members are left out. A Holder with no points is ranked but never paid: `paidPlaces`.
+ * Holders in the leaderboard order (ADR 0037): most activity points first, then the bigger holding,
+ * the earlier member, the lower wallet, so a rebuild gives the same order. Zero-share members are
+ * left out. A Holder below the floor is ranked but not paid: `paidPlaces` (ADR 0040).
  */
 export function rankHolders<H extends Holder>(holders: readonly H[]): H[] {
   return holders
@@ -284,45 +451,40 @@ export function rankHolders<H extends Holder>(holders: readonly H[]): H[] {
     );
 }
 
-/** The Holders the pool pays: the `maxHolders` most active of those ranked, and only with some activity. */
-export function paidPlaces<H extends Holder>(ranked: readonly H[]): H[] {
-  return ranked.filter((h) => (h.points ?? 0) > 0).slice(0, REWARDS.maxHolders);
+/** The Holders the pool pays (ADR 0040): every one of those ranked with at least `rules.minPoints`. */
+export function paidPlaces<H extends Holder>(ranked: readonly H[], rules: ClubRules = DEFAULT_CLUB_RULES): H[] {
+  return ranked.filter((h) => (h.points ?? 0) >= rules.minPoints);
 }
 
 /**
- * How many more activity points `wallet` needs to be among the paid Holders: 0 when it already is,
- * null when it isn't ranked at all (it holds nothing). With fewer than `maxHolders` active Holders
- * any activity is enough, so the answer is the smallest step a point can make.
+ * How many more activity points `wallet` needs to be paid: 0 when it already is, null when it isn't
+ * ranked at all (it holds nothing). The floor is a number, not a place, so what others do doesn't move it.
  */
-export function entryGap(ranked: readonly Holder[], wallet: string): number | null {
-  const at = ranked.findIndex((h) => h.wallet.toLowerCase() === wallet.toLowerCase());
-  if (at < 0) return null;
-  const me = ranked[at]!;
-  const paid = paidPlaces(ranked);
-  if (paid.includes(me)) return 0;
-  if (paid.length < REWARDS.maxHolders) return 0.01;
-  const last = paid[paid.length - 1]!;
-  const winsTie = rankHolders([{ ...me, points: last.points }, last])[0] !== last;
-  return Number((Math.max(0, (last.points ?? 0) - (me.points ?? 0)) + (winsTie ? 0 : 0.01)).toFixed(2));
+export function entryGap(ranked: readonly Holder[], wallet: string, rules: ClubRules = DEFAULT_CLUB_RULES): number | null {
+  const me = ranked.find((h) => h.wallet.toLowerCase() === wallet.toLowerCase());
+  if (!me) return null;
+  return Number(Math.max(0, rules.minPoints - (me.points ?? 0)).toFixed(2));
 }
 
 /** A Holder's whole bonus in basis points: activity (capped at `maxBonusBps`) plus streak. */
-export function totalBonusBps(h: Pick<Holder, "bonusBps" | "streak">): number {
-  const activity = Math.min(REWARDS.maxBonusBps, Math.max(0, Math.floor(h.bonusBps ?? 0)));
-  return activity + streakBps(h.streak ?? 0);
+export function totalBonusBps(h: Pick<Holder, "bonusBps" | "streak">, rules: ClubRules = DEFAULT_CLUB_RULES): number {
+  const activity = Math.min(PROTOCOL.maxBonusBps, Math.max(0, Math.floor(h.bonusBps ?? 0)));
+  return activity + streakBps(h.streak ?? 0, rules);
 }
 
 /**
- * Splits one Club's pools between its Holders and its Owner. Only the `maxHolders` most active
- * Holders are paid (`paidPlaces`: the top of `rankHolders`, with some activity). Among them a
- * Holder's weight is their shares times (1 + bonus): holding is the base, activity adds up to
- * `maxBonusBps` and a streak up to `maxStreakBps`. Integer wei throughout; rounding dust rolls into
- * the next epoch.
+ * Splits one Club's pools between its Holders and its Owner. Every Holder with at least
+ * `rules.minPoints` is paid (`paidPlaces`). Among them a Holder's weight is their NFTs, averaged over
+ * the week (`held`, or `shares` when none was sampled), times (1 + bonus): holding is the base,
+ * activity adds up to `maxBonusBps` and a streak up to `maxStreakBps`. Integer wei throughout;
+ * rounding dust rolls into the next epoch.
  */
 export function splitClub(input: ClubInput): ClubSplit {
+  const rules = input.rules ?? DEFAULT_CLUB_RULES;
+  const samples = input.samples ?? 0;
   const { holderPool, fundPool } = pools(input.fees, input.carried, input.sponsored ?? 0n);
-  const holders = paidPlaces(rankHolders(input.holders));
-  const weightOf = (h: Holder) => h.shares * BigInt(10_000 + totalBonusBps(h));
+  const holders = paidPlaces(rankHolders(input.holders), rules);
+  const weightOf = (h: Holder) => (h.held ?? h.shares) * BigInt(10_000 + totalBonusBps(h, rules));
   const totalWeight = holders.reduce((sum, h) => sum + weightOf(h), 0n);
   const payouts: ClubSplit["payouts"] = [];
 
@@ -337,10 +499,12 @@ export function splitClub(input: ClubInput): ClubSplit {
         wallet: h.wallet.toLowerCase(),
         amount,
         shares: h.shares,
-        bonusBps: totalBonusBps(h),
+        ...(h.held !== undefined ? { held: averageHeld(h.held, samples) } : {}),
+        bonusBps: totalBonusBps(h, rules),
         ...(h.points !== undefined ? { points: h.points } : {}),
         ...(h.days !== undefined ? { days: h.days } : {}),
         ...(h.streak !== undefined ? { streak: h.streak } : {}),
+        ...(h.backed !== undefined ? { backed: h.backed } : {}),
       });
       paidHolders += amount;
     }
@@ -358,9 +522,14 @@ export function splitClub(input: ClubInput): ClubSplit {
     paidFund,
     carry: { holders: holderPool - paidHolders, fund: fundPool - paidFund },
     holderCount: holders.length,
+    rules,
+    samples,
     payouts,
   };
 }
+
+/** The NFTs held on average (ADR 0040): `held` adds up `samples` daily reads and the one at close. */
+export const averageHeld = (held: bigint, samples: number) => round2(Number(held) / (samples + 1));
 
 /** One account's leaf: everything it earned this epoch, across Clubs, with the breakdown. */
 export type Leaf = { account: Address; amount: bigint; breakdown: Payout[] };
@@ -372,15 +541,17 @@ export function leavesOf(splits: readonly ClubSplit[]): Leaf[] {
     for (const p of split.payouts) {
       const leaf = byWallet.get(p.wallet) ?? { account: getAddress(p.wallet), amount: 0n, breakdown: [] };
       leaf.amount += p.amount;
-      const { club, kind, amount, shares, points, days, streak } = p;
+      const { club, kind, amount, shares, held, points, days, streak, backed } = p;
       leaf.breakdown.push({
         club,
         kind,
         amount,
         ...(shares !== undefined ? { shares, bonusBps: p.bonusBps } : {}),
+        ...(held !== undefined ? { held } : {}),
         ...(points !== undefined ? { points } : {}),
         ...(days !== undefined ? { days } : {}),
         ...(streak !== undefined ? { streak } : {}),
+        ...(backed !== undefined ? { backed } : {}),
       });
       byWallet.set(p.wallet, leaf);
     }
@@ -413,6 +584,12 @@ export type EpochRecord = {
     paidFund: string;
     carry: { holders: string; fund: string };
     holderCount: number;
+    /** The rules this Club's epoch was worked out with (ADR 0040); absent in epochs built before. */
+    rules?: ClubRules;
+    /** How many daily holdings samples the average NFTs (`held`) are over, plus the read at close. */
+    samples?: number;
+    /** Unix seconds this Club's inputs were frozen (ADR 0040): later likes taken back, deletes and hides don't count. */
+    closedAt?: number;
   }[];
   leaves: { account: Address; amount: string; proof: Hex[]; breakdown: PublishedPayout[] }[];
   /** The X reach the Holder bonus used (ADR 0024), or null when none was read. */
@@ -420,7 +597,7 @@ export type EpochRecord = {
 };
 
 /** A payout as published: amounts as decimal strings. */
-export type PublishedPayout = { club: string; kind: Payout["kind"]; amount: string; shares?: string; bonusBps?: number; points?: number; days?: number; streak?: number };
+export type PublishedPayout = { club: string; kind: Payout["kind"]; amount: string; shares?: string; held?: number; bonusBps?: number; points?: number; days?: number; streak?: number; backed?: number };
 
 /** A claimable leaf as `/api/rewards/me` serves it. */
 export type ClaimableLeaf = {

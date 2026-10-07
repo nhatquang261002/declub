@@ -8,7 +8,7 @@ import { LogoMark, Wordmark } from "@/components/Logo";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 import { NETWORK } from "@/lib/network";
-import { REWARDS, percent } from "@/lib/rewards";
+import { PROTOCOL, percent } from "@/lib/rewards";
 
 const STEPS = [
   {
@@ -24,7 +24,7 @@ const STEPS = [
   {
     number: "03",
     title: "Own a share of the market",
-    body: `Each completed swap pays a small fee. Every week ${percent(REWARDS.holderBps)} of it goes back to the Club’s ${REWARDS.maxHolders} most active Holders and ${percent(REWARDS.fundBps)} to its Owner’s Club fund, paid in MON.`,
+    body: `Each completed swap pays a small fee. Every week ${percent(PROTOCOL.holderBps)} of it goes back to the Club’s active Holders and ${percent(PROTOCOL.fundBps)} to its Owner’s Club fund, paid in MON.`,
   },
 ];
 
@@ -65,7 +65,7 @@ export default function HomePage() {
           <DeClubArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>{percent(REWARDS.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
+          <div className="hero-stat"><strong>{percent(PROTOCOL.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
           <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
           <div className="hero-stat"><strong>Escrowed by a contract</strong><span>Assets move only in transactions or signatures you approve</span></div>
         </div>

@@ -8,7 +8,7 @@ import { CrossIcon } from "@/components/Icons";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useSponsorFlow, useSponsorInfo } from "@/hooks/useSponsorFlow";
 import { formatMon, parseMon } from "@/lib/format";
-import { REWARDS, SPONSOR_MIN_WEI, SPONSOR_NAME_MAX } from "@/lib/rewards";
+import { SPONSOR_MIN_WEI, SPONSOR_NAME_MAX } from "@/lib/rewards";
 
 /**
  * "Sponsor this epoch" (ADR 0036): pay MON to the rewards operator, who puts it in this Club's
@@ -93,7 +93,7 @@ export function SponsorEpoch({ token, symbol, isOwner, onClose }: { token: strin
           </button>
         </div>
         <p className="text-sm">
-          Add MON to {symbol}’s Holder pool for epoch {info.epoch}. It goes to the {REWARDS.maxHolders} most active Holders on top of the swap fees, split the same way, and none of it
+          Add MON to {symbol}’s Holder pool for epoch {info.epoch}. It goes to the Holders with enough points that week, on top of the swap fees, split the same way, and none of it
           goes to the protocol.
           {isOwner ? " As the Owner, it shows as your Club’s own top-up." : " Your name shows on the Club’s Rewards tab and in its weekly recap."} The MON is sent to the rewards
           operator, who funds the epoch with it; it can’t be refunded.

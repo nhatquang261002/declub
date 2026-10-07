@@ -5,7 +5,7 @@ import { checkProfileEdit, linkFor, parseLink } from "../lib/clubPosts";
 import type { ActivityEvent } from "../lib/clubs";
 import { MOMENTUM, memberScore, score } from "../lib/momentum";
 import { profileKey, userWalletsKey } from "../lib/profiles";
-import { REWARDS, activityPoints, bonusBps, splitClub, type ReachRecord } from "../lib/rewards";
+import { DEFAULT_CLUB_RULES, REWARDS, activityPoints, bonusBps, splitClub, type ReachRecord } from "../lib/rewards";
 import { createPost, deletePost, hidePost, reportPost, updateProfile, type Deps } from "../lib/server/board";
 import { clubEvents } from "../lib/server/clubs";
 import { loadProfile, saveRoles } from "../lib/server/clubState";
@@ -280,15 +280,19 @@ describe("X shares", () => {
     assert.equal((await readXShares(store, token)).length, 0);
   });
 
-  it("stops counting when reports hide the post", async () => {
+  it("keeps counting when members report the post, and stops when a moderator hides it (ADR 0040)", async () => {
     const store = memoryStore();
     await member(store, "m1", 1);
+    const owner = await member(store, "own", 5);
+    await saveRoles(store, token, { owner: "own", moderators: [] });
     for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) await member(store, u, n);
     const id = idAt(NOW - 60_000);
     const deps = baseDeps(xWorld({ [id]: { author: "alice_x", text: `gm ${NFT}` } }));
     const r = await share(store, "m1", id, deps);
     assert.ok(r.ok);
     for (const u of ["r1", "r2", "r3"]) await reportPost(store, club, u, r.post.id, deps);
+    assert.equal((await readXShares(store, token)).length, 1, "reports alone hide nothing");
+    await hidePost(store, club, owner, r.post.id, true, deps);
     assert.equal((await readXShares(store, token)).length, 0);
   });
 
@@ -454,7 +458,7 @@ describe("the Holder bonus", () => {
   it("counts a swap with another wallet, never one between the member's own wallets (ADR 0034)", () => {
     const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2), swapEvent(300, [wallet(1), wallet(3)], 3)];
     const a = activityPoints(events, null, [wallet(1)]);
-    assert.deepEqual(a, { x: 0, days: 0, swaps: 2 * REWARDS.swapPoints, points: 2 * REWARDS.swapPoints, bonusBps: bonusBps(2 * REWARDS.swapPoints) });
+    assert.deepEqual(a, { x: 0, days: 0, swaps: 2 * REWARDS.swapPoints, backed: 0, points: 2 * REWARDS.swapPoints, bonusBps: bonusBps(2 * REWARDS.swapPoints) });
     const mine = activityPoints([swapEvent(100, [wallet(1), wallet(4)], 1)], null, [wallet(1), wallet(4)]);
     assert.equal(mine.swaps, 0, "two wallets of the same member swapping earns nothing");
     assert.equal(activityPoints(events, null, [wallet(9)]).swaps, 0, "a swap the member isn't on earns nothing");
@@ -471,11 +475,16 @@ describe("the Holder bonus", () => {
     assert.equal(activityPoints(farm, null, [wallet(1)]).bonusBps, bonusBps(REWARDS.swapCapPerEpoch), "so trading alone is worth at most that bonus");
   });
 
-  it("adds active days, at most 7, and a daily poster who shares on X each day earns the whole bonus", () => {
-    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, swaps: 0, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
+  it("adds active days, at most 7, and backing; acting alone can't reach the whole bonus (ADR 0038)", () => {
+    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, swaps: 0, backed: 0, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
     assert.equal(activityPoints([], null, [wallet(1)], 12).days, 7);
     const week = Array.from({ length: 7 }, (_, i) => xEvent(100 + i, wallet(1), `t${i}`));
-    assert.equal(activityPoints(week, null, [wallet(1)], 7).bonusBps, REWARDS.maxBonusBps);
+    const alone = activityPoints(week, null, [wallet(1)], 7);
+    assert.ok(alone.bonusBps < REWARDS.maxBonusBps, "a post and an X share every day is not enough on its own");
+    const backed = activityPoints(week, null, [wallet(1)], 7, 12.5);
+    assert.equal(backed.backed, 12.5);
+    assert.equal(backed.points, alone.points + 12.5);
+    assert.equal(backed.bonusBps, REWARDS.maxBonusBps, "other Holders' backing takes it the rest of the way");
   });
 
   it("adds X shares: base points, reach on a log scale, capped per epoch", () => {
@@ -504,9 +513,9 @@ describe("the Holder bonus", () => {
       fees: 10_000n,
       carried: { holders: 1n, fund: 0n },
       holders: [
-        { wallet: wallet(1), shares: 1n, points: 2, bonusBps: 5_000 },
-        { wallet: wallet(2), shares: 1n, points: 1, bonusBps: 0 },
-        { wallet: wallet(3), shares: 2n, points: 3, bonusBps: 99_999 },
+        { wallet: wallet(1), shares: 1n, points: 12, bonusBps: 5_000 },
+        { wallet: wallet(2), shares: 1n, points: 11, bonusBps: 0 },
+        { wallet: wallet(3), shares: 2n, points: 13, bonusBps: 99_999 },
       ],
       owner: null,
     });
@@ -550,6 +559,8 @@ describe("the Holder bonus", () => {
       genesis: GENESIS,
       length: LENGTH,
       reach: async () => reach,
+      // A floor of one point: this test is about what the points turn into, not about being paid.
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
     });
     assert.equal(result.status, "built");
     const record = result.status === "built" ? result.record : null;

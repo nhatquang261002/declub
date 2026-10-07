@@ -16,6 +16,7 @@ import {
   ownershipCheck,
   pinPost,
   purgeClub,
+  listReported,
   reportPost,
   roleIn,
   setRole,
@@ -237,13 +238,23 @@ export function reportHandler(registry: Registry, deps: RouteDeps = {}) {
   };
 }
 
+/** GET /api/clubs/[token]/reported: the reported posts and replies, for the Manage tab. Staff only. */
+export function reportedHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function GET(request: Request, ctx: Ctx) {
+    const f = await front(registry, ctx, request, deps, "club-mod");
+    if (f instanceof Response) return f;
+    const reported = await listReported(f.store, f.entry, f.user.id, deps);
+    return reported ? json({ enabled: true, reported }) : refuse("forbidden");
+  };
+}
+
 /** POST (like) and DELETE (take it back) /api/clubs/[token]/posts/[id]/like */
 export function likeHandlers(registry: Registry, deps: RouteDeps = {}) {
   const act = (like: boolean) =>
     async function (request: Request, ctx: ItemCtx) {
       const f = await front(registry, ctx, request, deps, "club-like", 240);
       if (f instanceof Response) return f;
-      const result = await likePost(f.store, f.entry, f.user.id, (await ctx.params).id, like);
+      const result = await likePost(f.store, f.entry, f.user.id, (await ctx.params).id, like, deps);
       return result.ok ? json({ enabled: true, likes: result.likes }) : refuse(result.reason);
     };
   return { POST: act(true), DELETE: act(false) };

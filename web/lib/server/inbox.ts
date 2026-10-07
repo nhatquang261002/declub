@@ -1,6 +1,6 @@
 import type { Address } from "viem";
 import { formatMon } from "../format";
-import { REWARDS, entryGap } from "../rewards";
+import { DEFAULT_CLUB_RULES, PROTOCOL, entryGap } from "../rewards";
 import { registry as defaultRegistry, type ClubEntry, type Registry } from "../verifiedAssets";
 import type { StoredPost } from "../clubPosts";
 import { strengthFactor } from "../xPosts";
@@ -128,7 +128,7 @@ export async function clubInbox(store: Store, userId: string, wallets: readonly 
         kind: "club-xshare",
         at: share.at * 1000,
         title: `Your X post counted in ${club.name}`,
-        body: `+${REWARDS.xShareBase * strengthFactor(share.strength)} points toward your Holder bonus this epoch.`,
+        body: `+${PROTOCOL.xShareBase * strengthFactor(share.strength)} points toward your Holder bonus this epoch.`,
         href: clubHref(token, "rewards"),
       });
     }
@@ -149,20 +149,21 @@ export async function clubInbox(store: Store, userId: string, wallets: readonly 
 export function standingsNews(s: ClubStandings, name: string, wallets: ReadonlySet<string>, nowMs: number): InboxItem[] {
   const out: InboxItem[] = [];
   const href = `/clubs/${s.club}?tab=rewards`;
+  const rules = s.rules ?? DEFAULT_CLUB_RULES;
   const row = s.rows.find((r) => wallets.has(r.wallet));
   if (row && BigInt(s.holderPool) > 0n) {
     const paid = row.estimate !== undefined;
-    const gap = entryGap(s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), row.wallet) ?? 0;
+    const gap = entryGap(s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), row.wallet, rules) ?? 0;
     out.push({
       key: `club-rank:${s.club}:${s.n}:${paid ? "in" : "out"}`,
       kind: "club-rank",
       at: s.computedAt * 1000,
-      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, outside the top ${REWARDS.maxHolders}` : `You’re not earning in ${name} yet`,
+      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, below ${rules.minPoints} points` : `You’re not earning in ${name} yet`,
       body: paid
         ? `About ${formatMon(BigInt(row.estimate ?? "0"))} so far, if the epoch closed now.`
         : row.points > 0
-          ? `About ${gap} more activity points would put you in the top ${REWARDS.maxHolders} and earn a share.`
-          : `Post on the Board, share on X or swap to earn a share: the top ${REWARDS.maxHolders} most active Holders are paid.`,
+          ? `About ${gap} more activity points and you’re paid: Holders with ${rules.minPoints}+ points share the pool. Posts and replies others back count the most.`
+          : `Post, like or reply on the Board to earn a share: every Holder with ${rules.minPoints}+ points is paid, and backing from others counts the most.`,
       href,
     });
   }
@@ -170,7 +171,7 @@ export function standingsNews(s: ClubStandings, name: string, wallets: ReadonlyS
   const mine = [...wallets].map((w) => s.activity[w]).find(Boolean);
   const days = row?.days ?? mine?.days ?? 0;
   // In the last day one more active day is all there's time for: a streak that needs more is lost.
-  const atRisk = mine && mine.carried > 0 && mine.streak === 0 && REWARDS.streakMinDays - days === 1;
+  const atRisk = mine && mine.carried > 0 && mine.streak === 0 && rules.streakMinDays - days === 1;
   if (left > 0 && left <= CLOSING_SEC && (row || atRisk) && days < 7) {
     const hours = Math.max(1, Math.ceil(left / 3600));
     out.push({

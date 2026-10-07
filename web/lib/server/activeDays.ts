@@ -5,10 +5,10 @@ import { postKey } from "./board";
 import type { Store } from "./store";
 
 /**
- * Active days (ADR 0032): a UTC day in an epoch with at least one visible top-level Board post by
- * the member in the Club. Each post is recorded when it's written, against the epoch it falls in;
- * reading checks the post is still there and not hidden, so a deleted or hidden post earns nothing.
- * Streaks are in ./streaks.ts.
+ * Active days (ADR 0032, ADR 0038): a UTC day in an epoch with a visible top-level Board post by the
+ * member in the Club, or a like or reply they gave there (recorded in ./backing.ts and passed in).
+ * Each post is recorded when it's written, against the epoch it falls in; reading checks the post
+ * is still there and not hidden, so a deleted or hidden post earns nothing. Streaks are in ./streaks.ts.
  */
 
 /** The posts that can make a day active, as `userId:day:postId`. */
@@ -29,8 +29,11 @@ export async function recordActive(store: Store, club: string, post: { id: strin
   await store.addMember(activeKey(club, n), `${post.userId}:${day}:${post.id}`);
 }
 
-/** Each member's active days in a Club's epoch `n`, by user id, counting only posts still shown. */
-export async function activeDays(store: Store, club: string, n: number): Promise<Map<string, number>> {
+/**
+ * Each member's active days in a Club's epoch `n`, by user id, counting only posts still shown, and
+ * the days in `also` (by user id: the days they liked or replied on).
+ */
+export async function activeDays(store: Store, club: string, n: number, also: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Promise<Map<string, number>> {
   const entries = (await store.members(activeKey(club, n))).flatMap((m) => {
     // The user id is a Privy DID (`did:privy:…`), so it holds colons: read the day and post id off the right.
     const postAt = m.lastIndexOf(":");
@@ -44,5 +47,6 @@ export async function activeDays(store: Store, club: string, n: number): Promise
     if (!post || post.hidden || post.parent || post.userId !== userId) return;
     days.set(userId, (days.get(userId) ?? new Set()).add(day));
   });
+  for (const [userId, more] of also) for (const day of more) days.set(userId, (days.get(userId) ?? new Set()).add(day));
   return new Map([...days].map(([userId, set]) => [userId, set.size]));
 }

@@ -10,6 +10,7 @@ import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
 import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
 import type { LogEntry, Ban } from "@/lib/server/clubState";
+import type { ReportedItem } from "@/lib/server/board";
 import type { XShareVerdict } from "@/lib/server/xPosts";
 
 // The board, the Club's page text and the staff tools (docs/09-clubs.md). Reads are public; a
@@ -180,10 +181,10 @@ export function useClubActions(token: string) {
         setReplyStage(undefined);
       }
     }, ["club-replies", "club-posts"]),
-    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log"]),
-    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies"], "Reported. Thank you."),
+    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log", "club-reported"]),
+    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies", "club-reported"], "Reported. Thank you."),
     like: useAct((v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`), ["club-posts", "club-replies"]),
-    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log"]),
+    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log", "club-reported"]),
     pin: useAct((v: { id: string; pinned: boolean }) => send("POST", `/posts/${v.id}/pin`, { pinned: v.pinned }), ["club-posts", "club-log"]),
     ban: useAct((v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v), ["club-posts", "club-bans", "club-log", "club-members", "clubs"], "Banned."),
     unban: useAct((v: { wallet: string; everywhere?: boolean }) => send("DELETE", "/bans", v), ["club-bans", "club-log"], "Ban lifted."),
@@ -221,5 +222,13 @@ export function useClubStaff(token: string, enabled: boolean) {
     enabled: enabled && !!getToken,
     retry: 1,
   });
-  return { log: log.data?.log ?? [], ownership: log.data?.ownership ?? null, bans: bans.data, isLoading: log.isLoading };
+  // Posts and replies members reported, for the Manage tab (ADR 0040: a report alone hides nothing).
+  const reported = useQuery({
+    queryKey: ["club-reported", key],
+    queryFn: () => call<{ enabled: boolean; reported: ReportedItem[] }>(getToken!, "GET", `/api/clubs/${token}/reported`),
+    enabled: enabled && !!getToken,
+    refetchInterval: REFRESH_MS,
+    retry: 1,
+  });
+  return { log: log.data?.log ?? [], ownership: log.data?.ownership ?? null, bans: bans.data, reported: reported.data?.reported ?? [], isLoading: log.isLoading };
 }

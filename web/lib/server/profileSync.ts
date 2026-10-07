@@ -52,7 +52,10 @@ export async function syncProfile(
   }
   if (refresh && owned.length === 0) return { shared: false };
 
-  const row: StoredProfile = { ...profile, userId, updatedAt: Date.now() };
+  // A share keeps the time it started across rewrites, so a long-linked account's base voice isn't reset (ADR 0039).
+  const now = Date.now();
+  const since = Math.min(now, ...owned.map((entry) => entry.row!.since ?? entry.row!.updatedAt));
+  const row: StoredProfile = { ...profile, userId, updatedAt: now, since };
   await Promise.all(wallets.map((wallet) => store.set(profileKey(wallet), row)));
   await store.setMembers(userWalletsKey(userId), wallets.map((w) => w.toLowerCase()));
   return { shared: true, profile };

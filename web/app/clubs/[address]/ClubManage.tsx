@@ -300,8 +300,8 @@ function XEditor({ token }: { token: string }) {
 
 /** The staff view: the Club's page text, bans, the moderation log, and claiming ownership. */
 export function ClubManage({ token, role, now }: { token: string; role: ViewerRole; now: number }) {
-  const { log, ownership, bans, isLoading } = useClubStaff(token, true);
-  const { unban } = useClubActions(token);
+  const { log, ownership, bans, reported, isLoading } = useClubStaff(token, true);
+  const { unban, hide, remove } = useClubActions(token);
   const page = useClubPage(token);
   const owner = isOwnerOrAdmin(role);
   const banned = bans ? [...bans.club.map((b) => ({ ...b, everywhere: false })), ...bans.everywhere.map((b) => ({ ...b, everywhere: true }))] : [];
@@ -332,6 +332,46 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
           <XEditor token={token} />
         </Panel>
       )}
+
+      <Panel title={`Reported${reported.length ? ` · ${reported.length}` : ""}`}>
+        <p className="-mt-1 mb-3 text-xs text-muted">
+          Reports never hide a post by themselves: a hidden post’s backing counts for nothing, so only a moderator decides. Holders’ reports are counted apart.
+        </p>
+        {reported.length === 0 ? (
+          <p className="text-sm text-muted">Nothing is waiting for review.</p>
+        ) : (
+          <ul className="-mx-5 divide-y divide-[#111318]/10 border-y border-[#111318]/10">
+            {reported.map(({ post, reports, holderReports }) => (
+              <li key={post.id} className="flex flex-col gap-2 px-5 py-3 text-sm">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <WalletAvatar seed={post.wallet} size="1.5rem" />
+                  <Who address={post.wallet} />
+                  {post.parent && <span className="chip">Reply</span>}
+                  {post.hidden && <span className="chip chip-warn">Hidden</span>}
+                  <span className="text-xs text-muted">
+                    {reports} {reports === 1 ? "report" : "reports"}
+                    {holderReports > 0 && ` · ${holderReports} from Holders or staff`} · {ago(Math.floor(post.at / 1000), now)}
+                  </span>
+                </p>
+                {post.text !== null && <p className="break-words whitespace-pre-wrap">{post.text}</p>}
+                <div className="flex flex-wrap gap-2">
+                  {!post.hidden && (
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => hide.mutate({ id: post.id, hidden: true })}>
+                      Hide
+                    </button>
+                  )}
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => hide.mutate({ id: post.id, hidden: false })}>
+                    {post.hidden ? "Restore" : "Dismiss reports"}
+                  </button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => remove.mutate(post.id)}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
       <Panel title={`Bans${banned.length ? ` · ${banned.length}` : ""}`}>
         {banned.length === 0 ? (

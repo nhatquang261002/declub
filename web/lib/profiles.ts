@@ -10,8 +10,11 @@ export type ProfileProvider = "twitter" | "discord";
 /** What other traders get to see. */
 export type Profile = { provider: ProfileProvider; handle: string };
 
-/** What the server keeps: the public part, plus who owns the row and when it was written. */
-export type StoredProfile = Profile & { userId: string; updatedAt: number };
+/**
+ * What the server keeps: the public part, plus who owns the row, when it was written, and since when
+ * the user has shared a profile (epoch ms; absent on rows written before it was kept, ADR 0039).
+ */
+export type StoredProfile = Profile & { userId: string; updatedAt: number; since?: number };
 
 // Both are what the providers allow, and the check is what makes a handle safe to put in a URL.
 const HANDLE: Record<ProfileProvider, RegExp> = {

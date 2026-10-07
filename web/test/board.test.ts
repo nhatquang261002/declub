@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { MAX_PINNED, POSTS_PER_HOUR, POST_MAX, REPORTS_PER_DAY, REPORTS_TO_HIDE, type PostLink } from "../lib/clubPosts";
+import { MAX_PINNED, POSTS_PER_HOUR, POST_MAX, REPORTS_PER_DAY, type PostLink } from "../lib/clubPosts";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import {
-  banUser, claimOwner, createPost, deletePost, hidePost, likePost, listBans, listPosts, ownershipCheck, pinPost, purgeClub,
+  banUser, claimOwner, createPost, deletePost, hidePost, likePost, listBans, listPosts, listReported, ownershipCheck, pinPost, purgeClub,
   reportPost, roleIn, setRole, unbanUser, updateProfile, postsKey, postKey, type Actor, type Deps,
 } from "../lib/server/board";
 import { activityKey } from "../lib/server/activity";
@@ -280,19 +280,20 @@ describe("the Club inbox: replies and standings", () => {
     assert.match(one[0]!.title, /^A reply to your post/);
   });
 
-  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: i <= 10 ? 4 : 2, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
+  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: i <= 10 ? 12 : 2, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
   const standings = (over: Partial<ClubStandings> = {}): ClubStandings => ({
     club: token, n: 3, start: 0, endsAt: 1_000_000, computedAt: 100, fees: "1", holderPool: "10", fundPool: "1",
     rows: Array.from({ length: 12 }, (_, i) => row(i + 1)), activity: {}, ...over,
   });
 
-  it("says where a Holder stands, in or out of the paid places, keyed by which", () => {
+  it("says where a Holder stands, paid or below the floor, keyed by which", () => {
     const [inside] = standingsNews(standings(), "N", new Set([wallet(4)]), 0);
     assert.equal(inside!.key, `club-rank:${token}:3:in`);
     assert.match(inside!.title, /#4/);
     const [outside] = standingsNews(standings(), "N", new Set([wallet(12)]), 0);
     assert.equal(outside!.key, `club-rank:${token}:3:out`);
-    assert.match(outside!.body, /^About 2\.01 more activity points/, "the 10th has 4 points and holds more NFTs: 2 points tie, one more wins");
+    assert.match(outside!.body, /^About 8 more activity points and you’re paid/, "2 points against the floor of 10");
+    assert.match(outside!.title, /below 10 points/);
     const [idle] = standingsNews(standings({ rows: standings().rows.map((r) => (r.wallet === wallet(12) ? { ...r, points: 0 } : r)) }), "N", new Set([wallet(12)]), 0);
     assert.match(idle!.title, /not earning in N yet/);
     assert.deepEqual(standingsNews(standings({ holderPool: "0" }), "N", new Set([wallet(4)]), 0), [], "no pool, no race");
@@ -310,23 +311,40 @@ describe("the Club inbox: replies and standings", () => {
 });
 
 describe("reports", () => {
-  it("hides a post at three distinct reports, never counting one member twice", async () => {
+  it("flags a post for the moderators however many report it, and never hides it (ADR 0040)", async () => {
     const { store, deps } = await club1();
     const id = await posted(store, "m1", "scam");
-    const reporters = [await member(store, "r1", 11, { holder: true }), await member(store, "r2", 12, { holder: true }), await member(store, "r3", 13, { holder: true })];
-    assert.deepEqual(await reportPost(store, club, "r1", id, deps), { ok: true, hidden: false });
+    for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13], ["r4", 14], ["r5", 15]] as const) {
+      await member(store, u, n, { holder: true });
+      assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false });
+    }
     assert.deepEqual(await reportPost(store, club, "r1", id, deps), { ok: true, hidden: false }, "the same member again adds nothing");
-    assert.deepEqual(await reportPost(store, club, "r2", id, deps), { ok: true, hidden: false });
-    assert.equal(REPORTS_TO_HIDE, 3);
-    assert.deepEqual(await reportPost(store, club, reporters[2]!.userId, id, deps), { ok: true, hidden: true });
     const asOther = (await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!;
-    assert.equal(asOther.text, null);
-    assert.equal(asOther.hidden, "reports");
-    assert.equal((await listPosts(store, club, { userId: "m1" }, deps)).posts[0]!.text, "scam", "the author still sees it");
+    assert.equal(asOther.text, "scam", "five reports leave it visible");
+    assert.equal(asOther.hidden, null);
+    assert.equal(asOther.reports, undefined, "members don't see counts");
     const asMod = (await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!;
-    assert.equal(asMod.text, "scam");
-    assert.equal(asMod.reports, 3);
-    assert.equal((await readLog(store, token))[0]!.action, "auto_hide");
+    assert.equal(asMod.reports, 5);
+    assert.deepEqual((await readLog(store, token)).map((l) => l.action), [], "nothing was logged: nobody moderated");
+    assert.equal((await store.get<{ reported?: true }>(postKey(token, id)))?.reported, true);
+  });
+
+  it("lists reported posts and replies for staff only, and drops them once restored or deleted", async () => {
+    const { store, mod, deps } = await club1();
+    const a = await posted(store, "m1", "a");
+    const b = await posted(store, "m1", "b");
+    await member(store, "r1", 11, { holder: true });
+    await member(store, "r2", 12);
+    await reportPost(store, club, "r1", a, deps);
+    await reportPost(store, club, "r2", a, deps);
+    await reportPost(store, club, "r2", b, deps);
+    assert.equal(await listReported(store, club, "m2", deps), null, "members can't read it");
+    const list = (await listReported(store, club, "mod", deps))!;
+    assert.deepEqual(list.map((i) => [i.post.id, i.reports, i.holderReports]), [[a, 2, 1], [b, 1, 0]], "most Holder reports first; text is shown to staff");
+    assert.equal(list[0]!.post.text, "a");
+    assert.ok((await hidePost(store, club, mod, a, false, deps)).ok, "dismissing the reports");
+    assert.ok((await deletePost(store, club, mod, b, deps)).ok);
+    assert.deepEqual(await listReported(store, club, "mod", deps), []);
   });
 
   it("refuses non-members, banned users, your own post, a missing post and an archived Club", async () => {
@@ -352,23 +370,23 @@ describe("reports", () => {
     assert.deepEqual(await reportPost(store, club, "m2", ids[REPORTS_PER_DAY]!, deps), { ok: false, reason: "rate_limited" });
   });
 
-  it("a Moderator's restore clears the reports, so a post isn't hidden again by the old ones", async () => {
+  it("a Moderator's restore clears the reports", async () => {
     const { store, mod, deps } = await club1();
     const id = await posted(store, "m1");
     for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) {
       await member(store, u, n, { holder: true });
       await reportPost(store, club, u, id, deps);
     }
+    assert.ok((await hidePost(store, club, mod, id, true, deps)).ok);
+    assert.equal((await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!.hidden, "moderator");
     assert.ok((await hidePost(store, club, mod, id, false, deps)).ok);
     assert.equal((await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!.hidden, null);
     assert.equal((await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!.reports, undefined, "no reports left to show");
-    await member(store, "r4", 14, { holder: true });
-    assert.deepEqual(await reportPost(store, club, "r4", id, deps), { ok: true, hidden: false }, "one new report is not three");
   });
 });
 
 describe("who reports count", () => {
-  it("counts only Holders' and staff's reports toward hiding, but shows staff every report", async () => {
+  it("counts Holders' and staff's reports apart for staff to weigh, and shows staff every report", async () => {
     const { store, deps } = await club1();
     const id = await posted(store, "m1", "contested");
     for (const [u, n] of [["f1", 31], ["f2", 32], ["f3", 33], ["f4", 34]] as const) {
@@ -384,12 +402,12 @@ describe("who reports count", () => {
     await member(store, "h2", 36, { holder: true });
     assert.deepEqual(await reportPost(store, club, "h1", id, deps), { ok: true, hidden: false });
     assert.deepEqual(await reportPost(store, club, "h2", id, deps), { ok: true, hidden: false });
-    // A Moderator's report counts like a Holder's: they could hide it themselves anyway.
-    assert.deepEqual(await reportPost(store, club, "mod", id, deps), { ok: true, hidden: true });
+    assert.deepEqual(await reportPost(store, club, "mod", id, deps), { ok: true, hidden: false }, "even a Moderator's own report doesn't hide it");
     assert.equal((await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!.reports, 7);
+    assert.deepEqual((await listReported(store, club, "mod", deps))!.map((i) => [i.reports, i.holderReports]), [[7, 3]], "the three from Holders and staff are told apart");
   });
 
-  it("never hides a post by the Owner, a Moderator or an admin", async () => {
+  it("keeps staff posts up however many report them, and the reports still reach staff", async () => {
     const { store, deps } = await club1();
     await member(store, "adm", 99);
     const ids = [await posted(store, "own", "owner"), await posted(store, "mod", "moderator"), await posted(store, "adm", "admin")];
@@ -404,15 +422,13 @@ describe("who reports count", () => {
 });
 
 describe("moderating posts", () => {
-  it("keeps the pin on a post that reports hid, shows it unpinned until restored, then pinned again", async () => {
+  it("keeps the pin on a post an old report hid, shows it unpinned until restored, then pinned again", async () => {
     const { store, own, mod, deps } = await club1();
     const id = await posted(store, "m1", "pinned");
     await posted(store, "m2", "newer");
     await pinPost(store, club, own, id, true, deps);
-    for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) {
-      await member(store, u, n, { holder: true });
-      await reportPost(store, club, u, id, deps);
-    }
+    // Before ADR 0040 three reports hid a post: those stay hidden until staff act.
+    await store.set(postKey(token, id), { ...(await store.get<object>(postKey(token, id)))!, reported: true, hidden: "reports" });
     assert.deepEqual((await loadProfile(store, token)).pinned, [id], "the pin is kept");
     const asMember = (await listPosts(store, club, { userId: "m2" }, deps)).posts;
     assert.deepEqual(asMember.find((p) => p.id === id), { ...asMember.find((p) => p.id === id)!, text: null, pinned: false }, "not shown as pinned while hidden");

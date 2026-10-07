@@ -1,14 +1,15 @@
 import type { ActivityEvent } from "../clubs";
 import { CHAIN_ID, DECLUB_INTENTS_ADDRESS } from "../config";
-import { REWARDS, entryGap, epochAt, epochWindow, qualifies, rankHolders, splitClub, type ReachRecord } from "../rewards";
+import { averageHeld, entryGap, epochAt, epochWindow, qualifies, rankHolders, splitClub, type ClubRules, type ReachRecord } from "../rewards";
 import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "./streaks";
 
 export { standingsKey };
+import { rulesFor } from "./clubRules";
 import { clubEvents } from "./clubs";
 import { allRows, viemHoldings, type Holdings } from "./members";
 import { readSponsors, sponsorsByClub } from "./sponsors";
-import { cachedSettlementFee, carryKey, holderInputs, ownerWallet, reachKey, swapFee, viemSettlementFee } from "./rewards";
+import { cachedSettlementFee, carryKey, holderInputs, ownerWallet, reachKey, swapFee, verifiedBy, viemSettlementFee } from "./rewards";
 import type { Store } from "./store";
 
 /**
@@ -24,15 +25,26 @@ const lockKey = (club: string) => `declub:rewards:${CHAIN_ID}:standings-lock:${c
 
 export type StandingRow = {
   wallet: string;
-  /** 1-based, in the order the Holder pool reads them (`rankHolders`): most points first. Only rows with points, up to the paid places, get an estimate. */
+  /** 1-based, in leaderboard order (`rankHolders`): most points first. Only rows with at least `rules.minPoints` get an estimate. */
   rank: number;
   /** Decimal strings. */
   shares: string;
+  /** The NFTs held on average over the epoch so far (ADR 0040), 2 decimals: what the voice and the share of the pool count. Absent in copies cached before. */
+  held?: number;
   joinedAt: number;
   days: number;
   /** Own X shares counted this epoch. */
   xShares: number;
+  /** Activity points: days on the Board, X shares and swaps together (ADR 0037 ranks by it). */
   points: number;
+  /** Of `points`: from X shares, from swaps, and from others' backing (ADR 0038); the rest is from active days. Absent in copies cached before. */
+  xPoints?: number;
+  swapPoints?: number;
+  backedPoints?: number;
+  /** How many members backed them this epoch. */
+  backers?: number;
+  /** Of `backedPoints`: from verified accounts' base voices (ADR 0039). */
+  basePoints?: number;
   /** The whole bonus if the epoch closed now: activity plus streak. */
   bonusBps: number;
   /** Qualifying epochs in a row, counting this one if it already qualifies. */
@@ -56,6 +68,12 @@ export type ClubStandings = {
   sponsored?: string;
   holderPool: string;
   fundPool: string;
+  /** The Club's rules for this epoch (ADR 0040). Absent in copies cached before: the defaults. */
+  rules?: ClubRules;
+  /** How many Holders have the points to be paid right now. */
+  paid?: number;
+  /** Daily holdings samples so far; `held` averages them with the read just made. */
+  samples?: number;
   rows: StandingRow[];
   /** By display wallet, lowercase: every member with active days or a live streak. */
   activity: Record<string, MemberActivity>;
@@ -71,6 +89,8 @@ export type StandingsDeps = {
   intents?: string;
   genesis?: number;
   length?: number;
+  /** A Club's rules for epoch `n`. Defaults to `rulesFor`; tests give their own. */
+  rules?: (club: string, n: number) => Promise<ClubRules> | ClubRules;
 };
 
 /** Works out a Club's standings now. Throws when balances can't be read. */
@@ -94,7 +114,8 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
 
   const reach = await store.get<ReachRecord>(reachKey(n));
   const streaks = await readStreaks(store, key);
-  const { holders, days } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks);
+  const rules = await (deps.rules ?? ((c: string, k: number) => rulesFor(store, c, k)))(key, n);
+  const { holders, days, samples } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks, verifiedBy(window.end), rules);
   const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
   const sponsored = sponsorsByClub(await readSponsors(store, n)).get(key)?.total ?? 0n;
   const split = splitClub({
@@ -104,6 +125,8 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     carried: { holders: BigInt(carried.holders), fund: BigInt(carried.fund) },
     holders,
     owner: await ownerWallet(store, club),
+    rules,
+    samples,
   });
   const paid = new Map(split.payouts.filter((p) => p.kind === "holder").map((p) => [p.wallet, p]));
 
@@ -114,10 +137,16 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       wallet: h.wallet.toLowerCase(),
       rank: i + 1,
       shares: h.shares.toString(),
+      ...(h.held !== undefined ? { held: averageHeld(h.held, samples) } : {}),
       joinedAt: h.joinedAt,
       days: h.days,
       xShares: events.filter((e) => e.kind === "xshare" && own.has(e.parties[0] ?? "")).length,
       points: h.points,
+      xPoints: h.xPoints,
+      swapPoints: h.swapPoints,
+      backedPoints: h.backedPoints,
+      backers: h.backers,
+      basePoints: h.basePoints,
       bonusBps: payout?.bonusBps ?? 0,
       streak: h.streak,
       ...(payout ? { estimate: payout.amount.toString() } : {}),
@@ -130,7 +159,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     const d = days.get(row.userId) ?? 0;
     const alive = liveStreak(streaks[row.userId], n);
     if (d === 0 && alive === 0) continue;
-    activity[row.displayWallet.toLowerCase()] = { days: d, streak: streakAt(streaks[row.userId], n, qualifies(d)), carried: alive };
+    activity[row.displayWallet.toLowerCase()] = { days: d, streak: streakAt(streaks[row.userId], n, qualifies(d, rules)), carried: alive };
   }
 
   return {
@@ -143,6 +172,9 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     sponsored: sponsored.toString(),
     holderPool: split.holderPool.toString(),
     fundPool: split.fundPool.toString(),
+    rules,
+    paid: split.holderCount,
+    samples,
     rows,
     activity,
   };
@@ -170,8 +202,8 @@ export async function clubStandings(store: Store, club: ClubEntry, deps: Standin
   }
 }
 
-/** How many rows the route serves: the paid places and a few below the cut line. */
-export const ROWS_SHOWN = REWARDS.maxHolders + 15;
+/** How many rows the route serves: the leaderboard's top. Everyone with the floor's points is paid, however many that is. */
+export const ROWS_SHOWN = 25;
 
 /** What one reader is shown: the top rows, and their own place if they gave a wallet. */
 export type StandingsView = Omit<ClubStandings, "rows" | "activity"> & {
@@ -188,7 +220,12 @@ export function standingsView(standings: ClubStandings, wallet?: string): Standi
     const row = rows.find((r) => r.wallet === w);
     const mine = activity[w] ?? null;
     if (row) {
-      const gap = entryGap(rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), w) ?? 0;
+      const gap =
+        entryGap(
+          rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })),
+          w,
+          rest.rules,
+        ) ?? 0;
       me = { ...row, gap: String(gap), activity: mine };
     } else {
       me = { rank: null, activity: mine };
