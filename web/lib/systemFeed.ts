@@ -3,13 +3,13 @@ import type { ActivityEvent } from "./clubs";
 /**
  * System messages (ADR 0043): the Club speaking on its Board and in the timeline, in a line between
  * posts. Each is something that happened and anyone can already see: a swap that completed, a deal
- * that was listed, a member who joined. They are read from the activity log and the member list
+ * that was listed, a member who joined, a challenge the Owner started or that was won (ADR 0045). They are read from the activity log and the member list
  * when asked, never stored, and never signed or moderated, since nobody wrote them.
  */
-export type SystemKind = "swap" | "listing" | "join";
+export type SystemKind = "swap" | "listing" | "join" | "challenge" | "winner";
 
 export type SystemEvent = {
-  /** The activity event's id, or `join:<club>:<wallet>`. */
+  /** The activity event's id, `join:<club>:<wallet>`, or `challenge:<id>` / `challenge-won:<id>`. */
   id: string;
   /** Lowercase tokens of the Clubs it happened in: a deal naming two Clubs' assets is one event in both. */
   clubs: string[];
@@ -22,6 +22,8 @@ export type SystemEvent = {
   deal?: string;
   /** A signed swap: `deal` is a transaction, not an escrow deal. */
   signed?: true;
+  /** A challenge or a win (ADR 0045): the challenge's title, as the Owner wrote it (plain text). For "challenge" the wallet is the Owner's; for "winner", the winners', best first. */
+  title?: string;
 };
 
 /** How far back system messages go. */

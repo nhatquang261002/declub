@@ -1588,6 +1588,8 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 .sys-line { --sys-edge: #1f7a55; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .sys-listing { --sys-edge: #315ea8; }
 .sys-join { --sys-edge: #c4682a; }
+.sys-challenge { --sys-edge: #6d4fb3; }
+.sys-winner { --sys-edge: #b27500; }
 .sys-icon { display: grid; flex: none; place-items: center; width: 1.2rem; height: 1.2rem; border-radius: 9999px; background: var(--sys-edge); color: white; }
 .sys-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sys a.sys-name { font-weight: 700; color: #111318; }

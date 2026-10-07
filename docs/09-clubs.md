@@ -7,7 +7,7 @@ A **Club** is the community for one verified NFT collection, and the heart of De
 - **Market:** the open deals and signed swaps that offer or want the asset, and its recent swaps.
 - **Board:** short posts from members: notes, and "Looking for" posts that can link a deal.
 - **Members:** a leaderboard ranked by member Momentum, with verified X or Discord handles ([ADR 0011](adr/0011-verified-profiles.md)) and a Holder badge.
-- **Pulse:** the Club speaking between posts. Swaps, new deals and new members of the last week show on the Board, and on the timeline for the reader's own Clubs, as one-line **system messages** with a coloured icon per kind, grouped between posts ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation.
+- **Pulse:** the Club speaking between posts. Swaps, new deals, new members and challenges (started, and won) of the last week show on the Board, and on the timeline for the reader's own Clubs, as one-line **system messages** with a coloured icon per kind, grouped between posts ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
 - **Challenges:** tasks the Owner sets the Club at any time; members answer with a post and the winners earn activity points ([ADR 0045](adr/0045-club-challenges.md); [below](#challenges)).
 - **Rewards:** a share of the fees the Club's swaps paid, to its active Holders and its Owner, each week, by rules the Owner sets ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).

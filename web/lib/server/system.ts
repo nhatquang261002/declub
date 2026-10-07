@@ -1,5 +1,7 @@
 import { mergeClubs, newest, SYSTEM_WINDOW_SEC, systemKindOf, type SystemEvent } from "../systemFeed";
 import type { ClubEntry } from "../verifiedAssets";
+import type { StoredChallenge } from "../challenges";
+import { challengeKey, challengesKey } from "./challengeState";
 import { clubEvents, type Deps } from "./clubs";
 import { allRows } from "./members";
 import type { Store } from "./store";
@@ -21,7 +23,30 @@ async function ofClub(store: Store, entry: ClubEntry, now: number, deps: Deps): 
     // A row's joinedAt is epoch ms.
     .filter((row) => Math.floor(row.joinedAt / 1000) > since)
     .map((row): SystemEvent => ({ id: `join:${club}:${row.displayWallet}`, clubs: [club], kind: "join", at: Math.floor(row.joinedAt / 1000), wallets: [row.displayWallet] }));
-  return [...logged, ...joined];
+  return [...logged, ...joined, ...(await challengeEvents(store, club, since))];
+}
+
+/**
+ * A Club's challenges as messages (ADR 0045): one when the Owner started it (not if it was cancelled),
+ * one when it was won. A likes-judged win is told at the challenge's end, an Owner's pick when it was made.
+ */
+async function challengeEvents(store: Store, club: string, since: number): Promise<SystemEvent[]> {
+  let all: StoredChallenge[] = [];
+  try {
+    const ids = await store.ranked(challengesKey(club), 30);
+    all = (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(club, id)))).filter((c): c is StoredChallenge => !!c);
+  } catch {
+    // A Club whose challenges can't be read leaves them out of its messages.
+  }
+  return all.flatMap((c): SystemEvent[] => {
+    const out: SystemEvent[] = [];
+    const startedAt = Math.floor(c.startsAt / 1000);
+    if (c.state !== "cancelled" && startedAt > since) out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], title: c.title });
+    const winners = c.settled?.winners ?? [];
+    const wonAt = c.settled ? Math.floor((c.judging === "likes" ? Math.min(c.endsAt, c.settled.at) : c.settled.at) / 1000) : 0;
+    if (winners.length > 0 && wonAt > since) out.push({ id: `challenge-won:${c.id}`, clubs: [club], kind: "winner", at: wonAt, wallets: winners.map((w) => w.wallet.toLowerCase()), title: c.title });
+    return out;
+  });
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { SwapIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { SwapIcon, TagIcon, TrophyIcon, UsersIcon } from "@/components/Icons";
 import { useProfile } from "@/hooks/useProfiles";
 import { profilePath } from "@/lib/about";
 import type { ClubInfo } from "@/lib/clubs";
@@ -10,7 +10,7 @@ import { explorerTx } from "@/lib/config";
 import { ago, shortAddress } from "@/lib/format";
 import { SYSTEM_GROUP_SHOWN, type SystemEvent, type SystemKind } from "@/lib/systemFeed";
 
-const ICONS: Record<SystemKind, (p: { className?: string }) => ReactNode> = { swap: SwapIcon, listing: TagIcon, join: UsersIcon };
+const ICONS: Record<SystemKind, (p: { className?: string }) => ReactNode> = { swap: SwapIcon, listing: TagIcon, join: UsersIcon, challenge: TrophyIcon, winner: TrophyIcon };
 
 /** A wallet as short as it can be said: its shown handle, else the short address. Opens its profile. */
 function Name({ address }: { address: string }) {
@@ -51,6 +51,13 @@ function Line({ event, now, clubs }: { event: SystemEvent; now: number; clubs?: 
       </span>
       <span className="sys-text">
         {first && <Name address={first} />}
+        {event.kind === "winner" &&
+          event.wallets.slice(1).map((w) => (
+            <span key={w}>
+              {", "}
+              <Name address={w} />
+            </span>
+          ))}
         {event.kind === "swap" && second && (
           <>
             {" ⇄ "}
@@ -60,6 +67,22 @@ function Line({ event, now, clubs }: { event: SystemEvent; now: number; clubs?: 
         {event.kind === "swap" && <Action event={event}>swapped</Action>}
         {event.kind === "listing" && <Action event={event}>listed a deal</Action>}
         {event.kind === "join" && <span>joined</span>}
+        {event.kind === "challenge" && (
+          <>
+            started a challenge:{" "}
+            <Link href={`/clubs/${event.clubs[0]}?tab=challenges`} className="sys-action">
+              {event.title}
+            </Link>
+          </>
+        )}
+        {event.kind === "winner" && (
+          <>
+            won{" "}
+            <Link href={`/clubs/${event.clubs[0]}?tab=challenges`} className="sys-action">
+              {event.title}
+            </Link>
+          </>
+        )}
         {where && <span className="sys-where"> · {where}</span>}
       </span>
       <time className="sys-time">{ago(event.at, now)}</time>

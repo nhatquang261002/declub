@@ -12,6 +12,7 @@ import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
 import { joinClub, type Holdings } from "../lib/server/members";
 import { buildEpoch, closeEpoch, pointsKey, type PublishedLedger, type RewardsDeps } from "../lib/server/rewards";
+import { listSystem } from "../lib/server/system";
 import { setRewardBan } from "../lib/server/rewardSettings";
 import { computeStandings } from "../lib/server/standings";
 import { memoryStore, type Store } from "../lib/server/store";
@@ -434,6 +435,26 @@ describe("a challenge the Owner judges", () => {
     const done = (await listChallenges(store, club, {}, at(END + 15 * DAY))).find((c) => c.id === id)!;
     assert.deepEqual([done.phase, done.settled!.expired, done.settled!.winners], ["settled", true, []]);
     assert.deepEqual(await pickWinners(store, club, actor("own", 1), id, [], at(END + 16 * DAY)), { ok: false, reason: "not_judging" });
+  });
+});
+
+describe("challenges in the system messages (the Board and the timeline)", () => {
+  it("tells when one starts and who won, not a cancelled one", async () => {
+    const store = await world();
+    const id = await start(store, { title: "Best meme" });
+    const gone = await start(store, { title: "Called off" });
+    assert.ok((await cancelChallenge(store, club, actor("own", 1), gone, at(20))).ok);
+    const g = await post(store, "g", 60);
+    assert.ok((await enterChallenge(store, club, "g", id, g, at(61))).ok);
+    assert.ok((await likePost(store, club, "a", g, true, at(62))).ok);
+    const sys = (s: number) => listSystem(store, [club], { now: () => GENESIS + s, settlements: async () => [] });
+
+    const early = (await sys(100)).events.filter((e) => e.kind === "challenge" || e.kind === "winner");
+    assert.deepEqual(early.map((e) => [e.id, e.kind, e.wallets, e.title]), [[`challenge:${id}`, "challenge", [wallet(1)], "Best meme"]]);
+
+    await listChallenges(store, club, {}, at(END + 500));
+    const late = (await sys(END + 600)).events.filter((e) => e.kind === "winner");
+    assert.deepEqual(late.map((e) => [e.id, e.wallets, e.title, e.at]), [[`challenge-won:${id}`, [wallet(3)], "Best meme", GENESIS + END]], "told at its end");
   });
 });
 
