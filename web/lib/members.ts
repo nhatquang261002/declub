@@ -78,6 +78,8 @@ export function matchesMember(wallet: string, handle: string | undefined, query:
 
 /** A balance is re-read when its check is older than this. */
 export const HOLDER_RECHECK_MS = 24 * 60 * 60 * 1000;
+/** A member's own badge is re-read when they ask (their membership, a Holders-only entry) and its check is older than this. */
+export const HOLDER_SELF_RECHECK_MS = 60 * 1000;
 /** The most rows one request re-checks, so a big Club can't turn a page load into a flood of reads. */
 export const RECHECK_PER_READ = 50;
 /** How many members a request returns when it doesn't say. */

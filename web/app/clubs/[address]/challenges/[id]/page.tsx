@@ -70,6 +70,7 @@ function Challenge({ token, id }: { token: string; id: string }) {
             owner={me.role === "owner" || me.role === "admin"}
             member={!!me.member}
             holder={!!me.holder}
+            recheck={{ run: me.recheck, busy: me.rechecking }}
             wallet={me.wallet}
             archived={info.archived}
           />

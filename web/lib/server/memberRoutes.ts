@@ -6,7 +6,7 @@ import type { Registry } from "../verifiedAssets";
 import { roleIn, type Deps as BoardDeps } from "./board";
 import { clubEvents, type Deps } from "./clubs";
 import { fail, gateUser, json, type UserGate } from "./gate";
-import { clubsOf, getMember, joinClub, leaveClub, listMembers, syncMemberships, type MemberDeps } from "./members";
+import { clubsOf, freshHolder, getMember, joinClub, leaveClub, listMembers, syncMemberships, type MemberDeps } from "./members";
 import { clientId, getStore, withinLimit } from "./store";
 
 /**
@@ -54,7 +54,10 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
       const { store, user } = g;
 
       await syncMemberships(store, user.id, linkedEthereumWallets(user.linked_accounts));
-      const row = await getMember(store, entry.address, user.id);
+      // A member without the badge is read fresh (at most once a minute), so an NFT they just
+      // swapped for shows as Holder now, not at the Members list's daily re-check.
+      const known = await getMember(store, entry.address, user.id);
+      const row = known && !known.holder ? await freshHolder(store, entry, user.id, deps) : known;
       const role = await roleIn(store, entry.address, user.id, deps);
       // An admin has staff powers in a Club they never joined, so the page needs to know.
       return json({ enabled: true, ...(row ? mine(row, role) : { member: false, ...(role === "admin" ? { role } : {}) }) });

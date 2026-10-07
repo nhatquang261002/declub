@@ -8,15 +8,17 @@ import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
 import { PostItem } from "@/components/PostItem";
 import { Spinner } from "@/components/Spinner";
-import { ChallengeFeedCard } from "@/components/ChallengeCard";
+import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
+import { useChallenges } from "@/hooks/useChallenges";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
 import { useSystemMessages } from "@/hooks/useSystemMessages";
+import { isLive } from "@/lib/challenges";
 import { isStaff } from "@/lib/clubRoles";
 import { LENSES, type LensId } from "@/lib/lenses";
-import { weave } from "@/lib/systemFeed";
+import { weave, withoutPinned } from "@/lib/systemFeed";
 import { Empty, Loading } from "./parts";
 
 const FILTERS = [
@@ -54,14 +56,18 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
   const system = useSystemMessages({ club: token });
+  // Challenges still running (ADR 0045) are pinned on top, so the feed leaves out their start.
+  const { challenges } = useChallenges(token);
+  const live = useMemo(() => challenges.filter((c) => isLive(c.phase)), [challenges]);
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
   // and holds everything: another lens or "Looking for" is a question about posts.
   const byTime = active.id === "newest";
   const items = useMemo(() => {
     const list = filter === "all" ? posts : posts.filter((p) => p.kind === "looking");
     const withSystem = byTime && filter === "all";
-    return weave(list, withSystem ? system.events : [], { since: system.since, complete: !hasMore });
-  }, [posts, filter, byTime, system.events, system.since, hasMore]);
+    const events = withoutPinned(system.events, new Set(live.map((c) => c.id)));
+    return weave(list, withSystem ? events : [], { since: system.since, complete: !hasMore });
+  }, [posts, filter, byTime, system.events, system.since, hasMore, live]);
 
   if (error && posts.length === 0) return <LoadError title="Couldn’t load the board" error={error} />;
   if (!enabled) return <Empty title="No board on this server">This server isn’t keeping Club boards.</Empty>;
@@ -98,6 +104,16 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
           </p>
         )}
       </div>
+
+      {filter === "all" && live.length > 0 && (
+        <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
+          {live.map((c) => (
+            <li key={c.id}>
+              <ChallengeSummary c={c} token={token} now={now} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={live.length > 1} />
+            </li>
+          ))}
+        </ul>
+      )}
 
       {isLoading ? (
         <Loading label="Loading the board" />

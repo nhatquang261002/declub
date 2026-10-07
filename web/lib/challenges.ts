@@ -1,4 +1,4 @@
-import { cleanLine } from "./clubPosts";
+import { cleanLine, type StoredPost, type StoredXCard } from "./clubPosts";
 
 /**
  * Club challenges (ADR 0045, docs/09-clubs.md#challenges): the Owner sets the Club a task at any
@@ -124,6 +124,22 @@ export function phaseOf(c: Pick<StoredChallenge, "state" | "endsAt" | "judging">
   return c.judging === "owner" ? "judging" : "closing";
 }
 
+/** Still running or waiting on its result: pinned on top of the Board, and listed first on the Challenges tab. */
+export const isLive = (phase: Phase) => phase === "open" || phase === "closing" || phase === "judging";
+
+/**
+ * Why a Board post can't be a challenge's entry as an X post, or null when it can: an entry is the
+ * member's own X post (from the X account linked to their profile, ADR 0024), shared to the Board,
+ * and posted on X while the challenge runs, so a challenge sends the Club out onto X and an old post
+ * can't be recycled.
+ */
+export function xEntryProblem(post: Pick<StoredPost, "link" | "x">, c: Pick<StoredChallenge, "startsAt" | "endsAt">): "not_x" | "x_not_own" | "x_too_old" | null {
+  if (post.link?.kind !== "x" || !post.x) return "not_x";
+  if (!post.x.own) return "x_not_own";
+  if (post.x.postedAt === null || post.x.postedAt < c.startsAt || post.x.postedAt >= c.endsAt) return "x_too_old";
+  return null;
+}
+
 /** One entry as a reader sees it. */
 export type PublicEntry = {
   post: string;
@@ -136,6 +152,8 @@ export type PublicEntry = {
   mine: boolean;
   /** The text is read from the Board post; null when it's hidden from this reader. */
   text: string | null;
+  /** The X post it shares, as the server read it; absent for a hidden post, or one entered before entries were X posts. */
+  x?: StoredXCard;
   place?: number;
 };
 

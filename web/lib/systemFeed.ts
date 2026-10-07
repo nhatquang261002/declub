@@ -36,6 +36,14 @@ export const SYSTEM_MAX = 40;
 /** A challenge's start or result is drawn as a card of its own in a feed, never as a line in a run of messages (ADR 0045). */
 export const isChallengeEvent = (e: Pick<SystemEvent, "kind">) => e.kind === "challenge" || e.kind === "winner";
 
+/**
+ * The events without the starts of challenges pinned on top of the Board while they run: the card is
+ * already there, so it isn't drawn twice. A result still shows; a challenge that is done falls back
+ * into the feed at the time it started.
+ */
+export const withoutPinned = (events: readonly SystemEvent[], pinned: ReadonlySet<string>) =>
+  events.filter((e) => !(e.kind === "challenge" && e.challenge && pinned.has(e.challenge)));
+
 /** What `kind` of system message an activity event makes, or null for the kinds that make none (X shares are posts' business). */
 export const systemKindOf = (e: Pick<ActivityEvent, "kind">): SystemKind | null => (e.kind === "swapped" ? "swap" : e.kind === "created" ? "listing" : null);
 

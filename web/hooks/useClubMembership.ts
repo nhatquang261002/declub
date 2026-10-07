@@ -74,6 +74,13 @@ export function useClubMembership(token: string) {
     join: () => join.mutate(),
     leave: () => leave.mutate(),
     pending: join.isPending || leave.isPending,
+    /** Asks again: the server re-reads a non-Holder's wallets (at most once a minute), so one who just bought in gets the badge. */
+    recheck: () => {
+      void query.refetch().then((r) => {
+        if (r.data?.holder) void queryClient.invalidateQueries({ queryKey: ["club-members", token.toLowerCase()] });
+      });
+    },
+    rechecking: query.isFetching,
     error: query.error,
   };
 }

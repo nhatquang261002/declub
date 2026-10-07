@@ -10,13 +10,14 @@ import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listCha
 import { readAwards } from "../lib/server/challengeState";
 import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
-import { joinClub, type Holdings } from "../lib/server/members";
+import { getMember, joinClub, type Holdings } from "../lib/server/members";
 import { buildEpoch, closeEpoch, pointsKey, type PublishedLedger, type RewardsDeps } from "../lib/server/rewards";
 import { listSystem } from "../lib/server/system";
 import { setRewardBan } from "../lib/server/rewardSettings";
 import { computeStandings } from "../lib/server/standings";
 import { memoryStore, type Store } from "../lib/server/store";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
+import type { XCard } from "../lib/xPosts";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const reg = makeRegistry(parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." }]));
@@ -28,7 +29,16 @@ const GENESIS = 1_700_000_000;
 const WEEK = 7 * 86_400;
 const DAY = 86_400;
 /** The clock `s` seconds into epoch 0, and the admins. */
-const at = (s: number): Deps => ({ now: () => (GENESIS + s) * 1000, epochs: { genesis: GENESIS, length: WEEK }, admins: new Set(["adm"]) });
+/** The X posts members shared, by id: an entry is a member's own X post (`xEntryProblem`). */
+const tweets = new Map<string, XCard>();
+const at = (s: number): Deps => ({
+  now: () => (GENESIS + s) * 1000,
+  epochs: { genesis: GENESIS, length: WEEK },
+  admins: new Set(["adm"]),
+  lookupX: async (id) => tweets.get(id) ?? null,
+  // Each member's linked X account is named after their user id.
+  xAccountOf: async (userId) => ({ username: userId, subject: userId }),
+});
 const actor = (userId: string, n: number) => ({ userId, wallet: wallet(n) });
 
 async function member(store: Store, userId: string, n: number) {
@@ -37,9 +47,17 @@ async function member(store: Store, userId: string, n: number) {
   await store.setMembers(userWalletsKey(userId), [w]);
   assert.ok((await joinClub(store, club, userId, [w], { holdings: async () => [0n] })).ok);
 }
-async function post(store: Store, userId: string, s: number) {
+let tweetId = 1_000;
+/**
+ * A Board post by `userId` at `s` seconds, sharing an X post: by default their own, posted on X just
+ * before. `x: "none"` makes a plain note; "theirs" another account's post; a number, the X post's time.
+ */
+async function post(store: Store, userId: string, s: number, x: "own" | "none" | "theirs" | number = "own") {
   await store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
-  const r = await createPost(store, club, userId, { kind: "note", text: `gm ${userId} ${s}` }, at(s));
+  const id = String(tweetId++);
+  tweets.set(id, { id, author: x === "theirs" ? "someone" : userId, text: `my entry ${s}`, postedAt: (GENESIS + (typeof x === "number" ? x : s)) * 1000 });
+  const link = x === "none" ? {} : { link: `https://x.com/${userId}/status/${id}` };
+  const r = await createPost(store, club, userId, { kind: "note", text: `gm ${userId} ${s}`, ...link }, at(s));
   assert.ok(r.ok);
   return r.post.id;
 }
@@ -180,9 +198,43 @@ describe("a challenge for Holders only", () => {
     const open = await start(store, { title: "Open" });
     assert.ok((await enterChallenge(store, club, "a", open, theirs, at(64))).ok);
   });
+
+  it("reads the badge fresh, so an NFT just bought counts and one sold doesn't", async () => {
+    const store = await world();
+    const w = wallet(8);
+    await store.set(profileKey(w), { provider: "twitter", handle: "h8", userId: "b", updatedAt: 1 });
+    await store.setMembers(userWalletsKey("b"), [w]);
+    assert.ok((await joinClub(store, club, "b", [w], { holdings: async () => [0n], now: () => (GENESIS + 100) * 1000 })).ok);
+    const id = await start(store, { holdersOnly: true });
+    const entry = await post(store, "b", 120);
+    const holding = (n: bigint) => async (_t: string, ws: readonly string[]) => ws.map(() => n);
+    // Read less than a minute ago: that answer stands.
+    assert.deepEqual(await enterChallenge(store, club, "b", id, entry, { ...at(130), holdings: holding(1n) }), { ok: false, reason: "holders_only" });
+    // Later, the chain is read again: they bought one.
+    assert.ok((await enterChallenge(store, club, "b", id, entry, { ...at(200), holdings: holding(1n) })).ok);
+    assert.equal((await getMember(store, token, "b"))!.holder, true);
+    // And sold it: a new entry is refused.
+    assert.deepEqual(await enterChallenge(store, club, "b", id, entry, { ...at(300), holdings: holding(0n) }), { ok: false, reason: "holders_only" });
+  });
 });
 
 describe("entering a challenge", () => {
+  it("takes only the member's own X post, posted on X while it runs, and shows its card", async () => {
+    const store = await world();
+    const id = await start(store);
+    const plain = await post(store, "g", 30, "none");
+    const theirs = await post(store, "g", 40, "theirs");
+    const old = await post(store, "g", 50, START - 5);
+    assert.deepEqual(await enterChallenge(store, club, "g", id, plain, at(60)), { ok: false, reason: "not_x" });
+    assert.deepEqual(await enterChallenge(store, club, "g", id, theirs, at(60)), { ok: false, reason: "x_not_own" });
+    assert.deepEqual(await enterChallenge(store, club, "g", id, old, at(60)), { ok: false, reason: "x_too_old" });
+    const good = await post(store, "g", 70);
+    assert.ok((await enterChallenge(store, club, "g", id, good, at(80))).ok);
+    const shown = (await getChallenge(store, club, id, {}, at(90)))!.entries[0]!;
+    assert.equal(shown.x?.author, "g");
+    assert.equal(shown.x?.own, true);
+  });
+
   it("takes a member's own post made while it's open, one entry each", async () => {
     const store = await world();
     const early = await post(store, "g", 5);

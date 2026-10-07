@@ -5,6 +5,7 @@ import {
   phaseOf,
   winnersByLikes,
   winnersByPick,
+  xEntryProblem,
   type Candidate,
   type PublicChallenge,
   type PublicEntry,
@@ -12,7 +13,7 @@ import {
   type StoredChallenge,
   type Winner,
 } from "../challenges";
-import type { StoredPost } from "../clubPosts";
+import type { StoredPost, StoredXCard } from "../clubPosts";
 import { isOwnerOrAdmin } from "../clubRoles";
 import { epochAt, epochWindow } from "../rewards";
 import type { AssetEntry } from "../verifiedAssets";
@@ -20,7 +21,7 @@ import { getPost, likesKey, postKey, roleIn, type Actor, type Deps } from "./boa
 import { ALL, appendLog, loadBans } from "./clubState";
 import { awardsKey, challengeKey, challengesKey, entriesKey, entryOfKey, readAwards, settleLockKey } from "./challengeState";
 import { rewardBans } from "./clubRules";
-import { allRows, getMember } from "./members";
+import { allRows, freshHolder, getMember, type MemberDeps } from "./members";
 import { closingKey } from "./rewards";
 import type { Store } from "./store";
 
@@ -36,7 +37,7 @@ const toEpoch = (ms: number, deps: Pick<Deps, "epochs">) => Math.max(0, epochAt(
 
 export type ChallengeRefusal =
   | "archived" | "forbidden" | "not_found" | "invalid" | "not_member" | "banned" | "reward_banned" | "closed"
-  | "holders_only" | "too_many_open" | "owner_entry" | "bad_post" | "already_entered" | "full" | "not_judging" | "no_entry" | "busy";
+  | "holders_only" | "too_many_open" | "owner_entry" | "bad_post" | "not_x" | "x_not_own" | "x_too_old" | "already_entered" | "full" | "not_judging" | "no_entry" | "busy";
 
 async function load(store: Store, token: string, id: string) {
   return /^[0-9a-f-]{36}$/.test(id) ? store.get<StoredChallenge>(challengeKey(token, id)) : null;
@@ -96,19 +97,19 @@ export async function cancelChallenge(store: Store, entry: AssetEntry, actor: Ac
 }
 
 /** The entries that can win, with their likes, now. A post that's gone or hidden, or a member who left, was banned or banned from rewards, drops out. */
-async function candidates(store: Store, token: string, c: StoredChallenge): Promise<(Candidate & { text: string; likers: string[] })[]> {
+async function candidates(store: Store, token: string, c: StoredChallenge): Promise<(Candidate & { text: string; x?: StoredXCard; likers: string[] })[]> {
   const entries = await entriesOf(store, token, c.id);
   const posts = await store.getMany<StoredPost>(entries.map((e) => postKey(token, e.post)));
   const rows = new Map((await allRows(store, token)).map((r) => [r.userId, r]));
   const banned = new Set([...Object.keys(await loadBans(store, token)), ...Object.keys(await loadBans(store, ALL))]);
   const noRewards = new Set(Object.keys(await rewardBans(store, token)));
-  const out: (Candidate & { text: string; likers: string[] })[] = [];
+  const out: (Candidate & { text: string; x?: StoredXCard; likers: string[] })[] = [];
   for (const [i, e] of entries.entries()) {
     const post = posts[i];
     const row = rows.get(e.userId);
     if (!post || post.userId !== e.userId || post.parent || post.hidden || !row?.displayWallet || banned.has(e.userId) || noRewards.has(e.userId)) continue;
     const likers = (await store.members(likesKey(token, e.post))).filter((u) => u !== e.userId && rows.has(u) && !noRewards.has(u));
-    out.push({ post: e.post, userId: e.userId, wallet: row.displayWallet, at: post.at, likes: likers.length, text: post.text, likers });
+    out.push({ post: e.post, userId: e.userId, wallet: row.displayWallet, at: post.at, likes: likers.length, text: post.text, ...(post.x ? { x: post.x } : {}), likers });
   }
   return out;
 }
@@ -190,7 +191,7 @@ export async function enterChallenge(
   userId: string,
   id: string,
   postId: unknown,
-  deps: Deps = {},
+  deps: Deps & MemberDeps = {},
 ): Promise<{ ok: true } | { ok: false; reason: ChallengeRefusal }> {
   const token = entry.address.toLowerCase();
   if (entry.club === "archived") return { ok: false, reason: "archived" };
@@ -198,7 +199,8 @@ export async function enterChallenge(
   if (!c) return { ok: false, reason: "not_found" };
   const now = nowOf(deps);
   if (phaseOf(c, now) !== "open") return { ok: false, reason: "closed" };
-  const row = await getMember(store, token, userId);
+  // For Holders only, the badge is read fresh: an NFT bought a minute ago counts, one sold doesn't.
+  const row = c.holdersOnly ? await freshHolder(store, entry, userId, deps) : await getMember(store, token, userId);
   if (!row) return { ok: false, reason: "not_member" };
   if (c.holdersOnly && !row.holder) return { ok: false, reason: "holders_only" };
   const [here, everywhere] = await Promise.all([loadBans(store, token), loadBans(store, ALL)]);
@@ -209,6 +211,8 @@ export async function enterChallenge(
   if (typeof postId !== "string") return { ok: false, reason: "bad_post" };
   const post = await getPost(store, token, postId);
   if (!post || post.userId !== userId || post.parent || post.hidden || post.at < c.startsAt || post.at >= c.endsAt) return { ok: false, reason: "bad_post" };
+  const notX = xEntryProblem(post, c);
+  if (notX) return { ok: false, reason: notX };
   const elsewhere = await store.get<string>(entryOfKey(token, postId));
   if (elsewhere && elsewhere !== id) return { ok: false, reason: "already_entered" };
 
@@ -284,7 +288,7 @@ async function viewOf(store: Store, token: string, c: StoredChallenge, viewer: {
     mine = all.find((e) => e.userId === viewer.userId)?.post;
     const cands = await candidates(store, token, c);
     entries = cands
-      .map((x): PublicEntry => ({ post: x.post, wallet: x.wallet, at: x.at, likes: x.likes, liked: !!viewer.userId && x.likers.includes(viewer.userId), mine: x.userId === viewer.userId, text: x.text, ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}) }))
+      .map((x): PublicEntry => ({ post: x.post, wallet: x.wallet, at: x.at, likes: x.likes, liked: !!viewer.userId && x.likers.includes(viewer.userId), mine: x.userId === viewer.userId, text: x.text, ...(x.x ? { x: x.x } : {}), ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}) }))
       .sort((a, b) => (winnerPlace.get(a.post) ?? 99) - (winnerPlace.get(b.post) ?? 99) || b.likes - a.likes || a.at - b.at);
   }
   return {

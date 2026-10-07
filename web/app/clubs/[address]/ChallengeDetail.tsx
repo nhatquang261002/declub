@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ChallengeBand, ChallengeClock, ChallengeFacts, EntryRank, PLACES, PrizeTiles, noWinnerText } from "@/components/ChallengeCard";
-import { HeartIcon, LockIcon } from "@/components/Icons";
+import { HeartIcon, LockIcon, XLogoIcon } from "@/components/Icons";
+import { XPostCard } from "@/components/PostItem";
 import { Spinner } from "@/components/Spinner";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -11,6 +13,7 @@ import { useClubActions } from "@/hooks/useClubBoard";
 import { type PublicChallenge, type PublicEntry } from "@/lib/challenges";
 import { POST_MAX } from "@/lib/clubPosts";
 import { ago } from "@/lib/format";
+import { parseXStatus, postedAtOf } from "@/lib/xPosts";
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
 
@@ -29,6 +32,7 @@ export function ChallengeDetail({
   holder,
   wallet,
   archived,
+  recheck,
 }: {
   c: PublicChallenge;
   token: string;
@@ -39,6 +43,8 @@ export function ChallengeDetail({
   holder: boolean;
   wallet?: string;
   archived: boolean;
+  /** Reads the member's Holder badge again, for one who just bought in. */
+  recheck?: { run: () => void; busy: boolean };
 }) {
   const { withdraw, pick, cancel } = useChallengeActions(token);
   // The Owner's picks: place → entry. Giving a place to one entry takes it from any other.
@@ -79,12 +85,20 @@ export function ChallengeDetail({
       </article>
 
       {canEnter && c.holdersOnly && !holder && (
-        <p className="club-panel flex items-center gap-2 px-5 py-4 text-sm font-semibold">
+        <div className="club-panel flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
           <LockIcon className="size-4 shrink-0" />
-          This challenge is for Holders of the Club’s asset. You can still like entries.
-        </p>
+          <p className="min-w-0 flex-1 text-sm">
+            <b>This challenge is for Holders of the Club’s asset.</b> You can still like entries. Just got one? Your wallets are read again at most once a minute.
+          </p>
+          {recheck && (
+            <button type="button" className="btn-secondary btn-sm shrink-0" aria-busy={recheck.busy} disabled={recheck.busy} onClick={recheck.run}>
+              {recheck.busy && <Spinner />}
+              Check my wallets
+            </button>
+          )}
+        </div>
       )}
-      {canEnter && (!c.holdersOnly || holder) && <Entering c={c} token={token} wallet={wallet} onWithdraw={() => withdraw.mutate(c.id)} withdrawing={withdraw.isPending} />}
+      {canEnter && (!c.holdersOnly || holder) && <Entering c={c} token={token} wallet={wallet} now={now} onWithdraw={() => withdraw.mutate(c.id)} withdrawing={withdraw.isPending} />}
       {open && !member && <p className="club-panel px-5 py-4 text-sm font-semibold">Join the Club to enter and to like entries.</p>}
 
       <section className="club-panel overflow-hidden" aria-labelledby="entries-heading">
@@ -165,14 +179,24 @@ export function ChallengeDetail({
   );
 }
 
-/** A member's own entry, and the box to write one: it posts to the Board (signed, like any post) and enters it. */
-function Entering({ c, token, wallet, onWithdraw, withdrawing }: { c: PublicChallenge; token: string; wallet?: string; onWithdraw: () => void; withdrawing: boolean }) {
+/**
+ * A member's own entry, and the box to make one: an entry is their own X post (ADR 0045), so they
+ * post it on X, paste its link and add a line; it is shared to the Board (signed, like any post) and
+ * entered.
+ */
+function Entering({ c, token, wallet, now, onWithdraw, withdrawing }: { c: PublicChallenge; token: string; wallet?: string; now: number; onWithdraw: () => void; withdrawing: boolean }) {
   const { post, postStage } = useClubActions(token);
   const { enter } = useChallengeActions(token);
+  const [link, setLink] = useState("");
   const [text, setText] = useState("");
   const busy = post.isPending || enter.isPending;
   const length = [...text].length;
   const mine = c.entries.find((e) => e.mine);
+  const tweet = parseXStatus(link.trim());
+  // X post ids carry their own time, so a post made before the challenge is caught here, before signing.
+  const postedAt = tweet ? postedAtOf(tweet) : null;
+  const tooOld = tweet !== null && (postedAt === null || postedAt < c.startsAt);
+  const linkOk = tweet !== null && !tooOld;
 
   return (
     <form
@@ -180,42 +204,74 @@ function Entering({ c, token, wallet, onWithdraw, withdrawing }: { c: PublicChal
       onSubmit={async (event) => {
         event.preventDefault();
         try {
-          const result = (await post.mutateAsync({ kind: "note", text, wallet })) as { post?: { id: string } };
+          const result = (await post.mutateAsync({ kind: "note", text, link: link.trim(), wallet })) as { post?: { id: string } };
           if (result.post?.id) await enter.mutateAsync({ id: c.id, post: result.post.id });
           setText("");
+          setLink("");
         } catch {
           // Both mutations have already told the member what went wrong.
         }
       }}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <label htmlFor={`entry-${c.id}`} className="text-base font-black">
-          {mine ? "You’re in" : "Your entry"}
-        </label>
-        <span className="text-xs font-bold text-muted">{mine ? "A new entry replaces yours." : "It’s posted on the Board too, signed by your wallet."}</span>
+        <p className="text-base font-black">{mine ? "You’re in" : "Your entry"}</p>
+        <span className="text-xs font-bold text-muted">{mine ? "A new entry replaces yours." : "It’s shared on the Board too, signed by your wallet."}</span>
       </div>
       {mine && (
         <div className="flex items-start gap-3 rounded-xl border-2 border-[#111318] bg-white p-3">
-          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm">{mine.text}</p>
+          <div className="min-w-0 flex-1">
+            <p className="whitespace-pre-wrap break-words text-sm">{mine.text}</p>
+            {mine.x && <XPostCard id={mine.x.id} card={mine.x} now={now} />}
+          </div>
           <button type="button" className="btn-secondary btn-sm shrink-0" disabled={withdrawing} onClick={onWithdraw}>
             Withdraw
           </button>
         </div>
       )}
-      <textarea
-        id={`entry-${c.id}`}
-        className={`${field} min-h-24 resize-y`}
-        value={text}
-        readOnly={busy}
-        maxLength={POST_MAX * 2}
-        placeholder={mine ? "Write a new entry…" : "Your answer to the challenge…"}
-        onChange={(e) => setText(e.target.value)}
-      />
+      <ol className="flex flex-col gap-1 text-xs font-semibold text-muted">
+        <li>
+          <b className="text-[#111318]">1.</b> Post your entry on X from the X account linked to your{" "}
+          <Link href="/profile" className="underline">
+            profile
+          </Link>
+          . Posts made before the challenge started don’t count.
+        </li>
+        <li>
+          <b className="text-[#111318]">2.</b> Paste its link here and add a line for the Board.
+        </li>
+      </ol>
+      <label className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 text-sm font-bold">
+          <XLogoIcon className="size-3.5" /> Your X post
+        </span>
+        <input
+          className={field}
+          value={link}
+          readOnly={busy}
+          inputMode="url"
+          placeholder="https://x.com/you/status/…"
+          aria-invalid={link.trim() !== "" && !linkOk}
+          onChange={(e) => setLink(e.target.value)}
+        />
+        {link.trim() !== "" && !tweet && <span className="text-xs font-bold text-danger">That isn’t the link of an X post.</span>}
+        {tooOld && <span className="text-xs font-bold text-danger">That X post was made before the challenge started. Post a new one for it.</span>}
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-sm font-bold">A line for the Board</span>
+        <textarea
+          className={`${field} min-h-16 resize-y`}
+          value={text}
+          readOnly={busy}
+          maxLength={POST_MAX * 2}
+          placeholder={mine ? "Say something about your new entry…" : "Say something about your entry…"}
+          onChange={(e) => setText(e.target.value)}
+        />
+      </label>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-muted" role="status">
           {post.isPending ? (postStage === "sending" ? "Signed. Posting it…" : "Confirm in your wallet…") : enter.isPending ? "Entering…" : `${POST_MAX - length} characters left`}
         </span>
-        <button type="submit" className="btn-primary btn-sm px-5" aria-busy={busy} disabled={busy || text.trim() === "" || length > POST_MAX}>
+        <button type="submit" className="btn-primary btn-sm px-5" aria-busy={busy} disabled={busy || !linkOk || text.trim() === "" || length > POST_MAX}>
           {busy && <Spinner />}
           {mine ? "Sign & replace" : "Sign & enter"}
         </button>
@@ -255,6 +311,7 @@ function EntryRow({
           <span className="text-xs font-normal text-muted">{ago(Math.floor(e.at / 1000), now)}</span>
         </p>
         <p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed ${e.text === null ? "italic text-muted" : ""}`}>{e.text ?? "This entry is hidden."}</p>
+        {e.x && <XPostCard id={e.x.id} card={e.x} now={now} />}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {canLike ? (
             <button

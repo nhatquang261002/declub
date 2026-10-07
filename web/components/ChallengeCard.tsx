@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChatIcon, ClockIcon, HeartIcon, LockIcon, PinIcon, TrophyIcon, UsersIcon } from "@/components/Icons";
+import { ChatIcon, ClockIcon, HeartIcon, LockIcon, PinIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useChallenge } from "@/hooks/useChallenges";
@@ -129,6 +129,10 @@ export function ChallengeFacts({ c }: { c: PublicChallenge }) {
         {c.judging === "likes" ? <HeartIcon className="size-3.5" /> : <UsersIcon className="size-3.5" />}
         {c.judging === "likes" ? "Most liked wins" : "Owner picks"}
       </span>
+      <span className="inline-flex items-center gap-1">
+        <XLogoIcon className="size-3" />
+        Enter with an X post
+      </span>
       {c.holdersOnly && (
         <span className="inline-flex items-center gap-1">
           <LockIcon className="size-3.5" />
@@ -217,7 +221,10 @@ export function ChallengeSummary({
                     <span className="block truncate text-xs font-extrabold">
                       <Who address={e.wallet} mine={e.mine} plain />
                     </span>
-                    <span className="block truncate text-sm text-muted">{e.text ?? "Hidden"}</span>
+                    <span className="flex min-w-0 items-center gap-1 text-sm text-muted">
+                      {e.x && <XLogoIcon className="size-3 shrink-0" />}
+                      <span className="truncate">{e.text === null ? "Hidden" : (e.x?.text ?? e.text)}</span>
+                    </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-muted" aria-label={`${e.likes} likes`}>
                     <HeartIcon className="size-3.5" filled={e.liked} />

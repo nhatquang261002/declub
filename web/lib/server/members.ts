@@ -3,6 +3,7 @@ import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { toScored, type ActivityEvent } from "../clubs";
 import {
+  HOLDER_SELF_RECHECK_MS,
   MAX_MEMBERS,
   RECHECK_PER_READ,
   coinRule,
@@ -115,6 +116,20 @@ async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps, coin:
   );
   if (!results.includes(true) && results.includes(null)) return row;
   return { ...row, holder: results.includes(true), holderCheckedAt: nowOf(deps) };
+}
+
+/**
+ * The member's row with the Holder badge re-read from the chain when its last check is older than
+ * `maxAge` (ms), saved if it changed; null for a non-member. For the member's own reads (their
+ * membership, a Holders-only entry), so an NFT bought in a swap counts within a minute rather than at
+ * the list's daily re-check (`HOLDER_RECHECK_MS`).
+ */
+export async function freshHolder(store: Store, entry: ClubEntry, userId: string, deps: MemberDeps = {}, maxAge = HOLDER_SELF_RECHECK_MS): Promise<MemberRow | null> {
+  const row = await getMember(store, entry.address, userId);
+  if (!row || nowOf(deps) - row.holderCheckedAt < maxAge) return row;
+  const next = await checked(entry, row, deps, (await coinRuleOf(store, entry))?.rule);
+  if (next !== row) await store.set(memberKey(entry.address, userId), next);
+  return next;
 }
 
 export type JoinResult =

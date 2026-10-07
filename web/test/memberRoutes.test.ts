@@ -317,6 +317,20 @@ describe("the routes", () => {
     assert.deepEqual((await getMember(store, NFT, "route-u2"))?.wallets, [W2]);
   });
 
+  it("a GET reads a non-Holder's wallets again after a minute, so an NFT just swapped for counts", async () => {
+    const t0 = Date.now();
+    const none = holdings({});
+    const first = membershipHandlers(reg, { gate: gateAs("route-u4", [account(getAddress(W2))]), holdings: none.fn, now: () => t0 });
+    assert.equal((await (await first.POST(req("POST"), ctx(NFT))).json()).holder, false);
+    const bought = holdings({ [W2]: 1n });
+    const soon = membershipHandlers(reg, { gate: gateAs("route-u4", [account(getAddress(W2))]), holdings: bought.fn, now: () => t0 + 30_000 });
+    assert.equal((await (await soon.GET(req(), ctx(NFT))).json()).holder, false);
+    assert.equal(bought.calls.length, 0, "not read again within a minute");
+    const later = membershipHandlers(reg, { gate: gateAs("route-u4", [account(getAddress(W2))]), holdings: bought.fn, now: () => t0 + 61_000 });
+    assert.equal((await (await later.GET(req(), ctx(NFT))).json()).holder, true);
+    assert.equal((await getMember(store, NFT, "route-u4"))?.holder, true);
+  });
+
   it("answers 401 signed out, 404 / 400 for no Club, 422 without a wallet, 409 archived", async () => {
     const out = membershipHandlers(reg, { gate: signedOut });
     assert.equal((await out.POST(req("POST"), ctx(NFT))).status, 401);

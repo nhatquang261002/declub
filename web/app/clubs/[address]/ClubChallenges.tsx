@@ -6,7 +6,7 @@ import { LoadError } from "@/components/ErrorPanel";
 import { Spinner } from "@/components/Spinner";
 import { useChallengeActions, useChallenges } from "@/hooks/useChallenges";
 import { useClubMembership } from "@/hooks/useClubMembership";
-import { CHALLENGE_RULES, type Judging } from "@/lib/challenges";
+import { CHALLENGE_RULES, isLive, type Judging } from "@/lib/challenges";
 import { REWARDS_EPOCH_SECONDS, REWARDS_GENESIS } from "@/lib/config";
 import { countdown } from "@/lib/format";
 import { epochAt, epochWindow } from "@/lib/rewards";
@@ -27,8 +27,8 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
 
   if (error && challenges.length === 0) return <LoadError title="Couldn’t load the challenges" error={error} />;
   if (!enabled) return <Empty title="No challenges on this server">This server isn’t keeping Club challenges.</Empty>;
-  const active = challenges.filter((c) => c.phase === "open" || c.phase === "closing" || c.phase === "judging");
-  const past = challenges.filter((c) => c.phase === "settled" || c.phase === "cancelled");
+  const active = challenges.filter((c) => isLive(c.phase));
+  const past = challenges.filter((c) => !isLive(c.phase));
 
   return (
     <div className="flex flex-col gap-5">

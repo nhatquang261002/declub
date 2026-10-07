@@ -7,7 +7,7 @@ import { listSystem } from "../lib/server/system";
 import { joinClub } from "../lib/server/members";
 import { getStore, memoryStore, type Store } from "../lib/server/store";
 import { timelineSystemHandler } from "../lib/server/systemRoutes";
-import { mergeClubs, newest, SYSTEM_MAX, SYSTEM_WINDOW_SEC, weave, type SystemEvent } from "../lib/systemFeed";
+import { mergeClubs, newest, SYSTEM_MAX, SYSTEM_WINDOW_SEC, weave, withoutPinned, type SystemEvent } from "../lib/systemFeed";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NOW = 1_800_000_000;
@@ -82,6 +82,19 @@ describe("weave", () => {
   it("shows nothing before any unpinned post has loaded, while more are to come", () => {
     assert.deepEqual(order(weave([], [event("e", 100)], { since, complete: false })), []);
     assert.deepEqual(order(weave([], [event("e", 100)], { since, complete: true })), ["[e]"]);
+  });
+});
+
+describe("withoutPinned", () => {
+  it("leaves out the start of a challenge pinned on the Board, and keeps its result and other challenges", () => {
+    const events = [
+      { ...event("challenge:a", 300, "challenge"), challenge: "a" },
+      { ...event("challenge-won:a", 400, "winner"), challenge: "a" },
+      { ...event("challenge:b", 200, "challenge"), challenge: "b" },
+      event("swap", 100),
+    ];
+    assert.deepEqual(withoutPinned(events, new Set(["a"])).map((e) => e.id), ["challenge-won:a", "challenge:b", "swap"]);
+    assert.equal(withoutPinned(events, new Set()).length, 4);
   });
 });
 
