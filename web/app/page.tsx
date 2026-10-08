@@ -52,8 +52,8 @@ export default function HomePage() {
               <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Every verified Monad NFT collection gets a Club. Members talk in posts they sign and own, trade inside it, and its active Holders
-              share the fees its swaps pay, every week.
+              A new way to have fun with your community. Grow together as a Club — your own market and social circle, where members talk,
+              make deals, climb the leaderboard and get rewarded along the way.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/clubs" className="btn-primary">
