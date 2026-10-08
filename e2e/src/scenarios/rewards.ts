@@ -89,23 +89,23 @@ export const rewardCases: Case<World>[] = [
 
       // Alice sells Bob an NFT for MON through the escrow: both sides pay the fee.
       const [sold] = await w.mintNfts(w.alice, 3);
-      await w.approveAll(w.alice, w.v2);
-      const fee = await w.v2Fee();
+      await w.approveAll(w.alice, w.escrow);
+      const fee = await w.escrowFee();
       const offered = [w.nftAsset(sold!)];
       const price = parseEther("0.001");
-      const created = await w.send(w.alice, w.v2, w.abi.v2, "createTrade", [offered, [w.monAsset(price)], zeroAddress, (await w.now()) + 3600n], fee);
-      const [ev] = w.events<{ tradeId: bigint }>(created, w.abi.v2, "TradeCreated", w.v2);
-      const filled = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [ev!.tradeId], price + fee);
+      const created = await w.send(w.alice, w.escrow, w.abi.escrow, "createTrade", [offered, [w.monAsset(price)], zeroAddress, (await w.now()) + 3600n], fee);
+      const [ev] = w.events<{ tradeId: bigint }>(created, w.abi.escrow, "TradeCreated", w.escrow);
+      const filled = await w.send(w.bob, w.escrow, w.abi.escrow, "fillTrade", [ev!.tradeId], price + fee);
 
       // The server records it as it would a report: from the receipt, with the fee it paid.
       const reader = {
         receipt: (hash: Hex) => w.pub.getTransactionReceipt({ hash }),
         timestamp: async (block: bigint) => Number((await w.pub.getBlock({ blockNumber: block })).timestamp),
-        trade: (contract: Address, id: bigint) => w.read(contract, w.abi.v2, "getTrade", [id]),
+        trade: (contract: Address, id: bigint) => w.read(contract, w.abi.escrow, "getTrade", [id]),
         proposalAssets: async () => [],
       };
       const club = (t: string) => (t.toLowerCase() === w.nft.toLowerCase() ? w.nft : null);
-      assert.equal(await app.recordActivity(store, filled.transactionHash, filled, { reader, contracts: [w.v2], clubOf: club }), 1);
+      assert.equal(await app.recordActivity(store, filled.transactionHash, filled, { reader, contracts: [w.escrow], clubOf: club }), 1);
       const events = await app.readActivity(store, w.nft);
       assert.equal(events.length, 1);
       assert.equal(events[0]!.fee, (2n * fee).toString(), "the activity log didn't keep the swap's fee");

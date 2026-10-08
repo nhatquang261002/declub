@@ -6,7 +6,7 @@ import { useReadContracts } from "wagmi";
 import { erc20Abi } from "viem";
 import { CHAIN_ID } from "@/lib/config";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 
 /**
  * Symbol and decimals read from each token contract. Anyone can list any ERC-20 in a deal, so the
@@ -44,7 +44,7 @@ export function useTokenInfo(tokens: readonly Address[]) {
 }
 
 /** `useTokenInfo` for every ERC-20 that appears in a list of DeClubEscrow deals. */
-export function useDealsTokenInfo(deals: readonly DealV2[]) {
+export function useDealsTokenInfo(deals: readonly Deal[]) {
   const tokens = useMemo(() => erc20Tokens(deals.flatMap((t) => [...t.offered, ...t.requested])), [deals]);
   return useTokenInfo(tokens);
 }

@@ -40,17 +40,17 @@ import { allVerified, sideTrust } from "@/lib/assetTrust";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
-import { useProposalsV2 } from "@/hooks/useProposalsV2";
+import { useProposals } from "@/hooks/useProposals";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTraitFill } from "@/hooks/useTraitFill";
-import { useDealV2 } from "@/hooks/useDealV2";
+import { useDeal } from "@/hooks/useDeal";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, feeUnits, formatAsset, nativeAsset, sameAsset, sideFee, type Asset } from "@/lib/assets";
-import { swapV2 } from "@/lib/contracts";
-import { DECLUB_ESCROW_ADDRESS, explorerAddress, SHOW_V2 } from "@/lib/config";
+import { swapEscrow } from "@/lib/contracts";
+import { DECLUB_ESCROW_ADDRESS, explorerAddress, SHOW_DEALS } from "@/lib/config";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
-import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
+import { isOpenOffer, type Deal } from "@/lib/deals";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 import { CopyAddress } from "@/components/CopyAddress";
 import { ShareDeal } from "@/components/ShareDeal";
@@ -58,16 +58,16 @@ import { ShareDeal } from "@/components/ShareDeal";
 const NO_ASSETS: readonly Asset[] = [];
 const ESCROW_ONLY = ["escrow"] as const;
 
-export default function DealV2Page() {
+export default function DealPage() {
   const params = useParams<{ id: string }>();
-  if (!SHOW_V2) return <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>;
+  if (!SHOW_DEALS) return <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>;
   if (!/^\d+$/.test(params.id)) return <EmptyState>Invalid deal id.</EmptyState>;
-  return <DealDetailV2 id={BigInt(params.id)} />;
+  return <DealDetail id={BigInt(params.id)} />;
 }
 
-function DealDetailV2({ id }: { id: bigint }) {
+function DealDetail({ id }: { id: bigint }) {
   const { address } = useConnection();
-  const { deal, note, traitClauses, isLoading, error } = useDealV2(id);
+  const { deal, note, traitClauses, isLoading, error } = useDeal(id);
   const now = useNow();
   const action = useTxFlow();
   const claim = useTxFlow();
@@ -78,7 +78,7 @@ function DealDetailV2({ id }: { id: bigint }) {
 
   // An open offer has no ask: takers send proposals and the maker picks one (ADR 0007).
   const openOffer = !!deal && isOpenOffer(deal);
-  const { proposals, total, hasMore, loadMore } = useProposalsV2(id, openOffer);
+  const { proposals, total, hasMore, loadMore } = useProposals(id, openOffer);
 
   const assets = useMemo(() => [...(deal?.offered ?? []), ...(deal?.requested ?? []), ...proposals.flatMap((p) => p.assets)], [deal, proposals]);
   const tokens = useMemo(() => erc20Tokens(assets), [assets]);
@@ -156,8 +156,8 @@ function DealDetailV2({ id }: { id: bigint }) {
     // What the maker asked for in MON, plus this wallet's share of the protocol fee: one per NFT it hands over.
     const value = requestedNative + sideFee(fee, deal!.requested);
     const receipt = traitFill.hasTraits
-      ? traitFill.fills && (await action.run({ ...swapV2!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
-      : await action.run({ ...swapV2!, functionName: "fillTrade", args: [id], value });
+      ? traitFill.fills && (await action.run({ ...swapEscrow!, functionName: "fillTraitTrade", args: [id, traitFill.fills], value }))
+      : await action.run({ ...swapEscrow!, functionName: "fillTrade", args: [id], value });
     if (receipt) record(id);
   }
 
@@ -288,12 +288,12 @@ function DealDetailV2({ id }: { id: bigint }) {
           {(status === "open" && isMaker) || status === "expired" || canFill || canPropose ? (
             <div className="flex flex-wrap items-center gap-3">
               {status === "open" && isMaker && (
-                <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapV2!, functionName: "cancelTrade", args: [id] })}>
+                <TxButton state={action.state} variant="danger" onClick={() => action.run({ ...swapEscrow!, functionName: "cancelTrade", args: [id] })}>
                   Cancel deal
                 </TxButton>
               )}
               {status === "expired" && (
-                <TxButton state={action.state} onClick={() => action.run({ ...swapV2!, functionName: "reclaimExpired", args: [id] })}>
+                <TxButton state={action.state} onClick={() => action.run({ ...swapEscrow!, functionName: "reclaimExpired", args: [id] })}>
                   {isMaker ? "Reclaim my assets" : "Return assets to maker"}
                 </TxButton>
               )}
@@ -336,7 +336,7 @@ function DealDetailV2({ id }: { id: bigint }) {
                 </span>
                 <TxButton
                   state={claim.state}
-                  onClick={() => claim.run({ ...swapV2!, functionName: "claim", args: [ASSET_TYPE[asset.kind], asset.token, asset.id] })}
+                  onClick={() => claim.run({ ...swapEscrow!, functionName: "claim", args: [ASSET_TYPE[asset.kind], asset.token, asset.id] })}
                 >
                   Claim
                 </TxButton>
@@ -393,7 +393,7 @@ function Dock({
   connected,
   children,
 }: {
-  deal: DealV2;
+  deal: Deal;
   status: DisplayStatus;
   isMaker: boolean;
   allowed: boolean;
@@ -473,12 +473,12 @@ function useCredits(account: `0x${string}` | undefined, assets: readonly Asset[]
     contracts: unique.map(
       (a) =>
         ({
-          ...swapV2!,
+          ...swapEscrow!,
           functionName: "claimable",
           args: [account!, ASSET_TYPE[a.kind], a.token, a.id],
         }) as const,
     ),
-    query: { enabled: !!account && !!swapV2 && unique.length > 0, refetchInterval: 8_000 },
+    query: { enabled: !!account && !!swapEscrow && unique.length > 0, refetchInterval: 8_000 },
   });
 
   return useMemo(

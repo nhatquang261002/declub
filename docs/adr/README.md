@@ -5,7 +5,7 @@ One file per decision, numbered in the order they were made. The **Status** line
 **Reading tips**
 
 - "Amended by" means a later record changed part of this one. Read both, newest last.
-- ADRs 0001–0020 keep the names they were written with: `OnDeal` is the deleted v1 escrow, `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents` ([0021](0021-declub-pivot.md)).
+- ADRs 0001–0020 keep the names they were written with: `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents` ([0021](0021-declub-pivot.md)).
 - To add one: copy the shape of a recent record, take the next number, add a row to the right table below, and link it from the spec it changes.
 
 ## Contracts and trading

@@ -1,9 +1,9 @@
 import { getAddress, isAddress, type Address } from "viem";
 import { toAsset, type Asset, type TokenInfo } from "./assets";
 import { DEFAULT_FILTERS, type DealFilters, type DealSort, type MonFilter } from "./dealFilters";
-import { applyDealFiltersV2, involvesToken } from "./dealFiltersV2";
+import { applyDealFilters, involvesToken } from "./dealFilters";
 import { isExpired, sameAddress, type DealStatus } from "./deals";
-import type { DealV2 } from "./dealsV2";
+import type { Deal } from "./deals";
 import { intentAsListing, intentToWire, parsePoolIntent, wireAsset, type PoolIntent, type SignedListing, type WireAsset } from "./intents";
 
 /**
@@ -15,7 +15,7 @@ import { intentAsListing, intentToWire, parsePoolIntent, wireAsset, type PoolInt
 export type DealTab = "open" | "for-you" | "all";
 /** Which settlement to show: both, deals with locked assets, or signed swaps (ADR 0008). */
 export type BookKind = "any" | "locked" | "signed";
-type Listing = DealV2 | SignedListing;
+type Listing = Deal | SignedListing;
 
 export type BookQuery = {
   tab: DealTab;
@@ -92,7 +92,7 @@ export function parseBookQuery(p: URLSearchParams): BookQuery | string {
 
 /** What the server filters: the whole locked book, newest first, and the pool's signed swaps. */
 export type BookSource = {
-  deals: readonly DealV2[];
+  deals: readonly Deal[];
   /** Live signed swaps, newest first. */
   openSigned: readonly SignedListing[];
   /** Signed swaps of every status, for the "all" tab. */
@@ -116,7 +116,7 @@ export function pageBook(source: BookSource, q: BookQuery, now: number): BookRes
   const locked = q.kind !== "signed" ? source.deals : [];
   const signed = (list: readonly SignedListing[]) => (q.kind !== "locked" ? list : []);
   const forToken = (t: Listing) => q.tokens.length === 0 || q.tokens.some((token) => involvesToken(t, token));
-  const filter = (list: Listing[]) => applyDealFiltersV2(list.filter(forToken), q.filters, now, source.info);
+  const filter = (list: Listing[]) => applyDealFilters(list.filter(forToken), q.filters, now, source.info);
 
   // Signed swaps first: they carry no timestamp or id to order them against deals by, and
   // "Ending soon" re-sorts the two together anyway.
@@ -185,7 +185,7 @@ function fromWireAsset(v: WireAsset): Asset | null {
   return toAsset({ assetType: v.assetType, token: getAddress(v.token), id, amount });
 }
 
-function fromWireDeal(v: WireDeal): DealV2 | null {
+function fromWireDeal(v: WireDeal): Deal | null {
   const id = uint(v?.id);
   const expiry = uint(v?.expiry);
   const fee = uint(v?.fee);

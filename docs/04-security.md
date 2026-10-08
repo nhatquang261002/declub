@@ -4,7 +4,7 @@
 
 > **Every escrowed asset has a deterministic path to settlement or refund. Nothing is ever locked forever.**
 
-The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow) and [`DeClubIntents`](#declubintents) each have their own invariants, threats and tests. The first contract, a Chog-only escrow (v1), was deleted in [ADR 0021](adr/0021-declub-pivot.md); its record is in git history.
+The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow) and [`DeClubIntents`](#declubintents) each have their own invariants, threats and tests.
 
 ## Trust model
 
@@ -22,7 +22,7 @@ The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow
 
 `forge lint` is clean. Intentional patterns are suppressed inline with a reason, so any new finding stands out.
 
-**Slither 0.11.4 on everything** (`slither . --filter-paths "lib/|test/|script/|src/mocks/"`, run 2026-10-03 over `DeClubEscrow`, `DeClubIntents`, `FeeAdmin` and the since-deleted v1) returned 102 results, none of them a bug. The rows for v1 are left out:
+**Slither 0.11.4 on everything** (`slither . --filter-paths "lib/|test/|script/|src/mocks/"`, run 2026-10-03 over `DeClubEscrow`, `DeClubIntents` and `FeeAdmin`) returned 102 results, none of them a bug:
 
 | Detector | Impact | Where | Verdict |
 |---|---|---|---|

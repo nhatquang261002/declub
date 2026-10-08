@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
-import { AssetSide, DealCardV2 } from "@/components/DealCardV2";
+import { AssetSide, DealCard } from "@/components/DealCard";
 import { ExpiryCountdown, SettlementTag, SwapCardShell } from "@/components/DealParts";
 import { Masonry } from "@/components/Masonry";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
 import { explorerTx } from "@/lib/config";
 import { sameAddress } from "@/lib/deals";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { SETTLEMENT_GUIDE } from "@/lib/settlementTerms";
 import { Who } from "@/components/Who";
 import type { StampStatus } from "@/components/DealSheet";
@@ -165,7 +165,7 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
  * Deals and signed swaps in one grid, each tagged with how it settles. A signed swap links to
  * its own page (it has no deal id); everything else is an ordinary deal card.
  */
-export function ListingGrid({ listings, now, me, info }: { listings: readonly DealV2[]; now: number; me?: string; info: Info }) {
+export function ListingGrid({ listings, now, me, info }: { listings: readonly Deal[]; now: number; me?: string; info: Info }) {
   // Two columns, filled without gaps: a card is as tall as its longer side (assets stack), so a
   // plain grid leaves holes beside the cards with a bundle.
   return (
@@ -184,7 +184,7 @@ export function ListingGrid({ listings, now, me, info }: { listings: readonly De
         isSignedListing(listing) ? (
           <IntentCard key={listing.signed.hash} row={listing.signed} now={now} me={me} info={info} />
         ) : (
-          <DealCardV2 key={listing.id.toString()} deal={listing} now={now} me={me} info={info} tag={<SettlementTag signed={false} />} />
+          <DealCard key={listing.id.toString()} deal={listing} now={now} me={me} info={info} tag={<SettlementTag signed={false} />} />
         )
       }
     />

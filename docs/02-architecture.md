@@ -5,17 +5,17 @@
 ```text
  ┌─────────────────────────────── Browser ────────────────────────────────┐
  │  Next.js (App Router, TypeScript, Tailwind)                            │
- │    ├─ pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash]     │
+ │    ├─ pages: / · /deals · /create · /deal/[id] · /intent/[hash]     │
  │    │         /history · /clubs · /clubs/[address] · /profile/[address] · /settings           │
  │    │         /guide · /guide/clubs                                     │
- │    └─ hooks: useDealBook · useDealsV2 · useDealV2 · usePool            │
+ │    └─ hooks: useDealBook · useDeals · useDeal · usePool            │
  │              useFills · useNotifications · useTxFlow · useSignFlow     │
  │  wagmi + viem, Privy sign-in (injected-wallet fallback)                │
  └────┬───────────────────┬─────────────────────────────────┬─────────────┘
       │ RPC reads, txs    │ /api/*                          │ intents (HTTP)
       │ EIP-712 sigs      ▼                                 ▼
       │   ┌── Next.js server (web/app/api) ───┐   ┌────── matcher/ ──────┐
-      │   │ /api/deals: book of V2 + pool     │   │ pool: HTTP + sqlite  │
+      │   │ /api/deals: book of deals + pool     │   │ pool: HTTP + sqlite  │
       │   │ /api/cron/fills: fill watcher     │   │ matcher: pairs and   │
       │   │ /api/webhooks/privy (svix)        │   │ rings of up to 4,    │
       │   │ profiles, saves, Clubs, activity  │   │ simulate → settle    │
@@ -165,7 +165,7 @@ declub/
 | Explorers | [MonadVision](https://testnet.monadvision.com/), [Monadscan](https://testnet.monadscan.com/) | |
 | Verification | Sourcify: `https://sourcify-api-monad.blockvision.org/` | |
 
-The first deployment's creation bytecode (the v1 escrow and MockChog; solc 0.8.28, `evm_version = prague`) was gas-estimated against the Monad testnet node before it was sent, so Monad's own EVM accepts it, not only Foundry's local EVM. The later contracts use the same compiler settings and were deployed the same way.
+Creation bytecode (solc 0.8.28, `evm_version = prague`) is gas-estimated against the Monad testnet node before it is sent, so Monad's own EVM accepts it, not only Foundry's local EVM.
 
 ### Deployed (testnet)
 

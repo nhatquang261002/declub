@@ -2,7 +2,7 @@ import { getAddress, hashStruct, isAddress, type Address, type Hex } from "viem"
 import { nftCount, toAsset, toRawAsset, type Asset } from "./assets";
 import { CHAIN_ID, MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE } from "./config";
 import { sameAddress } from "./deals";
-import type { DealV2 } from "./dealsV2";
+import type { Deal } from "./deals";
 
 // Signed trade intents (ADR 0008, 0009). Everything here mirrors matcher/src/intent.ts and
 // matcher/src/wire.ts: the EIP-712 types, the struct hash that identifies an intent, and the
@@ -299,7 +299,7 @@ export const nonceBit = (nonce: bigint) => ({ word: nonce >> 8n, mask: 1n << (no
  * of filters (search, MON, sort). `id` is -1n so a numeric search never matches it; the card links
  * by `signed.hash` instead. An intent has no counterparty, so `taker` is always null.
  */
-export type SignedListing = DealV2 & { signed: PoolIntent };
+export type SignedListing = Deal & { signed: PoolIntent };
 
 export const intentAsListing = (row: PoolIntent): SignedListing => ({
   id: -1n,
@@ -315,4 +315,4 @@ export const intentAsListing = (row: PoolIntent): SignedListing => ({
   signed: row,
 });
 
-export const isSignedListing = (listing: DealV2): listing is SignedListing => "signed" in listing;
+export const isSignedListing = (listing: Deal): listing is SignedListing => "signed" in listing;

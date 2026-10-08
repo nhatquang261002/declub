@@ -9,7 +9,7 @@ Three tools. The unit, fuzz and invariant suites in `contracts/`, `matcher/` and
 | `npm run verify` | Read-only checks of a deployment (DEP) | **No.** Safe on mainnet |
 | `npm run web -- --url <app>` | HTTP smoke tests of a running app (WEB) | No |
 
-Each run prints a line per case and writes `results/<run>-<time>.{json,md}`; the `.md` table pastes into a test-plan run record. Exit code 1 means something failed. `--only V2,IN-02` runs the cases whose IDs start with those prefixes.
+Each run prints a line per case and writes `results/<run>-<time>.{json,md}`; the `.md` table pastes into a test-plan run record. Exit code 1 means something failed. `--only ESC,IN-02` runs the cases whose IDs start with those prefixes.
 
 `../scripts/test-all.sh` runs every suite in the repo plus `npm run local` in one go.
 
@@ -18,7 +18,7 @@ Each run prints a line per case and writes `results/<run>-<time>.{json,md}`; the
 ```bash
 cd contracts && forge build          # the scenarios read ABIs and bytecode from contracts/out
 cd ../matcher && npm install         # for IN-08 (the local run starts the real matcher)
-cd ../web && npm install             # V2-06 builds its Merkle set with the app's web/lib/merkle.ts
+cd ../web && npm install             # ESC-06 builds its Merkle set with the app's web/lib/merkle.ts
 cd ../e2e && npm install
 ```
 
@@ -28,15 +28,15 @@ Needs Node 24+, and `anvil` for the local run.
 
 | ID | Scenario |
 |---|---|
-| V2-01 | Exact swap: NFT for ERC-20 + MON, filled by anyone; `FeeCharged` is both sides' share |
-| V2-02 | Cancel returns NFT, ERC-20, MON and the fee share; only the maker can cancel; a cancelled deal can't be filled |
-| V2-03 | Expiry: a late fill reverts; anyone reclaims to the maker |
-| V2-04 | Private deal: only the named taker fills |
-| V2-05 | Open offer: two proposals, reject one, accept one, a third withdrawn; `fillTrade` refused |
-| V2-06 | Trait deal with the app's Merkle builder; a token outside the set is refused |
-| V2-07 | Multi-asset deal, gas recorded; the fee is 5 NFTs × the per-NFT fee |
-| V2-09 | The fee is per NFT: a 5-NFT bundle pays for every NFT, a side with none pays once, a 6th NFT is refused |
-| V2-08 | Guards: self-fill, wrong MON amount (and a missing fee share), duplicate asset, past expiry, empty side, MON sent straight to the contract |
+| ESC-01 | Exact swap: NFT for ERC-20 + MON, filled by anyone; `FeeCharged` is both sides' share |
+| ESC-02 | Cancel returns NFT, ERC-20, MON and the fee share; only the maker can cancel; a cancelled deal can't be filled |
+| ESC-03 | Expiry: a late fill reverts; anyone reclaims to the maker |
+| ESC-04 | Private deal: only the named taker fills |
+| ESC-05 | Open offer: two proposals, reject one, accept one, a third withdrawn; `fillTrade` refused |
+| ESC-06 | Trait deal with the app's Merkle builder; a token outside the set is refused |
+| ESC-07 | Multi-asset deal, gas recorded; the fee is 5 NFTs × the per-NFT fee |
+| ESC-09 | The fee is per NFT: a 5-NFT bundle pays for every NFT, a side with none pays once, a 6th NFT is refused |
+| ESC-08 | Guards: self-fill, wrong MON amount (and a missing fee share), duplicate asset, past expiry, empty side, MON sent straight to the contract |
 | IN-01 | EIP-712 domain, struct hash and digest agree with the contract |
 | IN-02 | Pair settled by a third party; each maker pays the fee in WMON |
 | IN-03 | Ring of 3 |
@@ -84,7 +84,7 @@ Run it against a deployment of the current source (`npm run verify` shows what i
 | `E2E_RPC_URL` | Default `NEXT_PUBLIC_RPC_URL` |
 | `E2E_ENV_FILE` | Read another env file instead of the root `.env` |
 
-V2-03 waits about 20 s of real time for a deal to expire.
+ESC-03 waits about 20 s of real time for a deal to expire.
 
 ## Verify (DEP)
 
@@ -105,7 +105,7 @@ npm run verify -- --mainnet        # mainnet rules: warnings become failures, ev
 | DEP-08 | Assets per side 10, NFTs per side 5, max cycle 4 |
 | DEP-09 | App env: `NEXT_PUBLIC_CHOG_ADDRESS` set and deployed, `FILL_WATCHER_START_BLOCK` set |
 
-Expectations, all optional except under `--mainnet`: `EXPECT_FEE_WEI`, `EXPECT_MAX_FEE_WEI`, `EXPECT_FEE_RECIPIENT`, `EXPECT_FEE_ADMIN`, `EXPECT_FEE_TOKEN`. Override the addresses with `VERIFY_V2_ADDRESS`, `VERIFY_INTENTS_ADDRESS` and `VERIFY_RPC_URL`.
+Expectations, all optional except under `--mainnet`: `EXPECT_FEE_WEI`, `EXPECT_MAX_FEE_WEI`, `EXPECT_FEE_RECIPIENT`, `EXPECT_FEE_ADMIN`, `EXPECT_FEE_TOKEN`. Override the addresses with `VERIFY_ESCROW_ADDRESS`, `VERIFY_INTENTS_ADDRESS` and `VERIFY_RPC_URL`.
 
 ## Web smoke (WEB)
 
@@ -117,7 +117,7 @@ npm run web -- --url https://<preview> --expect-live   # store, Privy, cron and 
 
 | ID | Check |
 |---|---|
-| WEB-01 | Every page answers 200 without the error boundary; `/v2/create`, `/intents/new` and `/intents` redirect; unknown pages 404 |
+| WEB-01 | Every page answers 200 without the error boundary; `/create`, `/intents/new` and `/intents` redirect; unknown pages 404 |
 | WEB-02 | Security headers on pages and API routes (and HSTS on HTTPS) |
 | WEB-03 | `/api/deals` answers a page of the book, and says whether signed swaps loaded |
 | WEB-04 | `/api/state`, `/api/profile`, `/api/me/clubs` refuse anonymous and forged-token callers |

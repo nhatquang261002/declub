@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useReadContract } from "wagmi";
-import { swapV2 } from "@/lib/contracts";
-import { toProposal, type ProposalV2 } from "@/lib/proposals";
+import { swapEscrow } from "@/lib/contracts";
+import { toProposal, type Proposal } from "@/lib/proposals";
 
 const PAGE = 20;
 
@@ -11,12 +11,12 @@ const PAGE = 20;
  * The newest proposals on an open offer, newest first. `proposalCount` then one `getProposals`
  * page, like the deal list (ADR 0004): no logs, no indexer. `loadMore` widens the window.
  */
-export function useProposalsV2(dealId: bigint, enabled: boolean) {
+export function useProposals(dealId: bigint, enabled: boolean) {
   const [limit, setLimit] = useState(PAGE);
-  const active = enabled && !!swapV2;
+  const active = enabled && !!swapEscrow;
 
   const count = useReadContract({
-    ...swapV2!,
+    ...swapEscrow!,
     functionName: "proposalCount",
     args: [dealId],
     query: { enabled: active, refetchInterval: 6_000 },
@@ -25,7 +25,7 @@ export function useProposalsV2(dealId: bigint, enabled: boolean) {
   const offset = total > BigInt(limit) ? total - BigInt(limit) : 0n;
 
   const page = useReadContract({
-    ...swapV2!,
+    ...swapEscrow!,
     functionName: "getProposals",
     args: [dealId, offset, BigInt(limit)],
     query: {
@@ -36,7 +36,7 @@ export function useProposalsV2(dealId: bigint, enabled: boolean) {
   });
 
   const proposals = useMemo(() => {
-    const out: ProposalV2[] = [];
+    const out: Proposal[] = [];
     page.data?.forEach((raw, i) => {
       const proposal = toProposal(dealId, offset + BigInt(i), raw);
       if (proposal) out.push(proposal);

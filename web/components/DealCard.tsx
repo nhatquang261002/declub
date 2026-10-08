@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { formatUnits } from "viem";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { CHOG_ADDRESS } from "@/lib/config";
-import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
+import { isOpenOffer, type Deal } from "@/lib/deals";
 import { ChogThumb } from "./Chog";
 import { MonPill, DealCardFrame } from "./DealParts";
 import { CopyAddress } from "@/components/CopyAddress";
@@ -102,10 +102,10 @@ function OpenToOffers() {
   );
 }
 
-export function DealCardV2({ deal, now, me, info, tag }: { deal: DealV2; now: number; me?: string; info: Info; tag?: ReactNode }) {
+export function DealCard({ deal, now, me, info, tag }: { deal: Deal; now: number; me?: string; info: Info; tag?: ReactNode }) {
   return (
     <DealCardFrame
-      href={`/v2/deal/${deal.id}`}
+      href={`/deal/${deal.id}`}
       deal={deal}
       now={now}
       me={me}

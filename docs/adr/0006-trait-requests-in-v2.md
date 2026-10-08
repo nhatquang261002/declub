@@ -4,7 +4,7 @@
 
 ## Context
 
-[ADR 0005](0005-generic-asset-model.md) left trait requests ("any Chog with a Crown hat") on v1, because they need a Merkle set per collection and proofs at fill time. Keeping them there means the flagship feature can't be combined with the rest of V2 (a Chog for MON plus a token, say), and v1's version has a flaw of its own: it stores one number, `requestedCount`, as both the size of the Merkle set and the number of ids the taker must hand over. A trade for "any 1 Crown Chog" is impossible; the taker has to supply every id in the set.
+[ADR 0005](0005-generic-asset-model.md) left trait requests ("any Chog with a Crown hat") out, because they need a Merkle set per collection and proofs at fill time. Leaving them out means the flagship feature can't be combined with the rest of V2 (a Chog for MON plus a token, say). A design that stores one number, `requestedCount`, as both the size of the Merkle set and the number of ids the taker must hand over can't express "any 1 Crown Chog": the taker has to supply every id in the set.
 
 Two more needs came up:
 
@@ -27,7 +27,7 @@ An `ERC721Trait` asset fits the existing `Asset` struct, so `getTrade` and `Trad
 | `id` | the Merkle root of the allowed ids, as a `uint256` |
 | `amount` | how many NFTs the taker hands over, `1..MAX_ASSETS_PER_SIDE` |
 
-The set's size never goes on-chain, so "any 1 of 40 Crown Chogs" is expressible. Leaves are `keccak256(abi.encode(token, tokenId))` and the tree is a sorted-pair tree, the same as v1's leaves, so `web/lib/merkle.ts` builds both. A test pins a root and proof produced by the TypeScript builder to the contract's OpenZeppelin verifier.
+The set's size never goes on-chain, so "any 1 of 40 Crown Chogs" is expressible. Leaves are `keccak256(abi.encode(token, tokenId))` and the tree is a sorted-pair tree, so `web/lib/merkle.ts` builds it. A test pins a root and proof produced by the TypeScript builder to the contract's OpenZeppelin verifier.
 
 **Requested side only.** A trait set is something only a taker can pay: nothing in escrow could match it. Creation rejects it on the offered side and in proposals (`InvalidAsset`), along with a zero root, a zero or oversized `amount`, and a token that isn't a contract. Two trait assets with the same collection and root are `DuplicateAsset`, like any other duplicate.
 
@@ -57,7 +57,7 @@ A collection is refused if it isn't an ERC-721, has no `totalSupply`, has non-se
 
 ## Trust model
 
-Unchanged from v1: the contract trusts the root the maker set, and proves only that each id is in that set. It can't know what the set means, or whether the spec is honest.
+The contract trusts the root the maker set, and proves only that each id is in that set. It can't know what the set means, or whether the spec is honest.
 
 Before a taker's client offers a fill, it rebuilds each set from the spec and the collection's traits and checks the root equals the deal's. If it doesn't (a lying maker, a stale spec, changed metadata, a scan the taker's server can't do), the deal is shown with a warning and can't be accepted from the app. A deal whose spec is missing or unreadable is treated the same way. Nothing is lost either way: the maker can still cancel, and the contract still enforces the set.
 
@@ -68,5 +68,4 @@ Before a taker's client offers a fill, it rebuilds each set from the spec and th
 - The maker's set is fixed at creation. NFTs whose traits change afterwards stay in or out of it; a mutable collection can make the rebuilt root differ, which blocks filling from the app.
 - The scan is a server feature, so it needs the Next.js server (not a static export), reads the RPC hard on first use of a collection, and refuses collections above 10,000 tokens. An indexer could replace it later without touching the contract.
 - The list of deals shows a trait request as "By trait, any N" and the collection. The traits themselves load on the deal page, which reads the spec.
-- v1's trait trades still work as before. Nothing about them changes, and the `requestedCount` flaw stays there.
 - Needs external review like the rest of V2. Verified so far: unit and fuzz tests, 100% coverage of `OnDealV2`, and the scan against the deployed MockChog. Not yet exercised: a deployed V2 with the new ABI, and the create and fill screens against it.

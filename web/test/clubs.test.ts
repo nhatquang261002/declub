@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { getAddress, type Address, type Hex } from "viem";
 import { completedSwaps, heat, initials, mergeEvents, settlementEvents, summarize, toClubInfo, type ActivityEvent } from "../lib/clubs";
-import { involvesToken, offersToken, requestsToken } from "../lib/dealFiltersV2";
-import type { DealV2 } from "../lib/dealsV2";
+import { involvesToken, offersToken, requestsToken } from "../lib/dealFilters";
+import type { Deal } from "../lib/deals";
 import type { Settlement } from "../lib/intents";
 import { activityKey } from "../lib/server/activity";
 import { clubDetail, clubEvents, clubList } from "../lib/server/clubs";
@@ -147,7 +147,7 @@ describe("toClubInfo", () => {
 
 describe("deal token helpers", () => {
   const asset = (kind: "erc721" | "erc20" | "native" | "trait", token: Address) => ({ kind, token, id: 1n, amount: 1n });
-  const deal = (offered: DealV2["offered"], requested: DealV2["requested"]) => ({ offered, requested });
+  const deal = (offered: Deal["offered"], requested: Deal["requested"]) => ({ offered, requested });
 
   it("tells giving from asking, in any case", () => {
     const d = deal([asset("erc721", NFT)], [asset("erc20", USD)]);

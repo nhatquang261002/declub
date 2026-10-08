@@ -1,10 +1,10 @@
 import { createPublicClient, erc20Abi, http, type PublicClient } from "viem";
 import { chain } from "../chain";
 import { DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
-import { swapV2Abi } from "../contracts";
+import { swapEscrowAbi } from "../contracts";
 import { displayStatus } from "../deals";
 import { cardItems, describeAssets, type DealFacts } from "../dealShare";
-import { isOpenOffer, toDealV2, type RawDealV2 } from "../dealsV2";
+import { isOpenOffer, toDeal, type RawDeal } from "../deals";
 import { erc20Tokens, type TokenInfo } from "../assets";
 import { registry } from "../verifiedAssets";
 
@@ -19,8 +19,8 @@ export async function readDealFacts(id: string, nowSec = Math.floor(Date.now() /
   if (!DECLUB_ESCROW_ADDRESS || !/^\d{1,18}$/.test(id)) return null;
   try {
     client ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
-    const raw = (await client.readContract({ address: DECLUB_ESCROW_ADDRESS, abi: swapV2Abi, functionName: "getTrade", args: [BigInt(id)] })) as RawDealV2;
-    const deal = toDealV2(BigInt(id), raw);
+    const raw = (await client.readContract({ address: DECLUB_ESCROW_ADDRESS, abi: swapEscrowAbi, functionName: "getTrade", args: [BigInt(id)] })) as RawDeal;
+    const deal = toDeal(BigInt(id), raw);
     if (!deal) return null;
 
     const tokens = erc20Tokens([...deal.offered, ...deal.requested]);

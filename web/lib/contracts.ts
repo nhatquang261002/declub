@@ -29,10 +29,10 @@ const erc20Errors = [
   },
   { type: "error", name: "SafeERC20FailedOperation", inputs: [{ name: "token", type: "address" }] },
 ] as const satisfies Abi;
-export const swapV2Abi = [...deClubEscrowAbi, ...chogErrors, ...erc20Errors] as const;
+export const swapEscrowAbi = [...deClubEscrowAbi, ...chogErrors, ...erc20Errors] as const;
 
-/** Spread into read/write calls: `{ ...swapV2, functionName, args }`. Undefined until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set. */
-export const swapV2 = DECLUB_ESCROW_ADDRESS ? ({ address: DECLUB_ESCROW_ADDRESS, abi: swapV2Abi, chainId: CHAIN_ID } as const) : undefined;
+/** Spread into read/write calls: `{ ...swapEscrow, functionName, args }`. Undefined until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set. */
+export const swapEscrow = DECLUB_ESCROW_ADDRESS ? ({ address: DECLUB_ESCROW_ADDRESS, abi: swapEscrowAbi, chainId: CHAIN_ID } as const) : undefined;
 
 /**
  * DeClubIntents (ADR 0008). It holds no assets, so the only call the app makes is

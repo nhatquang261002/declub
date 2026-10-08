@@ -2,18 +2,18 @@
 
 import { useMemo } from "react";
 import { useReadContract, useReadContracts } from "wagmi";
-import { swapV2 } from "@/lib/contracts";
-import { toDealV2, type DealV2 } from "@/lib/dealsV2";
+import { swapEscrow } from "@/lib/contracts";
+import { toDeal, type Deal } from "@/lib/deals";
 
 /**
  * The newest `limit` DeClubEscrow deals, newest first. Same approach as the original deal list
  * (ADR 0004): `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
  * Returns nothing while DeClubEscrow isn't configured.
  */
-export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
-  const active = enabled && !!swapV2;
+export function useDeals({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
+  const active = enabled && !!swapEscrow;
   const count = useReadContract({
-    ...swapV2!,
+    ...swapEscrow!,
     functionName: "tradeCount",
     query: { enabled: active, refetchInterval: 5_000 },
   });
@@ -26,7 +26,7 @@ export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; en
   }, [total, limit]);
 
   const results = useReadContracts({
-    contracts: ids.map((id) => ({ ...swapV2!, functionName: "getTrade", args: [id] }) as const),
+    contracts: ids.map((id) => ({ ...swapEscrow!, functionName: "getTrade", args: [id] }) as const),
     query: {
       enabled: active && ids.length > 0,
       refetchInterval: 8_000,
@@ -35,10 +35,10 @@ export function useDealsV2({ limit = 200, enabled = true }: { limit?: number; en
   });
 
   const deals = useMemo(() => {
-    const out: DealV2[] = [];
+    const out: Deal[] = [];
     results.data?.forEach((r, i) => {
       if (r.status !== "success" || ids[i] === undefined) return;
-      const deal = toDealV2(ids[i], r.result);
+      const deal = toDeal(ids[i], r.result);
       if (deal) out.push(deal);
     });
     return out;

@@ -37,8 +37,13 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: { root: __dirname },
   // The account page is now the account settings, and the profile has a page of its own (ADR 0042).
+  // Deal pages lost their /v2 prefix; shared links to the old paths keep working.
   async redirects() {
-    return [{ source: "/account", destination: "/settings", permanent: true }];
+    return [
+      { source: "/account", destination: "/settings", permanent: true },
+      { source: "/v2/deal/:id", destination: "/deal/:id", permanent: true },
+      { source: "/v2/create", destination: "/create", permanent: true },
+    ];
   },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];

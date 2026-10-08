@@ -24,7 +24,7 @@ type Market = ReturnType<typeof useClubMarket>;
 /** A completed swap links to its deal, or for a signed swap to its transaction. */
 function swapHref(e: ActivityEvent) {
   const signed = !!DECLUB_INTENTS_ADDRESS && e.contract === DECLUB_INTENTS_ADDRESS.toLowerCase();
-  return signed ? explorerTx(e.deal) : `/v2/deal/${e.deal}`;
+  return signed ? explorerTx(e.deal) : `/deal/${e.deal}`;
 }
 
 function RecentSwaps({ events, now }: { events: readonly ActivityEvent[]; now: number }) {

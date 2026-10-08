@@ -32,7 +32,7 @@ const COLOR: Record<Outcome, string> = { pass: "32", fail: "31", skip: "90", war
 const tty = process.stdout.isTTY;
 const paint = (o: Outcome, s: string) => (tty ? `\x1b[${COLOR[o]}m${s}\x1b[0m` : s);
 
-/** `--only V2,IN-02` keeps cases whose id starts with any of the prefixes. */
+/** `--only ESC,IN-02` keeps cases whose id starts with any of the prefixes. */
 export function selected(id: string, only?: string): boolean {
   if (!only || only === "true") return true;
   return only.split(",").some((p) => id.toUpperCase().startsWith(p.trim().toUpperCase()));

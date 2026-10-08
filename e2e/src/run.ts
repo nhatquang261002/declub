@@ -4,7 +4,7 @@
  *   node src/run.ts --target local     fresh anvil, the real deploy scripts, the matcher process
  *   node src/run.ts --target testnet   the addresses in the root .env, funded E2E wallets
  *
- * Options: --only V2,IN-02 (id prefixes)  --no-matcher (local)
+ * Options: --only ESC,IN-02 (id prefixes)  --no-matcher (local)
  * Writes e2e/results/e2e-<target>-<time>.{json,md}. Exits 1 if anything failed.
  */
 import { existsSync } from "node:fs";
@@ -18,7 +18,7 @@ import { type WorldConfig, makeWorld } from "./lib/world.ts";
 import { feeCases } from "./scenarios/fee.ts";
 import { intentCases } from "./scenarios/intents.ts";
 import { rewardCases } from "./scenarios/rewards.ts";
-import { v2Cases } from "./scenarios/v2.ts";
+import { escrowCases } from "./scenarios/escrow.ts";
 
 /** The original testnet MockChog, which anyone can mint from. */
 const TESTNET_MOCK_CHOG = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
@@ -42,7 +42,7 @@ function testnetConfig(): WorldConfig {
     target: "testnet",
     chainId,
     rpcUrl: str("E2E_RPC_URL", str("NEXT_PUBLIC_RPC_URL", "https://testnet-rpc.monad.xyz")),
-    v2: needAddr("NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
+    escrow: needAddr("NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
     intents: needAddr("NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS"),
     usd: needAddr("E2E_ERC20_ADDRESS", "NEXT_PUBLIC_MOCK_ERC20_ADDRESS"),
     nft: addr("E2E_NFT_ADDRESS") ?? TESTNET_MOCK_CHOG,
@@ -77,7 +77,7 @@ async function main() {
   try {
     Object.assign(meta, {
       chainId: String(w.chainId),
-      v2: w.v2,
+      escrow: w.escrow,
       intents: w.intents,
       nft: w.nft,
       erc20: w.usd,
@@ -85,7 +85,7 @@ async function main() {
       pool: w.poolUrl ?? "none",
     });
     for (const [label, a] of [
-      ["DeClubEscrow", w.v2],
+      ["DeClubEscrow", w.escrow],
       ["DeClubIntents", w.intents],
       ["NFT", w.nft],
       ["ERC-20", w.usd],
@@ -101,10 +101,10 @@ async function main() {
         console.log(`  ${who.name.padEnd(8)} ${who.address} ${w.fmt(await w.monOf(who.address))} MON`);
       }
     }
-    console.log(`fees: DeClubEscrow ${w.fmt(await w.v2Fee())} MON, DeClubIntents ${w.fmt(await w.intentsFee())} WMON per side\n`);
+    console.log(`fees: DeClubEscrow ${w.fmt(await w.escrowFee())} MON, DeClubIntents ${w.fmt(await w.intentsFee())} WMON per side\n`);
 
     // Fee cases go last: FA-04 moves a local chain's clock a week ahead.
-    const results = await runCases([...v2Cases, ...intentCases, ...rewardCases, ...feeCases], w, only);
+    const results = await runCases([...escrowCases, ...intentCases, ...rewardCases, ...feeCases], w, only);
     process.exitCode = finish(`e2e-${target}`, results, meta);
   } finally {
     w.stop();

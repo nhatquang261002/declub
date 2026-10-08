@@ -17,7 +17,7 @@ import { loadState, saveState } from "@/lib/userState";
 import { subscribeStorage } from "./subscribeStorage";
 import { useAccessToken } from "./useAccessToken";
 import { useNow } from "./useNow";
-import { useDealsV2 } from "./useDealsV2";
+import { useDeals } from "./useDeals";
 import { useIntents } from "./usePool";
 
 // Notifications are derived from deal state (lib/notifications.ts). All that is stored is which
@@ -68,7 +68,7 @@ const canAlert = () => typeof window !== "undefined" && "Notification" in window
 export function useNotifications() {
   const { address } = useConnection();
   const now = useNow(30_000);
-  const { deals, isLoading: dealsLoading } = useDealsV2({ limit: 200, enabled: !!address });
+  const { deals, isLoading: dealsLoading } = useDeals({ limit: 200, enabled: !!address });
 
   // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
   const intents = useIntents({ status: "all", maker: address, enabled: !!address });

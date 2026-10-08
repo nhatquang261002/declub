@@ -157,7 +157,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 - `want` is a floor: ERC-20 amounts are minimums, NFTs are exact ids. Each `give` is paid in full, so anything beyond the next maker's `want` (a larger amount, extra assets) goes to that maker.
 - The contract puts no upper bound on `deadline`. The pool only accepts deadlines 60 s to 7 days out; that's pool policy.
 - Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `DeClubEscrow`. Each intent signs `feeToken` and `maxFee`, the most its maker pays **per NFT** they give ([ADR 0033](adr/0033-fee-per-nft.md)). After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) for each NFT in their `give`, at least once, straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, total)` is emitted, the sum over the cycle. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
-- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`, as in V2); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
+- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
 - Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
 - The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`) and has no `receive()`. Its only admin is the fee admin, over the fee amount.
 - Events: `IntentFilled(intentHash, maker, recipient, nonce)` once per intent in a settled cycle, `FeeCharged(recipient, token, amount)`, `NoncesInvalidated(maker, word, mask)`, plus the `FeeAdmin` events.
@@ -219,7 +219,7 @@ A payout that the account refuses reverts the claim (`PayoutFailed`): nothing el
 
 ## Phase 3: trait-based requests
 
-Built in `DeClubEscrow` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)). The first version, overloads on the deleted v1 escrow, used the same design.
+Built in `DeClubEscrow` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)).
 
 Traits live in off-chain metadata, so the contract can't read them. The options considered:
 
@@ -311,7 +311,5 @@ The printed deploy blocks are the simulation block, a lower bound; the exact blo
 ### Deployed vs source
 
 On testnet, all three contracts are deployed from the current source (the
-[demo deployment](12-demo.md); addresses in the root README). The retired
-`OnDealIntents` and the first escrow signed or lived under older names and
-domains; nothing should point at them. Redeploy with
+[demo deployment](12-demo.md); addresses in `.env` and `contracts/broadcast/`). Redeploy with
 [`contracts/script/README.md`](../contracts/script/README.md).

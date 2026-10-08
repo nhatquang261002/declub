@@ -36,5 +36,5 @@ Start here. Each page below owns one topic; if two pages disagree, the one in th
 - **One owner per fact.** Point values, caps and the fee live in the spec above, not repeated in the guide or README. The in-app guide (`web/app/guide/`) shows no weights or caps on purpose.
 - **A decision that changes a rule** gets a new ADR (or an "Amended by" line on the old one), a row in the [ADR index](adr/README.md), and an edit to the spec in the same commit.
 - **Finished plans are deleted**, not archived: the ADR and git history keep them.
-- **Deployed addresses** live in the root [README](../README.md) and `.env`; other pages link there instead of copying them.
+- **Deployed addresses** live in `.env` and `contracts/broadcast/`; other pages link there instead of copying them.
 - Page numbers (01–15) are only file names; they don't mean reading order.

@@ -84,7 +84,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       FEE_RECIPIENT: feeRecipient,
       FEE_ADMIN: feeAdmin.address,
     };
-    const v2Out = forgeScript("DeployEscrow.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
+    const escrowOut = forgeScript("DeployEscrow.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
     const intentsOut = forgeScript("DeployIntents.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_WMON: "true" });
     // The relayer (account 5) runs reward epochs; a short delay and the shortest window, so the
     // scenarios can warp past both.
@@ -100,11 +100,11 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
     const hash = await deployer.deployContract({ abi: chog.abi, bytecode: chog.bytecode, args: [] });
     const nft = getAddress((await pub.waitForTransactionReceipt({ hash })).contractAddress!);
 
-    const v2 = v2Out.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS;
-    const usd = v2Out.NEXT_PUBLIC_MOCK_ERC20_ADDRESS;
+    const escrow = escrowOut.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS;
+    const usd = escrowOut.NEXT_PUBLIC_MOCK_ERC20_ADDRESS;
     const intents = intentsOut.NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS;
     const rewards = rewardsOut.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS;
-    if (!v2 || !usd || !intents || !rewards) throw new Error("a deploy script didn't print the expected addresses");
+    if (!escrow || !usd || !intents || !rewards) throw new Error("a deploy script didn't print the expected addresses");
 
     let poolUrl: string | undefined;
     if (opts.matcher) {
@@ -136,7 +136,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       target: "local",
       chainId: 31337,
       rpcUrl,
-      v2,
+      escrow,
       intents,
       nft,
       usd,
@@ -146,7 +146,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       poolUrl,
       canWarp: true,
       stop,
-      deployed: { ...v2Out, ...intentsOut, ...rewardsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
+      deployed: { ...escrowOut, ...intentsOut, ...rewardsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
     };
   } catch (e) {
     stop();

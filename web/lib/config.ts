@@ -1,12 +1,12 @@
 import { getAddress, isAddress, type Address } from "viem";
 
 // NEXT_PUBLIC_* values are inlined at build time, so each must be read by its full name.
-// The defaults are the Monad testnet deployment (see the root README).
+// The defaults are the Monad testnet deployment (see `.env.example`).
 const env = {
   chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
   chog: process.env.NEXT_PUBLIC_CHOG_ADDRESS,
-  swapV2: process.env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS,
+  swapEscrow: process.env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS,
   mockErc20: process.env.NEXT_PUBLIC_MOCK_ERC20_ADDRESS,
   intents: process.env.NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS,
   rewards: process.env.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS,
@@ -60,7 +60,7 @@ export const IPFS_GATEWAY = (env.ipfsGateway?.trim() || "https://ipfs.io/ipfs/")
  * DeClubEscrow, the deal contract (ADR 0005): any ERC-721, ERC-20 and MON. The app has no deals
  * without it, so the deal screens stay off until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set.
  */
-export const DECLUB_ESCROW_ADDRESS: Address | undefined = env.swapV2?.trim() ? getAddress(env.swapV2.trim()) : undefined;
+export const DECLUB_ESCROW_ADDRESS: Address | undefined = env.swapEscrow?.trim() ? getAddress(env.swapEscrow.trim()) : undefined;
 /** Test ERC-20 with an open mint, for demoing DeClubEscrow on testnet. */
 export const MOCK_ERC20_ADDRESS: Address | undefined = env.mockErc20?.trim() ? getAddress(env.mockErc20.trim()) : undefined;
 
@@ -94,7 +94,7 @@ export const KNOWN_COLLECTIONS: Address[] = (env.knownCollections ?? "")
   .map((a) => getAddress(a));
 
 /** Whether the deal screens (DeClubEscrow deals) are shown: only when the contract is configured. */
-export const SHOW_V2 = !!DECLUB_ESCROW_ADDRESS;
+export const SHOW_DEALS = !!DECLUB_ESCROW_ADDRESS;
 export const SHOW_INTENTS = !!DECLUB_INTENTS_ADDRESS;
 
 /**

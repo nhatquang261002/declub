@@ -17,9 +17,9 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
 import { feeUnits, nftCount, sideFee, toRawAsset, traitAsset } from "@/lib/assets";
 import { MAX_NFTS_PER_SIDE, MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
-import { swapV2, swapV2Abi } from "@/lib/contracts";
+import { swapEscrow, swapEscrowAbi } from "@/lib/contracts";
 import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from "@/lib/createFlow";
-import { noteBytes } from "@/lib/dealsV2";
+import { noteBytes } from "@/lib/deals";
 import { draftClause, newTraitDraft, resolveDrafts, type TraitDraft } from "@/lib/traitDraft";
 import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
 import { blockedProblem } from "@/lib/assetTrust";
@@ -114,34 +114,34 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
   const nextApproval = askError || offerError ? undefined : steps[0];
 
   async function create() {
-    if (!address || !swapV2 || askError || offerError || fee === undefined) return;
+    if (!address || !swapEscrow || askError || offerError || fee === undefined) return;
     // The native amount in the offer, plus this side's share of the protocol fee: one per NFT it gives.
     const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, offered.assets);
     const expiry = expiryTimestamp(terms.expiry);
     const to = takerAddress(terms.taker);
     const receipt = isOpen
       ? await tx.run({
-          ...swapV2,
+          ...swapEscrow,
           functionName: "createOpenOffer",
           args: [offered.assets.map(toRawAsset), to, expiry, note.trim()],
           value: native,
         })
       : isTrait
         ? await tx.run({
-            ...swapV2,
+            ...swapEscrow,
             functionName: "createTraitTrade",
             args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry, encodeSpec(clauses)],
             value: native,
           })
         : await tx.run({
-            ...swapV2,
+            ...swapEscrow,
             functionName: "createTrade",
             args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry],
             value: native,
           });
     if (!receipt) return;
-    const id = parseEventLogs({ abi: swapV2Abi, eventName: "TradeCreated", logs: receipt.logs })[0]?.args.tradeId;
-    if (id !== undefined) router.push(`/v2/deal/${id.toString()}`);
+    const id = parseEventLogs({ abi: swapEscrowAbi, eventName: "TradeCreated", logs: receipt.logs })[0]?.args.tradeId;
+    if (id !== undefined) router.push(`/deal/${id.toString()}`);
   }
 
   if (step === 1) {

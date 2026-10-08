@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useReadContracts } from "wagmi";
-import { swapV2 } from "@/lib/contracts";
-import { toDealV2 } from "@/lib/dealsV2";
+import { swapEscrow } from "@/lib/contracts";
+import { toDeal } from "@/lib/deals";
 import { parseSpec } from "@/lib/traitSpec";
 
 /**
@@ -11,17 +11,17 @@ import { parseSpec } from "@/lib/traitSpec";
  * trait-request description if it has trait assets.
  * `deal` is null for an id that doesn't exist.
  */
-export function useDealV2(id: bigint) {
+export function useDeal(id: bigint) {
   const result = useReadContracts({
     contracts: [
-      { ...swapV2!, functionName: "getTrade", args: [id] },
-      { ...swapV2!, functionName: "offerNote", args: [id] },
-      { ...swapV2!, functionName: "traitSpec", args: [id] },
+      { ...swapEscrow!, functionName: "getTrade", args: [id] },
+      { ...swapEscrow!, functionName: "offerNote", args: [id] },
+      { ...swapEscrow!, functionName: "traitSpec", args: [id] },
     ],
-    query: { enabled: !!swapV2, refetchInterval: 6_000 },
+    query: { enabled: !!swapEscrow, refetchInterval: 6_000 },
   });
   const [dealRead, noteRead, specRead] = result.data ?? [];
-  const deal = useMemo(() => (dealRead?.status === "success" ? toDealV2(id, dealRead.result) : null), [dealRead, id]);
+  const deal = useMemo(() => (dealRead?.status === "success" ? toDeal(id, dealRead.result) : null), [dealRead, id]);
   const note = noteRead?.status === "success" ? noteRead.result : "";
   // What the maker published about the deal's trait requests, one entry per trait asset in order.
   // null when there is none, or it isn't something this app wrote (the deal then can't be filled here).
@@ -31,7 +31,7 @@ export function useDealV2(id: bigint) {
     deal,
     note,
     traitClauses,
-    isLoading: !!swapV2 && result.isLoading,
+    isLoading: !!swapEscrow && result.isLoading,
     error: dealRead?.status === "failure" ? dealRead.error : result.error,
   };
 }

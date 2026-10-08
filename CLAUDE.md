@@ -30,7 +30,7 @@ Rewards epochs: `npm run rewards:epoch | rewards:sponsor | rewards:verify` in `w
 - Specs say how it works now; ADRs say why. A rule change gets a new ADR (or an "Amended by" line), a row in `docs/adr/README.md`, and an edit to the owning spec in the same commit.
 - `docs/06-roadmap.md` is the only tracker. Tick items there, don't keep side plans; delete finished plans.
 - Point values, caps and the fee live in `docs/09-clubs.md` and the ADRs. **User-facing copy** (`/guide`, the Rewards tab, `docs/07-user-guide.md`) must not show weights or caps: say what earns points and what doesn't, in short cards and steps, not paragraphs. The fee split and the 25% bonus cap may be shown; an Owner's own settings screens keep their numbers.
-- Deployed addresses live in the root `README.md` and `.env`. Don't copy them into other pages.
+- Deployed addresses live in `.env` and `contracts/broadcast/`. Don't copy them into other pages.
 
 ## Rules that bite
 

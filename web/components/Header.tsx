@@ -18,9 +18,8 @@ const NAV = [
 
 export function Header() {
   const pathname = usePathname();
-  // Deal pages (/v2/deal/<id>) and signed swaps (/intent/<hash>) are reached from the deals list, so they belong to the Deals tab.
-  const active = (href: string) =>
-    href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/v2/deal") || pathname.startsWith("/intent") : pathname.startsWith(href);
+  // Deal pages (/deal/<id>) and signed swaps (/intent/<hash>) are reached from the deals list, so they belong to the Deals tab.
+  const active = (href: string) => (href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/intent") : pathname.startsWith(href));
 
   return (
     <header className="sticky top-0 z-20 border-b border-line/70 backdrop-blur-xl" style={{ background: "var(--surface-overlay)" }}>

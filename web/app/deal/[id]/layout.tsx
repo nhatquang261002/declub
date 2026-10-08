@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const title = `Deal #${id}: ${dealTitle(facts)}`;
   const description =
     facts.status === "open" ? "A swap held in escrow on Monad: both sides or nothing. Open it to take the deal." : "A swap held in escrow on Monad.";
-  const image = `/v2/deal/${id}/opengraph-image`;
+  const image = `/deal/${id}/opengraph-image`;
   return {
     title,
     description,

@@ -10,12 +10,12 @@ import { Tabs } from "@/components/Tabs";
 import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
-import { useDealsV2 } from "@/hooks/useDealsV2";
+import { useDeals } from "@/hooks/useDeals";
 import { useIntents } from "@/hooks/usePool";
 import { DECLUB_ESCROW_ADDRESS, SHOW_INTENTS } from "@/lib/config";
 import { intentAsListing } from "@/lib/intents";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
@@ -31,15 +31,15 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const v2 = useDealsV2({ limit: 200 });
+  const onChain = useDeals({ limit: 200 });
   // Signed swaps (ADR 0008) sit beside locked deals, every status.
   const signed = useIntents({ status: "all", maker: address, enabled: SHOW_INTENTS && !!address });
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
-  const deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
+  const deals = useMemo(() => [...signedListings, ...onChain.deals], [signedListings, onChain.deals]);
   const { info } = useDealsTokenInfo(deals);
   const { ids: fillIds } = useFills(address, DECLUB_ESCROW_ADDRESS);
-  const { error } = v2;
-  const isLoading = (v2.isLoading || signed.isLoading) && !error;
+  const { error } = onChain;
+  const isLoading = (onChain.isLoading || signed.isLoading) && !error;
 
   const walletDeals = useMemo(() => deals.filter((deal) => isWalletDeal(deal, address, fillIds)), [address, fillIds, deals]);
   const statuses = useMemo(() => walletDeals.map((deal) => displayStatus(deal, now)), [now, walletDeals]);
@@ -121,7 +121,7 @@ export default function HistoryPage() {
   );
 }
 
-function isWalletDeal(deal: Pick<DealV2, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
+function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
   return !!address && (sameAddress(deal.maker, address) || sameAddress(deal.taker, address) || fillIds.some((id) => id === deal.id));
 }
 

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { getAddress, type Address } from "viem";
 import { swapIntents } from "@/lib/contracts";
-import { useDealsV2 } from "./useDealsV2";
+import { useDeals } from "./useDeals";
 import { useIntents } from "./usePool";
 
 /**
@@ -11,7 +11,7 @@ import { useIntents } from "./usePool";
  * there is no list of "all collections", but the book itself shows which ones people trade.
  */
 export function useMarketCollections(enabled = true): Address[] {
-  const deals = useDealsV2({ limit: 50, enabled });
+  const deals = useDeals({ limit: 50, enabled });
   const signed = useIntents({ status: "open", enabled: enabled && !!swapIntents });
 
   return useMemo(() => {

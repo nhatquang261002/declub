@@ -16,8 +16,8 @@ import { useTxFlow } from "@/hooks/useTxFlow";
 import { allVerified, blockedProblem, sideTrust } from "@/lib/assetTrust";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
 import { feeUnits, sideFee, toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
-import { swapV2 } from "@/lib/contracts";
-import type { ProposalStatus, ProposalV2 } from "@/lib/proposals";
+import { swapEscrow } from "@/lib/contracts";
+import type { ProposalStatus, Proposal } from "@/lib/proposals";
 import { sameAddress } from "@/lib/deals";
 import { Who } from "@/components/Who";
 
@@ -56,7 +56,7 @@ export function ProposalList({
   dealId,
   canDecide,
 }: {
-  proposals: readonly ProposalV2[];
+  proposals: readonly Proposal[];
   total: bigint;
   hasMore: boolean;
   onLoadMore: () => void;
@@ -103,13 +103,13 @@ export function ProposalList({
   );
 }
 
-function ProposalRow({ proposal, info, dealId, canDecide }: { proposal: ProposalV2; info: Info; dealId: bigint; canDecide: boolean }) {
+function ProposalRow({ proposal, info, dealId, canDecide }: { proposal: Proposal; info: Info; dealId: bigint; canDecide: boolean }) {
   const { address } = useConnection();
   const decide = useTxFlow();
   const mine = sameAddress(proposal.proposer, address);
   const isActive = proposal.status === "active";
   const call = (functionName: "acceptProposal" | "rejectProposal" | "withdrawProposal") =>
-    decide.run({ ...swapV2!, functionName, args: [dealId, proposal.id] });
+    decide.run({ ...swapEscrow!, functionName, args: [dealId, proposal.id] });
   // The maker receives this offer's assets: unverified ones need a tick, blocked ones can't be taken (ADR 0014).
   const trust = sideTrust(proposal.assets, useAssetTrust(proposal.assets, info));
   const [checked, setChecked] = useState(false);
@@ -184,7 +184,7 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
     // The native amount in the offer, plus this wallet's share of the protocol fee: one per NFT it offers.
     const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, draft.assets);
     const receipt = await tx.run({
-      ...swapV2!,
+      ...swapEscrow!,
       functionName: "propose",
       args: [dealId, draft.assets.map(toRawAsset)],
       value: native,

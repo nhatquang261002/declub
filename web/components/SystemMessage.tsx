@@ -32,7 +32,7 @@ function Action({ event, children }: { event: SystemEvent; children: ReactNode }
       {children}
     </a>
   ) : (
-    <Link href={`/v2/deal/${event.deal}`} className="sys-action">
+    <Link href={`/deal/${event.deal}`} className="sys-action">
       {children}
     </Link>
   );

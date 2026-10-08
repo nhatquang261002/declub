@@ -43,7 +43,7 @@ function off(c: Ctx, what: string) {
 
 const PAGES = ["/", "/deals", "/create", "/history", "/clubs", "/guide", "/guide/deals", "/account"];
 /** Old routes that now redirect (the app's three redirect pages). */
-const REDIRECTS: Record<string, string> = { "/v2/create": "/create", "/intents/new": "/create", "/intents": "/deals" };
+const REDIRECTS: Record<string, string> = { "/create": "/create", "/intents/new": "/create", "/intents": "/deals" };
 /** Next.js's error boundary text, which a 200 can still carry. */
 const BROKEN = /Application error: a (client|server)-side exception has occurred|Internal Server Error/;
 

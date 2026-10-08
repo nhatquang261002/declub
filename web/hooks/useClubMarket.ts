@@ -6,9 +6,9 @@ import { useConnection } from "wagmi";
 import { swapIntents } from "@/lib/contracts";
 import { MAX_PAGE_SIZE } from "@/lib/dealBook";
 import { isExpired } from "@/lib/deals";
-import { offersToken, requestsToken } from "@/lib/dealFiltersV2";
+import { offersToken, requestsToken } from "@/lib/dealFilters";
 import { DEFAULT_FILTERS } from "@/lib/dealFilters";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { intentAsListing } from "@/lib/intents";
 import { useDealBook } from "./useDealBook";
 import { useIntents } from "./usePool";
@@ -39,7 +39,7 @@ export function useClubMarket(tokens: readonly [Address, Address?], now: number)
   const signedPaired = useIntents({ status: "open", token: paired, enabled: !!swapIntents && !!paired });
 
   const { have, wanted } = useMemo(() => {
-    const live = (d: DealV2) => d.status === "open" && !isExpired(d, now);
+    const live = (d: Deal) => d.status === "open" && !isExpired(d, now);
     const intents = [...signed.intents, ...(paired ? signedPaired.intents : [])];
     // A signed swap naming both assets comes back from both reads.
     const unique = [...new Map(intents.map((i) => [i.hash, i])).values()];

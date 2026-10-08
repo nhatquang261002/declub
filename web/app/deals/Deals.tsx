@@ -32,7 +32,7 @@ const KIND_OPTIONS: Array<SelectOption<BookKind>> = [
  * from the pool, in one list. Any mix of ERC-721 and ERC-20 on each side, plus MON on locked deals.
  * The server searches, filters and pages the whole book (ADR 0020); this page only shows a page.
  */
-export function DealsV2() {
+export function Deals() {
   const { address } = useConnection();
   const now = useNow();
   const [tab, setTab] = useState<DealTab>("open");

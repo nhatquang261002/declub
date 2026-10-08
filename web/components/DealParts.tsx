@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { formatMon } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { ClockIcon, LockIcon, SwapIcon } from "./Icons";
 import { Who } from "./Who";
 
@@ -155,7 +155,7 @@ export function DealCardFrame({
   tag,
 }: {
   href: string;
-  deal: Pick<DealV2, "id" | "maker" | "taker" | "expiry" | "status">;
+  deal: Pick<Deal, "id" | "maker" | "taker" | "expiry" | "status">;
   now: number;
   me?: string;
   gives: ReactNode;

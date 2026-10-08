@@ -1,12 +1,12 @@
 # ADR 0020: Search and filter the whole deal book on the server
 
-**Status:** Accepted · 2026-10-03 · Web only. No contract, matcher or pool change. Lifts the "search, filters or sorting" trigger of [ADR 0003](0003-no-indexer-in-v1.md) without an indexer, reading storage as [ADR 0004](0004-read-deals-from-storage.md) does. Drops OnDeal (v1) from the app.
+**Status:** Accepted · 2026-10-03 · Web only. No contract, matcher or pool change. Lifts the "search, filters or sorting" trigger of [ADR 0003](0003-no-indexer-in-v1.md) without an indexer, reading storage as [ADR 0004](0004-read-deals-from-storage.md) does.
 
 ## Context
 
 The deals page searched and filtered in the browser, over the newest 200 deals it had read (`tradeCount`, then one multicall of `getTrade`). Anything older couldn't be found, and every visitor paid for the same 200 reads. A Club's market had the same limit. ADR 0003 named search and filters as the point to add an indexer, and ADR 0019 named a hosted indexer as the answer for server-side filtering.
 
-The app also still carried OnDeal (v1): a Chogs / Multi-asset switch on Deals and History, its own detail page, cards, filters and create flow. v1 has no fee and isn't going to mainnet ([ADR 0018](0018-adjustable-protocol-fee.md)), and the app fell back to its testnet address when none was set.
+The app also still carried the first, Chog-only deal contract: a Chogs / Multi-asset switch on Deals and History, its own detail page, cards, filters and create flow. It has no fee, and the app fell back to its testnet address when none was set.
 
 ## Decision
 
@@ -17,7 +17,7 @@ The app also still carried OnDeal (v1): a Chogs / Multi-asset switch on Deals an
 - **Signed swaps** come from the pool on the same refresh, and are merged and filtered with the deals. The pool being down drops only them, and the answer says so. A signed swap travels as the pool's own row, so the browser recomputes its hash as it does for a row from the pool.
 - **The filtering is shared code** (`web/lib/dealBook.ts`): the same tabs, search, MON filter and sort as before, now over every deal.
 - **Everything lives in the server's memory.** A cold start reads the book again: one multicall per 100 deals that aren't closed yet, plus one per 100 closed ones the first time.
-- **OnDeal (v1) is gone from the app.** OnDealV2 is the deal contract. Without `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` there are no deals, rather than a fallback to a testnet address. The v1 contract and its tests stay in `contracts/`.
+- **The first deal contract is gone from the app.** OnDealV2 is the deal contract. Without `NEXT_PUBLIC_ON_DEAL_V2_ADDRESS` there are no deals, rather than a fallback to a testnet address.
 
 ## Alternatives
 
@@ -31,4 +31,4 @@ The app also still carried OnDeal (v1): a Chogs / Multi-asset switch on Deals an
 - The server's RPC calls grow with the number of open deals, not with visitors. With many thousands open, the 5 s refresh gets expensive; that is the point to revisit the indexer.
 - History and the notifications bell still read the newest 200 deals in the browser. Moving them needs a `party=` filter that includes deals a wallet filled, which the fill records (ADR 0012, 0019) can provide.
 - A Club's market lists at most 50 locked deals per asset and says when there are more. It now leaves out private offers made to other wallets, like the deals page.
-- Old `/deal/[id]` links (v1 deals) are 404s. Deal links are `/v2/deal/[id]`.
+- Deal links were `/v2/deal/[id]`; the prefix was dropped later, and those links redirect to `/deal/[id]`.

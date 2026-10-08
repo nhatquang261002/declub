@@ -103,7 +103,7 @@ Three views, switched with pills:
 - **For trade:** open deals and signed swaps that offer the asset, open offers included.
 - **Wanted:** open deals and signed swaps that ask for it, trait requests for the collection included.
 - **Recent swaps:** the Club's latest completed swaps, with who traded and a link to the deal (or, for a signed swap, its transaction).
-- For trade and Wanted show only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCardV2`.
+- For trade and Wanted show only live ones: open and not expired. Built from the existing cards, `ListingGrid` and `DealCard`.
 - Says when more than 50 locked deals name the asset ("showing the newest 50 deals; browse Deals and search to see the rest") and when the signed-swap pool isn't answering.
 
 **Board tab**: member posts, pinned ones on top, in the order of the reader's lens (Newest, Most active, Holders, Following), filtered to All or Looking for. Each post shows **Signed** and a **Follow** button beside its author.
@@ -155,7 +155,7 @@ Pure functions in `web/lib/momentum.ts`, computed from the Club's activity log o
 
 | Event | Weight | Why |
 |---|---|---|
-| Completed swap containing the asset (V2 fill, accepted proposal, settled intent) | 10 per side | Each side pays the protocol fee for every NFT it gives ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)), so faking it costs real money. A swap counts once however many NFTs it moves; the fee is what scales with them |
+| Completed swap containing the asset (escrow fill, accepted proposal, settled intent) | 10 per side | Each side pays the protocol fee for every NFT it gives ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)), so faking it costs real money. A swap counts once however many NFTs it moves; the fee is what scales with them |
 | New deal, open offer or intent naming the asset | 2, at most 3 per wallet per day | Cheap to make, so capped |
 | A Holder's own X post about the Club, shared on its Board ([X posts](#x-posts)) | 3 (1.5 if it only matches a tag), at most one a day per member per Club | Attention is part of a Club's life; capped low and limited to Holders so it can't outweigh trading |
 | A Holder's top-level Board post ([ADR 0047](adr/0047-board-posts-in-momentum.md)) | 4, the first a day per member per Club | Talk on the Board is part of a Club's life too. Limited to Holders and to one a day so posting can't outweigh trading; a hidden or deleted post counts for nothing, and the member's next post that day takes its place |
@@ -176,11 +176,11 @@ There is no indexer, and the public RPC caps `eth_getLogs` at 100 blocks ([ADR 0
   - `DeClubEscrow` only: `TradeCreated` is a `created` event; `TradeFilled` is a `swapped` one. The deal's assets come from `getTrade`, plus the proposal's assets when the same receipt holds the `ProposalAccepted` that filled it. A swap's parties are the maker and the taker. Native MON never counts as a token. A reverted transaction records nothing.
   - The log is one sorted set per Club, scored by block time, whose members are the events as JSON. Trimming at 5000 therefore leaves nothing behind, and storing the same event twice is a no-op.
 - **`POST /api/activity {hash}`** reads the receipt once and feeds both History (`recordFills`, the part of `ingestFills` after the receipt) and the Club log. `POST /api/fills` stays for older clients.
-- **Client:** `web/lib/fillReport.ts` has `mayFill` (a fill: awaited, History needs it before it refetches), `mayReport` (a fill, or a V2 `createTrade`, `createTraitTrade` or `createOpenOffer`: fire-and-forget) and `reportTx`. Accepting a proposal is a fill.
+- **Client:** `web/lib/fillReport.ts` has `mayFill` (a fill: awaited, History needs it before it refetches), `mayReport` (a fill, or an escrow `createTrade`, `createTraitTrade` or `createOpenOffer`: fire-and-forget) and `reportTx`. Accepting a proposal is a fill.
 - **Signed swaps** are not in `ingestTx`, and are not copied into the store. The Club routes read the matcher's `/settlements?token=` when asked (cached 30 s per Club in the server process) and merge it with the log by event id. A settled cycle is one swap with every maker in it as a party. A pool that is down only costs the signed swaps. This needs no cursor, and it relies on the matcher keeping its history.
 - **A Club added later has no past:** only events recorded while its asset was on the list count, until the fill watcher backfills it ([ADR 0019](adr/0019-fill-watcher.md), `FILL_WATCHER_START_BLOCK`).
 - **Matcher:** `GET /intents` and `/settlements` take `?token=`: any intent naming that address on either side, whatever the id (it matches the address inside the `intent_assets` key, so there is no schema change). `/settlements` also takes `?after=` (milliseconds; later cycles only, oldest first) for a reader that pages forward. `web/lib/pool.ts` passes `token`.
-- **Deals feed** comes from the server's deal book ([ADR 0020](adr/0020-server-side-deal-book.md)): `useClubMarket` asks `/api/deals` for the open locked deals that name the Club's assets, across every deal, and `offersToken` / `requestsToken` in `lib/dealFiltersV2.ts` split them into For trade and Wanted.
+- **Deals feed** comes from the server's deal book ([ADR 0020](adr/0020-server-side-deal-book.md)): `useClubMarket` asks `/api/deals` for the open locked deals that name the Club's assets, across every deal, and `offersToken` / `requestsToken` in `lib/dealFilters.ts` split them into For trade and Wanted.
 - **Deals made outside the app** come in through the fill watcher ([ADR 0019](adr/0019-fill-watcher.md)): a cron (`GET /api/cron/fills`) that follows the finalized head from a cursor and passes each transaction through `recordActivity`, so they count within a run's interval. It runs only with a store and `CRON_SECRET` set; without it, Momentum counts only what the app itself reported.
 
 ## Membership and the Holder badge

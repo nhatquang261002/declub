@@ -5,7 +5,7 @@ import { erc20Asset, nativeAsset, nftAsset, type TokenInfo } from "../lib/assets
 import { bookParams, fromWireListings, pageBook, parseBookQuery, toWireListing, type BookQuery, type BookResponse, type BookSource } from "../lib/dealBook";
 import { DEFAULT_FILTERS } from "../lib/dealFilters";
 import { displayStatus } from "../lib/deals";
-import type { DealV2 } from "../lib/dealsV2";
+import type { Deal } from "../lib/deals";
 import { intentAsListing, intentHash, type PoolIntent } from "../lib/intents";
 import { createBook, type BookReader } from "../lib/server/dealBook";
 import { dealsHandler } from "../lib/server/dealRoutes";
@@ -18,7 +18,7 @@ const NFT = getAddress("0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4");
 const USD = getAddress("0xd300f095f456D59AAc122B0100833fE195136F6c");
 const TOADS = getAddress("0x00000000000000000000000000000000000000d4");
 
-const deal = (id: number, over: Partial<DealV2> = {}): DealV2 => ({
+const deal = (id: number, over: Partial<Deal> = {}): Deal => ({
   id: BigInt(id),
   maker: ANA,
   taker: null,
@@ -40,7 +40,7 @@ const query = (over: Partial<BookQuery> = {}): BookQuery => ({
   ...over,
 });
 
-const source = (deals: DealV2[], signed: PoolIntent[] = [], info: Map<string, TokenInfo> = new Map()): BookSource => ({
+const source = (deals: Deal[], signed: PoolIntent[] = [], info: Map<string, TokenInfo> = new Map()): BookSource => ({
   deals,
   openSigned: signed.map(intentAsListing),
   allSigned: signed.map(intentAsListing),
@@ -166,7 +166,7 @@ describe("the wire format", () => {
 });
 
 /** A fake contract that counts what is read. */
-function fakeReader(deals: DealV2[]) {
+function fakeReader(deals: Deal[]) {
   const state = { deals, reads: [] as bigint[], counts: 0, tokenReads: [] as string[], fail: false };
   const reader: BookReader = {
     async tradeCount() {

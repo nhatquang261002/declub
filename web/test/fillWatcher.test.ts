@@ -7,7 +7,7 @@ import { listFills } from "../lib/server/fills";
 import { cronAuthorized, cursorKey, startBlockFromEnv, watchFills, type ChainScan, type WatchOptions } from "../lib/server/fillWatcher";
 import { memoryStore, type Store } from "../lib/server/store";
 
-const V2: Address = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
+const ESCROW: Address = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
 const NFT: Address = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const maker: Address = getAddress("0xaaaa000000000000000000000000000000000001");
 const taker: Address = getAddress("0xbbbb000000000000000000000000000000000002");
@@ -22,9 +22,9 @@ function log(address: Address, eventName: string, args: Record<string, unknown>,
   return { address, data, topics, logIndex };
 }
 
-const v2Fill = (tradeId: bigint) => log(V2, "TradeFilled", { tradeId, maker, taker });
-const v2Create = (tradeId: bigint) =>
-  log(V2, "TradeCreated", { tradeId, maker, taker: zeroAddress, offered: [{ assetType: 2, token: NFT, id: 1n, amount: 1n }], requested: [], expiry: 0n });
+const escrowFill = (tradeId: bigint) => log(ESCROW, "TradeFilled", { tradeId, maker, taker });
+const escrowCreate = (tradeId: bigint) =>
+  log(ESCROW, "TradeCreated", { tradeId, maker, taker: zeroAddress, offered: [{ assetType: 2, token: NFT, id: 1n, amount: 1n }], requested: [], expiry: 0n });
 
 /**
  * A fake chain: transactions placed at block numbers, a finalized head that can move, and a record of
@@ -77,13 +77,13 @@ describe("watchFills", () => {
       reader: chain.reader,
       range: 100,
       parallel: 2,
-      activity: { contracts: [V2], clubOf: (t) => (t.toLowerCase() === NFT.toLowerCase() ? NFT : null) },
+      activity: { contracts: [ESCROW], clubOf: (t) => (t.toLowerCase() === NFT.toLowerCase() ? NFT : null) },
       ...over,
     });
 
   it("starts at the head on its first run when no start block is set", async () => {
     const chain = fakeChain(500n);
-    chain.put(400n, hashOf(1), [v2Fill(1n)]);
+    chain.put(400n, hashOf(1), [escrowFill(1n)]);
     const result = await run(chain);
     assert.deepEqual(result, { status: "scanned", cursor: 500, head: 500, behind: 0, transactions: 0, fills: 0, events: 0 });
     assert.deepEqual(chain.queries, []);
@@ -92,9 +92,9 @@ describe("watchFills", () => {
 
   it("scans from the start block in chunks, recording fills and Club activity", async () => {
     const chain = fakeChain(250n);
-    chain.put(10n, hashOf(1), [v2Fill(1n)]);
-    chain.put(150n, hashOf(2), [v2Create(2n)]);
-    chain.put(250n, hashOf(3), [v2Fill(3n)]);
+    chain.put(10n, hashOf(1), [escrowFill(1n)]);
+    chain.put(150n, hashOf(2), [escrowCreate(2n)]);
+    chain.put(250n, hashOf(3), [escrowFill(3n)]);
     const result = await run(chain, { startBlock: 1n });
     assert.deepEqual(chain.queries, [
       [1n, 100n],
@@ -102,7 +102,7 @@ describe("watchFills", () => {
       [201n, 250n],
     ]);
     assert.deepEqual(result, { status: "scanned", cursor: 250, head: 250, behind: 0, transactions: 3, fills: 2, events: 1 });
-    assert.deepEqual(await listFills(store, V2, taker), ["3", "1"]);
+    assert.deepEqual(await listFills(store, ESCROW, taker), ["3", "1"]);
     assert.equal((await readActivity(store, NFT))[0].deal, "2");
   });
 
@@ -115,7 +115,7 @@ describe("watchFills", () => {
     assert.deepEqual(chain.queries, [], "nothing new at the same head");
 
     chain.state.head = 130n;
-    chain.put(120n, hashOf(4), [v2Fill(4n)]);
+    chain.put(120n, hashOf(4), [escrowFill(4n)]);
     // The start block only matters before there is a cursor.
     const result = await run(chain, { startBlock: 1n });
     assert.deepEqual(chain.queries, [[101n, 130n]]);
@@ -124,12 +124,12 @@ describe("watchFills", () => {
 
   it("records nothing twice when blocks are scanned again", async () => {
     const chain = fakeChain(100n);
-    chain.put(50n, hashOf(1), [v2Fill(1n)]);
-    chain.put(60n, hashOf(2), [v2Create(2n)]);
+    chain.put(50n, hashOf(1), [escrowFill(1n)]);
+    chain.put(60n, hashOf(2), [escrowCreate(2n)]);
     await run(chain, { startBlock: 1n });
     await store.del(cursorKey());
     await run(chain, { startBlock: 1n });
-    assert.deepEqual(await listFills(store, V2, taker), ["1"]);
+    assert.deepEqual(await listFills(store, ESCROW, taker), ["1"]);
     assert.equal((await readActivity(store, NFT)).length, 1);
   });
 
@@ -148,8 +148,8 @@ describe("watchFills", () => {
 
   it("keeps the cursor before a chunk it couldn't finish, and frees the lock", async () => {
     const chain = fakeChain(300n);
-    chain.put(50n, hashOf(1), [v2Fill(1n)]);
-    chain.put(150n, hashOf(2), [v2Fill(2n)]);
+    chain.put(50n, hashOf(1), [escrowFill(1n)]);
+    chain.put(150n, hashOf(2), [escrowFill(2n)]);
     chain.missing.add(hashOf(2));
     await assert.rejects(run(chain, { startBlock: 1n }), /no receipt/);
     assert.equal(await store.get(cursorKey()), 100);
@@ -157,7 +157,7 @@ describe("watchFills", () => {
     chain.missing.clear();
     const retry = await run(chain);
     assert.equal(retry.status === "scanned" && retry.cursor, 300);
-    assert.deepEqual(await listFills(store, V2, taker), ["2", "1"]);
+    assert.deepEqual(await listFills(store, ESCROW, taker), ["2", "1"]);
   });
 
   it("doesn't run while another run holds the lock", async () => {

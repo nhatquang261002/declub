@@ -33,7 +33,7 @@ import type { useFollows } from "@/hooks/useSocial";
 type AppLink = Exclude<PostLink, { kind: "x" }>;
 
 /** Where a linked deal or signed swap lives in the app. */
-export const linkHref = (link: AppLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
+export const linkHref = (link: AppLink) => (link.kind === "deal" ? `/deal/${link.id}` : `/intent/${link.hash}`);
 export const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
 
 /**

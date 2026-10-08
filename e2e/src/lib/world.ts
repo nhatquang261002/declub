@@ -18,7 +18,7 @@ import {
   parseEventLogs,
   zeroAddress,
 } from "viem";
-import { INTENTS, MOCK_CHOG, MOCK_ERC20, MOCK_WMON, V2 } from "./artifacts.ts";
+import { INTENTS, MOCK_CHOG, MOCK_ERC20, MOCK_WMON, ESCROW } from "./artifacts.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,7 +30,7 @@ export interface Actor {
 }
 
 export interface Addresses {
-  v2: Address;
+  escrow: Address;
   intents: Address;
   /** An ERC-721 with an open `mint(to, quantity)` (MockChog). */
   nft: Address;
@@ -131,14 +131,14 @@ export async function makeWorld(cfg: WorldConfig) {
   const wmonAbi = MOCK_WMON().abi;
   // Token errors bubble up through the deal contracts; with them in the ABI a revert names its cause.
   const tokenErrors = [...erc20Abi, ...nftAbi].filter((x) => x.type === "error");
-  const v2Abi = [...V2().abi, ...tokenErrors] as Abi;
+  const escrowAbi = [...ESCROW().abi, ...tokenErrors] as Abi;
   const intentsAbi = [...INTENTS().abi, ...tokenErrors] as Abi;
 
   const read = <T>(address: Address, abi: Abi, functionName: string, args: unknown[] = []) =>
     pub.readContract({ address, abi, functionName, args }) as Promise<T>;
 
   const feeToken = await read<Address>(cfg.intents, intentsAbi, "FEE_TOKEN");
-  const feeRecipient = await read<Address>(cfg.v2, v2Abi, "FEE_RECIPIENT");
+  const feeRecipient = await read<Address>(cfg.escrow, escrowAbi, "FEE_RECIPIENT");
   const intentsRecipient = await read<Address>(cfg.intents, intentsAbi, "FEE_RECIPIENT");
 
   /** Simulate (for a decoded revert), send, and wait for a successful receipt. */
@@ -309,7 +309,7 @@ export async function makeWorld(cfg: WorldConfig) {
     relayer,
     feeAdmin,
     traders: [alice, bob, carol, dave],
-    abi: { v2: v2Abi, intents: intentsAbi, nft: nftAbi, erc20: erc20Abi, wmon: wmonAbi },
+    abi: { escrow: escrowAbi, intents: intentsAbi, nft: nftAbi, erc20: erc20Abi, wmon: wmonAbi },
     feeToken,
     feeRecipient,
     intentsRecipient,
@@ -337,9 +337,9 @@ export async function makeWorld(cfg: WorldConfig) {
     tokenAsset,
     monAsset,
     fmt,
-    v2Fee: () => read<bigint>(cfg.v2, v2Abi, "fee"),
+    escrowFee: () => read<bigint>(cfg.escrow, escrowAbi, "fee"),
     intentsFee: () => read<bigint>(cfg.intents, intentsAbi, "fee"),
-    trade: (id: bigint) => read<{ maker: Address; status: number; fee: bigint; taker: Address; expiry: bigint }>(cfg.v2, v2Abi, "getTrade", [id]),
+    trade: (id: bigint) => read<{ maker: Address; status: number; fee: bigint; taker: Address; expiry: bigint }>(cfg.escrow, escrowAbi, "getTrade", [id]),
     stop: () => cfg.stop?.(),
   };
 }

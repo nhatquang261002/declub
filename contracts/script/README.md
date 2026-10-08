@@ -139,7 +139,7 @@ Browse on [MonadVision](https://testnet.monadvision.com/) or [Monadscan](https:/
 
 ## Broadcast records
 
-Each testnet broadcast writes `broadcast/<Script>.s.sol/10143/run-<timestamp>.json` and overwrites `run-latest.json` with the same content. So `run-latest.json` only records the most recent run, and earlier deployments live in the timestamped files: for example, `Deploy.s.sol/10143/run-latest.json` holds the deleted v1 `ChogSwap` and the `ChogGenesisMirror`, while the original v1 contract and `MockChog` are in `run-1790581370358.json`. Records from before the rename stay under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`). Commit both kinds so there's a record of every deployed address. Local (31337) runs and dry runs are gitignored.
+Each testnet broadcast writes `broadcast/<Script>.s.sol/10143/run-<timestamp>.json` and overwrites `run-latest.json` with the same content. So `run-latest.json` only records the most recent run, and earlier deployments live in the timestamped files. Records from before the rename stay under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`). Commit both kinds so there's a record of every deployed address. Local (31337) runs and dry runs are gitignored.
 
 ## Mainnet
 

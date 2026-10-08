@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useReadContracts } from "wagmi";
-import { swapIntents, swapV2 } from "@/lib/contracts";
+import { swapIntents, swapEscrow } from "@/lib/contracts";
 
 // The protocol fee (ADR 0015) is read from the contracts and never from config: a wrong number in
 // an env file would make every deal fail, or quote the wrong fee. A fee admin can change it
@@ -29,21 +29,21 @@ const pendingOf = (amount: bigint | undefined, at: bigint | undefined): PendingF
  */
 export function useEscrowFee() {
   const result = useReadContracts({
-    contracts: swapV2
+    contracts: swapEscrow
       ? ([
-          { ...swapV2, functionName: "fee" },
-          { ...swapV2, functionName: "pendingFee" },
-          { ...swapV2, functionName: "pendingFeeAt" },
+          { ...swapEscrow, functionName: "fee" },
+          { ...swapEscrow, functionName: "pendingFee" },
+          { ...swapEscrow, functionName: "pendingFeeAt" },
         ] as const)
       : [],
-    query: { enabled: !!swapV2, staleTime: STALE_MS },
+    query: { enabled: !!swapEscrow, staleTime: STALE_MS },
   });
   const [feeRead, pendingRead, atRead] = result.data ?? [];
   const fee = feeRead?.status === "success" ? feeRead.result : undefined;
   const pendingAmount = pendingRead?.status === "success" ? pendingRead.result : undefined;
   const pendingAt = atRead?.status === "success" ? atRead.result : undefined;
   const pending = useMemo(() => pendingOf(pendingAmount, pendingAt), [pendingAmount, pendingAt]);
-  return { fee, pending, isLoading: result.isLoading, failed: !!swapV2 && !result.isLoading && fee === undefined };
+  return { fee, pending, isLoading: result.isLoading, failed: !!swapEscrow && !result.isLoading && fee === undefined };
 }
 
 export type IntentFee = { token: Address; amount: bigint };
