@@ -29,7 +29,7 @@ import {
   stepsOf,
   type Party,
 } from "@/components/DealSheet";
-import { LockIcon } from "@/components/Icons";
+import { ExternalIcon, LockIcon } from "@/components/Icons";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useFills } from "@/hooks/useFills";
@@ -41,7 +41,7 @@ import { useDealV2 } from "@/hooks/useDealV2";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { ASSET_TYPE, erc20Tokens, feeUnits, formatAsset, nativeAsset, sameAsset, sideFee, type Asset } from "@/lib/assets";
 import { swapV2 } from "@/lib/contracts";
-import { DECLUB_ESCROW_ADDRESS, SHOW_V2 } from "@/lib/config";
+import { DECLUB_ESCROW_ADDRESS, explorerAddress, SHOW_V2 } from "@/lib/config";
 import { Who } from "@/components/Who";
 import { formatDate } from "@/lib/format";
 import { isOpenOffer, type DealV2 } from "@/lib/dealsV2";
@@ -214,6 +214,21 @@ function DealDetailV2({ id }: { id: bigint }) {
               { label: "Expires", value: deal.expiry === 0n ? "Never" : formatDate(deal.expiry) },
               // The whole address, where people are meant to check it against their counterparty.
               { label: "Maker's wallet", value: <CopyAddress address={deal.maker} full className="text-xs font-semibold" /> },
+              // A deal has no address of its own: it lives in the escrow contract under its id.
+              {
+                label: "On-chain",
+                value: (
+                  <a
+                    href={explorerAddress(DECLUB_ESCROW_ADDRESS!)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"
+                  >
+                    View on explorer <ExternalIcon className="size-3" />
+                  </a>
+                ),
+                hint: `Deal #${id} in the DeClub escrow contract`,
+              },
             ]}
           />
         </DealSheet>
