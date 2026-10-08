@@ -1,5 +1,6 @@
 import type { Registry } from "../verifiedAssets";
 import { softViewer, type RouteDeps } from "./boardRoutes";
+import { liveChallenges } from "./challenges";
 import { fail } from "./gate";
 import { clubOf, type Ctx } from "./memberRoutes";
 import { clubsOf } from "./members";
@@ -49,5 +50,30 @@ export function timelineSystemHandler(registry: Registry, deps: Pick<RouteDeps, 
     const clubs = viewer ? (await clubsOf(store, viewer.id)).flatMap((token) => registry.clubFor(token) ?? []) : [];
     const { events, since } = await listSystem(store, clubs, deps);
     return Response.json({ enabled: true, events, since }, { headers: OFF });
+  };
+}
+
+/**
+ * GET /api/timeline/challenges?scope=joined|all   { enabled, challenges: [{ club, challenge }] }: the
+ * challenges still running or waiting on their result, in the Clubs the reader has joined or in
+ * every live Club, pinned on top of the timeline as they are on a Board (ADR 0045).
+ */
+export function timelineChallengesHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function GET(request: Request) {
+    const scope = new URL(request.url).searchParams.get("scope") ?? "joined";
+    if (scope !== "joined" && scope !== "all") return fail(400, "bad_request", "scope is joined or all.");
+    const store = getStore();
+    if (!store) return Response.json({ enabled: false, challenges: [] }, { headers: OFF });
+    if (!(await withinLimit(store, "timeline-read", clientId(request), 120, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const viewer = await softViewer(request, deps);
+    const clubs =
+      scope === "all"
+        ? registry.clubs().filter((club) => club.club !== "archived")
+        : viewer
+          ? (await clubsOf(store, viewer.id)).flatMap((token) => registry.clubFor(token) ?? [])
+          : [];
+    const challenges = await liveChallenges(store, clubs, { userId: viewer?.id }, deps);
+    // A signed-in reader sees which entries are theirs, so theirs is not shared.
+    return Response.json({ enabled: true, challenges }, { headers: viewer ? { "Cache-Control": "private, no-store" } : { "Cache-Control": SHARED } });
   };
 }

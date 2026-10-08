@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CHALLENGE_RULES,
   checkChallenge,
+  isLive,
   phaseOf,
   winnersByLikes,
   winnersByPick,
@@ -329,6 +330,36 @@ export async function listChallenges(store: Store, entry: AssetEntry, viewer: { 
   const ids = await store.ranked(challengesKey(token), 30);
   const stored = (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter((c): c is StoredChallenge => !!c);
   const out = await Promise.all(stored.map((c) => viewOf(store, token, c, viewer, now)));
-  const rank = (p: PublicChallenge) => (p.phase === "open" ? 0 : p.phase === "judging" || p.phase === "closing" ? 1 : 2);
-  return out.sort((a, b) => rank(a) - rank(b) || (a.phase === "open" ? a.endsAt - b.endsAt : b.startsAt - a.startsAt));
+  return out.sort(byStanding);
+}
+
+const rank = (p: PublicChallenge) => (p.phase === "open" ? 0 : p.phase === "judging" || p.phase === "closing" ? 1 : 2);
+/** Open ones first (soonest end first), then those being judged or settled, newest first. */
+const byStanding = (a: PublicChallenge, b: PublicChallenge) => rank(a) - rank(b) || (a.phase === "open" ? a.endsAt - b.endsAt : b.startsAt - a.startsAt);
+
+/**
+ * The challenges still running or waiting on their result in `clubs`, each with its Club, for the
+ * timeline to pin on top. Only a Club with one that has ended is settled first, so reading every
+ * Club stays cheap.
+ */
+export async function liveChallenges(
+  store: Store,
+  clubs: readonly AssetEntry[],
+  viewer: { userId?: string },
+  deps: Deps = {},
+): Promise<{ club: string; challenge: PublicChallenge }[]> {
+  const now = nowOf(deps);
+  const lists = await Promise.all(
+    clubs.map(async (entry) => {
+      const token = entry.address.toLowerCase();
+      const read = async () => {
+        const ids = await store.ranked(challengesKey(token), 30);
+        return (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter((c): c is StoredChallenge => !!c && isLive(phaseOf(c, now)));
+      };
+      let live = await read();
+      if (live.some((c) => now >= c.endsAt) && (await settleDue(store, entry, deps)) > 0) live = await read();
+      return Promise.all(live.map(async (c) => ({ club: token, challenge: await viewOf(store, token, c, viewer, now) })));
+    }),
+  );
+  return lists.flat().sort((a, b) => byStanding(a.challenge, b.challenge));
 }

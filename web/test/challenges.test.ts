@@ -6,7 +6,7 @@ import type { ActivityEvent } from "../lib/clubs";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import { banUser, createPost, deletePost, hidePost, likePost, type Deps } from "../lib/server/board";
 import { challengesHandlers, challengeHandlers } from "../lib/server/boardRoutes";
-import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, settleDue, withdrawEntry } from "../lib/server/challenges";
+import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, liveChallenges, pickWinners, settleDue, withdrawEntry } from "../lib/server/challenges";
 import { readAwards } from "../lib/server/challengeState";
 import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
@@ -507,6 +507,32 @@ describe("challenges in the system messages (the Board and the timeline)", () =>
     await listChallenges(store, club, {}, at(END + 500));
     const late = (await sys(END + 600)).events.filter((e) => e.kind === "winner");
     assert.deepEqual(late.map((e) => [e.id, e.wallets, e.title, e.at]), [[`challenge-won:${id}`, [wallet(3)], "Best meme", GENESIS + END]], "told at its end");
+  });
+});
+
+describe("challenges pinned on the timeline", () => {
+  it("are the running ones, each with its Club, until they are settled", async () => {
+    const store = await world();
+    const later = await start(store, { title: "Two weeks", epochs: 2 });
+    const soon = await start(store, { title: "This week" });
+    const gone = await start(store, { title: "Called off" });
+    assert.ok((await cancelChallenge(store, club, actor("own", 1), gone, at(20))).ok);
+    const owner = await start(store, { title: "Owner picks", judging: "owner" }, 30);
+    const g = await post(store, "g", 60);
+    assert.ok((await enterChallenge(store, club, "g", soon, g, at(61))).ok);
+    assert.ok((await likePost(store, club, "a", g, true, at(62))).ok);
+
+    const open = await liveChallenges(store, [club], { userId: "g" }, at(100));
+    assert.ok(open.every((p) => p.club === token));
+    // Soonest end first: the two ending with this epoch, then the one that runs on.
+    assert.deepEqual(open.map((p) => p.challenge.id).slice(0, 2).sort(), [soon, owner].sort());
+    assert.equal(open[2]!.challenge.id, later);
+    assert.equal(open.find((p) => p.challenge.id === soon)!.challenge.mine, g);
+
+    // Past the end, the likes-judged one is settled and drops off; the Owner's waits on their pick.
+    const after = await liveChallenges(store, [club], {}, at(END + 5));
+    assert.deepEqual(after.map((p) => [p.challenge.id, p.challenge.phase]), [[later, "open"], [owner, "judging"]]);
+    assert.equal((await getChallenge(store, club, soon, {}, at(END + 6)))!.phase, "settled");
   });
 });
 

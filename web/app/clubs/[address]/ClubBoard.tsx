@@ -56,7 +56,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
   const system = useSystemMessages({ club: token });
-  // Challenges still running (ADR 0045) are pinned on top, so the feed leaves out their start.
+  // Challenges still running (ADR 0045) are pinned on top, whatever the order or filter, so the feed leaves out their start.
   const { challenges } = useChallenges(token);
   const live = useMemo(() => challenges.filter((c) => isLive(c.phase)), [challenges]);
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
@@ -105,7 +105,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         )}
       </div>
 
-      {filter === "all" && live.length > 0 && (
+      {live.length > 0 && (
         <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
           {live.map((c) => (
             <li key={c.id}>

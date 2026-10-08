@@ -8,18 +8,19 @@ import { ClubAvatar } from "@/components/ClubArt";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
 import { Masonry } from "@/components/Masonry";
-import { ChallengeFeedCard } from "@/components/ChallengeCard";
+import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
 import { TimelineCard } from "@/components/TimelineCard";
 import { TimelineComposer } from "@/components/TimelineComposer";
 import { useAccessToken } from "@/hooks/useAccessToken";
+import { useTimelineChallenges } from "@/hooks/useChallenges";
 import { useMyClubs } from "@/hooks/useClubMembership";
 import { useNow } from "@/hooks/useNow";
 import { useSignIn } from "@/hooks/useSignIn";
 import { useSystemMessages } from "@/hooks/useSystemMessages";
 import { useTimeline } from "@/hooks/useTimeline";
 import { toClubInfo, type ClubInfo } from "@/lib/clubs";
-import { weave, type FeedItem } from "@/lib/systemFeed";
+import { weave, withoutPinned, type FeedItem } from "@/lib/systemFeed";
 import { estimateHeight, systemHeight, type TimelinePost } from "@/lib/timeline";
 import { registry } from "@/lib/verifiedAssets";
 
@@ -36,33 +37,53 @@ type Show = "all" | "joined";
 
 /**
  * Posts as cards, endlessly (the next page loads as the end nears), with what happened in those
- * Clubs set among them as system messages (ADR 0043), and what to say when there is nothing. A
- * card is read-only in a Club the reader hasn't joined.
+ * Clubs set among them as system messages (ADR 0043), the challenges still running pinned on top
+ * (ADR 0045), and what to say when there is nothing. A card is read-only in a Club the reader hasn't joined.
  */
 function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<string>; now: number; empty: React.ReactNode }) {
   const feed = useTimeline(show);
   const system = useSystemMessages(show === "joined" ? "timeline" : "everywhere");
+  // Challenges still running are pinned on top, as on a Board (ADR 0045), so the feed leaves out their start.
+  const pinned = useTimelineChallenges(show);
   // Messages are set among the posts by time, down as far as the posts have loaded.
-  const items = useMemo(() => weave(feed.posts, system.events, { since: system.since, complete: !feed.hasMore }), [feed.posts, feed.hasMore, system.events, system.since]);
+  const items = useMemo(() => {
+    const events = withoutPinned(system.events, new Set(pinned.map((p) => p.challenge.id)));
+    return weave(feed.posts, events, { since: system.since, complete: !feed.hasMore });
+  }, [feed.posts, feed.hasMore, system.events, system.since, pinned]);
   if (feed.error && feed.posts.length === 0) return <LoadError title="Couldn’t load the timeline" error={feed.error} />;
   if (!feed.enabled) return <Empty title="No timeline on this server">This server isn’t keeping Club boards.</Empty>;
-  if (feed.isLoading) return <Loading label="Loading the timeline" rows={3} />;
-  if (items.length === 0) return <>{empty}</>;
 
   return (
     <>
-      <Masonry
-        as="ul"
-        items={items}
-        height={heightOf}
-        render={(item) => {
-          if (item.type === "challenge") return <ChallengeFeedCard key={`challenge:${item.event.id}`} event={item.event} now={now} clubs={clubOf} />;
-          if (item.type === "system") return <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} clubs={clubOf} />;
-          const club = CLUBS.get(item.post.club);
-          return club ? <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined={joined.has(item.post.club)} now={now} /> : null;
-        }}
-      />
-      <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
+      {pinned.length > 0 && (
+        <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
+          {pinned.map(({ club, challenge: c }) => (
+            <li key={`${club}:${c.id}`}>
+              <ChallengeSummary c={c} token={club} now={now} club={clubOf(club)} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={pinned.length > 1} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {feed.isLoading ? (
+        <Loading label="Loading the timeline" rows={3} />
+      ) : items.length === 0 ? (
+        pinned.length === 0 ? empty : null
+      ) : (
+        <>
+          <Masonry
+            as="ul"
+            items={items}
+            height={heightOf}
+            render={(item) => {
+              if (item.type === "challenge") return <ChallengeFeedCard key={`challenge:${item.event.id}`} event={item.event} now={now} clubs={clubOf} />;
+              if (item.type === "system") return <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} clubs={clubOf} />;
+              const club = CLUBS.get(item.post.club);
+              return club ? <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined={joined.has(item.post.club)} now={now} /> : null;
+            }}
+          />
+          <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
+        </>
+      )}
     </>
   );
 }
