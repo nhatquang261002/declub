@@ -39,8 +39,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
   // The ERC-20 row whose token is being searched for.
   const [tokenRow, setTokenRow] = useState<string | null>(null);
   const rememberCollection = useRememberCollection();
-  const update = (key: string, patch: Partial<DraftRow>) =>
-    onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const update = (key: string, patch: Partial<DraftRow>) => onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const full = rows.length >= MAX_TOKENS_PER_SIDE;
   const hasNative = rows.some((row) => row.kind === "native");
 
@@ -52,7 +51,11 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
   const room = Math.min(MAX_TOKENS_PER_SIDE - kept.length, MAX_NFTS_PER_SIDE - keptNfts);
   const nftsFull = rows.filter((row) => row.kind === "erc721" && !isPlaceholder(row)).length >= MAX_NFTS_PER_SIDE;
   const taken = new Set(
-    kept.flatMap((row) => (row.kind === "erc721" && isAddress(row.token.trim()) && /^\d+$/.test(row.value.trim()) ? [`${row.token.trim().toLowerCase()}:${BigInt(row.value.trim())}`] : [])),
+    kept.flatMap((row) =>
+      row.kind === "erc721" && isAddress(row.token.trim()) && /^\d+$/.test(row.value.trim())
+        ? [`${row.token.trim().toLowerCase()}:${BigInt(row.value.trim())}`]
+        : [],
+    ),
   );
   const openPicker = (next: { replace?: string; collection?: Address }) => setPicker(next);
 
@@ -84,14 +87,9 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
           return (
             <li key={row.key} className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="chip chip-dark w-16 shrink-0 justify-center">
-                  {KIND_LABEL[row.kind]}
-                </span>
+                <span className="chip chip-dark w-16 shrink-0 justify-center">{KIND_LABEL[row.kind]}</span>
                 {row.kind === "erc721" ? (
-                  <NftSummary
-                    row={row}
-                    onChoose={() => openPicker({ replace: row.key, collection: isAddress(token) ? token : undefined })}
-                  />
+                  <NftSummary row={row} onChoose={() => openPicker({ replace: row.key, collection: isAddress(token) ? token : undefined })} />
                 ) : (
                   <>
                     {row.kind !== "native" && (
@@ -154,7 +152,12 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
             + Test token
           </button>
         )}
-        <button type="button" className="btn-secondary btn-sm" disabled={(full || nftsFull) && !rows.some(isPlaceholder)} onClick={() => openPicker({ collection: CHOG_ADDRESS })}>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          disabled={(full || nftsFull) && !rows.some(isPlaceholder)}
+          onClick={() => openPicker({ collection: CHOG_ADDRESS })}
+        >
           + Chog
         </button>
       </div>
@@ -170,16 +173,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
         />
       )}
 
-      {picker && (
-        <NftPicker
-          owner={owner}
-          collection={picker.collection}
-          room={room}
-          taken={taken}
-          onConfirm={addNfts}
-          onClose={() => setPicker(null)}
-        />
-      )}
+      {picker && <NftPicker owner={owner} collection={picker.collection} room={room} taken={taken} onConfirm={addNfts} onClose={() => setPicker(null)} />}
     </section>
   );
 }

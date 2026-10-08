@@ -11,14 +11,11 @@ function pair(a: Hex, b: Hex): Hex {
   return keccak256(`0x${left.slice(2)}${right.slice(2)}` as Hex);
 }
 
-export function tokenLeaf(collection: Address, tokenId: bigint): Hex {
-  return keccak256(encodeAbiParameters(
-    [{ type: "address" }, { type: "uint256" }],
-    [collection, tokenId],
-  ));
+function tokenLeaf(collection: Address, tokenId: bigint): Hex {
+  return keccak256(encodeAbiParameters([{ type: "address" }, { type: "uint256" }], [collection, tokenId]));
 }
 
-export type MerkleTree = {
+type MerkleTree = {
   root: Hex;
   /** One proof per leaf, in the order given. */
   proofs: Hex[][];

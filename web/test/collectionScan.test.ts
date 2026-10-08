@@ -2,15 +2,35 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isPublicAddress, readCapped, safeUrl, type Resolve } from "../lib/server/collectionScan";
 
-const to = (...addresses: string[]): Resolve => async () => addresses.map((address) => ({ address }));
+const to =
+  (...addresses: string[]): Resolve =>
+  async () =>
+    addresses.map((address) => ({ address }));
 const PUBLIC = to("93.184.215.14");
 
 describe("isPublicAddress", () => {
   it("refuses loopback, private, CGNAT, link-local, unique-local and mapped addresses", () => {
     for (const ip of [
-      "127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "100.64.0.1", "169.254.169.254", "0.0.0.0",
-      "224.0.0.1", "255.255.255.255", "::1", "::", "fc00::1", "fd12:3456::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:8.8.8.8",
-      "64:ff9b::7f00:1", "ff02::1", "not-an-ip",
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.16.0.1",
+      "172.31.255.255",
+      "192.168.1.1",
+      "100.64.0.1",
+      "169.254.169.254",
+      "0.0.0.0",
+      "224.0.0.1",
+      "255.255.255.255",
+      "::1",
+      "::",
+      "fc00::1",
+      "fd12:3456::1",
+      "fe80::1",
+      "::ffff:127.0.0.1",
+      "::ffff:8.8.8.8",
+      "64:ff9b::7f00:1",
+      "ff02::1",
+      "not-an-ip",
     ]) {
       assert.equal(isPublicAddress(ip), false, ip);
     }
@@ -29,13 +49,28 @@ describe("safeUrl", () => {
   });
 
   it("refuses other schemes, credentials and literal IPs", async () => {
-    for (const uri of ["http://meta.example.com/1", "file:///etc/passwd", "https://u:p@meta.example.com/", "https://127.0.0.1/", "https://[::1]/", "https://0x7f000001/", "nonsense"]) {
+    for (const uri of [
+      "http://meta.example.com/1",
+      "file:///etc/passwd",
+      "https://u:p@meta.example.com/",
+      "https://127.0.0.1/",
+      "https://[::1]/",
+      "https://0x7f000001/",
+      "nonsense",
+    ]) {
       assert.equal(await safeUrl(uri, PUBLIC), null, uri);
     }
   });
 
   it("refuses local names, with or without a trailing dot", async () => {
-    for (const uri of ["https://localhost/", "https://localhost./", "https://a.localhost./", "https://metadata.google.internal./", "https://printer.local/", "https://intranet/"]) {
+    for (const uri of [
+      "https://localhost/",
+      "https://localhost./",
+      "https://a.localhost./",
+      "https://metadata.google.internal./",
+      "https://printer.local/",
+      "https://intranet/",
+    ]) {
       assert.equal(await safeUrl(uri, PUBLIC), null, uri);
     }
   });
@@ -45,7 +80,12 @@ describe("safeUrl", () => {
     assert.equal(await safeUrl("https://mixed.example.com/", to("93.184.215.14", "10.0.0.5")), null);
     assert.equal(await safeUrl("https://mapped.example.com/", to("::ffff:169.254.169.254")), null);
     assert.equal(await safeUrl("https://nothing.example.com/", to()), null);
-    assert.equal(await safeUrl("https://broken.example.com/", async () => { throw new Error("ENOTFOUND"); }), null);
+    assert.equal(
+      await safeUrl("https://broken.example.com/", async () => {
+        throw new Error("ENOTFOUND");
+      }),
+      null,
+    );
   });
 });
 

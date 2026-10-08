@@ -74,8 +74,14 @@ describe("viewPost", () => {
 describe("pinnedFirst", () => {
   it("puts pinned posts on top in pin order and keeps the rest's order", () => {
     const posts = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
-    assert.deepEqual(pinnedFirst(posts, ["c", "a"]).map((p) => p.id), ["c", "a", "b", "d"]);
-    assert.deepEqual(pinnedFirst(posts, ["gone"]).map((p) => p.id), ["a", "b", "c", "d"]);
+    assert.deepEqual(
+      pinnedFirst(posts, ["c", "a"]).map((p) => p.id),
+      ["c", "a", "b", "d"],
+    );
+    assert.deepEqual(
+      pinnedFirst(posts, ["gone"]).map((p) => p.id),
+      ["a", "b", "c", "d"],
+    );
   });
 });
 
@@ -93,7 +99,17 @@ describe("checkProfileEdit", () => {
   });
 
   it("allows only plain https links", () => {
-    for (const bad of ["http://a.io", "javascript:alert(1)", "data:text/html,x", "//a.io", "a.io", "https://user:pw@a.io", "ftp://a.io", `https://a.io/${"x".repeat(200)}`, 5]) {
+    for (const bad of [
+      "http://a.io",
+      "javascript:alert(1)",
+      "data:text/html,x",
+      "//a.io",
+      "a.io",
+      "https://user:pw@a.io",
+      "ftp://a.io",
+      `https://a.io/${"x".repeat(200)}`,
+      5,
+    ]) {
       assert.equal(checkProfileEdit({ links: [bad] }).ok, false, String(bad));
     }
   });
@@ -105,8 +121,17 @@ describe("checkProfileEdit", () => {
 
   it("rejects wrong types and empty edits", () => {
     for (const bad of [
-      null, "x", {}, { holdersOnlyPosts: "yes" }, { description: 5 }, { links: "https://a.io" },
-      { coinHolders: true }, { coinHolders: { min: "5" } }, { coinHolders: { on: true, min: "0" } }, { coinHolders: { on: true, min: "1.5" } }, { coinHolders: { on: true, min: 5 } },
+      null,
+      "x",
+      {},
+      { holdersOnlyPosts: "yes" },
+      { description: 5 },
+      { links: "https://a.io" },
+      { coinHolders: true },
+      { coinHolders: { min: "5" } },
+      { coinHolders: { on: true, min: "0" } },
+      { coinHolders: { on: true, min: "1.5" } },
+      { coinHolders: { on: true, min: 5 } },
     ]) {
       assert.equal(checkProfileEdit(bad).ok, false, JSON.stringify(bad));
     }

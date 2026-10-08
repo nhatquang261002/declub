@@ -14,18 +14,21 @@ const created = (a: string, ageDays = 0, offsetSec = 0): ScoredEvent => ({ kind:
 
 describe("constants", () => {
   it("match docs/09-clubs.md, so a tuning change is a deliberate one", () => {
-    assert.deepEqual({ ...MOMENTUM }, {
-      halfLifeDays: 7,
-      windowDays: 30,
-      swapWeight: 10,
-      createdWeight: 2,
-      createdPerDay: 3,
-      washFactor: 0.5,
-      washDays: 7,
-      breadthDivisor: 4,
-      xShareWeight: 3,
-      postWeight: 4,
-    });
+    assert.deepEqual(
+      { ...MOMENTUM },
+      {
+        halfLifeDays: 7,
+        windowDays: 30,
+        swapWeight: 10,
+        createdWeight: 2,
+        createdPerDay: 3,
+        washFactor: 0.5,
+        washDays: 7,
+        breadthDivisor: 4,
+        xShareWeight: 3,
+        postWeight: 4,
+      },
+    );
   });
 });
 
@@ -112,7 +115,13 @@ describe("score", () => {
   });
 
   it("pays a Board post a little more than an X share, without widening breadth", () => {
-    const scores = score([{ kind: "post", at: NOW, parties: [alice] }, { kind: "xshare", at: NOW, parties: [bob] }], NOW);
+    const scores = score(
+      [
+        { kind: "post", at: NOW, parties: [alice] },
+        { kind: "xshare", at: NOW, parties: [bob] },
+      ],
+      NOW,
+    );
     assert.equal(memberScore(scores, [alice]), MOMENTUM.postWeight);
     assert.ok(MOMENTUM.postWeight > MOMENTUM.xShareWeight);
     assert.equal(scores.uniqueWallets, 0);
@@ -128,7 +137,10 @@ describe("score", () => {
     const a = score(events, NOW);
     const b = score([...events].reverse(), NOW);
     assert.equal(a.club, b.club);
-    assert.deepEqual([...a.wallets], [...b.wallets].sort((x, y) => [...a.wallets.keys()].indexOf(x[0]) - [...a.wallets.keys()].indexOf(y[0])));
+    assert.deepEqual(
+      [...a.wallets],
+      [...b.wallets].sort((x, y) => [...a.wallets.keys()].indexOf(x[0]) - [...a.wallets.keys()].indexOf(y[0])),
+    );
   });
 });
 

@@ -19,7 +19,7 @@ import type { Store } from "./store";
 /** The likes and replies given in a Club's epoch `n`, as `kind|day|postId|userId`. */
 export const backingKey = (club: string, n: number) => `declub:backing:${CHAIN_ID}:${club.toLowerCase()}:${n}`;
 /** Everything `userId` gave in epoch `n`, in every Club, as `club|kind|day|postId`. */
-export const givenKey = (n: number, userId: string) => `declub:backing-by:${CHAIN_ID}:${n}:${userId}`;
+const givenKey = (n: number, userId: string) => `declub:backing-by:${CHAIN_ID}:${n}:${userId}`;
 
 /** Records a like (of post `id`) or a reply (`id` is the reply) by `userId`. `at` is epoch ms, as posts keep it. */
 export async function recordBacking(
@@ -43,9 +43,9 @@ type Entry = { kind: "like" | "reply"; day: string; id: string; userId: string }
  * Whether a post's backing counts for nothing (ADR 0040): only a moderator's hide removes points. A
  * post that members' reports hid (before ADR 0040 they could) still counts until staff act on it.
  */
-export const removedForRewards = (post: Pick<StoredPost, "hidden">) => post.hidden === "moderator";
+const removedForRewards = (post: Pick<StoredPost, "hidden">) => post.hidden === "moderator";
 
-export type EpochBacking = {
+type EpochBacking = {
   /** One per like (per post and giver) and per reply that still stands. */
   actions: BackingAction[];
   /** What a moderator's hide took out: published, so the loss can be matched to the moderation log (ADR 0040). */
@@ -190,7 +190,7 @@ export const backingRecordKey = (n: number) => `declub:rewards:${CHAIN_ID}:backi
  * A user's public wallet: their Club wallet when they're a member (`members`), else the first wallet
  * of their shared profile. With neither, a stable label from a hash of their id, which shows nobody's.
  */
-export async function publicWallet(store: Store, userId: string, members: ReadonlyMap<string, string>): Promise<string> {
+async function publicWallet(store: Store, userId: string, members: ReadonlyMap<string, string>): Promise<string> {
   const known = members.get(userId);
   if (known) return known.toLowerCase();
   const wallets = (await store.members(userWalletsKey(userId))).sort();
@@ -211,7 +211,8 @@ export async function publishBacking(
   };
   const out: PublishedBacking = { voices: {}, actions: [], removed: [] };
   for (const [userId, voice] of voices) out.voices[await nameOf(userId)] = voice;
-  for (const a of backing.actions) out.actions.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, ...(a.entry ? { entry: true as const } : {}) });
+  for (const a of backing.actions)
+    out.actions.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, ...(a.entry ? { entry: true as const } : {}) });
   for (const a of backing.removed) out.removed.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, by: a.by ?? "moderator" });
   return out;
 }

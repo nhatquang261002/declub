@@ -6,7 +6,7 @@ import type { StoredPost } from "./clubPosts";
  * every input is public (the signed-post export, the Members list, follows), and a third party can
  * rank the same records their own way. Pinned posts stay on top except where a lens says otherwise.
  */
-export type LensPost = Pick<StoredPost, "id" | "wallet" | "kind" | "at">;
+type LensPost = Pick<StoredPost, "id" | "wallet" | "kind" | "at">;
 
 export type LensContext = {
   /** Epoch ms. */
@@ -19,7 +19,7 @@ export type LensContext = {
   momentum: ReadonlyMap<string, number>;
 };
 
-export type Lens = {
+type Lens = {
   id: LensId;
   name: string;
   description: string;
@@ -33,7 +33,7 @@ export type LensId = "newest" | "momentum" | "holders" | "following";
 const newestFirst = <T extends LensPost>(posts: readonly T[]) => [...posts].sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : 1));
 
 /** A post's weight halves every this many hours under the Momentum lens. */
-export const MOMENTUM_LENS_HALF_LIFE_H = 24;
+const MOMENTUM_LENS_HALF_LIFE_H = 24;
 
 export const LENSES: readonly Lens[] = [
   {

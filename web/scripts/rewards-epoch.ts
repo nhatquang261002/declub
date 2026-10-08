@@ -26,22 +26,13 @@
  * you build, in order.
  */
 import path from "node:path";
-import { loadEnv } from "./env";
+import { flag, loadEnv, option, requireStore } from "./env";
 
 const web = path.resolve(import.meta.dirname, "..");
 loadEnv(web);
 
-const args = process.argv.slice(2);
-const flag = (name: string) => args.includes(`--${name}`);
-const option = (name: string) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
-};
-
 async function main() {
-  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
-    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
-  }
+  requireStore();
   // Imported after the env is loaded: the app's config reads it once, at import.
   const { createPublicClient, createWalletClient, encodeFunctionData, formatEther, http } = await import("viem");
   const { privateKeyToAccount } = await import("viem/accounts");
@@ -110,8 +101,11 @@ async function main() {
   // Funding: `publish` takes MON, and signed swaps paid their fees in WMON. Unwrap what's short.
   const total = BigInt(record.total);
   const operator = await pub.readContract({ address: DECLUB_REWARDS_ADDRESS, abi: deClubRewardsAbi, functionName: "operator" });
-  const feeToken = DECLUB_INTENTS_ADDRESS ? await pub.readContract({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, functionName: "FEE_TOKEN" }) : undefined;
-  const wmonOf = (owner: `0x${string}`) => (feeToken ? pub.readContract({ address: feeToken, abi: wmonAbi, functionName: "balanceOf", args: [owner] }) : Promise.resolve(0n));
+  const feeToken = DECLUB_INTENTS_ADDRESS
+    ? await pub.readContract({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, functionName: "FEE_TOKEN" })
+    : undefined;
+  const wmonOf = (owner: `0x${string}`) =>
+    feeToken ? pub.readContract({ address: feeToken, abi: wmonAbi, functionName: "balanceOf", args: [owner] }) : Promise.resolve(0n);
   const [mon, wmon, fees] = await Promise.all([pub.getBalance({ address: operator }), wmonOf(operator), pub.estimateFeesPerGas()]);
   // Gas is billed on the limit on Monad: keep back enough for an unwrap and the publish.
   const plan = fundingPlan({ total, mon, wmon, gas: 2n * PUBLISH_GAS_LIMIT * fees.maxFeePerGas });
@@ -119,7 +113,9 @@ async function main() {
   if (plan.unwrap > 0n) console.log(`  unwrap ${formatEther(plan.unwrap)} WMON first`);
   if (plan.short > 0n) {
     console.log(`  still short ${formatEther(plan.short)} MON after unwrapping`);
-    const recipient = DECLUB_INTENTS_ADDRESS ? await pub.readContract({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, functionName: "FEE_RECIPIENT" }) : undefined;
+    const recipient = DECLUB_INTENTS_ADDRESS
+      ? await pub.readContract({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, functionName: "FEE_RECIPIENT" })
+      : undefined;
     if (recipient && recipient.toLowerCase() !== operator.toLowerCase()) {
       console.log(`  the fee recipient ${recipient} holds ${formatEther(await wmonOf(recipient))} WMON: unwrap it there and send the MON to the operator`);
     }
@@ -128,7 +124,9 @@ async function main() {
   if (!flag("publish")) {
     console.log("\nNot published. Run again with --publish, or send this from the operator as one batch:");
     if (plan.unwrap > 0n) {
-      console.log(`  1. to ${feeToken}  value 0  data ${encodeFunctionData({ abi: wmonAbi, functionName: "withdraw", args: [plan.unwrap] })}  (withdraw ${formatEther(plan.unwrap)} WMON)`);
+      console.log(
+        `  1. to ${feeToken}  value 0  data ${encodeFunctionData({ abi: wmonAbi, functionName: "withdraw", args: [plan.unwrap] })}  (withdraw ${formatEther(plan.unwrap)} WMON)`,
+      );
     }
     console.log(
       `  ${plan.unwrap > 0n ? 2 : 1}. to ${DECLUB_REWARDS_ADDRESS}  value ${total} wei  data ${encodeFunctionData({ abi: deClubRewardsAbi, functionName: "publish", args: [BigInt(record.n), record.root] })}  (publish(${record.n}, root))`,
@@ -138,7 +136,8 @@ async function main() {
   const key = process.env.REWARDS_OPERATOR_KEY?.trim();
   if (!key) throw new Error("--publish needs REWARDS_OPERATOR_KEY.");
   const account = privateKeyToAccount(key as `0x${string}`);
-  if (account.address.toLowerCase() !== operator.toLowerCase()) throw new Error(`REWARDS_OPERATOR_KEY is ${account.address}, not the contract's operator ${operator}.`);
+  if (account.address.toLowerCase() !== operator.toLowerCase())
+    throw new Error(`REWARDS_OPERATOR_KEY is ${account.address}, not the contract's operator ${operator}.`);
   if (plan.short > 0n) throw new Error(`The operator needs ${formatEther(plan.short)} more MON to publish.`);
   const wallet = createWalletClient({ account, chain, transport: http(RPC_URL) });
   if (plan.unwrap > 0n) {

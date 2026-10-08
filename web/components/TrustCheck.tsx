@@ -33,10 +33,7 @@ export function TrustCheck({
   if (side.blocked.length > 0) {
     return (
       <Alert tone="danger" title="Blocked asset">
-        <p>
-          Something {receiving} is on DeClub&apos;s blocked list, usually a scam or a copy of a real collection, so it can&apos;t
-          be accepted here.
-        </p>
+        <p>Something {receiving} is on DeClub&apos;s blocked list, usually a scam or a copy of a real collection, so it can&apos;t be accepted here.</p>
         <AssetAddresses assets={side.blocked} info={info} />
       </Alert>
     );
@@ -48,8 +45,8 @@ export function TrustCheck({
       {copies.length > 0 ? (
         copies.map(({ asset, of }) => (
           <p key={`${asset.kind}:${asset.token}:${asset.id}`}>
-            {formatAsset(asset, info.get(asset.token.toLowerCase()))} is named like <strong>{of.name}</strong>, but it isn&apos;t the
-            verified contract. The real one is at <span className="break-all font-mono text-xs">{of.address}</span>.
+            {formatAsset(asset, info.get(asset.token.toLowerCase()))} is named like <strong>{of.name}</strong>, but it isn&apos;t the verified contract. The
+            real one is at <span className="break-all font-mono text-xs">{of.address}</span>.
           </p>
         ))
       ) : (
@@ -74,12 +71,7 @@ function AssetAddresses({ assets, info }: { assets: readonly Asset[]; info: Read
           <li key={`${asset.kind}:${asset.token}:${asset.id}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
             <span className="font-semibold">{formatAsset(asset, info.get(token.toLowerCase()))}</span>
             <CopyAddress address={token} full className="font-mono" />
-            <a
-              href={explorerAddress(token)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 underline underline-offset-2"
-            >
+            <a href={explorerAddress(token)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
               Explorer <ExternalIcon className="size-3" />
             </a>
           </li>

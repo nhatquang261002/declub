@@ -19,14 +19,29 @@ describe("GET /api/clubs", () => {
     assert.match(res.headers.get("cache-control") ?? "", /s-maxage/);
     const body = await res.json();
     assert.equal(body.logging, true);
-    assert.deepEqual(body.clubs.map((c: { token: string }) => c.token).sort(), registry.clubs().map((c) => c.address.toLowerCase()).sort());
+    assert.deepEqual(
+      body.clubs.map((c: { token: string }) => c.token).sort(),
+      registry
+        .clubs()
+        .map((c) => c.address.toLowerCase())
+        .sort(),
+    );
     assert.equal(body.clubs[0].stats.momentum, 0);
   });
 
   it("reflects what the log holds", async () => {
     const store = getStore()!;
     const now = Math.floor(Date.now() / 1000);
-    const e: ActivityEvent = { id: "0xroute:0", kind: "swapped", contract: "0xswap", deal: "1", block: 1, at: now - 60, parties: ["0xaa", "0xbb"], tokens: [club.address.toLowerCase()] };
+    const e: ActivityEvent = {
+      id: "0xroute:0",
+      kind: "swapped",
+      contract: "0xswap",
+      deal: "1",
+      block: 1,
+      at: now - 60,
+      parties: ["0xaa", "0xbb"],
+      tokens: [club.address.toLowerCase()],
+    };
     await store.rank(activityKey(club.address), [{ member: JSON.stringify(e), score: e.at }], 10);
     const body = await (await list(get())).json();
     const mine = body.clubs.find((c: { token: string }) => c.token === club.address.toLowerCase());
@@ -59,14 +74,16 @@ describe("which assets have a Club", () => {
   const C = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
   const D = "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298";
   const entry = (address: string, over: Record<string, unknown> = {}) => ({
-    chainId: 10143, address, kind: "erc721", name: "Name", symbol: "SYM", status: "verified", note: "Why.", ...over,
+    chainId: 10143,
+    address,
+    kind: "erc721",
+    name: "Name",
+    symbol: "SYM",
+    status: "verified",
+    note: "Why.",
+    ...over,
   });
-  const reg = makeRegistry(parseAssets([
-    entry(A),
-    entry(B, { club: false }),
-    entry(C, { status: "blocked" }),
-    entry(D, { club: "archived" }),
-  ]));
+  const reg = makeRegistry(parseAssets([entry(A), entry(B, { club: false }), entry(C, { status: "blocked" }), entry(D, { club: "archived" })]));
   const deps = { settlements: async () => [] };
 
   it("serves a Club, archived or not, and nothing else", async () => {
@@ -82,6 +99,9 @@ describe("which assets have a Club", () => {
 
   it("lists only the Clubs, in the registry's order", async () => {
     const body = await (await listHandler(reg, deps)(new Request("http://x"))).json();
-    assert.deepEqual(body.clubs.map((c: { token: string }) => c.token), [A.toLowerCase(), D.toLowerCase()]);
+    assert.deepEqual(
+      body.clubs.map((c: { token: string }) => c.token),
+      [A.toLowerCase(), D.toLowerCase()],
+    );
   });
 });

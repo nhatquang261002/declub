@@ -10,7 +10,7 @@ import type { WriteCall } from "./useTxFlow";
 /** Which DeClub contract an approval is for: the escrow behind deals, or the signed-swap settler. */
 export type Spender = "escrow" | "intents";
 
-export const SPENDERS: { key: Spender; address: Address | undefined }[] = [
+const SPENDERS: { key: Spender; address: Address | undefined }[] = [
   { key: "escrow", address: DECLUB_ESCROW_ADDRESS },
   { key: "intents", address: DECLUB_INTENTS_ADDRESS },
 ];

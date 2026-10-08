@@ -85,7 +85,14 @@ async function present(store: Store, page: Listed[], userId: string | undefined)
     }),
   );
   return page.map(({ token, post }, i) => ({
-    ...viewPost(post, { userId, staff: false }, false, undefined, { count: counts[i]!.likes, liked: liked.get(token)?.has(post.id) ?? false }, counts[i]!.replies),
+    ...viewPost(
+      post,
+      { userId, staff: false },
+      false,
+      undefined,
+      { count: counts[i]!.likes, liked: liked.get(token)?.has(post.id) ?? false },
+      counts[i]!.replies,
+    ),
     club: token,
   }));
 }

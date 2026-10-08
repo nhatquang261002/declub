@@ -10,9 +10,6 @@ import { registry } from "../verifiedAssets";
 
 let client: PublicClient | undefined;
 
-/** The Club's name for a deal's asset, when it has one. */
-export const clubNameOf = (token: string) => registry.clubFor(token)?.name;
-
 /**
  * What a deal's preview card and share text need, read from the chain on the server. `null` for an
  * id that doesn't exist, an unreadable one or a deploy without the escrow: the page then has no
@@ -33,7 +30,9 @@ export async function readDealFacts(id: string, nowSec = Math.floor(Date.now() /
           client!.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
           client!.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
         ]).catch(() => [null, null] as const);
-        return symbol === null ? [] : [[address.toLowerCase(), { symbol: String(symbol).slice(0, 12), decimals: Number(decimals) } satisfies TokenInfo] as const];
+        return symbol === null
+          ? []
+          : [[address.toLowerCase(), { symbol: String(symbol).slice(0, 12), decimals: Number(decimals) } satisfies TokenInfo] as const];
       }),
     );
     const info = new Map(reads.flat());

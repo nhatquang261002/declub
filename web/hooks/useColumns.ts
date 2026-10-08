@@ -15,4 +15,8 @@ function subscribe(onChange: () => void) {
 const read = () => (window.matchMedia(`(min-width: ${THREE}px)`).matches ? 3 : window.matchMedia(`(min-width: ${TWO}px)`).matches ? 2 : 1);
 
 /** How many columns a masonry list has at this screen width: 1, 2 or 3, and at most `max`. One on the server, where there is no screen. */
-export const useColumns = (max = 3) => Math.min(useSyncExternalStore(subscribe, read, () => 1), max);
+export const useColumns = (max = 3) =>
+  Math.min(
+    useSyncExternalStore(subscribe, read, () => 1),
+    max,
+  );

@@ -45,13 +45,30 @@ async function post(store: Store, userId: string, s: number) {
 /** An Owner (1), a Moderator (2), Holders g (4 NFTs) and a (2), and x, a member with no NFT. */
 async function world() {
   const store = memoryStore();
-  for (const [u, n] of [["own", 1], ["mod", 2], ["g", 3], ["a", 4], ["x", 5]] as const) await member(store, u, n);
+  for (const [u, n] of [
+    ["own", 1],
+    ["mod", 2],
+    ["g", 3],
+    ["a", 4],
+    ["x", 5],
+  ] as const)
+    await member(store, u, n);
   await saveRoles(store, token, { owner: "own", moderators: ["mod"] });
   return store;
 }
 const held: Record<string, bigint> = { [wallet(1)]: 1n, [wallet(3)]: 4n, [wallet(4)]: 2n };
 const holdings: Holdings = async (_t, ws) => ws.map((w) => held[w.toLowerCase()] ?? 0n);
-const swap: ActivityEvent = { id: "0x1:0", kind: "swapped", contract: "0xswap", deal: "1", block: 1, at: GENESIS + 100, parties: [wallet(8), wallet(9)], tokens: [token], fee: (4n * 10n ** 18n).toString() };
+const swap: ActivityEvent = {
+  id: "0x1:0",
+  kind: "swapped",
+  contract: "0xswap",
+  deal: "1",
+  block: 1,
+  at: GENESIS + 100,
+  parties: [wallet(8), wallet(9)],
+  tokens: [token],
+  fee: (4n * 10n ** 18n).toString(),
+};
 const deps = (n: number, over: Partial<RewardsDeps> = {}): RewardsDeps => ({
   now: () => GENESIS + (n + 1) * WEEK + 60,
   clubs: [club],
@@ -112,7 +129,8 @@ describe("an Owner's reward rules (ADR 0044)", () => {
     const gate = async (): Promise<UserGate> => ({ store, user: { id: who, linked_accounts: [] } }) as unknown as UserGate;
     const handlers = rulesHandlers(reg, { ...at(60), gate });
     const ctx = { params: Promise.resolve({ token: NFT }) };
-    const patch = (body: unknown) => handlers.PATCH(new Request("http://x/api", { method: "PATCH", body: JSON.stringify(body), headers: { "x-forwarded-for": "203.0.113.9" } }), ctx);
+    const patch = (body: unknown) =>
+      handlers.PATCH(new Request("http://x/api", { method: "PATCH", body: JSON.stringify(body), headers: { "x-forwarded-for": "203.0.113.9" } }), ctx);
     assert.equal((await patch({ maxPaidPercent: 0 })).status, 400);
     const ok = await patch({ maxPaidPercent: 25 });
     assert.equal(ok.status, 200);
@@ -131,9 +149,15 @@ describe("bans from rewards (ADR 0044)", () => {
     assert.deepEqual(await setRewardBan(store, club, actor("own", 1), "nope", true, at(60)), { ok: false, reason: "invalid" });
     assert.deepEqual(await setRewardBan(store, club, actor("own", 1), getAddress(wallet(3)), true, at(60)), { ok: true, wallet: wallet(3) });
     assert.deepEqual(await setRewardBan(store, club, actor("own", 1), wallet(3), true, at(60)), { ok: false, reason: "no_change" });
-    assert.deepEqual((await listRewardBans(store, club, "mod", at(60)))!.map((b) => b.wallet), [wallet(3)]);
+    assert.deepEqual(
+      (await listRewardBans(store, club, "mod", at(60)))!.map((b) => b.wallet),
+      [wallet(3)],
+    );
     assert.equal(await listRewardBans(store, club, "a", at(60)), null, "members can't read it");
-    assert.deepEqual((await readLog(store, token)).map((l) => [l.action, l.target]), [["reward_ban", wallet(3)]]);
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => [l.action, l.target]),
+      [["reward_ban", wallet(3)]],
+    );
     assert.ok((await setRewardBan(store, club, actor("own", 1), wallet(3), false, at(120))).ok);
     assert.deepEqual(await listRewardBans(store, club, "mod", at(60)), []);
   });
@@ -160,12 +184,16 @@ describe("bans from rewards (ADR 0044)", () => {
     const gate = async (): Promise<UserGate> => ({ store, user: { id: who, linked_accounts: [] } }) as unknown as UserGate;
     const handlers = rewardBansHandlers(reg, { ...at(60), gate });
     const ctx = { params: Promise.resolve({ token: NFT }) };
-    const req = (method: string, body?: unknown) => new Request("http://x/api", { method, ...(body ? { body: JSON.stringify(body) } : {}), headers: { "x-forwarded-for": "203.0.113.9" } });
+    const req = (method: string, body?: unknown) =>
+      new Request("http://x/api", { method, ...(body ? { body: JSON.stringify(body) } : {}), headers: { "x-forwarded-for": "203.0.113.9" } });
     assert.equal((await handlers.POST(req("POST", { wallet: wallet(4) }), ctx)).status, 200);
     who = "mod";
     assert.equal((await handlers.DELETE(req("DELETE", { wallet: wallet(4) }), ctx)).status, 403);
     const list = (await (await handlers.GET(req("GET"), ctx)).json()) as { bans: { wallet: string }[] };
-    assert.deepEqual(list.bans.map((b) => b.wallet), [wallet(4)]);
+    assert.deepEqual(
+      list.bans.map((b) => b.wallet),
+      [wallet(4)],
+    );
     who = "a";
     assert.equal((await handlers.GET(req("GET"), ctx)).status, 403);
   });
@@ -186,7 +214,10 @@ describe("paying members without NFTs (ADR 0044)", () => {
     assert.equal(line.paidMembers, (4n * 10n ** 17n).toString());
     assert.equal(line.memberCount, 1);
     const x = record.leaves.find((l) => l.account.toLowerCase() === wallet(5))!;
-    assert.deepEqual(x.breakdown.map((b) => [b.kind, b.amount]), [["member", (4n * 10n ** 17n).toString()]]);
+    assert.deepEqual(
+      x.breakdown.map((b) => [b.kind, b.amount]),
+      [["member", (4n * 10n ** 17n).toString()]],
+    );
     const ledger = (await store.get<Record<string, PublishedLedger>>(pointsKey(0)))![token]!;
     const row = ledger.rows.find((r) => r.wallet === wallet(5))!;
     assert.deepEqual([row.holder, row.paid, row.days], [false, true, 2]);

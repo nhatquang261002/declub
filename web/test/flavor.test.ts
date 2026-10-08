@@ -20,8 +20,7 @@ const MAINNET = [
   "NEXT_PUBLIC_CHOG_MINTABLE=false",
 ].join("\n");
 
-const flavorEnv = (flavor: string, o: { root: string; web: string; base: Record<string, string> }) =>
-  run(flavor, { ...o, base: o.base as NodeJS.ProcessEnv });
+const flavorEnv = (flavor: string, o: { root: string; web: string; base: Record<string, string> }) => run(flavor, { ...o, base: o.base as NodeJS.ProcessEnv });
 
 describe("flavorEnv", () => {
   it("leaves testnet alone until a .env.testnet exists", () => {

@@ -76,7 +76,7 @@ export async function clubList(store: Store | null, entries: readonly ClubEntry[
 }
 
 /** How many completed swaps the Market tab lists. */
-export const RECENT_LIMIT = 20;
+const RECENT_LIMIT = 20;
 
 export async function clubDetail(store: Store | null, entry: ClubEntry, deps: Deps = {}): Promise<ClubDetail> {
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);

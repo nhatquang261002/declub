@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { ErrorPanel } from "@/components/ErrorPanel";
+import { useLogError, type ErrorBoundaryProps } from "@/hooks/useLogError";
 
 // Catches a crash while rendering a page, so one broken screen doesn't blank the whole app.
 // The header and wallet stay up because this sits inside the root layout.
-export default function RouteError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
+export default function RouteError({ error, retry }: ErrorBoundaryProps) {
+  useLogError(error);
 
   return (
     <ErrorPanel

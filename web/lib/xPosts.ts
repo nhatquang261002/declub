@@ -160,9 +160,7 @@ export function matchSignals(signals: ClubSignals, post: XPostFacts): SignalStre
   const mentions = new Set([...seen.mentions, ...(post.mentions ?? []).map((m) => m.toLowerCase())]);
   for (const account of signals.accounts) {
     if (mentions.has(account.handle)) return "strong";
-    const quoted = (post.referenced ?? []).some(
-      (r) => (account.xUserId && r.id === account.xUserId) || r.username?.toLowerCase() === account.handle,
-    );
+    const quoted = (post.referenced ?? []).some((r) => (account.xUserId && r.id === account.xUserId) || r.username?.toLowerCase() === account.handle);
     if (quoted) return "strong";
   }
 

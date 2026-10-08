@@ -127,7 +127,13 @@ async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps, coin:
  * membership, a Holders-only entry), so an NFT bought in a swap counts within a minute rather than at
  * the list's daily re-check (`HOLDER_RECHECK_MS`).
  */
-export async function freshHolder(store: Store, entry: ClubEntry, userId: string, deps: MemberDeps = {}, maxAge = HOLDER_SELF_RECHECK_MS): Promise<MemberRow | null> {
+export async function freshHolder(
+  store: Store,
+  entry: ClubEntry,
+  userId: string,
+  deps: MemberDeps = {},
+  maxAge = HOLDER_SELF_RECHECK_MS,
+): Promise<MemberRow | null> {
   const row = await getMember(store, entry.address, userId);
   if (!row || nowOf(deps) - row.holderCheckedAt < maxAge) return row;
   const next = await checked(entry, row, deps, (await coinRuleOf(store, entry))?.rule);
@@ -135,18 +141,10 @@ export async function freshHolder(store: Store, entry: ClubEntry, userId: string
   return next;
 }
 
-export type JoinResult =
-  | { ok: true; row: MemberRow }
-  | { ok: false; reason: "archived" | "no_wallet" | "full" | "banned" };
+type JoinResult = { ok: true; row: MemberRow } | { ok: false; reason: "archived" | "no_wallet" | "full" | "banned" };
 
 /** Joins `userId` to the Club. Joining twice is the same as once. */
-export async function joinClub(
-  store: Store,
-  entry: ClubEntry,
-  userId: string,
-  wallets: readonly string[],
-  deps: MemberDeps = {},
-): Promise<JoinResult> {
+export async function joinClub(store: Store, entry: ClubEntry, userId: string, wallets: readonly string[], deps: MemberDeps = {}): Promise<JoinResult> {
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   if (wallets.length === 0) return { ok: false, reason: "no_wallet" };
   if (await isBanned(store, entry.address, userId)) return { ok: false, reason: "banned" };

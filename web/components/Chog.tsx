@@ -18,14 +18,7 @@ export function ChogImage({ id, className = "", preferLocal = false }: { id: big
   return (
     <div className={`relative aspect-square overflow-hidden bg-panel-2 ${className}`}>
       {image ? (
-        <Image
-          src={image}
-          alt={metadata?.name ?? `Chog #${id}`}
-          fill
-          unoptimized
-          sizes="200px"
-          className="object-cover"
-        />
+        <Image src={image} alt={metadata?.name ?? `Chog #${id}`} fill unoptimized sizes="200px" className="object-cover" />
       ) : (
         <div className="grid h-full place-items-center font-mono text-xs text-muted">#{id}</div>
       )}

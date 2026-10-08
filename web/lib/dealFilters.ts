@@ -11,8 +11,7 @@ export type DealFilters = {
 
 export const DEFAULT_FILTERS: DealFilters = { query: "", mon: "any", sort: "newest" };
 
-export const isFiltering = (f: DealFilters) =>
-  f.query.trim() !== "" || f.mon !== "any" || f.sort !== "newest";
+export const isFiltering = (f: DealFilters) => f.query.trim() !== "" || f.mon !== "any" || f.sort !== "newest";
 
 /** Live deals with a deadline first (soonest first), then no-expiry, then the rest. */
 export function endingSoonRank(deal: { status: DealStatus; expiry: bigint }, now: number): number {

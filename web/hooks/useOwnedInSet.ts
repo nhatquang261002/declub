@@ -19,12 +19,7 @@ const MAX_CHECKED = 3_000;
  * list when the collection is enumerable, and otherwise checks `ownerOf` for each id in the set.
  * `tooLarge` means the set is too big to check that way.
  */
-export function useOwnedInSet(
-  collection: Address,
-  owner: Address | undefined,
-  ids: readonly bigint[],
-  enumerable: boolean,
-) {
+export function useOwnedInSet(collection: Address, owner: Address | undefined, ids: readonly bigint[], enumerable: boolean) {
   const on = !!owner && ids.length > 0;
   const balance = useReadContract({
     address: collection,
@@ -39,13 +34,17 @@ export function useOwnedInSet(
   const tooLarge = on && !enumerate && ids.length > MAX_CHECKED;
 
   const listed = useReadContracts({
-    contracts: Array.from({ length: enumerate ? Number(held) : 0 }, (_, i) => ({
-      address: collection,
-      abi,
-      chainId: CHAIN_ID,
-      functionName: "tokenOfOwnerByIndex",
-      args: [owner!, BigInt(i)],
-    }) as const),
+    contracts: Array.from(
+      { length: enumerate ? Number(held) : 0 },
+      (_, i) =>
+        ({
+          address: collection,
+          abi,
+          chainId: CHAIN_ID,
+          functionName: "tokenOfOwnerByIndex",
+          args: [owner!, BigInt(i)],
+        }) as const,
+    ),
     query: { enabled: on && enumerate && held > 0n },
   });
   const checked = useReadContracts({

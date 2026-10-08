@@ -26,7 +26,8 @@ const challenge = (over: Partial<PublicChallenge> = {}): PublicChallenge => ({
 });
 
 const win = (wallet: string, place: number, post = `post-${place}`): Winner => ({ post, wallet, place, points: [10, 5, 2][place - 1] ?? 1 });
-const settled = (winners: Winner[], over: Partial<PublicChallenge> = {}) => challenge({ phase: "settled", settled: { at: ENDS + 1, epoch: 3, winners }, ...over });
+const settled = (winners: Winner[], over: Partial<PublicChallenge> = {}) =>
+  challenge({ phase: "settled", settled: { at: ENDS + 1, epoch: 3, winners }, ...over });
 const names: Record<string, string> = { [ALICE.toLowerCase()]: "@alice", [BOB.toLowerCase()]: "@bob", [CAROL.toLowerCase()]: "@carol" };
 const nameOf = (w: string) => names[w.toLowerCase()];
 
@@ -51,7 +52,10 @@ describe("challengeShareText", () => {
   });
 
   it("asks for likes on an entry when likes decide, and not when the Owner does", () => {
-    assert.equal(challengeShareText(challenge({ mine: "p1" }), { club: "Chog" }), "I entered “Best Chog meme” in the Chog Club on DeClub ✍️\n\nLike my entry to push it up 👇");
+    assert.equal(
+      challengeShareText(challenge({ mine: "p1" }), { club: "Chog" }),
+      "I entered “Best Chog meme” in the Chog Club on DeClub ✍️\n\nLike my entry to push it up 👇",
+    );
     assert.doesNotMatch(challengeShareText(challenge({ mine: "p1", judging: "owner" }), { club: "Chog" }), /Like my entry/);
   });
 
@@ -62,14 +66,20 @@ describe("challengeShareText", () => {
 
   it("posts the podium for anyone else, naming the winners when it can", () => {
     const c = settled([win(BOB, 2), win(ALICE, 1), win(CAROL, 3)]);
-    assert.equal(challengeShareText(c, { club: "Chog", nameOf }), "Results are in for “Best Chog meme” in the Chog Club on DeClub 🏆\n\n1st: @alice\n2nd: @bob\n3rd: @carol");
+    assert.equal(
+      challengeShareText(c, { club: "Chog", nameOf }),
+      "Results are in for “Best Chog meme” in the Chog Club on DeClub 🏆\n\n1st: @alice\n2nd: @bob\n3rd: @carol",
+    );
     assert.equal(challengeShareText(c, { club: "Chog" }), "Results are in for “Best Chog meme” in the Chog Club on DeClub 🏆");
   });
 
   it("counts the winners of a flat challenge and names three at most", () => {
     const winners = Array.from({ length: 7 }, (_, i) => win([ALICE, BOB, CAROL][i % 3]!, i + 1, `p${i}`));
     const c = settled(winners, { judging: "everyone", prizes: Array(7).fill(3), winners: 7, prize: 3 });
-    assert.equal(challengeShareText(c, { club: "Chog", nameOf }), "Results are in for “Best Chog meme” in the Chog Club on DeClub 🏆\n\n7 winners: @alice, @bob, @carol and 4 more");
+    assert.equal(
+      challengeShareText(c, { club: "Chog", nameOf }),
+      "Results are in for “Best Chog meme” in the Chog Club on DeClub 🏆\n\n7 winners: @alice, @bob, @carol and 4 more",
+    );
   });
 
   it("is neutral for one waiting on its results, with no winner, or called off", () => {
@@ -87,7 +97,13 @@ describe("challengeShareText", () => {
       challengeShareText(challenge({ ...long, mine: "p1" }), { club }),
       challengeShareText(settled([win(ALICE, 1)], long), { club, viewerWallets: [ALICE] }),
       challengeShareText(settled([win(ALICE, 1), win(BOB, 2), win(CAROL, 3)], long), { club, nameOf: longName }),
-      challengeShareText(settled(Array.from({ length: 25 }, (_, i) => win(ALICE, i + 1, `p${i}`)), { ...long, judging: "first", prizes: Array(25).fill(1) }), { club, nameOf: longName }),
+      challengeShareText(
+        settled(
+          Array.from({ length: 25 }, (_, i) => win(ALICE, i + 1, `p${i}`)),
+          { ...long, judging: "first", prizes: Array(25).fill(1) },
+        ),
+        { club, nameOf: longName },
+      ),
       challengeShareText(settled([win(ALICE, 1), win(BOB, 2)], { ...long, judging: "raffle" }), { club, viewerWallets: [BOB] }),
       challengeShareText(challenge({ ...long, phase: "judging" }), { club }),
     ];

@@ -23,13 +23,7 @@ export function Tabs<T extends string>({
   return (
     <div className={`tabbar ${className}`.trim()} role="group" aria-label={label}>
       {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          className="tab"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-        >
+        <button key={option.value} type="button" className="tab" aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
           {option.label}
         </button>
       ))}

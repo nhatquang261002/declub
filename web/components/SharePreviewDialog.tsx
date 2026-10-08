@@ -1,58 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { CheckIcon, CopyIcon, CrossIcon, XLogoIcon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
+import { useModalFocus } from "@/hooks/useModalFocus";
 
-export function SharePreviewDialog({
-  imageUrl,
-  shareUrl,
-  title,
-  onClose,
-}: {
-  imageUrl: string;
-  shareUrl: string;
-  title: string;
-  onClose: () => void;
-}) {
-  const panel = useRef<HTMLDivElement>(null);
-  const close = useRef<HTMLButtonElement>(null);
+export function SharePreviewDialog({ imageUrl, shareUrl, title, onClose }: { imageUrl: string; shareUrl: string; title: string; onClose: () => void }) {
+  const { panel, initial, onKeyDown } = useModalFocus(onClose);
   const [copied, setCopied] = useState(false);
   // The card is drawn on request (it reads the chain), so it takes a moment: say so, and say when it can't load.
   const [image, setImage] = useState<"loading" | "ready" | "failed">("loading");
   const toast = useToast();
-
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    const opener = document.activeElement as HTMLElement | null;
-    document.body.style.overflow = "hidden";
-    close.current?.focus();
-    return () => {
-      document.body.style.overflow = previous;
-      opener?.focus?.();
-    };
-  }, []);
-
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onClose();
-    } else if (event.key === "Tab") {
-      const buttons = panel.current?.querySelectorAll<HTMLButtonElement>("button");
-      if (!buttons?.length) return;
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-  };
 
   async function copyImage() {
     try {
@@ -73,10 +33,17 @@ export function SharePreviewDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div ref={panel} role="dialog" aria-modal="true" aria-label={title} className="page-section flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col gap-4 overflow-auto p-4 sm:p-5" onKeyDown={onKeyDown}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="page-section flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col gap-4 overflow-auto p-4 sm:p-5"
+        onKeyDown={onKeyDown}
+      >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold tracking-tight">{title}</h2>
-          <button ref={close} type="button" className="icon-button" aria-label="Close share preview" onClick={onClose}>
+          <button ref={initial} type="button" className="icon-button" aria-label="Close share preview" onClick={onClose}>
             <CrossIcon />
           </button>
         </div>

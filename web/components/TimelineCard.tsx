@@ -78,7 +78,9 @@ function CardThread({ post, archived, now }: { post: TimelinePost; archived: boo
   const page = useClubPage(post.club);
   // The same rule as the Board's composer: a "holders only" Club lets staff and Holders reply.
   const holdersOnly = page?.holdersOnlyPosts === true && me.member && !me.holder && !(me.role && isStaff(me.role));
-  return <Thread parent={post.id} context={{ token: post.club, wallet: me.wallet, canReply: !!me.member && !archived && !holdersOnly }} role={me.role} now={now} />;
+  return (
+    <Thread parent={post.id} context={{ token: post.club, wallet: me.wallet, canReply: !!me.member && !archived && !holdersOnly }} role={me.role} now={now} />
+  );
 }
 
 /**

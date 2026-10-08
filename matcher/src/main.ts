@@ -51,19 +51,23 @@ const matcher = new Matcher(
   log,
 );
 
-const server = createPoolServer(pool, {
-  chainId: cfg.chainId,
-  swap: cfg.swap,
-  matcher: sender.account.address,
-  fee: async () => ({
-    token: feeSetup.token,
-    amount: (await readFee(reader, cfg.swap)).toString(),
-    recipient: feeSetup.recipient,
-  }),
-}, {
-  ipLimit: new RateLimiter({ perMinute: cfg.rateLimitIp }),
-  trustProxy: cfg.trustProxy,
-});
+const server = createPoolServer(
+  pool,
+  {
+    chainId: cfg.chainId,
+    swap: cfg.swap,
+    matcher: sender.account.address,
+    fee: async () => ({
+      token: feeSetup.token,
+      amount: (await readFee(reader, cfg.swap)).toString(),
+      recipient: feeSetup.recipient,
+    }),
+  },
+  {
+    ipLimit: new RateLimiter({ perMinute: cfg.rateLimitIp }),
+    trustProxy: cfg.trustProxy,
+  },
+);
 
 server.listen(cfg.port, cfg.host, () => {
   log(`pool listening on http://${cfg.host}:${cfg.port}`);
@@ -73,9 +77,7 @@ server.listen(cfg.port, cfg.host, () => {
       ? `matching only ${cfg.tokenAllowlist.size} allowlisted token(s) and the fee token`
       : "no token allowlist: any token is matched (set MATCHER_TOKEN_ALLOWLIST on a public deployment)",
   );
-  void readFee(reader, cfg.swap).then((amount) =>
-    log(`protocol fee: ${amount} of ${feeSetup.token} per maker, to ${feeSetup.recipient}`),
-  );
+  void readFee(reader, cfg.swap).then((amount) => log(`protocol fee: ${amount} of ${feeSetup.token} per maker, to ${feeSetup.recipient}`));
   matcher.start({ pollMs: cfg.pollMs, pruneMs: cfg.pruneMs });
 });
 

@@ -23,7 +23,7 @@ import { MOCK_ERC20_ADDRESS, POOL_URL } from "@/lib/config";
 import type { Step } from "@/lib/createFlow";
 import { DEADLINES, DEFAULT_DEADLINE, deadlineSeconds, intentProblem, type DeadlineKey } from "@/lib/intents";
 import { blockedProblem } from "@/lib/assetTrust";
-import { ConfirmCard, NextButton, ReviewCard, ReviewStage, StepHeading, StepNav } from "./parts";
+import { ConfirmCard, ReviewCard, ReviewRows, ReviewStage, StepContinue, StepHeading } from "./parts";
 import { DealStageSide } from "@/components/DealSheet";
 
 /** The longest choice gets a warning: a signature out for a week is a standing offer (ADR 0008). */
@@ -106,18 +106,9 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
           title="What do you want in return?"
           blurb="Token amounts are a minimum: a match can pay more, and you keep the extra. NFTs must be exactly these."
         />
-        <AssetEditor
-          title="You want"
-          rows={wantRows}
-          onChange={setWantRows}
-          info={info}
-          allowNative={false}
-          amountIsMinimum
-        />
+        <AssetEditor title="You want" rows={wantRows} onChange={setWantRows} info={info} allowNative={false} amountIsMinimum />
         {escrowHint}
-        <StepNav hint={wantError}>
-          <NextButton disabled={!!wantError} onClick={() => onStep(2)} />
-        </StepNav>
+        <StepContinue error={wantError} onNext={() => onStep(2)} />
       </div>
     );
   }
@@ -129,21 +120,18 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
         <AssetEditor title="You give" rows={giveRows} onChange={setGiveRows} info={info} allowNative={false} owner={address} />
         <section className="page-section grid gap-6 p-4 md:grid-cols-2">
           <div>
-            <label className="label" htmlFor="deadline">Good for</label>
-            <Select
-              id="deadline"
-              value={deadline}
-              options={DEADLINES.map(({ key, label }) => ({ value: key, label }))}
-              onChange={setDeadline}
-            />
+            <label className="label" htmlFor="deadline">
+              Good for
+            </label>
+            <Select id="deadline" value={deadline} options={DEADLINES.map(({ key, label }) => ({ value: key, label }))} onChange={setDeadline} />
             <p className="mt-1 text-xs text-muted">
-              After this it can no longer settle. Shorter is safer: once a signature has left the pool, only cancelling it on-chain
-              (which costs gas) stops it sooner.
+              After this it can no longer settle. Shorter is safer: once a signature has left the pool, only cancelling it on-chain (which costs gas) stops it
+              sooner.
             </p>
             {deadline === LONG_DEADLINE && (
               <p className="mt-2 text-xs font-semibold text-warn">
-                A week is a long time to leave a signature out. If prices move or you change your mind, removing it from the pool
-                isn&apos;t enough: you&apos;d have to cancel it on-chain.
+                A week is a long time to leave a signature out. If prices move or you change your mind, removing it from the pool isn&apos;t enough: you&apos;d
+                have to cancel it on-chain.
               </p>
             )}
           </div>
@@ -160,8 +148,7 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
                 <span>
                   Approve whole collections
                   <span className="block text-xs text-muted">
-                    Fewer transactions, but the contract may move any NFT you own in that collection while a signed swap
-                    is live. Off: one approval per NFT.
+                    Fewer transactions, but the contract may move any NFT you own in that collection while a signed swap is live. Off: one approval per NFT.
                   </span>
                 </span>
               </label>
@@ -169,9 +156,7 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
           )}
         </section>
         {escrowHint}
-        <StepNav onBack={() => onStep(1)} hint={giveError}>
-          <NextButton disabled={!!giveError} onClick={() => onStep(3)} />
-        </StepNav>
+        <StepContinue onBack={() => onStep(1)} error={giveError} onNext={() => onStep(3)} />
       </div>
     );
   }
@@ -200,20 +185,13 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
         }
       />
       <ReviewCard title="Terms">
-        <dl className="space-y-1.5">
-          {(
-            [
-              ["Deal type", "Signed swap (nothing locked)"],
-              ["Who can settle it", "Anyone that meets what you want"],
-              ["Expires", `In ${DEADLINES.find((d) => d.key === deadline)!.label}`],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="flex flex-wrap justify-between gap-x-4 text-sm">
-              <dt className="text-muted">{label}</dt>
-              <dd className="font-semibold">{value}</dd>
-            </div>
-          ))}
-        </dl>
+        <ReviewRows
+          rows={[
+            ["Deal type", "Signed swap (nothing locked)"],
+            ["Who can settle it", "Anyone that meets what you want"],
+            ["Expires", `In ${DEADLINES.find((d) => d.key === deadline)!.label}`],
+          ]}
+        />
       </ReviewCard>
       {fee && (
         <FeeNote
@@ -223,10 +201,9 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
           pending={pendingFee}
           pendingNote="A swap signed now can't settle after that unless you sign it again at the new fee."
         >
-          Signed with your swap as the most you&apos;ll pay for each NFT you give, and taken from your wallet only if it
-          settles, in WMON (wrapped MON). If the fee is cut before then, you pay less. Every wallet in the match pays the
-          same for each NFT it gives. If it never settles, you pay nothing. Holding only MON is fine: the first step wraps
-          what you need.
+          Signed with your swap as the most you&apos;ll pay for each NFT you give, and taken from your wallet only if it settles, in WMON (wrapped MON). If the
+          fee is cut before then, you pay less. Every wallet in the match pays the same for each NFT it gives. If it never settles, you pay nothing. Holding
+          only MON is fine: the first step wraps what you need.
         </FeeNote>
       )}
       <ConsentNotice />

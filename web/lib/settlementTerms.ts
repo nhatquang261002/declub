@@ -19,7 +19,7 @@ export type SettlementTerm = {
   detail: string;
 };
 
-export const SETTLEMENT_TERMS: readonly SettlementTerm[] = [
+const SETTLEMENT_TERMS: readonly SettlementTerm[] = [
   {
     id: "cant-fail",
     mode: "escrow",

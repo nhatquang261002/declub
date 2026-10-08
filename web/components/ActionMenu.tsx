@@ -50,15 +50,7 @@ export function ActionMenu({ groups, label }: { groups: ReadonlyArray<ReadonlyAr
 
   return (
     <div ref={ref} className="relative" onKeyDown={onKeyDown}>
-      <button
-        ref={button}
-        type="button"
-        className="icon-btn"
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
+      <button ref={button} type="button" className="icon-btn" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         <MoreIcon className="size-5" />
       </button>
       {open && (

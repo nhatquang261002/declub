@@ -37,8 +37,7 @@ describe("the matcher process", { skip }, () => {
         MATCHER_RPC_URL: w.rpcUrl,
         NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS: w.swap,
         MATCHER_PRIVATE_KEY: toHex(
-          mnemonicToAccount("test test test test test test test test test test test junk", { addressIndex: 9 })
-            .getHdKey().privateKey!,
+          mnemonicToAccount("test test test test test test test test test test test junk", { addressIndex: 9 }).getHdKey().privateKey!,
         ),
         MATCHER_PORT: String(port),
         MATCHER_DB_PATH: join(dir, "pool.sqlite"),
@@ -75,7 +74,10 @@ describe("the matcher process", { skip }, () => {
     await w.approveToken(w.bob, w.usd, 12n * ONE);
     const sell = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, 12n * ONE)]);
     const buy = w.intent(w.bob.address, [w.tokenOf(w.usd, 12n * ONE)], [w.chogOf(id!)]);
-    for (const [who, intent] of [[w.alice, sell], [w.bob, buy]] as const) {
+    for (const [who, intent] of [
+      [w.alice, sell],
+      [w.bob, buy],
+    ] as const) {
       const res = await fetch(`${base}/intents`, {
         method: "POST",
         headers: { "content-type": "application/json" },

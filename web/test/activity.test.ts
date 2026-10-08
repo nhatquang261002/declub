@@ -180,7 +180,10 @@ describe("recordActivity", () => {
     await recordActivity(store, HASH2, receipt([filled()]), opts(later.reader));
     await store.rank(activityKey(NFT), [{ member: "not json", score: AT + 999 }], 10);
     const events = await readActivity(store, NFT);
-    assert.deepEqual(events.map((e) => e.kind), ["swapped", "created"]);
+    assert.deepEqual(
+      events.map((e) => e.kind),
+      ["swapped", "created"],
+    );
   });
 
   it("keeps each chain's and each Club's log apart", async () => {

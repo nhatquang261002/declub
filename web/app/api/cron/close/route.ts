@@ -1,9 +1,7 @@
-import { fail, json } from "@/lib/server/gate";
-import { cronAuthorized } from "@/lib/server/fillWatcher";
+import { gateCron, json } from "@/lib/server/gate";
 import { epochAt } from "@/lib/rewards";
 import { settleDue } from "@/lib/server/challenges";
 import { closeEpoch } from "@/lib/server/rewards";
-import { getStore } from "@/lib/server/store";
 import { registry } from "@/lib/verifiedAssets";
 
 /**
@@ -21,10 +19,8 @@ import { registry } from "@/lib/verifiedAssets";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const store = getStore();
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!store || !secret) return fail(503, "disabled", "The epoch close is not configured.");
-  if (!cronAuthorized(request, secret)) return fail(401, "unauthorized", "Missing or wrong cron secret.");
+  const store = gateCron(request, "The epoch close");
+  if (store instanceof Response) return store;
   const n = epochAt(Math.floor(Date.now() / 1000)) - 1;
   if (n < 0) return json({ status: "open", message: "No epoch has ended yet." });
   for (const club of registry.clubs()) {

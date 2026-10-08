@@ -117,7 +117,9 @@ export const feeCases: Case<World>[] = [
       for (const who of [w.alice, w.bob]) await w.ensureFeeToken(who, raised * 2n);
       await w.approveAll(w.alice, w.intents);
       await w.approveToken(w.bob, w.usd, w.intents);
-      const a = await w.intent(w.alice.address, [w.nftAsset(nftId!)], [w.tokenAsset(w.usd, parseEther("1"))], { deadline: (await w.now()) + 30n * 24n * 3600n });
+      const a = await w.intent(w.alice.address, [w.nftAsset(nftId!)], [w.tokenAsset(w.usd, parseEther("1"))], {
+        deadline: (await w.now()) + 30n * 24n * 3600n,
+      });
       const b = await w.intent(w.bob.address, [w.tokenAsset(w.usd, parseEther("1"))], [w.nftAsset(nftId!)], { deadline: a.deadline });
       const sigs: Hex[] = [await w.sign(w.alice, a), await w.sign(w.bob, b)];
 

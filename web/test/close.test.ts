@@ -38,7 +38,12 @@ async function post(store: Store, userId: string, s: number) {
 /** g (4 NFTs) and a (2) like each other's posts; q (1) does nothing. */
 async function world() {
   const store = memoryStore();
-  for (const [u, n] of [["g", 1], ["a", 2], ["q", 3]] as const) await member(store, u, n);
+  for (const [u, n] of [
+    ["g", 1],
+    ["a", 2],
+    ["q", 3],
+  ] as const)
+    await member(store, u, n);
   const pg = await post(store, "g", 60);
   const pa = await post(store, "a", 60);
   assert.ok((await likePost(store, club, "g", pa, true, at(120))).ok);
@@ -69,7 +74,18 @@ describe("closing an epoch (ADR 0040)", () => {
     assert.deepEqual(await closeEpoch(store, 0, deps({ holdings: async () => null })), { status: "closed", closed: [], existing: [], failed: [token] });
     assert.equal(await store.get(closingKey(token, 0)), null, "nothing stored for a Club that couldn't be read");
     assert.deepEqual(await closeEpoch(store, 0, deps()), { status: "closed", closed: [token], existing: [], failed: [] });
-    assert.deepEqual(await closeEpoch(store, 0, deps({ holdings: async () => { throw new Error("must not read again"); } })), { status: "closed", closed: [], existing: [token], failed: [] });
+    assert.deepEqual(
+      await closeEpoch(
+        store,
+        0,
+        deps({
+          holdings: async () => {
+            throw new Error("must not read again");
+          },
+        }),
+      ),
+      { status: "closed", closed: [], existing: [token], failed: [] },
+    );
   });
 
   it("freezes the epoch's backing: a like taken back, or a moderator's hide, after the close changes nothing", async () => {
@@ -113,7 +129,15 @@ describe("closing an epoch (ADR 0040)", () => {
     await buildEpoch(store, 0, { ...deps(), events: async () => [] });
     const ledger = await ledgerOf(store);
     assert.deepEqual(ledger.rules, { ...DEFAULT_CLUB_RULES, pairCap: 60 });
-    assert.deepEqual(ledger.rows.map((r) => [r.wallet, r.holder, r.paid]), [[wallet(2), true, true], [wallet(1), true, true], [wallet(3), true, false]], "ranked by points; the idle Holder is listed, unpaid");
+    assert.deepEqual(
+      ledger.rows.map((r) => [r.wallet, r.holder, r.paid]),
+      [
+        [wallet(2), true, true],
+        [wallet(1), true, true],
+        [wallet(3), true, false],
+      ],
+      "ranked by points; the idle Holder is listed, unpaid",
+    );
     const q = row(ledger, 3);
     assert.deepEqual([q.points, q.days, q.bonusBps, q.shares, q.held], [0, 0, 0, "1", 1]);
     assert.ok(!JSON.stringify(ledger).includes("did:") && !JSON.stringify(ledger).includes('"g"'), "no user ids");

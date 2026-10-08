@@ -40,10 +40,4 @@ export type Status =
   | "consumed" //  nonce used on-chain by someone else (settled elsewhere, or invalidated)
   | "rejected"; // can never settle (bad signature, malformed, token that doesn't deliver)
 
-export const TERMINAL: ReadonlySet<Status> = new Set([
-  "settled",
-  "cancelled",
-  "expired",
-  "consumed",
-  "rejected",
-]);
+export const TERMINAL: ReadonlySet<Status> = new Set(["settled", "cancelled", "expired", "consumed", "rejected"]);

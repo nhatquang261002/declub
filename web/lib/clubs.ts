@@ -36,7 +36,12 @@ export type ActivityEvent = {
   entry?: true;
 };
 
-export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties, ...(e.weight !== undefined ? { weight: e.weight } : {}) });
+export const toScored = (e: ActivityEvent): ScoredEvent => ({
+  kind: e.kind,
+  at: e.at,
+  parties: e.parties,
+  ...(e.weight !== undefined ? { weight: e.weight } : {}),
+});
 
 export type ClubStats = {
   /** Club Momentum. */
@@ -82,9 +87,7 @@ export function summarize(events: readonly ActivityEvent[], now: number): ClubSt
 export function settlementEvents(settlements: readonly Settlement[]): ActivityEvent[] {
   return settlements.map((s) => {
     const makers = s.cycle.map((row) => row.intent.maker.toLowerCase());
-    const tokens = s.cycle.flatMap((row) =>
-      [...row.intent.give, ...row.intent.want].filter((a) => a.kind !== "native").map((a) => a.token.toLowerCase()),
-    );
+    const tokens = s.cycle.flatMap((row) => [...row.intent.give, ...row.intent.want].filter((a) => a.kind !== "native").map((a) => a.token.toLowerCase()));
     return {
       id: `${s.txHash.toLowerCase()}:settled`,
       kind: "swapped" as const,
@@ -106,10 +109,7 @@ export function mergeEvents(...lists: ReadonlyArray<readonly ActivityEvent[]>): 
 }
 
 /** Completed swaps, newest first. */
-export const completedSwaps = (events: readonly ActivityEvent[], limit: number) =>
-  mergeEvents(events.filter((e) => e.kind === "swapped")).slice(0, limit);
-
-
+export const completedSwaps = (events: readonly ActivityEvent[], limit: number) => mergeEvents(events.filter((e) => e.kind === "swapped")).slice(0, limit);
 
 /** One asset of a Club. */
 export type ClubAsset = { token: string; kind: "erc721" | "erc20"; name: string; symbol: string };

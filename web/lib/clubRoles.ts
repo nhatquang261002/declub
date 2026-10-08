@@ -40,7 +40,7 @@ export const atLeast = (actor: ClubRole, required: ClubRole) => RANK[actor] >= R
 export const isOwnerOrAdmin = (role: ClubRole) => role === "owner" || role === "admin";
 
 export type RoleChange = { userId: string; role: "owner" | "moderator" | null };
-export type RoleResult =
+type RoleResult =
   | { ok: true; roles: Roles; action: "appoint_moderator" | "remove_moderator" | "assign_owner" | "remove_owner" }
   | { ok: false; reason: "forbidden" | "too_many_moderators" | "already_owner" | "no_change" };
 

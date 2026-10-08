@@ -34,7 +34,7 @@ export const SYSTEM_WINDOW_SEC = 7 * 86_400;
 export const SYSTEM_MAX = 40;
 
 /** A challenge's start or result is drawn as a card of its own in a feed, never as a line in a run of messages (ADR 0045). */
-export const isChallengeEvent = (e: Pick<SystemEvent, "kind">) => e.kind === "challenge" || e.kind === "winner";
+const isChallengeEvent = (e: Pick<SystemEvent, "kind">) => e.kind === "challenge" || e.kind === "winner";
 
 /**
  * The events without the starts of challenges pinned on top of the Board while they run: the card is
@@ -89,7 +89,11 @@ export type FeedItem<P> = { type: "post"; post: P } | { type: "system"; events: 
  * and the messages between two posts come as one item. A challenge's start or result (ADR 0045) is
  * an item of its own, in its place by time, and splits a run.
  */
-export function weave<P extends { at: number; pinned?: boolean }>(posts: readonly P[], events: readonly SystemEvent[], options: { since: number; complete: boolean }): FeedItem<P>[] {
+export function weave<P extends { at: number; pinned?: boolean }>(
+  posts: readonly P[],
+  events: readonly SystemEvent[],
+  options: { since: number; complete: boolean },
+): FeedItem<P>[] {
   // Posts' `at` is epoch ms; events' is unix seconds.
   const seconds = (p: P) => Math.floor(p.at / 1000);
   const pinned = posts.filter((p) => p.pinned);

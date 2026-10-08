@@ -112,7 +112,7 @@ const isAdmin = (deps: Deps, userId: string) => (deps.admins ?? adminIds()).has(
 
 export const postsKey = (token: string) => `declub:club-posts:${CHAIN_ID}:${token.toLowerCase()}`;
 export const postKey = (token: string, id: string) => `declub:club-post:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
-export const reportsKey = (token: string, id: string) => `declub:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+const reportsKey = (token: string, id: string) => `declub:club-reports:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 /** The members who liked a post, and the posts a member liked in a Club (to mark them on a read). */
 export const likesKey = (token: string, id: string) => `declub:club-likes:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 export const likedKey = (token: string, userId: string) => `declub:club-liked:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
@@ -124,8 +124,8 @@ export const repliesKey = (token: string, id: string) => `declub:club-replies:${
 export const walletPostsKey = (wallet: string) => `declub:wallet-posts:${CHAIN_ID}:${wallet.toLowerCase()}`;
 /** The reports that count toward hiding a post: those filed by Holders and staff. */
 /** The posts and replies reported since they were posted or last restored, for the staff's "Reported" list. */
-export const reportedKey = (token: string) => `declub:club-reported:${CHAIN_ID}:${token.toLowerCase()}`;
-export const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
+const reportedKey = (token: string) => `declub:club-reported:${CHAIN_ID}:${token.toLowerCase()}`;
+const countedReportsKey = (token: string, id: string) => `declub:club-reports-counted:${CHAIN_ID}:${token.toLowerCase()}:${id}`;
 
 /** The user's role in the Club, an app admin's outranking everything. */
 export async function roleIn(store: Store, token: string, userId: string, deps: Deps = {}): Promise<ClubRole> {
@@ -143,7 +143,7 @@ const tokensOf = (assets: readonly { kind: string; token?: string }[]) =>
   assets.filter((a) => a.kind !== "native" && a.token).map((a) => a.token!.toLowerCase());
 
 /** The real lookup: DeClubEscrow's `getTrade`, or the pool's intent. */
-export async function resolveLink(link: PostLink): Promise<string[] | null> {
+async function resolveLink(link: PostLink): Promise<string[] | null> {
   if (link.kind === "x") return null;
   if (link.kind === "intent") {
     const found = await getIntent(link.hash as `0x${string}`);
@@ -164,17 +164,62 @@ export async function resolveLink(link: PostLink): Promise<string[] | null> {
 // ---------------------------------------------------------------------------------------------
 // Posts
 
-export type PostRefusal =
-  | "archived" | "not_member" | "banned" | "no_profile" | "holders_only" | "bad_kind" | "empty" | "too_long"
-  | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable" | "cooldown" | "rate_limited";
+type PostRefusal =
+  | "archived"
+  | "not_member"
+  | "banned"
+  | "no_profile"
+  | "holders_only"
+  | "bad_kind"
+  | "empty"
+  | "too_long"
+  | "bad_link"
+  | "link_not_found"
+  | "link_mismatch"
+  | "link_unavailable"
+  | "x_not_found"
+  | "x_unavailable"
+  | "cooldown"
+  | "rate_limited";
 
-export type PostInput = {
+type PostInput = {
   kind: unknown;
   text: unknown;
   link?: unknown;
   /** A post `createSignedPost` checked: it takes the message's id and keeps the signature. */
   signed?: { message: PostMessage; signature: Hex };
 };
+
+/** Who may act on a Club's Board: a member of a Club that isn't archived, and who hasn't been banned from it. */
+async function memberGate(store: Store, entry: ClubEntry, userId: string) {
+  const token = entry.address.toLowerCase();
+  if (entry.club === "archived") return { ok: false, reason: "archived" } as const;
+  const row = await getMember(store, token, userId);
+  if (!row) return { ok: false, reason: "not_member" } as const;
+  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" } as const;
+  return { ok: true, row } as const;
+}
+
+/** Who may post or reply: a member who can act, within what the Owner has switched on, with a shared profile. */
+async function postingGate(store: Store, entry: ClubEntry, userId: string, deps: Deps) {
+  const gate = await memberGate(store, entry, userId);
+  if (!gate.ok) return gate;
+  const token = entry.address.toLowerCase();
+  const role = await roleIn(store, token, userId, deps);
+  const profile = await loadProfile(store, token);
+  // Staff post whatever the Owner has switched on: it is for members.
+  if (profile.holdersOnlyPosts && !gate.row.holder && !isStaff(role)) return { ok: false, reason: "holders_only" } as const;
+  if ((await sharedWallets(store, userId)).size === 0) return { ok: false, reason: "no_profile" } as const;
+  return { ok: true, row: gate.row, role } as const;
+}
+
+/** A signed post or reply sent before: sending it again gives back the first, unless it was another member's. */
+async function sentBefore(store: Store, token: string, userId: string, id: string, deps: Deps) {
+  const existing = await getPost(store, token, id);
+  if (!existing) return null;
+  if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" } as const;
+  return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) } as const;
+}
 
 export async function createPost(
   store: Store,
@@ -184,16 +229,9 @@ export async function createPost(
   deps: Deps = {},
 ): Promise<{ ok: true; post: PublicPost; xShare?: XShareVerdict } | { ok: false; reason: PostRefusal }> {
   const token = entry.address.toLowerCase();
-  if (entry.club === "archived") return { ok: false, reason: "archived" };
-  const row = await getMember(store, token, userId);
-  if (!row) return { ok: false, reason: "not_member" };
-  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
-
-  const role = await roleIn(store, token, userId, deps);
-  const profile = await loadProfile(store, token);
-  // Staff post whatever the Owner has switched on: it is for members.
-  if (profile.holdersOnlyPosts && !row.holder && !isStaff(role)) return { ok: false, reason: "holders_only" };
-  if ((await sharedWallets(store, userId)).size === 0) return { ok: false, reason: "no_profile" };
+  const gate = await postingGate(store, entry, userId, deps);
+  if (!gate.ok) return gate;
+  const { row, role } = gate;
 
   if (input.kind !== "note" && input.kind !== "looking") return { ok: false, reason: "bad_kind" };
   const kind: PostKind = input.kind;
@@ -258,7 +296,7 @@ export async function createPost(
   return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false, undefined, undefined, 0), ...(xShare ? { xShare } : {}) };
 }
 
-export type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
+type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
 
 let verifier: PublicClient | undefined;
 /** viem's check: an EOA's signature, or a smart wallet's through ERC-1271. */
@@ -309,12 +347,15 @@ export async function createSignedPost(
   const signer = getAddress(row.displayWallet);
   if (!(await (deps.verifyPost ?? viemVerifyPost)(signer, message, signature as Hex))) return { ok: false, reason: "bad_signature" };
 
-  const existing = await getPost(store, token, postId(message));
-  if (existing) {
-    if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" };
-    return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) };
-  }
-  return createPost(store, entry, userId, { kind: message.kind, text: message.text, link: message.link || undefined, signed: { message, signature: signature as Hex } }, deps);
+  const before = await sentBefore(store, token, userId, postId(message), deps);
+  if (before) return before;
+  return createPost(
+    store,
+    entry,
+    userId,
+    { kind: message.kind, text: message.text, link: message.link || undefined, signed: { message, signature: signature as Hex } },
+    deps,
+  );
 }
 
 /**
@@ -346,10 +387,12 @@ export async function exportPosts(store: Store, entry: AssetEntry, limit = POSTS
 /** Every signed post `wallet` wrote, across Clubs, newest first. */
 export async function walletPosts(store: Store, wallet: string, limit = POSTS_KEPT): Promise<SignedPost[]> {
   const refs = await store.ranked(walletPostsKey(wallet), limit);
-  const rows = await store.getMany<StoredPost>(refs.map((ref) => {
-    const [token, id] = ref.split(":");
-    return postKey(token!, id!);
-  }));
+  const rows = await store.getMany<StoredPost>(
+    refs.map((ref) => {
+      const [token, id] = ref.split(":");
+      return postKey(token!, id!);
+    }),
+  );
   return rows.flatMap((row, i) => {
     const signed = row ? toSigned(refs[i]!.split(":")[0]!, row) : null;
     return signed ? [signed] : [];
@@ -387,7 +430,10 @@ export async function listPosts(
   // The reader's lens orders the rest (ADR 0023). Pins stay on top whatever it filters, unless the
   // lens drops them: an Owner's pin is the Club speaking.
   const lens = lensOf(viewer.lens);
-  const ranked = lens.rank(recent.filter((p) => !lens.pins || !pinned.includes(p.id)), await lensContext(store, entry, lens.id, viewer.as, deps));
+  const ranked = lens.rank(
+    recent.filter((p) => !lens.pins || !pinned.includes(p.id)),
+    await lensContext(store, entry, lens.id, viewer.as, deps),
+  );
   const pinnedPosts = lens.pins ? pinned.flatMap((id) => (live.has(id) ? [live.get(id)!] : [])) : [];
   const all = pinnedFirst([...pinnedPosts, ...ranked], lens.pins ? pinned : []);
   // A page of the ranked list: the rank is the same on every request, so an offset is enough.
@@ -397,9 +443,7 @@ export async function listPosts(
   // toward hiding (from members who aren't Holders) still reach them for review.
   const counts = new Map<string, number>();
   if (staff) {
-    await Promise.all(
-      ordered.filter((p) => p.hidden || p.reported).map(async (p) => counts.set(p.id, await store.countMembers(reportsKey(token, p.id)))),
-    );
+    await Promise.all(ordered.filter((p) => p.hidden || p.reported).map(async (p) => counts.set(p.id, await store.countMembers(reportsKey(token, p.id)))));
   }
   const liked = new Set(viewer.userId ? await store.members(likedKey(token, viewer.userId)) : []);
   const likes = new Map<string, number>();
@@ -415,7 +459,14 @@ export async function listPosts(
   );
   return {
     posts: ordered.map((p) =>
-      viewPost(p, { userId: viewer.userId, staff }, pinned.includes(p.id), counts.get(p.id), { count: likes.get(p.id) ?? 0, liked: liked.has(p.id) }, replies.get(p.id) ?? 0),
+      viewPost(
+        p,
+        { userId: viewer.userId, staff },
+        pinned.includes(p.id),
+        counts.get(p.id),
+        { count: likes.get(p.id) ?? 0, liked: liked.has(p.id) },
+        replies.get(p.id) ?? 0,
+      ),
     ),
     role,
     total: all.length,
@@ -438,16 +489,19 @@ async function lensContext(store: Store, entry: AssetEntry, lens: LensId, as: st
   return ctx;
 }
 
-
 // ---------------------------------------------------------------------------------------------
 // Replies (ADR 0032): one level under a top-level post, signed like posts. A reply is stored as a
 // post with a `parent`, so likes, reports, hiding, deleting and bans work on it unchanged; it isn't
 // on the Board list or in the lenses. It makes its author's day active and gives the post's author
 // part of their voice toward Club Rewards (ADR 0038).
 
-export type ReplyRefusal = Exclude<PostRefusal, "bad_kind" | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable"> | "not_found" | "hidden" | "thread_full";
+type ReplyRefusal =
+  | Exclude<PostRefusal, "bad_kind" | "bad_link" | "link_not_found" | "link_mismatch" | "link_unavailable" | "x_not_found" | "x_unavailable">
+  | "not_found"
+  | "hidden"
+  | "thread_full";
 
-export type ReplyInput = { text: unknown; signed?: { message: ReplyMessage; signature: Hex } };
+type ReplyInput = { text: unknown; signed?: { message: ReplyMessage; signature: Hex } };
 
 export async function createReply(
   store: Store,
@@ -458,14 +512,9 @@ export async function createReply(
   deps: Deps = {},
 ): Promise<{ ok: true; post: PublicPost } | { ok: false; reason: ReplyRefusal }> {
   const token = entry.address.toLowerCase();
-  if (entry.club === "archived") return { ok: false, reason: "archived" };
-  const row = await getMember(store, token, userId);
-  if (!row) return { ok: false, reason: "not_member" };
-  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
-  const role = await roleIn(store, token, userId, deps);
-  const profile = await loadProfile(store, token);
-  if (profile.holdersOnlyPosts && !row.holder && !isStaff(role)) return { ok: false, reason: "holders_only" };
-  if ((await sharedWallets(store, userId)).size === 0) return { ok: false, reason: "no_profile" };
+  const gate = await postingGate(store, entry, userId, deps);
+  if (!gate.ok) return gate;
+  const { row, role } = gate;
 
   const parent = await getPost(store, token, parentId);
   // One level: a reply answers a post, never another reply.
@@ -497,7 +546,7 @@ export async function createReply(
   return { ok: true, post: viewPost(reply, { userId, staff: isStaff(role) }, false) };
 }
 
-export type SignedReplyRefusal = ReplyRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
+type SignedReplyRefusal = ReplyRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
 
 /** A reply the author signed: the message must be exactly what `createReply` stores, as for posts. */
 export async function createSignedReply(
@@ -523,11 +572,8 @@ export async function createSignedReply(
   const signer = getAddress(row.displayWallet);
   if (!(await (deps.verifyReply ?? viemVerifyReply)(signer, message, signature as Hex))) return { ok: false, reason: "bad_signature" };
 
-  const existing = await getPost(store, token, replyId(message));
-  if (existing) {
-    if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" };
-    return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) };
-  }
+  const before = await sentBefore(store, token, userId, replyId(message), deps);
+  if (before) return before;
   return createReply(store, entry, userId, message.parent, { text: message.text, signed: { message, signature: signature as Hex } }, deps);
 }
 
@@ -552,7 +598,10 @@ export async function listReplies(
   const rows = (await store.getMany<StoredPost>(ids.map((id) => postKey(token, id)))).filter((r): r is StoredPost => r !== null).sort((a, b) => a.at - b.at);
   const liked = new Set(viewer.userId ? await store.members(likedKey(token, viewer.userId)) : []);
   const likes = await Promise.all(rows.map((r) => (r.hidden ? 0 : store.countMembers(likesKey(token, r.id)))));
-  return { ok: true, replies: rows.map((r, i) => viewPost(r, { userId: viewer.userId, staff }, false, undefined, { count: likes[i]!, liked: liked.has(r.id) })) };
+  return {
+    ok: true,
+    replies: rows.map((r, i) => viewPost(r, { userId: viewer.userId, staff }, false, undefined, { count: likes[i]!, liked: liked.has(r.id) })),
+  };
 }
 
 /** A Club's signed replies to its listed posts, for the public export. Hidden ones are left out. */
@@ -579,10 +628,28 @@ async function threadKeys(store: Store, token: string, id: string): Promise<stri
   return [...keysOf(id), ...replies.flatMap(keysOf), repliesKey(token, id)];
 }
 
-export type Refusal = "archived" | "own_like" | "not_member" | "banned" | "not_found" | "forbidden" | "own_post" | "rate_limited" | "too_many_pinned" | "hidden" | "voting_closed" | "challenge_conflict";
+type Refusal =
+  | "archived"
+  | "own_like"
+  | "not_member"
+  | "banned"
+  | "not_found"
+  | "forbidden"
+  | "own_post"
+  | "rate_limited"
+  | "too_many_pinned"
+  | "hidden"
+  | "voting_closed"
+  | "challenge_conflict";
 
 /** Author, or staff who may act on the author's role. */
-export async function deletePost(store: Store, entry: AssetEntry, actor: Actor, id: string, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
+export async function deletePost(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  id: string,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   const post = await getPost(store, token, id);
   if (!post) return { ok: false, reason: "not_found" };
@@ -652,10 +719,9 @@ export async function reportPost(
   deps: Deps = {},
 ): Promise<{ ok: true; hidden: boolean } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
-  if (entry.club === "archived") return { ok: false, reason: "archived" };
-  const row = await getMember(store, token, userId);
-  if (!row) return { ok: false, reason: "not_member" };
-  if (await isBanned(store, token, userId)) return { ok: false, reason: "banned" };
+  const gate = await memberGate(store, entry, userId);
+  if (!gate.ok) return gate;
+  const { row } = gate;
   const post = await getPost(store, token, id);
   if (!post) return { ok: false, reason: "not_found" };
   if (post.userId === userId) return { ok: false, reason: "own_post" };
@@ -700,7 +766,14 @@ async function unpin(store: Store, token: string, id: string): Promise<void> {
 }
 
 /** Staff hide a post, or restore a hidden one (which also clears its reports). */
-export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id: string, hide: boolean, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
+export async function hidePost(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  id: string,
+  hide: boolean,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   const roles = await loadRoles(store, token);
   const mine = roleOf(roles, actor.userId, isAdmin(deps, actor.userId));
@@ -728,7 +801,14 @@ export async function hidePost(store: Store, entry: AssetEntry, actor: Actor, id
 }
 
 /** The Owner (or an admin) pins up to `MAX_PINNED` posts; a hidden post can't be pinned. */
-export async function pinPost(store: Store, entry: AssetEntry, actor: Actor, id: string, pin: boolean, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
+export async function pinPost(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  id: string,
+  pin: boolean,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
   const profile = await loadProfile(store, token);
@@ -760,7 +840,7 @@ async function memberByWallet(store: Store, token: string, wallet: string) {
   return (await allRows(store, token)).find((row) => row.displayWallet === w) ?? null;
 }
 
-export type BanTarget = { wallet?: unknown; post?: unknown };
+type BanTarget = { wallet?: unknown; post?: unknown };
 
 /**
  * Bans a member (named by wallet) or a post's author (so a spammer who already left is still
@@ -812,7 +892,14 @@ export async function banUser(
  * Lifts a ban made in this Club, or (admins) everywhere. It doesn't put the user back in. Only
  * someone of at least the banner's rank may lift it.
  */
-export async function unbanUser(store: Store, entry: AssetEntry, actor: Actor, wallet: string, everywhere: boolean, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
+export async function unbanUser(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  wallet: string,
+  everywhere: boolean,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: Refusal }> {
   const token = entry.address.toLowerCase();
   const mine = await roleIn(store, token, actor.userId, deps);
   if (!isStaff(mine) || (everywhere && mine !== "admin")) return { ok: false, reason: "forbidden" };
@@ -844,7 +931,7 @@ const OWNER_ABI = parseAbi(["function owner() view returns (address)"]);
 let cached: PublicClient | undefined;
 
 /** The token contract's `owner()`, or `null` when it has none (or the read fails). */
-export async function readOwner(token: Address): Promise<string | null> {
+async function readOwner(token: Address): Promise<string | null> {
   try {
     cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
     return (await cached.readContract({ address: token, abi: OWNER_ABI, functionName: "owner" })).toLowerCase();
@@ -853,7 +940,7 @@ export async function readOwner(token: Address): Promise<string | null> {
   }
 }
 
-export type ClaimResult = { ok: true } | { ok: false; reason: "not_member" | "no_owner" | "not_owner" | "has_owner" };
+type ClaimResult = { ok: true } | { ok: false; reason: "not_member" | "no_owner" | "not_owner" | "has_owner" };
 
 /**
  * A member whose linked wallet is the contract's `owner()` becomes the Club's Owner. It is checked
@@ -877,17 +964,28 @@ export async function claimOwner(store: Store, entry: AssetEntry, actor: Actor, 
 }
 
 /** Whether the on-chain owner still is the wallet that claimed the Club. For admins. */
-export async function ownershipCheck(store: Store, entry: AssetEntry, deps: Deps = {}): Promise<{ claimed: string; onchain: string | null; changed: boolean } | null> {
+export async function ownershipCheck(
+  store: Store,
+  entry: AssetEntry,
+  deps: Deps = {},
+): Promise<{ claimed: string; onchain: string | null; changed: boolean } | null> {
   const claim = (await loadProfile(store, entry.address)).ownerClaim;
   if (!claim) return null;
   const onchain = await (deps.ownerOf ?? readOwner)(entry.address);
   return { claimed: claim.wallet, onchain, changed: onchain !== claim.wallet };
 }
 
-export type RoleRefusal = "forbidden" | "not_found" | "too_many_moderators" | "already_owner" | "no_change";
+type RoleRefusal = "forbidden" | "not_found" | "too_many_moderators" | "already_owner" | "no_change";
 
 /** Appoint or remove a Moderator, or hand over (or assign, for admins) the Owner role. */
-export async function setRole(store: Store, entry: AssetEntry, actor: Actor, wallet: string, role: RoleChange["role"], deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: RoleRefusal }> {
+export async function setRole(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  wallet: string,
+  role: RoleChange["role"],
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: RoleRefusal }> {
   const token = entry.address.toLowerCase();
   const roles = await loadRoles(store, token);
   const mine = roleOf(roles, actor.userId, isAdmin(deps, actor.userId));
@@ -901,7 +999,13 @@ export async function setRole(store: Store, entry: AssetEntry, actor: Actor, wal
   return { ok: true };
 }
 
-export async function updateProfile(store: Store, entry: ClubEntry, actor: Actor, input: unknown, deps: Deps = {}): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: "forbidden" | "archived" | "invalid"; message?: string }> {
+export async function updateProfile(
+  store: Store,
+  entry: ClubEntry,
+  actor: Actor,
+  input: unknown,
+  deps: Deps = {},
+): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: "forbidden" | "archived" | "invalid"; message?: string }> {
   const token = entry.address.toLowerCase();
   if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
   if (entry.club === "archived") return { ok: false, reason: "archived" };
@@ -936,7 +1040,7 @@ function nextCoinHolders(coin: AssetEntry, current: CoinHolders | undefined, edi
 // Admin
 
 /** What a Club had stored, and what a purge removed. */
-export type PurgeCounts = { members: number; posts: number };
+type PurgeCounts = { members: number; posts: number };
 
 /**
  * Deletes everything stored for a Club: members (and their entry in "your Clubs"), posts, roles,
@@ -957,6 +1061,11 @@ export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "n
   await store.del(momentumPostsKey(lower));
   // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days and backing.
   const epochs = Math.max(0, epochAt(Math.floor(nowOf(deps) / 1000)) + 1);
-  await store.del(reportedKey(lower), streaksKey(lower), standingsKey(lower), ...Array.from({ length: epochs }, (_, n) => [activeKey(lower, n), backingKey(lower, n), heldKey(lower, n)]).flat());
+  await store.del(
+    reportedKey(lower),
+    streaksKey(lower),
+    standingsKey(lower),
+    ...Array.from({ length: epochs }, (_, n) => [activeKey(lower, n), backingKey(lower, n), heldKey(lower, n)]).flat(),
+  );
   return { members: ids.length, posts: postIds.length };
 }

@@ -13,12 +13,7 @@ export function Stepper({ current, onJump }: { current: Step; onJump: (step: Ste
         const active = n === current;
         return (
           <li key={label} className="flex min-w-0 flex-1 items-center gap-2 last:flex-none sm:gap-3" aria-current={active ? "step" : undefined}>
-            <button
-              type="button"
-              disabled={!done}
-              onClick={() => onJump(n)}
-              className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default"
-            >
+            <button type="button" disabled={!done} onClick={() => onJump(n)} className="flex min-w-0 items-center gap-2 text-left disabled:cursor-default">
               <span
                 className={`grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] text-sm font-black ${
                   active ? "bg-accent text-white" : done ? "bg-mint" : "bg-[#fff4cf] text-muted"

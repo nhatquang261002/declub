@@ -50,7 +50,7 @@ export function traitOptions(catalog: TraitCatalog): { traitType: string; values
 }
 
 /** The token ids the clause matches: the set the deal commits to. */
-export function matchingIds(catalog: TraitCatalog, clause: Pick<TraitClause, "mode" | "picks">): bigint[] {
+function matchingIds(catalog: TraitCatalog, clause: Pick<TraitClause, "mode" | "picks">): bigint[] {
   if (clause.picks.length === 0) return [];
   const wanted = clause.picks.map(traitKey);
   return catalog.tokens
@@ -91,7 +91,7 @@ export function encodeSpec(clauses: readonly TraitClause[]): string {
   return JSON.stringify({ v: 1, c: body });
 }
 
-export const specBytes = (text: string) => new TextEncoder().encode(text).length;
+const specBytes = (text: string) => new TextEncoder().encode(text).length;
 
 /** What is wrong with a set of clauses before it goes on-chain, or null. */
 export function clausesError(clauses: readonly TraitClause[], resolved: readonly ResolvedClause[]): string | null {

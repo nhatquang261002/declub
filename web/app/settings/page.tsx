@@ -43,7 +43,9 @@ function Account() {
     return (
       <div className="page-section flex flex-col items-center gap-4 px-6 py-12 text-center">
         <p className="text-muted">Sign in to manage the accounts linked to your wallet.</p>
-        <button className="btn-primary" onClick={() => privy.login()}>Sign in</button>
+        <button className="btn-primary" onClick={() => privy.login()}>
+          Sign in
+        </button>
       </div>
     );
   }
@@ -64,11 +66,21 @@ function Account() {
     setBusy(row.id);
     try {
       switch (row.kind) {
-        case "email": await privy.unlinkEmail(row.id); break;
-        case "google": await privy.unlinkGoogle(row.id); break;
-        case "twitter": await privy.unlinkTwitter(row.id); break;
-        case "discord": await privy.unlinkDiscord(row.id); break;
-        case "wallet": await privy.unlinkWallet(row.id); break;
+        case "email":
+          await privy.unlinkEmail(row.id);
+          break;
+        case "google":
+          await privy.unlinkGoogle(row.id);
+          break;
+        case "twitter":
+          await privy.unlinkTwitter(row.id);
+          break;
+        case "discord":
+          await privy.unlinkDiscord(row.id);
+          break;
+        case "wallet":
+          await privy.unlinkWallet(row.id);
+          break;
       }
     } catch (error) {
       // Privy refuses to remove the last way to sign in; that comes back here as an error.
@@ -83,8 +95,8 @@ function Account() {
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Your Club rewards</h2>
         <p className="mt-1 mb-4 text-sm text-muted">
-          What Clubs have paid this wallet from their swap fees. Rewards go to your Club wallet (the one each Club’s Members list
-          shows); switch to it below to see its rewards here.
+          What Clubs have paid this wallet from their swap fees. Rewards go to your Club wallet (the one each Club’s Members list shows); switch to it below to
+          see its rewards here.
         </p>
         <RewardsClaim account={active} />
       </section>
@@ -92,8 +104,13 @@ function Account() {
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Linked accounts</h2>
         <p className="mt-1 text-sm text-muted">
-          Link a Google, X or Discord account to your wallet to sign in with it later, without opening
-          your wallet first. They are for signing in and recovery. You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders unless you turn it on in your <Link href="/profile" className="font-bold underline">profile</Link>.
+          Link a Google, X or Discord account to your wallet to sign in with it later, without opening your wallet first. They are for signing in and recovery.
+          You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders
+          unless you turn it on in your{" "}
+          <Link href="/profile" className="font-bold underline">
+            profile
+          </Link>
+          .
         </p>
         <ul className="mt-4 flex flex-col gap-2">
           {socials.length === 0 && <li className="text-sm text-muted">Nothing linked yet.</li>}
@@ -113,9 +130,7 @@ function Account() {
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Wallets</h2>
         <ul className="mt-4 flex flex-col gap-2">
-          {wallets.length === 0 && (
-            <li className="text-sm text-muted">No wallet linked yet. Link the one you trade with.</li>
-          )}
+          {wallets.length === 0 && <li className="text-sm text-muted">No wallet linked yet. Link the one you trade with.</li>}
           {wallets.map((row) => {
             const isActive = !!active && row.id.toLowerCase() === active.toLowerCase();
             const live = connected.wallets.find((w) => w.address.toLowerCase() === row.id.toLowerCase());
@@ -132,7 +147,9 @@ function Account() {
                       Use this wallet
                     </button>
                   ) : (
-                    <button className="btn-secondary" onClick={() => privy.connectWallet()}>Connect</button>
+                    <button className="btn-secondary" onClick={() => privy.connectWallet()}>
+                      Connect
+                    </button>
                   )
                 }
               />
@@ -151,33 +168,17 @@ function Account() {
         </div>
         {wallets.some((row) => row.embedded) && (
           <p className="mt-3 text-xs text-muted">
-            The embedded wallet is made for you at sign-in and only you can use it. Export its key
-            somewhere safe if it will hold anything you care about: anyone with the key controls it.
+            The embedded wallet is made for you at sign-in and only you can use it. Export its key somewhere safe if it will hold anything you care about:
+            anyone with the key controls it.
           </p>
         )}
-        <p className="mt-3 text-xs text-muted">
-          A wallet can be linked to one account only. Unlinking removes it from sign-in, not from the
-          wallet itself.
-        </p>
+        <p className="mt-3 text-xs text-muted">A wallet can be linked to one account only. Unlinking removes it from sign-in, not from the wallet itself.</p>
       </section>
     </div>
   );
 }
 
-
-function Row({
-  row,
-  busy,
-  onUnlink,
-  badge,
-  extra,
-}: {
-  row: LinkedRow;
-  busy: boolean;
-  onUnlink: () => void;
-  badge?: string;
-  extra?: ReactNode;
-}) {
+function Row({ row, busy, onUnlink, badge, extra }: { row: LinkedRow; busy: boolean; onUnlink: () => void; badge?: string; extra?: ReactNode }) {
   return (
     <li className="flex items-center justify-between gap-3 rounded-xl border border-line/70 px-3 py-2.5">
       <span className="flex min-w-0 flex-col">
@@ -185,9 +186,7 @@ function Row({
           {row.embedded ? "Embedded wallet" : KIND_LABEL[row.kind]}
           {badge && <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[0.65rem] text-mint">{badge}</span>}
         </span>
-        <span className="truncate font-mono text-sm">
-          {row.kind === "wallet" ? <CopyAddress address={row.label} /> : row.label}
-        </span>
+        <span className="truncate font-mono text-sm">{row.kind === "wallet" ? <CopyAddress address={row.label} /> : row.label}</span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {extra}

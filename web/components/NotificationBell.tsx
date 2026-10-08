@@ -2,7 +2,24 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrossIcon, CrownIcon, FlameIcon, HeartIcon, InboxIcon, PauseIcon, PinIcon, SwapIcon, TrendUpIcon, TrophyIcon, XLogoIcon } from "@/components/Icons";
+import {
+  BellIcon,
+  ChatIcon,
+  CheckIcon,
+  ClockIcon,
+  CoinIcon,
+  CrossIcon,
+  CrownIcon,
+  FlameIcon,
+  HeartIcon,
+  InboxIcon,
+  PauseIcon,
+  PinIcon,
+  SwapIcon,
+  TrendUpIcon,
+  TrophyIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { usePopover } from "@/components/Popover";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification, NotificationKind } from "@/lib/notifications";
@@ -79,7 +96,7 @@ export function NotificationBell() {
 }
 
 /** The bell and its panel, split from the data so the layout can be built and checked on its own. */
-export function NotificationBellView({
+function NotificationBellView({
   notifications,
   unreadCount,
   isRead,
@@ -114,9 +131,7 @@ export function NotificationBellView({
           <span className={`hdr-pop-icon !size-9 !rounded-full ${look.tone}`}>{look.icon}</span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline justify-between gap-2">
-              <span className={`truncate text-sm ${isNew ? "font-bold text-white" : "font-semibold text-white/75"}`}>
-                {n.title}
-              </span>
+              <span className={`truncate text-sm ${isNew ? "font-bold text-white" : "font-semibold text-white/75"}`}>{n.title}</span>
               {isNew && <span className="size-2 shrink-0 rounded-full bg-accent" role="img" aria-label="Unread" />}
             </span>
             <span className="text-xs leading-5 text-white/60">{n.body}</span>
@@ -160,10 +175,13 @@ export function NotificationBellView({
 
           {shown.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
-              <span className="hdr-pop-icon !size-11 !rounded-full text-white/70"><BellIcon className="size-5" /></span>
+              <span className="hdr-pop-icon !size-11 !rounded-full text-white/70">
+                <BellIcon className="size-5" />
+              </span>
               <p className="text-sm font-bold text-white">You&apos;re all caught up</p>
               <p className="text-xs leading-5 text-white/55">
-                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards, your rank and challenges) show up here.
+                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards, your rank and challenges)
+                show up here.
               </p>
             </div>
           ) : (
@@ -190,9 +208,7 @@ export function NotificationBellView({
                 <span className="flex flex-col">
                   <span className="text-xs font-bold text-white">Browser alerts</span>
                   <span className="text-xs leading-5 text-white/55">
-                    {alerts.denied
-                      ? "Blocked in your browser settings."
-                      : "While this tab is open in the background."}
+                    {alerts.denied ? "Blocked in your browser settings." : "While this tab is open in the background."}
                   </span>
                 </span>
                 {!alerts.denied && (

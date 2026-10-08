@@ -1,12 +1,4 @@
-import {
-  type Address,
-  type Chain,
-  type Hex,
-  createPublicClient,
-  createWalletClient,
-  defineChain,
-  http,
-} from "viem";
+import { type Address, type Chain, type Hex, createPublicClient, createWalletClient, defineChain, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { monadTestnet } from "viem/chains";
 import { intentsAbi } from "./abi.ts";
@@ -52,10 +44,7 @@ export function makeSender(cfg: ChainConfig, privateKey: Hex) {
 export type Sender = ReturnType<typeof makeSender>;
 
 /** The fee token and recipient, both fixed at deploy. Read once at start. */
-export async function readFeeSetup(
-  reader: Reader,
-  swap: Address,
-): Promise<{ token: Address; recipient: Address }> {
+export async function readFeeSetup(reader: Reader, swap: Address): Promise<{ token: Address; recipient: Address }> {
   const [token, recipient] = await Promise.all([
     reader.readContract({ address: swap, abi: intentsAbi, functionName: "FEE_TOKEN" }),
     reader.readContract({ address: swap, abi: intentsAbi, functionName: "FEE_RECIPIENT" }),

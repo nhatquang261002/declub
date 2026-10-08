@@ -45,7 +45,9 @@ export function TimelineComposer({ clubs }: { clubs: ClubInfo[] }) {
         <div className="club-panel mb-5 p-5">
           <div className="mb-3 flex justify-end">{picker}</div>
           <p className="font-extrabold">Only Holders post in {club.name}</p>
-          <p className="mt-0.5 text-sm text-muted">This Club’s Owner has limited posting to members who hold {club.symbol}. You can still read, like and reply to others.</p>
+          <p className="mt-0.5 text-sm text-muted">
+            This Club’s Owner has limited posting to members who hold {club.symbol}. You can still read, like and reply to others.
+          </p>
         </div>
       ) : (
         // Keyed by Club: a draft belongs to the Club it was written for, and each Club has its own wallet for you.

@@ -21,10 +21,7 @@ export function useDealV2(id: bigint) {
     query: { enabled: !!swapV2, refetchInterval: 6_000 },
   });
   const [dealRead, noteRead, specRead] = result.data ?? [];
-  const deal = useMemo(
-    () => (dealRead?.status === "success" ? toDealV2(id, dealRead.result) : null),
-    [dealRead, id],
-  );
+  const deal = useMemo(() => (dealRead?.status === "success" ? toDealV2(id, dealRead.result) : null), [dealRead, id]);
   const note = noteRead?.status === "success" ? noteRead.result : "";
   // What the maker published about the deal's trait requests, one entry per trait asset in order.
   // null when there is none, or it isn't something this app wrote (the deal then can't be filled here).

@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from "@tanstack/react-query";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { read } from "@/hooks/useClubBoard";
 import { TIMELINE_PAGE, type TimelinePost, type TimelineScope } from "@/lib/timeline";
@@ -21,7 +21,7 @@ export function useTimeline(scope: TimelineScope) {
     initialPageParam: null as string | null,
     enabled: !idle,
     queryFn: ({ pageParam }) =>
-      read<{ enabled: boolean; posts: TimelinePost[]; next: string | null }>(
+      read<TimelinePage>(
         `/api/timeline?${new URLSearchParams({ scope, limit: String(TIMELINE_PAGE), ...(pageParam ? { before: pageParam } : {}) })}`,
         getToken,
       ),
@@ -29,6 +29,13 @@ export function useTimeline(scope: TimelineScope) {
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
+  return { ...timelineView(query), isLoading: !idle && query.isLoading };
+}
+
+export type TimelinePage = { enabled: boolean; posts: TimelinePost[]; next: string | null };
+
+/** What the timeline's cards want from a paged query of {@link TimelinePost}s, each shown once. */
+export function timelineView(query: UseInfiniteQueryResult<InfiniteData<TimelinePage>>) {
   const pages = query.data?.pages ?? [];
   // A post that arrives between two pages shifts the next one by a row; show each post once.
   const posts = [...new Map(pages.flatMap((page) => page.posts).map((post) => [`${post.club}:${post.id}`, post])).values()];
@@ -38,7 +45,7 @@ export function useTimeline(scope: TimelineScope) {
     hasMore: query.hasNextPage,
     loadMore: () => void query.fetchNextPage(),
     loadingMore: query.isFetchingNextPage,
-    isLoading: !idle && query.isLoading,
+    isLoading: query.isLoading,
     error: query.error,
     /** The next page failed, with earlier ones still shown. */
     loadMoreFailed: query.isFetchNextPageError,

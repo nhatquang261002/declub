@@ -18,24 +18,16 @@
  */
 import path from "node:path";
 import type { EpochRecord } from "../lib/rewards";
-import { loadEnv } from "./env";
+import { loadEnv, option, requireStore } from "./env";
 
 const web = path.resolve(import.meta.dirname, "..");
 loadEnv(web);
-
-const args = process.argv.slice(2);
-const option = (name: string) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
-};
 
 /** Leaves read per multicall. */
 const LEAF_BATCH = 200;
 
 async function main() {
-  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
-    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
-  }
+  requireStore();
   // Imported after the env is loaded: the app's config reads it once, at import.
   const { createPublicClient, formatEther, getAddress, http, parseEther } = await import("viem");
   const { chain } = await import("../lib/chain");
@@ -87,12 +79,15 @@ async function main() {
     const batch = record.leaves.slice(i, i + LEAF_BATCH);
     const hashes = await client.multicall({
       allowFailure: false,
-      contracts: batch.map((l) => ({
-        address: contract,
-        abi: deClubRewardsAbi,
-        functionName: "leaf",
-        args: [BigInt(n), getAddress(l.account), BigInt(l.amount)],
-      }) as const),
+      contracts: batch.map(
+        (l) =>
+          ({
+            address: contract,
+            abi: deClubRewardsAbi,
+            functionName: "leaf",
+            args: [BigInt(n), getAddress(l.account), BigInt(l.amount)],
+          }) as const,
+      ),
     });
     leafHashes.push(...hashes);
   }
@@ -112,7 +107,9 @@ async function main() {
     problems.push(`The Safe transaction's root ${rootArg} isn't the epoch's ${record.root}.`);
   }
   if (value !== undefined && value !== BigInt(record.total)) {
-    problems.push(`The Safe transaction sends ${value} wei (${formatEther(value)} MON), but the epoch pays ${record.total} wei (${formatEther(BigInt(record.total))} MON).`);
+    problems.push(
+      `The Safe transaction sends ${value} wei (${formatEther(value)} MON), but the epoch pays ${record.total} wei (${formatEther(BigInt(record.total))} MON).`,
+    );
   }
 
   // The chain.
@@ -158,7 +155,9 @@ async function main() {
   console.log(`on chain ${published ? `published, opens ${new Date(Number(onChain.openAt) * 1000).toISOString()}` : "not published yet"}`);
   for (const note of result.notes) console.log(`note     ${note}`);
   if (sponsorEntries.length > 0) {
-    console.log(`note     ${sponsorEntries.length - unchecked} sponsor payments checked on chain${unchecked ? `; ${unchecked} without a transaction, check those by hand` : ""}.`);
+    console.log(
+      `note     ${sponsorEntries.length - unchecked} sponsor payments checked on chain${unchecked ? `; ${unchecked} without a transaction, check those by hand` : ""}.`,
+    );
   }
   if (rootArg === undefined || value === undefined) console.log("note     Pass --root and --value from the Safe transaction to check them too.");
 

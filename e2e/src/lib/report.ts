@@ -83,7 +83,9 @@ export function finish(name: string, results: Result[], meta: Record<string, str
 
   let commit = "";
   try {
-    commit = execSync("git rev-parse --short HEAD", { cwd: REPO, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    commit = execSync("git rev-parse --short HEAD", { cwd: REPO, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
   } catch {}
   const at = new Date().toISOString();
   const info = { run: name, at, commit, ...meta };
@@ -101,8 +103,7 @@ export function finish(name: string, results: Result[], meta: Record<string, str
     "",
     "| ID | Case | Result | Notes |",
     "|---|---|---|---|",
-    ...results.map((r) =>
-      `| ${r.id} | ${cell(r.title)} | ${r.outcome} | ${cell([...r.notes, r.detail ?? ""].filter(Boolean).join("; "))} |`),
+    ...results.map((r) => `| ${r.id} | ${cell(r.title)} | ${r.outcome} | ${cell([...r.notes, r.detail ?? ""].filter(Boolean).join("; "))} |`),
     "",
   ].join("\n");
   writeFileSync(`${stem}.md`, md);

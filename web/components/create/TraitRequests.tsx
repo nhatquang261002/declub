@@ -5,16 +5,7 @@ import { Tabs } from "@/components/Tabs";
 import { statusOf, type CatalogStatus } from "@/hooks/useCollectionTraits";
 import { CHOG_ADDRESS, MAX_NFTS_PER_SIDE } from "@/lib/config";
 import { newTraitDraft, type TraitDraft } from "@/lib/traitDraft";
-import {
-  describePicks,
-  MAX_TRAIT_PICKS,
-  pickLabel,
-  samePick,
-  traitOptions,
-  type ResolvedClause,
-  type TraitMode,
-  type TraitPick,
-} from "@/lib/traitSpec";
+import { describePicks, MAX_TRAIT_PICKS, pickLabel, samePick, traitOptions, type ResolvedClause, type TraitMode, type TraitPick } from "@/lib/traitSpec";
 
 type Props = {
   drafts: TraitDraft[];
@@ -33,16 +24,14 @@ const chip = "rounded-full border-2 border-[#111318] px-2.5 py-1 text-xs font-se
  * their Merkle root are computed from the scan, so nothing here is typed except the collection.
  */
 export function TraitRequests({ drafts, onChange, statuses, resolved, room }: Props) {
-  const update = (key: string, patch: Partial<TraitDraft>) =>
-    onChange(drafts.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+  const update = (key: string, patch: Partial<TraitDraft>) => onChange(drafts.map((d) => (d.key === key ? { ...d, ...patch } : d)));
 
   return (
     <section className="page-section space-y-4 p-4">
       <div>
         <h2 className="label !mb-0">You request by trait</h2>
         <p className="mt-1 text-xs text-muted">
-          Choose a collection, then the traits you want. Anyone holding a matching NFT can accept. The deal commits to
-          the NFTs that match today.
+          Choose a collection, then the traits you want. Anyone holding a matching NFT can accept. The deal commits to the NFTs that match today.
         </p>
       </div>
 
@@ -61,12 +50,7 @@ export function TraitRequests({ drafts, onChange, statuses, resolved, room }: Pr
         ))}
       </ul>
 
-      <button
-        type="button"
-        className="btn-secondary btn-sm"
-        disabled={room <= 0}
-        onClick={() => onChange([...drafts, newTraitDraft()])}
-      >
+      <button type="button" className="btn-secondary btn-sm" disabled={room <= 0} onClick={() => onChange([...drafts, newTraitDraft()])}>
         + Another trait request
       </button>
     </section>
@@ -170,9 +154,7 @@ function TraitRequestRow({
               );
             })}
           </div>
-          {draft.picks.length >= MAX_TRAIT_PICKS && (
-            <p className="text-xs text-muted">Up to {MAX_TRAIT_PICKS} traits per request.</p>
-          )}
+          {draft.picks.length >= MAX_TRAIT_PICKS && <p className="text-xs text-muted">Up to {MAX_TRAIT_PICKS} traits per request.</p>}
 
           {draft.picks.length > 1 && (
             <div className="space-y-1">
@@ -192,7 +174,9 @@ function TraitRequestRow({
           {draft.picks.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-end">
               <div>
-                <label className="label" htmlFor={`amount-${draft.key}`}>NFTs to receive</label>
+                <label className="label" htmlFor={`amount-${draft.key}`}>
+                  NFTs to receive
+                </label>
                 <input
                   id={`amount-${draft.key}`}
                   className="input w-24"
@@ -227,11 +211,7 @@ function ScanStatus({ status }: { status: CatalogStatus }) {
     case "busy":
       return <p className="text-xs text-muted">Other collections are being read. This will start shortly…</p>;
     case "unsupported":
-      return (
-        <p className="text-xs text-warn">
-          Can&apos;t request by trait from this collection. {status.reason} You can still request exact NFTs by id.
-        </p>
-      );
+      return <p className="text-xs text-warn">Can&apos;t request by trait from this collection. {status.reason} You can still request exact NFTs by id.</p>;
     case "ready":
       return (
         <>

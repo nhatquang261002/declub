@@ -16,10 +16,15 @@ export async function readSponsors(store: Store, n: number): Promise<Sponsorship
 
 /** A name safe to show: one line, no control characters, at most `SPONSOR_NAME_MAX` characters. */
 export function cleanSponsorName(name: string): string {
-  return name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, SPONSOR_NAME_MAX).trim();
+  return name
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, SPONSOR_NAME_MAX)
+    .trim();
 }
 
-export type ClubSponsors = { total: bigint; sponsors: PublishedSponsor[] };
+type ClubSponsors = { total: bigint; sponsors: PublishedSponsor[] };
 
 /** The ledger by Club (lowercase). The same sponsor (name, kind and wallet) adding twice to a Club shows once, with the sum. */
 export function sponsorsByClub(entries: readonly Sponsorship[]): Map<string, ClubSponsors> {

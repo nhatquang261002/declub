@@ -96,7 +96,11 @@ describe("watchFills", () => {
     chain.put(150n, hashOf(2), [v2Create(2n)]);
     chain.put(250n, hashOf(3), [v2Fill(3n)]);
     const result = await run(chain, { startBlock: 1n });
-    assert.deepEqual(chain.queries, [[1n, 100n], [101n, 200n], [201n, 250n]]);
+    assert.deepEqual(chain.queries, [
+      [1n, 100n],
+      [101n, 200n],
+      [201n, 250n],
+    ]);
     assert.deepEqual(result, { status: "scanned", cursor: 250, head: 250, behind: 0, transactions: 3, fills: 2, events: 1 });
     assert.deepEqual(await listFills(store, V2, taker), ["3", "1"]);
     assert.equal((await readActivity(store, NFT))[0].deal, "2");

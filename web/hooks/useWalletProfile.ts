@@ -6,12 +6,13 @@ import { useConnection } from "wagmi";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { read } from "@/hooks/useClubBoard";
+import { timelineView, type TimelinePage } from "@/hooks/useTimeline";
 import { call } from "@/hooks/useClubMembership";
 import type { About, WalletClub, WalletProfile } from "@/lib/about";
 import { linkedRows } from "@/lib/accounts";
 import { PRIVY_APP_ID } from "@/lib/config";
 import type { FollowMessage } from "@/lib/social";
-import { TIMELINE_PAGE, type TimelinePost } from "@/lib/timeline";
+import { TIMELINE_PAGE } from "@/lib/timeline";
 
 // The profile page (ADR 0042): what a wallet's owner shows about themselves, the Clubs it is listed in,
 // the Board posts it wrote and the wallets it follows. All of it is public and read by wallet address.
@@ -59,25 +60,14 @@ export function useWalletBoard(address: string | undefined) {
     initialPageParam: null as string | null,
     enabled: !!address,
     queryFn: ({ pageParam }) =>
-      read<{ enabled: boolean; posts: TimelinePost[]; next: string | null }>(
+      read<TimelinePage>(
         `/api/wallets/${address}/board?${new URLSearchParams({ limit: String(TIMELINE_PAGE), ...(pageParam ? { before: pageParam } : {}) })}`,
         getToken,
       ),
     getNextPageParam: (last) => last.next ?? undefined,
     retry: 1,
   });
-  const pages = query.data?.pages ?? [];
-  const posts = [...new Map(pages.flatMap((page) => page.posts).map((post) => [`${post.club}:${post.id}`, post])).values()];
-  return {
-    enabled: pages[0]?.enabled !== false,
-    posts,
-    hasMore: query.hasNextPage,
-    loadMore: () => void query.fetchNextPage(),
-    loadingMore: query.isFetchingNextPage,
-    isLoading: query.isLoading,
-    error: query.error,
-    loadMoreFailed: query.isFetchNextPageError,
-  };
+  return timelineView(query);
 }
 
 type GraphView = { enabled: boolean; follows: { message: FollowMessage }[]; followers: number };

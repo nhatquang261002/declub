@@ -46,7 +46,7 @@ async function freeNonce(config: ReturnType<typeof useConfig>, maker: Address): 
   }
 }
 
-export type NewIntent = { give: Asset[]; want: Asset[]; ttlSeconds: number };
+type NewIntent = { give: Asset[]; want: Asset[]; ttlSeconds: number };
 
 export function useSignFlow() {
   const config = useConfig();
@@ -56,7 +56,7 @@ export function useSignFlow() {
 
   /** Connects the chain, then runs `work` with the connected account. Resolves to null on failure. */
   const guarded = useCallback(
-    async <T,>(work: (account: Address) => Promise<T>): Promise<T | null> => {
+    async <T>(work: (account: Address) => Promise<T>): Promise<T | null> => {
       try {
         if (!DECLUB_INTENTS_ADDRESS || !swapIntents) throw new Error("Intents aren't enabled on this deployment.");
         const connection = getConnection(config);

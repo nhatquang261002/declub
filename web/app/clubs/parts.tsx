@@ -43,9 +43,7 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
               {joined && <span className="chip chip-peach py-0 text-[0.62rem]">Joined</span>}
               {info.archived && <span className="chip py-0 text-[0.62rem]">Archived</span>}
             </span>
-            <span className="truncate text-xs text-muted">
-              {clubLabel(info)}
-            </span>
+            <span className="truncate text-xs text-muted">{clubLabel(info)}</span>
             {stats && (
               <span className="mt-0.5 md:hidden">
                 <HeatMeter value={stats.momentum} />
@@ -64,9 +62,7 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
         </span>
         <span className="hidden text-right font-bold tabular-nums md:block">{members?.toLocaleString() ?? "—"}</span>
         <span className="hidden text-right font-bold tabular-nums md:block">{stats?.completed7d.toLocaleString() ?? "—"}</span>
-        <span className="hidden text-right text-xs text-muted md:block">
-          {stats?.lastActive != null ? ago(stats.lastActive, now) : stats ? "never" : "—"}
-        </span>
+        <span className="hidden text-right text-xs text-muted md:block">{stats?.lastActive != null ? ago(stats.lastActive, now) : stats ? "never" : "—"}</span>
       </Link>
     </li>
   );
@@ -101,7 +97,10 @@ export function Leaderboard({
         <ol className="flex flex-col">
           {rows.map((row, i) => (
             <li key={row.info.token}>
-              <Link href={`/clubs/${row.info.token}`} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-1.5 text-[#111318] transition-colors hover:bg-white">
+              <Link
+                href={`/clubs/${row.info.token}`}
+                className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-1.5 text-[#111318] transition-colors hover:bg-white"
+              >
                 <span className="w-4 text-center text-xs font-black text-muted tabular-nums">{i + 1}</span>
                 <ClubAvatar club={row.info} className="size-8 text-xs" sizes="32px" />
                 <span className="min-w-0 flex-1 truncate text-sm font-extrabold">{row.info.name}</span>

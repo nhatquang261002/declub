@@ -14,7 +14,7 @@ import type { Store } from "./store";
 /** Looks up the Privy user who linked a username. Privy in production; a stand-in in tests. */
 export type FindUser = (provider: ProfileProvider, username: string) => Promise<string | null>;
 
-export type LookupResult = {
+type LookupResult = {
   matches: HandleMatch[];
   /** The handle is the caller's own. */
   self: boolean;
@@ -29,8 +29,7 @@ async function walletsSharedAs(store: Store, userId: string, provider: ProfilePr
   const wallets = await store.members(userWalletsKey(userId));
   const rows = await store.getMany<StoredProfile>(wallets.map(profileKey));
   const shown = rows.filter(
-    (row): row is StoredProfile =>
-      row?.userId === userId && row.provider === provider && row.handle.toLowerCase() === username.toLowerCase(),
+    (row): row is StoredProfile => row?.userId === userId && row.provider === provider && row.handle.toLowerCase() === username.toLowerCase(),
   );
   if (shown.length === 0) return null;
   const matching = wallets.filter((_, i) => shown.includes(rows[i]!));
@@ -58,7 +57,7 @@ export async function lookupHandle(store: Store, callerId: string, query: string
   return result;
 }
 
-export type LookupDeps = {
+type LookupDeps = {
   gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
   find?: FindUser;
 };

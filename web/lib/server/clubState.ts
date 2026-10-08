@@ -20,7 +20,12 @@ export const banKey = (token: string) => `declub:club-ban:${token === ALL ? ALL 
 
 /** The app admins: Privy user ids in CLUB_ADMIN_USER_IDS, comma separated. */
 export function adminIds(env: string | undefined = process.env.CLUB_ADMIN_USER_IDS): Set<string> {
-  return new Set((env ?? "").split(",").map((id) => id.trim()).filter(Boolean));
+  return new Set(
+    (env ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
 }
 
 export async function loadRoles(store: Store, token: string): Promise<Roles> {
@@ -43,7 +48,7 @@ export type Ban = { wallet: string; at: number; by: string; role?: ClubRole };
 
 /** The rank needed to lift `ban`. Older bans without a role are treated as made by the Owner. */
 export const banRole = (ban: Ban): ClubRole => ban.role ?? "owner";
-export type Bans = Record<string, Ban>;
+type Bans = Record<string, Ban>;
 
 export async function loadBans(store: Store, token: string): Promise<Bans> {
   return (await store.get<Bans>(banKey(token))) ?? {};
@@ -59,7 +64,7 @@ export async function isBanned(store: Store, token: string, userId: string): Pro
 
 /** One line of the moderation log. Wallets, not user ids: staff read this. */
 export type LogEntry = { id: string; at: number; actor: string; action: string; target?: string; detail?: string };
-export const LOG_KEPT = 1_000;
+const LOG_KEPT = 1_000;
 
 // Two actions in the same millisecond must still read newest-first, and a ranked set breaks ties
 // by member text, which here starts with nothing orderly: so each entry gets a strictly later time.

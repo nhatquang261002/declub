@@ -153,12 +153,15 @@ function CoinEditor({ token, coin }: { token: string; coin: ClubCoin }) {
       }}
     >
       <label className="flex items-start gap-3 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
-        <input type="checkbox" className="mt-0.5 size-4 accent-[#d83b45]" checked={current.on} onChange={(e) => setDraft({ ...current, on: e.target.checked })} />
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-[#d83b45]"
+          checked={current.on}
+          onChange={(e) => setDraft({ ...current, on: e.target.checked })}
+        />
         <span>
           <span className="font-bold">Holding {coin.symbol} makes a member a Holder</span>
-          <span className="block text-xs text-muted">
-            Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.
-          </span>
+          <span className="block text-xs text-muted">Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.</span>
         </span>
       </label>
       {current.on && (
@@ -213,13 +216,23 @@ function XEditor({ token }: { token: string }) {
           <ul className="flex flex-col gap-1.5">
             {accounts.map((a) => (
               <li key={a.handle} className="flex flex-wrap items-center gap-2 text-sm">
-                <a className="inline-flex items-center gap-1.5 font-bold hover:underline" href={`https://x.com/${a.handle}`} target="_blank" rel="noopener noreferrer">
+                <a
+                  className="inline-flex items-center gap-1.5 font-bold hover:underline"
+                  href={`https://x.com/${a.handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <XLogoIcon className="size-3.5" />@{a.handle} ✓
                 </a>
                 <a className="text-xs text-muted hover:underline" href={`https://x.com/i/status/${a.proof}`} target="_blank" rel="noopener noreferrer">
                   proof
                 </a>
-                <button type="button" className="ml-auto text-xs font-bold text-muted hover:text-danger" disabled={xUnlink.isPending} onClick={() => xUnlink.mutate(a.handle)}>
+                <button
+                  type="button"
+                  className="ml-auto text-xs font-bold text-muted hover:text-danger"
+                  disabled={xUnlink.isPending}
+                  onClick={() => xUnlink.mutate(a.handle)}
+                >
                   Unlink
                 </button>
               </li>
@@ -249,8 +262,8 @@ function XEditor({ token }: { token: string }) {
         {proof && (
           <div className="flex flex-col gap-2 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
             <p>
-              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete
-              the post once it’s linked.
+              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete the
+              post once it’s linked.
             </p>
             <p className="rounded-lg bg-white p-2 font-mono text-xs break-all">{proof.text}</p>
             <a
@@ -268,7 +281,13 @@ function XEditor({ token }: { token: string }) {
                 xVerify.mutate({ handle: proof.handle, url }, { onSuccess: () => (setProof(null), setHandle("")) });
               }}
             >
-              <input className={`${field} min-w-48 flex-1`} value={url} inputMode="url" placeholder="https://x.com/…/status/…" onChange={(e) => setUrl(e.target.value)} />
+              <input
+                className={`${field} min-w-48 flex-1`}
+                value={url}
+                inputMode="url"
+                placeholder="https://x.com/…/status/…"
+                onChange={(e) => setUrl(e.target.value)}
+              />
               <button type="submit" className="btn-primary btn-sm" aria-busy={xVerify.isPending} disabled={xVerify.isPending || url.trim().length === 0}>
                 {xVerify.isPending && <Spinner />}
                 {xVerify.isPending ? "Checking…" : "Check and link"}
@@ -298,7 +317,11 @@ function XEditor({ token }: { token: string }) {
             : `Up to ${MAX_X_TAGS}, separated by spaces. A post that only matches a tag counts half. The Club’s ticker is always one.`}
         </span>
         {page?.x?.hint && <span className="text-xs text-muted">Right now a member’s own X post counts when it {page.x.hint}.</span>}
-        <button type="submit" className="btn-secondary btn-sm mt-1 w-fit" disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}>
+        <button
+          type="submit"
+          className="btn-secondary btn-sm mt-1 w-fit"
+          disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}
+        >
           Save tags
         </button>
       </form>
@@ -319,7 +342,8 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
       {ownership?.changed && (
         <Alert tone="warn" title="Ownership changed on-chain">
           The Owner claimed this Club as <CopyAddress address={ownership.claimed} />, but the contract’s owner() is now{" "}
-          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold the Club.
+          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold
+          the Club.
         </Alert>
       )}
 
@@ -421,7 +445,12 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
                 <p className="flex flex-wrap items-baseline gap-x-1.5">
                   <CopyAddress address={entry.actor} className="text-xs font-bold" />
                   <span>{ACTIONS[entry.action] ?? entry.action}</span>
-                  {entry.target && (entry.target.length > 20 ? <CopyAddress address={entry.target} className="text-xs" /> : <span className="font-mono text-xs break-all">{entry.target}</span>)}
+                  {entry.target &&
+                    (entry.target.length > 20 ? (
+                      <CopyAddress address={entry.target} className="text-xs" />
+                    ) : (
+                      <span className="font-mono text-xs break-all">{entry.target}</span>
+                    ))}
                   {entry.detail && <span className="text-xs text-muted">({entry.detail})</span>}
                 </p>
                 <p className="text-xs text-muted">{ago(Math.floor(entry.at / 1000), now)}</p>

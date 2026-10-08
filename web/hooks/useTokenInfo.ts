@@ -15,10 +15,13 @@ import type { DealV2 } from "@/lib/dealsV2";
  */
 export function useTokenInfo(tokens: readonly Address[]) {
   const result = useReadContracts({
-    contracts: tokens.flatMap((address) => [
-      { address, abi: erc20Abi, chainId: CHAIN_ID, functionName: "symbol" },
-      { address, abi: erc20Abi, chainId: CHAIN_ID, functionName: "decimals" },
-    ] as const),
+    contracts: tokens.flatMap(
+      (address) =>
+        [
+          { address, abi: erc20Abi, chainId: CHAIN_ID, functionName: "symbol" },
+          { address, abi: erc20Abi, chainId: CHAIN_ID, functionName: "decimals" },
+        ] as const,
+    ),
     query: { enabled: tokens.length > 0, staleTime: Infinity },
   });
 
@@ -42,9 +45,6 @@ export function useTokenInfo(tokens: readonly Address[]) {
 
 /** `useTokenInfo` for every ERC-20 that appears in a list of DeClubEscrow deals. */
 export function useDealsTokenInfo(deals: readonly DealV2[]) {
-  const tokens = useMemo(
-    () => erc20Tokens(deals.flatMap((t) => [...t.offered, ...t.requested])),
-    [deals],
-  );
+  const tokens = useMemo(() => erc20Tokens(deals.flatMap((t) => [...t.offered, ...t.requested])), [deals]);
   return useTokenInfo(tokens);
 }

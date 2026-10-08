@@ -18,7 +18,10 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   const shareTitle = `${title} on DeClub`;
   const won = c.phase === "settled" && c.winners.length > 0;
   const description = won
-    ? `Won by ${namesText(c.winners.map((w) => w.name), c.winnerCount)}. ${c.brief}`
+    ? `Won by ${namesText(
+        c.winners.map((w) => w.name),
+        c.winnerCount,
+      )}. ${c.brief}`
     : c.phase === "open"
       ? `${c.brief} Enter by ${endsText(c.endsAt)} with your own X post.`
       : c.brief;
@@ -26,7 +29,12 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   return {
     title,
     description,
-    openGraph: { title: shareTitle, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: `${c.title}: a ${facts.club} Club challenge on DeClub` }] },
+    openGraph: {
+      title: shareTitle,
+      description,
+      type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: `${c.title}: a ${facts.club} Club challenge on DeClub` }],
+    },
     twitter: { card: "summary_large_image", title: shareTitle, description, images: [image] },
   };
 }

@@ -10,16 +10,16 @@ import { withinLimit, type Store } from "./store";
  * record between two wallets wins, so an unfollow signed later undoes a follow signed earlier.
  */
 const base = `declub:follow:${CHAIN_ID}`;
-export const followsKey = (wallet: string) => `${base}:out:${wallet.toLowerCase()}`;
-export const followersKey = (wallet: string) => `${base}:in:${wallet.toLowerCase()}`;
-export const followRecordKey = (follower: string, target: string) => `${base}:rec:${follower.toLowerCase()}:${target.toLowerCase()}`;
+const followsKey = (wallet: string) => `${base}:out:${wallet.toLowerCase()}`;
+const followersKey = (wallet: string) => `${base}:in:${wallet.toLowerCase()}`;
+const followRecordKey = (follower: string, target: string) => `${base}:rec:${follower.toLowerCase()}:${target.toLowerCase()}`;
 
 /** A wallet follows at most this many others. */
-export const MAX_FOLLOWS = 1_000;
+const MAX_FOLLOWS = 1_000;
 /** Follow or unfollow at most this many times an hour per user. */
-export const FOLLOWS_PER_HOUR = 120;
+const FOLLOWS_PER_HOUR = 120;
 
-export type FollowRecord = { message: FollowMessage; signature: Hex };
+type FollowRecord = { message: FollowMessage; signature: Hex };
 
 export type FollowDeps = {
   /** Unix seconds. */
@@ -27,7 +27,7 @@ export type FollowDeps = {
   verifyFollow?: (message: FollowMessage, signature: Hex) => Promise<boolean>;
 };
 
-export type FollowRefusal = "unsigned" | "not_yours" | "self" | "stale" | "bad_signature" | "outdated" | "too_many" | "rate_limited";
+type FollowRefusal = "unsigned" | "not_yours" | "self" | "stale" | "bad_signature" | "outdated" | "too_many" | "rate_limited";
 
 let verifier: PublicClient | undefined;
 async function viemVerifyFollow(message: FollowMessage, signature: Hex): Promise<boolean> {

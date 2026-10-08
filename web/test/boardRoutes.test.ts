@@ -2,7 +2,21 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import type { UserGate } from "../lib/server/gate";
-import { claimHandler, bansHandlers, deletePostHandler, hideHandler, logHandler, pinHandler, postsHandlers, profileHandlers, purgeHandler, reportHandler, reportedHandler, rolesHandler, xLinkHandlers } from "../lib/server/boardRoutes";
+import {
+  claimHandler,
+  bansHandlers,
+  deletePostHandler,
+  hideHandler,
+  logHandler,
+  pinHandler,
+  postsHandlers,
+  profileHandlers,
+  purgeHandler,
+  reportHandler,
+  reportedHandler,
+  rolesHandler,
+  xLinkHandlers,
+} from "../lib/server/boardRoutes";
 import { joinClub } from "../lib/server/members";
 import { membershipHandlers } from "../lib/server/memberRoutes";
 import { getStore } from "../lib/server/store";
@@ -10,10 +24,12 @@ import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const BLOCKED = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
-const reg = makeRegistry(parseAssets([
-  { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
-  { chainId: 10143, address: BLOCKED, kind: "erc721", name: "B", symbol: "B", status: "blocked", note: "Scam." },
-]));
+const reg = makeRegistry(
+  parseAssets([
+    { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
+    { chainId: 10143, address: BLOCKED, kind: "erc721", name: "B", symbol: "B", status: "blocked", note: "Scam." },
+  ]),
+);
 const store = getStore()!;
 const wallet = (n: number) => `0x${n.toString(16).padStart(40, "0")}`;
 const account = (n: number) => ({ type: "wallet", chain_type: "ethereum", address: wallet(n) });
@@ -21,8 +37,7 @@ const account = (n: number) => ({ type: "wallet", chain_type: "ethereum", addres
 const users: Record<string, number> = { own: 1, mod: 2, m1: 3, m2: 4, adm: 9 };
 let current = "m1";
 /** The caller is whoever `as(...)` last named. */
-const gate = async (): Promise<UserGate> =>
-  ({ store, user: { id: current, linked_accounts: [account(users[current] ?? 50)] } }) as unknown as UserGate;
+const gate = async (): Promise<UserGate> => ({ store, user: { id: current, linked_accounts: [account(users[current] ?? 50)] } }) as unknown as UserGate;
 const viewer = async (request: Request) => (request.headers.get("authorization") === "Bearer none" ? null : { id: current });
 // The test wallets have no keys, so signatures are taken as valid here; test/social.test.ts checks
 // real ones.
@@ -32,7 +47,11 @@ const as = (id: string) => void (current = id);
 const ctx = (token = NFT) => ({ params: Promise.resolve({ token }) });
 const item = (id: string, token = NFT) => ({ params: Promise.resolve({ token, id }) });
 const req = (method: string, body?: unknown, headers: Record<string, string> = {}) =>
-  new Request("http://x/api", { method, headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.5", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+  new Request("http://x/api", {
+    method,
+    headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.5", ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 
 const posts = postsHandlers(reg, deps);
 /** A post as the client sends it: the message to sign, at the test clock's time, and a signature. */
@@ -159,7 +178,9 @@ describe("reports, hiding, pinning, deleting", () => {
       assert.equal((await res.json()).hidden, false, "reports never hide a post");
     }
     as("m2");
-    const visible = (await (await posts.GET(req("GET", undefined, { authorization: "Bearer t" }), ctx())).json()).posts.find((p: { id: string }) => p.id === id);
+    const visible = (await (await posts.GET(req("GET", undefined, { authorization: "Bearer t" }), ctx())).json()).posts.find(
+      (p: { id: string }) => p.id === id,
+    );
     assert.equal(visible.text, "report me");
 
     const reported = reportedHandler(reg, deps);
@@ -167,7 +188,10 @@ describe("reports, hiding, pinning, deleting", () => {
     assert.equal((await reported(req("GET"), ctx())).status, 403, "members can't read the Reported list");
     as("mod");
     const list = (await (await reported(req("GET"), ctx())).json()) as { reported: { post: { id: string }; reports: number }[] };
-    assert.deepEqual(list.reported.map((r) => [r.post.id, r.reports]), [[id, 3]]);
+    assert.deepEqual(
+      list.reported.map((r) => [r.post.id, r.reports]),
+      [[id, 3]],
+    );
 
     assert.equal((await hideHandler(reg, deps)(req("POST", { hidden: true }), item(id))).status, 200);
     as("m2");
@@ -216,7 +240,10 @@ describe("bans, the profile and the log", () => {
     as("mod");
     assert.equal((await bans.POST(req("POST", { wallet: wallet(1) }), ctx())).status, 403, "not the Owner");
     assert.equal((await bans.POST(req("POST", { wallet: wallet(3) }), ctx())).status, 200);
-    assert.deepEqual((await (await bans.GET(req("GET"), ctx())).json()).club.map((b: { wallet: string }) => b.wallet), [wallet(3)]);
+    assert.deepEqual(
+      (await (await bans.GET(req("GET"), ctx())).json()).club.map((b: { wallet: string }) => b.wallet),
+      [wallet(3)],
+    );
     as("m1");
     assert.equal((await membershipHandlers(reg, deps).POST(req("POST"), ctx())).status, 403, "can't rejoin");
     as("mod");
@@ -307,7 +334,10 @@ describe("X posts and the project's X account (ADR 0024)", () => {
     assert.equal(linked.status, 200);
 
     const page = await (await profileHandlers(reg, deps).GET(req("GET"), ctx())).json();
-    assert.deepEqual(page.x.accounts.map((a: { handle: string }) => a.handle), ["ChogNFT"]);
+    assert.deepEqual(
+      page.x.accounts.map((a: { handle: string }) => a.handle),
+      ["ChogNFT"],
+    );
     assert.match(page.x.hint, /@chognft/);
     assert.equal(JSON.stringify(page).includes("xUserId"), false);
 

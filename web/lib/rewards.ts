@@ -195,7 +195,7 @@ const DAY = 86_400;
 
 // ─────────────────────────────────────────────────────────────── epochs
 
-export type EpochWindow = { n: number; start: number; end: number };
+type EpochWindow = { n: number; start: number; end: number };
 
 /** The epoch `n`: `[start, end)` in unix seconds. */
 export function epochWindow(n: number, genesis = REWARDS_GENESIS, length = REWARDS_EPOCH_SECONDS): EpochWindow {
@@ -281,7 +281,7 @@ export const SPONSOR_MIN_WEI = 10n ** 17n;
 export const sponsorMessage = (club: string, tx: string, name: string) =>
   `DeClub sponsorship\nClub: ${club.toLowerCase()}\nPayment: ${tx.toLowerCase()}\nName: ${name}`;
 
-export type Activity = {
+type Activity = {
   x: number;
   days: number;
   swaps: number;
@@ -376,7 +376,11 @@ export type Voice = { club: number; base: number; given?: number };
  * `baseCapPerReceiver` of a member's points come from base voices. Gives, by user id, the points,
  * how many gave them any, and how much of it came from base voices.
  */
-export function backingPoints(actions: readonly BackingAction[], voices: ReadonlyMap<string, Voice>, rules: ClubRules = DEFAULT_CLUB_RULES): Map<string, { points: number; backers: number; base: number }> {
+export function backingPoints(
+  actions: readonly BackingAction[],
+  voices: ReadonlyMap<string, Voice>,
+  rules: ClubRules = DEFAULT_CLUB_RULES,
+): Map<string, { points: number; backers: number; base: number }> {
   // A challenge entry earns through its challenge (ADR 0048): backing given to one doesn't count, nor use the giver's voice.
   const given = actions.filter((a) => a.giver !== a.receiver && !a.entry);
   const has = (user: string) => {
@@ -435,7 +439,17 @@ export function engagementPoints(actions: readonly BackingAction[], rules: ClubR
     mine.set(a.receiver, Math.max(mine.get(a.receiver) ?? 0, worth));
     byGiver.set(a.giver, mine);
   }
-  return new Map([...byGiver].map(([giver, mine]) => [giver, round2(Math.min(rules.engageCapPerEpoch, [...mine.values()].reduce((sum, p) => sum + p, 0)))]));
+  return new Map(
+    [...byGiver].map(([giver, mine]) => [
+      giver,
+      round2(
+        Math.min(
+          rules.engageCapPerEpoch,
+          [...mine.values()].reduce((sum, p) => sum + p, 0),
+        ),
+      ),
+    ]),
+  );
 }
 
 /**
@@ -526,7 +540,7 @@ export type Holder = {
 };
 
 /** A holder payout also says how it was worked out: the shares held and the bonus they earned. */
-export type Payout = {
+type Payout = {
   club: string;
   /** A Holder's share, a member without NFTs' share (ADR 0044), or the Owner's Club fund. */
   kind: "holder" | "member" | "fund";
@@ -543,7 +557,7 @@ export type Payout = {
   backed?: number;
 };
 
-export type ClubSplit = {
+type ClubSplit = {
   club: string;
   fees: bigint;
   sponsored: bigint;
@@ -745,7 +759,7 @@ export function splitClub(input: ClubInput): ClubSplit {
 export const averageHeld = (held: bigint, samples: number) => round2(Number(held) / (samples + 1));
 
 /** One account's leaf: everything it earned this epoch, across Clubs, with the breakdown. */
-export type Leaf = { account: Address; amount: bigint; breakdown: Payout[] };
+type Leaf = { account: Address; amount: bigint; breakdown: Payout[] };
 
 /** Sums every Club's payouts per wallet, ordered by address so a rebuild gives the same tree. */
 export function leavesOf(splits: readonly ClubSplit[]): Leaf[] {
@@ -817,7 +831,18 @@ export type EpochRecord = {
 };
 
 /** A payout as published: amounts as decimal strings. */
-export type PublishedPayout = { club: string; kind: Payout["kind"]; amount: string; shares?: string; held?: number; bonusBps?: number; points?: number; days?: number; streak?: number; backed?: number };
+export type PublishedPayout = {
+  club: string;
+  kind: Payout["kind"];
+  amount: string;
+  shares?: string;
+  held?: number;
+  bonusBps?: number;
+  points?: number;
+  days?: number;
+  streak?: number;
+  backed?: number;
+};
 
 /** A claimable leaf as `/api/rewards/me` serves it. */
 export type ClaimableLeaf = {

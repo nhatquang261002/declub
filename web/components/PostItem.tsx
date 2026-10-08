@@ -4,7 +4,20 @@ import Link from "next/link";
 import { useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, BanIcon, ChatIcon, HeartIcon, ExternalIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon, XLogoIcon } from "@/components/Icons";
+import {
+  BadgeCheckIcon,
+  BanIcon,
+  ChatIcon,
+  HeartIcon,
+  ExternalIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FlagIcon,
+  PinIcon,
+  SwapIcon,
+  TrashIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -66,7 +79,7 @@ export function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; n
   );
 }
 
-export type PostActions = {
+type PostActions = {
   report: (id: string) => void;
   like: (id: string, like: boolean) => void;
   remove: (id: string) => void;
@@ -75,11 +88,32 @@ export type PostActions = {
   ban: (id: string) => void;
 };
 
+type ClubActions = ReturnType<typeof useClubActions>;
+
+/** A Club's mutations as the menu's actions. Replies can't be pinned, so they leave `pin` out and it does nothing. */
+export function postActions({
+  report,
+  like,
+  remove,
+  hide,
+  pin,
+  ban,
+}: Pick<ClubActions, "report" | "like" | "remove" | "hide" | "ban"> & Partial<Pick<ClubActions, "pin">>): PostActions {
+  return {
+    report: (id) => report.mutate(id),
+    like: (id, on) => like.mutate({ id, like: on }),
+    remove: (id) => remove.mutate(id),
+    hide: (id, hidden) => hide.mutate({ id, hidden }),
+    pin: (id, pinned) => pin?.mutate({ id, pinned }),
+    ban: (id) => ban.mutate({ post: id }),
+  };
+}
+
 // Reports no longer hide a post (ADR 0040); posts they hid before stay hidden until staff act.
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
 
 /** What a post needs to open its thread (ADR 0032): the Club, and the reader's Club wallet to sign replies with. */
-export type ThreadContext = { token: string; wallet?: string; canReply: boolean };
+type ThreadContext = { token: string; wallet?: string; canReply: boolean };
 
 /**
  * One post. The text is plain text: React escapes it and nothing here turns it into a link, so
@@ -110,10 +144,14 @@ export function PostItem({
 
   const own: MenuAction[] = [];
   if (role !== undefined && !post.mine && !post.hidden) {
-    own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post?",
+    own.push({
+      label: "Report",
+      icon: <FlagIcon />,
+      confirm: "Report this post?",
       confirmNote: "The Club’s moderators will be asked to look at it. Nothing is hidden until one of them decides.",
       confirmLabel: "Report",
-      onSelect: () => actions.report(post.id) });
+      onSelect: () => actions.report(post.id),
+    });
   }
   if (role !== undefined && (post.mine || staff)) {
     own.push({
@@ -257,14 +295,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
   const { replies, isLoading } = useClubReplies(context.token, parent, true);
   const { reply, replyStage, report, like, remove, hide, ban } = useClubActions(context.token);
   const [text, setText] = useState("");
-  const actions: PostActions = {
-    report: (id) => report.mutate(id),
-    like: (id, on) => like.mutate({ id, like: on }),
-    remove: (id) => remove.mutate(id),
-    hide: (id, hidden) => hide.mutate({ id, hidden }),
-    pin: () => {},
-    ban: (id) => ban.mutate({ post: id }),
-  };
+  const actions = postActions({ report, like, remove, hide, ban });
   const length = [...text].length;
 
   return (
@@ -301,7 +332,12 @@ export function Thread({ parent, context, role, now }: { parent: string; context
             readOnly={reply.isPending}
             onChange={(event) => setText(event.target.value)}
           />
-          <button type="submit" className="btn-primary px-3 py-2 text-sm" aria-busy={reply.isPending} disabled={reply.isPending || length === 0 || length > POST_MAX}>
+          <button
+            type="submit"
+            className="btn-primary px-3 py-2 text-sm"
+            aria-busy={reply.isPending}
+            disabled={reply.isPending || length === 0 || length > POST_MAX}
+          >
             {reply.isPending && <Spinner />}
             {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Confirm in wallet…") : "Reply"}
           </button>

@@ -29,10 +29,17 @@ function names(sponsors: readonly PublishedSponsor[] | undefined): string[] {
   return (sponsors ?? []).map((s) => `${s.sponsor}${s.kind === "owner" ? " (Owner)" : ""}${s.by ? ` · ${shortAddress(s.by)}` : ""}`);
 }
 const sponsoredBy = (list: string[]) =>
-  list.length === 0 ? "" : list.length === 1 ? list[0]! : list.length === 2 ? `${list[0]} and ${list[1]}` : `${list[0]}, ${list[1]} and ${list.length - 2} more`;
+  list.length === 0
+    ? ""
+    : list.length === 1
+      ? list[0]!
+      : list.length === 2
+        ? `${list[0]} and ${list[1]}`
+        : `${list[0]}, ${list[1]} and ${list.length - 2} more`;
 
 /** Signed swaps pay their fee in WMON; it's unwrapped to MON before the epoch is funded. */
-const signedHint = (signedFees: string | undefined) => (wei(signedFees) > 0n ? `${formatMon(wei(signedFees))} from signed swaps, unwrapped from WMON` : undefined);
+const signedHint = (signedFees: string | undefined) =>
+  wei(signedFees) > 0n ? `${formatMon(wei(signedFees))} from signed swaps, unwrapped from WMON` : undefined;
 
 type View = "overview" | "history";
 const VIEWS = [
@@ -93,13 +100,33 @@ export function ClubRewards({ token, symbol, wallet, isOwner, now }: { token: st
 type Data = ReturnType<typeof useClubRewards>["data"];
 
 /** The running epoch and what you can claim. */
-function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; token: string; symbol: string; wallet?: string; isOwner: boolean; now: number }) {
+function Overview({
+  data,
+  token,
+  symbol,
+  wallet,
+  isOwner,
+  now,
+}: {
+  data: Data;
+  token: string;
+  symbol: string;
+  wallet?: string;
+  isOwner: boolean;
+  now: number;
+}) {
   // The same read as the live standings (one request): the Club's own rules are what the copy states.
   const { standings } = useClubStandings(token, wallet);
   const rules = standings?.rules ?? DEFAULT_CLUB_RULES;
   return (
     <>
-      <LiveStandings token={token} symbol={symbol} wallet={wallet} now={now} sponsoredBy={data?.open ? sponsoredBy(names(data.open.sponsors)) || undefined : undefined} />
+      <LiveStandings
+        token={token}
+        symbol={symbol}
+        wallet={wallet}
+        now={now}
+        sponsoredBy={data?.open ? sponsoredBy(names(data.open.sponsors)) || undefined : undefined}
+      />
 
       <Panel title={wallet ? "Your share" : "Your share (join to earn)"}>
         <RewardsClaim account={wallet as Address | undefined} club={token} />
@@ -120,13 +147,14 @@ function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; t
         }
       >
         <p className="max-w-3xl text-sm">
-          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(PROTOCOL.holderBps)}</strong> of it goes to {whoIsPaid(rules)}, split by the NFTs they held
-          (on average over the week), and <strong>{percent(PROTOCOL.fundBps)}</strong> to the Club fund, which the Owner claims. Most points come from other people
-          backing your posts and replies with their likes and answers: the Club’s Holders weigh most, and any verified account, even from another Club, adds a little.
-          Posting, replying and liking, sharing on X and swapping add a little more. A Holder with no points isn’t paid that week; your whole
-          share counts from {rules.rampPoints} points (less below that), and {rules.fullBonusPoints} points raise it by up to {percent(PROTOCOL.maxBonusBps)}.
-          {rules.nonHolderBps > 0 && ` Members without NFTs share ${percent(rules.nonHolderBps)} of the Holder pool by their points.`} The Owner sets these rules; a change
-          applies from the next week.
+          Every completed swap of {symbol} pays a small protocol fee. Each week, <strong>{percent(PROTOCOL.holderBps)}</strong> of it goes to {whoIsPaid(rules)}
+          , split by the NFTs they held (on average over the week), and <strong>{percent(PROTOCOL.fundBps)}</strong> to the Club fund, which the Owner claims.
+          Most points come from other people backing your posts and replies with their likes and answers: the Club’s Holders weigh most, and any verified
+          account, even from another Club, adds a little. Posting, replying and liking, sharing on X and swapping add a little more. A Holder with no points
+          isn’t paid that week; your whole share counts from {rules.rampPoints} points (less below that), and {rules.fullBonusPoints} points raise it by up to{" "}
+          {percent(PROTOCOL.maxBonusBps)}.
+          {rules.nonHolderBps > 0 && ` Members without NFTs share ${percent(rules.nonHolderBps)} of the Holder pool by their points.`} The Owner sets these
+          rules; a change applies from the next week.
         </p>
       </Panel>
     </>
@@ -154,7 +182,11 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
         <dl className={`grid grid-cols-2 gap-4 text-sm ${latest!.sponsored ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
           <Figure label="Fees from swaps" value={formatMon(wei(latest!.fees))} hint={signedHint(latest!.signedFees)} />
           {latest!.sponsored && <Figure label="Sponsored" value={formatMon(wei(latest!.sponsored))} hint={sponsoredBy(names(latest!.sponsors))} />}
-          <Figure label="To Holders" value={formatMon(wei(latest!.paidHolders))} hint={`${latest!.holderCount} ${latest!.holderCount === 1 ? "Holder" : "Holders"}`} />
+          <Figure
+            label="To Holders"
+            value={formatMon(wei(latest!.paidHolders))}
+            hint={`${latest!.holderCount} ${latest!.holderCount === 1 ? "Holder" : "Holders"}`}
+          />
           <Figure label="Club fund" value={formatMon(wei(latest!.paidFund))} />
           <Figure label="Rolls over" value={formatMon(rolling)} hint="No Holders or no Owner yet, plus rounding" />
         </dl>

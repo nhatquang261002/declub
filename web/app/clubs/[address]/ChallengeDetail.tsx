@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChallengeBand, ChallengeClock, ChallengeFacts, EntryRank, PLACES, PrizeNotSent, PrizeTiles, noWinnerText, spotsText } from "@/components/ChallengeCard";
+import {
+  ChallengeBand,
+  ChallengeClock,
+  ChallengeFacts,
+  EntryRank,
+  PLACES,
+  PrizeNotSent,
+  PrizeTiles,
+  noWinnerText,
+  spotsText,
+} from "@/components/ChallengeCard";
 import { BadgeCheckIcon, CheckIcon, CoinIcon, ExternalIcon, HeartIcon, LockIcon, TagIcon, TrophyIcon, XLogoIcon } from "@/components/Icons";
 import { ChallengeShare } from "@/components/ChallengeShare";
 import { XPostCard } from "@/components/PostItem";
@@ -103,7 +113,8 @@ export function ChallengeDetail({
         <div className="club-panel flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4">
           <LockIcon className="size-4 shrink-0" />
           <p className="min-w-0 flex-1 text-sm">
-            <b>This challenge is for Holders of the Club’s asset.</b> You can still like entries. Just got one? Your wallets are read again at most once a minute.
+            <b>This challenge is for Holders of the Club’s asset.</b> You can still like entries. Just got one? Your wallets are read again at most once a
+            minute.
           </p>
           {recheck && (
             <button type="button" className="btn-secondary btn-sm shrink-0" aria-busy={recheck.busy} disabled={recheck.busy} onClick={recheck.run}>
@@ -113,7 +124,9 @@ export function ChallengeDetail({
           )}
         </div>
       )}
-      {canEnter && (!c.holdersOnly || holder) && <Entering c={c} token={token} wallet={wallet} now={now} onWithdraw={() => withdraw.mutate(c.id)} withdrawing={withdraw.isPending} />}
+      {canEnter && (!c.holdersOnly || holder) && (
+        <Entering c={c} token={token} wallet={wallet} now={now} onWithdraw={() => withdraw.mutate(c.id)} withdrawing={withdraw.isPending} />
+      )}
       {open && !member && <p className="club-panel px-5 py-4 text-sm font-semibold">Join the Club to enter and to like entries.</p>}
 
       <section className="club-panel overflow-hidden" aria-labelledby="entries-heading">
@@ -204,7 +217,9 @@ function Prizes({ c, token, now, owner }: { c: PublicChallenge; token: string; n
           <CoinIcon className="size-4" />
           Prizes from the Owner
         </h2>
-        <span className="text-xs font-bold text-muted">The Owner sends them from their own wallet. The app checks each transfer on chain; it never holds a prize.</span>
+        <span className="text-xs font-bold text-muted">
+          The Owner sends them from their own wallet. The app checks each transfer on chain; it never holds a prize.
+        </span>
       </header>
       {mine && (
         <p className="challenge-prize-row bg-[#f0b735]/10 text-sm font-bold">
@@ -229,7 +244,12 @@ function PrizeState({ w, at, now }: { w: Winner; at: number; now: number }) {
         {STATE_LABEL[state]}
       </span>
       {w.sent && (
-        <a href={`${EXPLORER_URL}/tx/${w.sent.tx}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold underline underline-offset-2">
+        <a
+          href={`${EXPLORER_URL}/tx/${w.sent.tx}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-bold underline underline-offset-2"
+        >
           Transaction
           <ExternalIcon className="size-3" />
         </a>
@@ -330,7 +350,8 @@ function DrawFacts({ c }: { c: PublicChallenge }) {
         <>
           <p className="break-all font-mono text-[0.7rem] text-muted">seed {draw.seed}</p>
           <p className="text-muted">
-            How to check: seed = keccak256(block hash ‖ challenge id). Sort the {draw.pool.length} {draw.pool.length === 1 ? "entry" : "entries"} by id and shuffle them with it (<code>drawOrder</code>); the first {c.winners ?? 1} that could still win, won.
+            How to check: seed = keccak256(block hash ‖ challenge id). Sort the {draw.pool.length} {draw.pool.length === 1 ? "entry" : "entries"} by id and
+            shuffle them with it (<code>drawOrder</code>); the first {c.winners ?? 1} that could still win, won.
           </p>
         </>
       )}
@@ -343,7 +364,21 @@ function DrawFacts({ c }: { c: PublicChallenge }) {
  * post it on X, paste its link and add a line; it is shared to the Board (signed, like any post) and
  * entered.
  */
-function Entering({ c, token, wallet, now, onWithdraw, withdrawing }: { c: PublicChallenge; token: string; wallet?: string; now: number; onWithdraw: () => void; withdrawing: boolean }) {
+function Entering({
+  c,
+  token,
+  wallet,
+  now,
+  onWithdraw,
+  withdrawing,
+}: {
+  c: PublicChallenge;
+  token: string;
+  wallet?: string;
+  now: number;
+  onWithdraw: () => void;
+  withdrawing: boolean;
+}) {
   const { post, postStage } = useClubActions(token);
   const { enter } = useChallengeActions(token);
   const [link, setLink] = useState("");
@@ -399,7 +434,10 @@ function Entering({ c, token, wallet, now, onWithdraw, withdrawing }: { c: Publi
           <b className="text-[#111318]">2.</b> Paste its link here and add a line for the Board.
         </li>
       </ol>
-      <p className="text-xs text-muted">Your entry adds to the Club’s Momentum. What it earns you is the prize: it doesn’t count as an X share or bring you points from its likes, even if you withdraw it.</p>
+      <p className="text-xs text-muted">
+        Your entry adds to the Club’s Momentum. What it earns you is the prize: it doesn’t count as an X share or bring you points from its likes, even if you
+        withdraw it.
+      </p>
       <label className="flex flex-col gap-1">
         <span className="inline-flex items-center gap-1.5 text-sm font-bold">
           <XLogoIcon className="size-3.5" /> Your X post
@@ -429,7 +467,13 @@ function Entering({ c, token, wallet, now, onWithdraw, withdrawing }: { c: Publi
       </label>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-muted" role="status">
-          {post.isPending ? (postStage === "sending" ? "Signed. Posting it…" : "Confirm in your wallet…") : enter.isPending ? "Entering…" : `${POST_MAX - length} characters left`}
+          {post.isPending
+            ? postStage === "sending"
+              ? "Signed. Posting it…"
+              : "Confirm in your wallet…"
+            : enter.isPending
+              ? "Entering…"
+              : `${POST_MAX - length} characters left`}
         </span>
         <button type="submit" className="btn-primary btn-sm px-5" aria-busy={busy} disabled={busy || !linkOk || text.trim() === "" || length > POST_MAX}>
           {busy && <Spinner />}
@@ -470,7 +514,9 @@ function EntryRow({
           {e.place && <span className="text-xs font-black">{isFlat(c.judging) ? "Winner" : `${PLACES[e.place - 1]} place`}</span>}
           <span className="text-xs font-normal text-muted">{ago(Math.floor(e.at / 1000), now)}</span>
         </p>
-        <p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed ${e.text === null ? "italic text-muted" : ""}`}>{e.text ?? "This entry is hidden."}</p>
+        <p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed ${e.text === null ? "italic text-muted" : ""}`}>
+          {e.text ?? "This entry is hidden."}
+        </p>
         {e.x && <XPostCard id={e.x.id} card={e.x} now={now} />}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {canLike ? (

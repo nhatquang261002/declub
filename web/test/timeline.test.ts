@@ -43,7 +43,8 @@ const say = async (store: Store, token: string, userId: string, text: string, at
 };
 const texts = (r: { posts: { text: string | null }[] }) => r.posts.map((p) => p.text);
 /** One big page, unless the test asks for less. */
-const list = (store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "all" | "others"; before?: { at: number; id: string }; limit?: number }) => listTimeline(store, reg, { limit: 100, ...v });
+const list = (store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "all" | "others"; before?: { at: number; id: string }; limit?: number }) =>
+  listTimeline(store, reg, { limit: 100, ...v });
 /** Every page of a list, one after another as the page would ask, and how many pages it took. */
 async function all(store: Store, reg: Registry, v: { userId?: string; scope: "joined" | "all" | "others"; limit: number }) {
   const posts: { id: string; text: string | null }[] = [];
@@ -79,7 +80,10 @@ describe("listTimeline", () => {
     const { store } = await world();
     const joined = await list(store, live, { userId: "u1", scope: "joined" });
     assert.deepEqual(texts(joined), ["a2", "c1", "a1"]);
-    assert.deepEqual(joined.posts.map((p) => p.club), [A.toLowerCase(), C.toLowerCase(), A.toLowerCase()]);
+    assert.deepEqual(
+      joined.posts.map((p) => p.club),
+      [A.toLowerCase(), C.toLowerCase(), A.toLowerCase()],
+    );
     assert.deepEqual(texts(await list(store, live, { userId: "u1", scope: "others" })), ["b1"]);
   });
 
@@ -165,9 +169,16 @@ describe("listTimeline", () => {
     assert.ok(r.pages >= 5);
     // Newest first, and the same list whatever the page size.
     const sizes = await Promise.all([7, 20, 50].map((limit) => all(store, live, { scope: "others", limit })));
-    for (const s of sizes) assert.deepEqual(s.posts.map((p) => p.id), r.posts.map((p) => p.id));
+    for (const s of sizes)
+      assert.deepEqual(
+        s.posts.map((p) => p.id),
+        r.posts.map((p) => p.id),
+      );
     const one = (await list(store, live, { scope: "others", limit: 100 })).posts.map((p) => p.id);
-    assert.deepEqual(r.posts.map((p) => p.id), one);
+    assert.deepEqual(
+      r.posts.map((p) => p.id),
+      one,
+    );
   });
 
   it("goes on past posts that are hidden or gone, even a page's worth of them", async () => {
@@ -181,7 +192,10 @@ describe("listTimeline", () => {
     for (const id of ids.slice(35)) assert.deepEqual(await hidePost(store, club(B), { userId: "own", wallet: wallet(5) }, id, true), { ok: true });
     await store.del(postKey(B, ids[10]!));
     const r = await all(store, live, { scope: "others", limit: 5 });
-    assert.deepEqual(r.posts.map((p) => p.text), Array.from({ length: 35 }, (_, i) => `p${34 - i}`).filter((t) => t !== "p10"));
+    assert.deepEqual(
+      r.posts.map((p) => p.text),
+      Array.from({ length: 35 }, (_, i) => `p${34 - i}`).filter((t) => t !== "p10"),
+    );
   });
 
   it("never carries a user id", async () => {
@@ -250,7 +264,13 @@ describe("toColumns", () => {
     const plain = { text: "hi", link: undefined, x: undefined };
     assert.ok(estimateHeight({ ...plain, text: "x".repeat(200) }) > estimateHeight(plain));
     assert.ok(estimateHeight({ ...plain, link: { kind: "deal", id: "1" } }) > estimateHeight(plain));
-    assert.ok(estimateHeight({ ...plain, link: { kind: "x", id: "1" }, x: { id: "1", author: "a", text: "t", image: "https://pbs.twimg.com/x.jpg", own: false, counted: null } as never }) > estimateHeight({ ...plain, link: { kind: "deal", id: "1" } }));
+    assert.ok(
+      estimateHeight({
+        ...plain,
+        link: { kind: "x", id: "1" },
+        x: { id: "1", author: "a", text: "t", image: "https://pbs.twimg.com/x.jpg", own: false, counted: null } as never,
+      }) > estimateHeight({ ...plain, link: { kind: "deal", id: "1" } }),
+    );
   });
 });
 
@@ -279,7 +299,10 @@ describe("a wallet's Board posts (ADR 0042)", () => {
     await member(store, "u3", 3, [A]);
     assert.ok((await likePost(store, club(A), "u3", ids.a2, true)).ok);
     const anon = await listWalletPosts(store, live, w1, { limit: 20 });
-    assert.deepEqual(anon.posts.map((p) => p.club), [A, C, A].map((t) => t.toLowerCase()));
+    assert.deepEqual(
+      anon.posts.map((p) => p.club),
+      [A, C, A].map((t) => t.toLowerCase()),
+    );
     assert.equal(anon.posts[0]!.likes, 1);
     assert.equal(anon.posts[0]!.liked, false);
     assert.equal((await listWalletPosts(store, live, w1, { limit: 20, userId: "u3" })).posts[0]!.liked, true);
@@ -317,7 +340,10 @@ describe("a wallet's Board posts (ADR 0042)", () => {
     assert.equal(res.status, 200);
     assert.match(res.headers.get("cache-control") ?? "", /s-maxage/);
     const body = (await res.json()) as { enabled: boolean; posts: { text: string }[]; next: string | null };
-    assert.deepEqual(body.posts.map((p) => p.text), ["a2", "c1"]);
+    assert.deepEqual(
+      body.posts.map((p) => p.text),
+      ["a2", "c1"],
+    );
     assert.ok(body.next);
     assert.equal((await get(new Request("http://x"), ctx("nope"))).status, 400);
     assert.equal((await get(new Request("http://x?limit=0"), ctx(w1))).status, 400);

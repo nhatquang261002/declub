@@ -68,7 +68,7 @@ const defaultVerify: NonNullable<SponsorDeps["verify"]> = ({ address, message, s
 export const sponsorTxKey = (tx: string) => `declub:rewards:sponsor-tx:${tx.toLowerCase()}`;
 const lockKey = (tx: string) => `declub:rewards:sponsor-lock:${tx.toLowerCase()}`;
 
-export type Recorded = { epoch: number; amount: string; sponsor: string; kind: "owner" | "partner" };
+type Recorded = { epoch: number; amount: string; sponsor: string; kind: "owner" | "partner" };
 
 /** GET /api/clubs/[token]/sponsor: where to send the money, the least, and the epoch it would land in. */
 export function sponsorInfoHandler(registry: Registry, deps: SponsorDeps = {}) {
@@ -119,10 +119,15 @@ export function sponsorHandler(registry: Registry, deps: SponsorDeps = {}) {
       const payment = await (deps.payment ?? defaultPayment)(tx as Hex);
       if (!payment) return fail(422, "not_found", "That payment isn't on the chain yet. Try again in a moment.");
       if (!payment.ok) return fail(422, "failed", "That transaction didn't go through.");
-      if (!payment.to || payment.to.toLowerCase() !== operator.toLowerCase()) return fail(422, "wrong_recipient", "That payment wasn't sent to the rewards operator.");
+      if (!payment.to || payment.to.toLowerCase() !== operator.toLowerCase())
+        return fail(422, "wrong_recipient", "That payment wasn't sent to the rewards operator.");
       if (payment.value < SPONSOR_MIN_WEI) return fail(422, "too_small", "That payment is under the least a sponsorship can be.");
 
-      const signed = await (deps.verify ?? defaultVerify)({ address: payment.from, message: sponsorMessage(club.address, tx, name), signature: signature as Hex });
+      const signed = await (deps.verify ?? defaultVerify)({
+        address: payment.from,
+        message: sponsorMessage(club.address, tx, name),
+        signature: signature as Hex,
+      });
       if (!signed) return fail(422, "bad_signature", "The signature isn't from the wallet that paid.");
 
       // The Owner's own top-up is labelled as one: the sender is one of the Owner's linked wallets.
@@ -134,7 +139,12 @@ export function sponsorHandler(registry: Registry, deps: SponsorDeps = {}) {
       const last = await store.get<number>(lastKey());
       let n = Math.max(0, epochAt(payment.at, deps.genesis, deps.length));
       if (last !== null && n <= last) n = last + 1;
-      const result = await recordSponsor(store, n, { club: club.address, amount: payment.value, sponsor: name, kind, by: getAddress(payment.from), tx }, deps.now?.());
+      const result = await recordSponsor(
+        store,
+        n,
+        { club: club.address, amount: payment.value, sponsor: name, kind, by: getAddress(payment.from), tx },
+        deps.now?.(),
+      );
       if (result.status === "busy") return fail(409, "busy", "Another sponsorship is being recorded. Try again in a moment.");
       if (result.status !== "recorded") return fail(422, "invalid", result.status === "invalid" ? result.message : "That epoch is already built.");
 

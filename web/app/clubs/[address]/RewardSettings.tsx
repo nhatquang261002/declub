@@ -72,9 +72,7 @@ export function RewardSettings({ token, owner, now }: { token: string; owner: bo
         aria-invalid={!!errors[k]}
         onChange={(e) => setDraft({ ...draft, [k]: e.target.value })}
       />
-      <span className={`text-xs ${errors[k] ? "text-danger" : "text-muted"}`}>
-        {errors[k] ?? FIELDS[k].hint}
-      </span>
+      <span className={`text-xs ${errors[k] ? "text-danger" : "text-muted"}`}>{errors[k] ?? FIELDS[k].hint}</span>
     </label>
   );
 
@@ -161,7 +159,12 @@ function RewardBans({ token, owner, now }: { token: string; owner: boolean; now:
       )}
       {owner && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <input className={`${field} min-w-0 flex-1 font-mono text-sm`} placeholder="The member’s Club wallet, 0x…" value={wallet} onChange={(e) => setWallet(e.target.value)} />
+          <input
+            className={`${field} min-w-0 flex-1 font-mono text-sm`}
+            placeholder="The member’s Club wallet, 0x…"
+            value={wallet}
+            onChange={(e) => setWallet(e.target.value)}
+          />
           <button
             type="button"
             className="btn-secondary"

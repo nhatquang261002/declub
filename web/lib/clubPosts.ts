@@ -94,7 +94,7 @@ export type PublicPost = {
 // post, and the last two can make one text read as another.
 const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u200b\u202a-\u202e\u2066-\u2069\ufeff]+/g;
 
-export type CleanText = { ok: true; text: string } | { ok: false; reason: "empty" | "too_long" };
+type CleanText = { ok: true; text: string } | { ok: false; reason: "empty" | "too_long" };
 
 /** `input` as it is stored when at most `max` characters long: unsafe characters become spaces, runs of space collapse, ends trimmed. */
 export function cleanLine(input: unknown, max: number): CleanText {
@@ -123,7 +123,7 @@ export function parseLink(input: unknown): PostLink | null {
 }
 
 /** A note may share an X post; a "Looking for" post may point at a deal or a signed swap. */
-export const linkFits = (kind: PostKind, link: PostLink) => (kind === "note" ? link.kind === "x" : link.kind !== "x");
+const linkFits = (kind: PostKind, link: PostLink) => (kind === "note" ? link.kind === "x" : link.kind !== "x");
 
 /** The link `input` names, if it fits a post of `kind`; `null` otherwise. */
 export function linkFor(kind: PostKind, input: unknown): PostLink | null {
@@ -199,12 +199,12 @@ export const MAX_DESCRIPTION = 500;
 export const MAX_LINKS = 3;
 export const NO_PROFILE: ClubProfile = { description: "", links: [], holdersOnlyPosts: false, pinned: [] };
 
-export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & {
+type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & {
   xTags?: string[];
   /** Without `min`, the current minimum stays. */
   coinHolders?: { on: boolean; min?: string };
 };
-export type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
+type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
 
 /** Checks an edit to the profile. Links must be plain `https://` addresses: they become anchors. */
 export function checkProfileEdit(input: unknown): ProfileResult {

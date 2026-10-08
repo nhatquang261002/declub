@@ -1,22 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type {
-  Abi,
-  ContractFunctionArgs,
-  ContractFunctionName,
-  Hash,
-  TransactionReceipt,
-} from "viem";
+import type { Abi, ContractFunctionArgs, ContractFunctionName, Hash, TransactionReceipt } from "viem";
 import { useConfig } from "wagmi";
-import {
-  getConnection,
-  getPublicClient,
-  simulateContract,
-  switchChain,
-  waitForTransactionReceipt,
-  writeContract,
-} from "wagmi/actions";
+import { getConnection, getPublicClient, simulateContract, switchChain, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { useQueryClient } from "@tanstack/react-query";
 import { describeError, type AppError } from "@/lib/errors";
 import { useToast } from "@/components/Toast";
@@ -43,13 +30,7 @@ export type TxState =
 
 type Mutability = "nonpayable" | "payable";
 
-export type WriteCall<
-  abi extends Abi = Abi,
-  functionName extends ContractFunctionName<abi, Mutability> = ContractFunctionName<
-    abi,
-    Mutability
-  >,
-> = {
+export type WriteCall<abi extends Abi = Abi, functionName extends ContractFunctionName<abi, Mutability> = ContractFunctionName<abi, Mutability>> = {
   address: `0x${string}`;
   abi: abi;
   functionName: functionName;
@@ -125,8 +106,7 @@ export function useTxFlow() {
   );
 
   const reset = useCallback(() => setState({ status: "idle" }), []);
-  const busy =
-    state.status !== "idle" && state.status !== "confirmed" && state.status !== "error";
+  const busy = state.status !== "idle" && state.status !== "confirmed" && state.status !== "error";
 
   return { state, run, reset, busy };
 }

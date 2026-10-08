@@ -4,7 +4,7 @@ import { CHAIN_ID } from "./config";
  * The app's flavor: testnet or mainnet, picked by NEXT_PUBLIC_CHAIN_ID at build time. Everything a
  * screen says about the network comes from here, so a mainnet build never claims to be a demo.
  */
-export type Network = {
+type Network = {
   chainId: number;
   mainnet: boolean;
   /** "Monad testnet" / "Monad", as it reads in a sentence. */

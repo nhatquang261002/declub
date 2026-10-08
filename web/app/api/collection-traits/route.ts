@@ -27,7 +27,10 @@ export async function GET(request: Request) {
   // Waiting for a free slot isn't starting a scan, so it doesn't count against the tight limit.
   if (!scanSlotFree()) return Response.json({ state: "busy" }, { headers: NO_STORE });
   if (store && !(await withinLimit(store, "traits-scan", id, 10, 600))) {
-    return Response.json({ state: "unsupported", reason: "Too many collections scanned from here. Try again in a few minutes." }, { status: 429, headers: NO_STORE });
+    return Response.json(
+      { state: "unsupported", reason: "Too many collections scanned from here. Try again in a few minutes." },
+      { status: 429, headers: NO_STORE },
+    );
   }
   return Response.json(scanCollection(collection), { headers: NO_STORE });
 }

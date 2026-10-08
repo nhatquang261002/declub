@@ -72,7 +72,7 @@ export type MembersPaging = {
 export const MEMBERS_QUERY_MAX = 64;
 
 /** Whether a wallet, or the handle shown under it, contains `query` (an "@" in front is ignored). */
-export function matchesMember(wallet: string, handle: string | undefined, query: string): boolean {
+function matchesMember(wallet: string, handle: string | undefined, query: string): boolean {
   const q = query.trim().toLowerCase().replace(/^@/, "");
   if (!q) return true;
   return wallet.toLowerCase().includes(q) || (handle?.toLowerCase().includes(q) ?? false);
@@ -178,5 +178,13 @@ export function rankMembers(
   // A page past the end is the last one, so a Club that shrank doesn't leave a reader on an empty page.
   const size = Math.min(MEMBERS_MAX_PAGE, Math.max(1, Math.floor(paging.size)));
   const page = Math.min(Math.max(1, Math.floor(paging.page)), Math.max(1, Math.ceil(found.length / size)));
-  return { members: found.slice((page - 1) * size, page * size), total: all.length, matches: found.length, holders: all.filter((m) => m.holder).length, topMomentum: Math.max(0, ...all.map((m) => m.momentum)), page, size };
+  return {
+    members: found.slice((page - 1) * size, page * size),
+    total: all.length,
+    matches: found.length,
+    holders: all.filter((m) => m.holder).length,
+    topMomentum: Math.max(0, ...all.map((m) => m.momentum)),
+    page,
+    size,
+  };
 }

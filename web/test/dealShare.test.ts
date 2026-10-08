@@ -14,21 +14,37 @@ describe("describeAssets", () => {
   it("groups NFTs by collection and words tokens and MON", () => {
     assert.equal(describeAssets([nftAsset(CHOG, 12n), nftAsset(CHOG, 40n)], info, nameOf), "Chog #12, #40");
     assert.equal(describeAssets([nativeAsset(1_500_000_000_000_000_000n), erc20Asset(USDC, 2_500_000n)], info, nameOf), "1.5 MON + 2.5 mUSD");
-    assert.equal(describeAssets(Array.from({ length: 6 }, (_, i) => nftAsset(CHOG, BigInt(i))), info, nameOf), "6 Chog");
+    assert.equal(
+      describeAssets(
+        Array.from({ length: 6 }, (_, i) => nftAsset(CHOG, BigInt(i))),
+        info,
+        nameOf,
+      ),
+      "6 Chog",
+    );
     assert.equal(describeAssets([traitAsset(CHOG, `0x${"00".repeat(32)}`, 2)], info, nameOf), "2 Chog of a kind");
   });
 
   it("falls back to a short address for a token it can't name, and says assets for none", () => {
-    assert.match(describeAssets([nftAsset(USDC, 1n)], info, () => undefined), /^0x7359… #1$/);
+    assert.match(
+      describeAssets([nftAsset(USDC, 1n)], info, () => undefined),
+      /^0x7359… #1$/,
+    );
     assert.equal(describeAssets([], info, nameOf), "assets");
   });
 });
 
 describe("the deal's post", () => {
   it("invites on a live offer, announces a swap, and names the Club", () => {
-    assert.equal(dealPost(facts(), "Chog"), "Offering Chog #12 for 3 MON 🤝\n\nIn the Chog Club on DeClub. Escrowed on Monad: both sides or nothing. Take the deal 👇");
+    assert.equal(
+      dealPost(facts(), "Chog"),
+      "Offering Chog #12 for 3 MON 🤝\n\nIn the Chog Club on DeClub. Escrowed on Monad: both sides or nothing. Take the deal 👇",
+    );
     assert.equal(dealPost(facts({ openOffer: true, want: "" })), "Offering Chog #12, open to offers 🤝\n\nOn DeClub. Escrowed on Monad. Make me an offer 👇");
-    assert.equal(dealPost(facts({ status: "filled" }), "Chog"), "Swapped Chog #12 for 3 MON ✅\n\nIn the Chog Club on DeClub. Escrowed on Monad, atomic, done.");
+    assert.equal(
+      dealPost(facts({ status: "filled" }), "Chog"),
+      "Swapped Chog #12 for 3 MON ✅\n\nIn the Chog Club on DeClub. Escrowed on Monad, atomic, done.",
+    );
   });
 
   it("shortens a long list of assets so the post fits with its link", () => {

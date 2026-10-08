@@ -59,14 +59,14 @@ import type { Store } from "./store";
 
 const base = `declub:rewards:${CHAIN_ID}`;
 export const epochKey = (n: number) => `${base}:epoch:${n}`;
-export const epochsKey = () => `${base}:epochs`;
-export const accountKey = (account: string) => `${base}:account:${account.toLowerCase()}`;
+const epochsKey = () => `${base}:epochs`;
+const accountKey = (account: string) => `${base}:account:${account.toLowerCase()}`;
 export const carryKey = (club: string) => `${base}:carry:${club.toLowerCase()}`;
 export const lastKey = () => `${base}:last`;
 /** The X reach read for epoch `n` before it's built (lib/server/xReach.ts). */
 export const reachKey = (n: number) => `${base}:reach:${n}`;
 /** A signed swap's settlement fee, read once from its receipt. */
-export const feeKey = (txHash: string) => `${base}:fee:${txHash.toLowerCase()}`;
+const feeKey = (txHash: string) => `${base}:fee:${txHash.toLowerCase()}`;
 const lockKey = () => `${base}:lock`;
 
 /** Epochs and per-account indexes kept. A year of weekly epochs fits many times over. */
@@ -135,7 +135,7 @@ export type RewardsDeps = {
   rules?: (club: string, n: number) => Promise<ClubRules> | ClubRules;
 };
 
-export type BuildResult =
+type BuildResult =
   | { status: "built"; record: EpochRecord }
   | { status: "exists"; record: EpochRecord }
   /** The epoch hasn't ended yet. */
@@ -146,7 +146,7 @@ export type BuildResult =
   /** No rewards contract is configured, so there's nothing to bind leaves to. */
   | { status: "unconfigured" };
 
-export type SponsorResult =
+type SponsorResult =
   | { status: "recorded"; entries: Sponsorship[] }
   /** The epoch is already built: its pools are fixed. Record it for the next one. */
   | { status: "built" }
@@ -183,7 +183,11 @@ export async function recordSponsor(
  * Takes an entry out of epoch `n`'s ledger by its transaction, for a name that shouldn't be shown.
  * The money stays with the operator; the payment stays recorded as taken, so it isn't added again.
  */
-export async function removeSponsor(store: Store, n: number, tx: string): Promise<{ status: "removed"; entry: Sponsorship } | { status: "built" } | { status: "missing" }> {
+export async function removeSponsor(
+  store: Store,
+  n: number,
+  tx: string,
+): Promise<{ status: "removed"; entry: Sponsorship } | { status: "built" } | { status: "missing" }> {
   if (await store.get<EpochRecord>(epochKey(n))) return { status: "built" };
   const lock = `${sponsorKey(n)}:lock`;
   if ((await store.hit(lock, 10)) > 1) return { status: "missing" };
@@ -303,7 +307,7 @@ export async function swapFee(event: ActivityEvent, intents: string, settlementF
 }
 
 /** A Holder as the builder and the standings see them: who they are, and their streak record. */
-export type HolderInput = Holder & {
+type HolderInput = Holder & {
   userId: string;
   wallets: string[];
   joinedAt: number;
@@ -325,6 +329,17 @@ export type HolderInput = Holder & {
   basePoints: number;
 };
 
+/** The parts a Holder's `points` are made of, as the ledger and the standings both list them (the optional ones only when there are any). */
+export const pointsBreakdown = (h: HolderInput) => ({
+  xPoints: h.xPoints,
+  swapPoints: h.swapPoints,
+  backedPoints: h.backedPoints,
+  ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
+  ...(h.engagedPoints ? { engagedPoints: h.engagedPoints } : {}),
+  backers: h.backers,
+  basePoints: h.basePoints,
+});
+
 /** The latest a profile can have been shared and still give a base voice in an epoch ending at `end` (unix seconds): epoch ms. */
 export const verifiedBy = (end: number) => (end - PROTOCOL.verifiedDays * 86_400) * 1000;
 
@@ -338,7 +353,7 @@ type BackingRead = {
 };
 
 /** One Holder as frozen at the close (ADR 0040). Server-private: the linked wallets and user id are never published. */
-export type ClosingHolder = {
+type ClosingHolder = {
   userId: string;
   wallet: string;
   wallets: string[];
@@ -363,7 +378,7 @@ export type ClosingHolder = {
  * taken back, a post deleted or a moderator's hide after the close can't move the result. What the
  * chain and X say (swaps, X shares and their reach) is read when the epoch is built.
  */
-export type Closing = {
+type Closing = {
   n: number;
   /** Unix seconds the snapshot was taken. */
   closedAt: number;
@@ -400,11 +415,22 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
   const closing = new Map(held.map((h) => [h.userId, h.shares]));
   const total = (userId: string) => BigInt(sampled.sums[userId] ?? "0") + (closing.get(userId) ?? 0n);
   const average = new Map<string, number>();
-  for (const userId of new Set([...Object.keys(sampled.sums), ...closing.keys()])) if (!banned.has(userId)) average.set(userId, Number(total(userId)) / (samples + 1));
+  for (const userId of new Set([...Object.keys(sampled.sums), ...closing.keys()]))
+    if (!banned.has(userId)) average.set(userId, Number(total(userId)) / (samples + 1));
   const read0 = await readBacking(store, club.address, n);
   const actions = read0.actions.filter((a) => !banned.has(a.giver));
-  const removed = [...read0.removed.map((a) => ({ ...a, by: "moderator" as const })), ...read0.actions.filter((a) => banned.has(a.giver)).map((a) => ({ ...a, by: "reward_ban" as const }))];
-  const voices = await voicesFor(store, n, actions.map((a) => a.giver), average, linkedBy, rules);
+  const removed = [
+    ...read0.removed.map((a) => ({ ...a, by: "moderator" as const })),
+    ...read0.actions.filter((a) => banned.has(a.giver)).map((a) => ({ ...a, by: "reward_ban" as const })),
+  ];
+  const voices = await voicesFor(
+    store,
+    n,
+    actions.map((a) => a.giver),
+    average,
+    linkedBy,
+    rules,
+  );
   const backed = backingPoints(actions, voices, rules);
   // What givers earn themselves for engaging (ADR 0046): a banned member's actions are already out.
   const engaged = engagementPoints(actions, rules);
@@ -432,12 +458,29 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
   const rows = await allRows(store, club.address);
   // Members without NFTs who did something: the Club may pay them a slice (ADR 0044).
   const members = rows
-    .filter((r) => r.displayWallet && r.wallets.length > 0 && !closing.has(r.userId) && !banned.has(r.userId) && ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId) || engaged.has(r.userId) || !!awards[r.userId]))
+    .filter(
+      (r) =>
+        r.displayWallet &&
+        r.wallets.length > 0 &&
+        !closing.has(r.userId) &&
+        !banned.has(r.userId) &&
+        ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId) || engaged.has(r.userId) || !!awards[r.userId]),
+    )
     .map((r) => row(r.userId, r.displayWallet!, r.wallets, 0n, r.joinedAt));
   const wallets = new Map(rows.flatMap((r) => (r.displayWallet ? [[r.userId, r.displayWallet] as const] : [])));
   const read: BackingRead = { actions, removed, voices, wallets };
   const challenges = Object.keys(awards).length > 0 ? publishAwards(awards) : undefined;
-  return { holders, members, excluded: Object.values(bans).map((b) => b.wallet).sort(), days: Object.fromEntries(days), samples, read, ...(challenges ? { challenges } : {}) };
+  return {
+    holders,
+    members,
+    excluded: Object.values(bans)
+      .map((b) => b.wallet)
+      .sort(),
+    days: Object.fromEntries(days),
+    samples,
+    read,
+    ...(challenges ? { challenges } : {}),
+  };
 }
 
 /**
@@ -445,7 +488,7 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
  * shares in the epoch's events, and the streak those days make. `streaks` are the Club's, from the
  * epochs built before.
  */
-export function scoreHolders(
+function scoreHolders(
   inputs: { holders: readonly ClosingHolder[] },
   n: number,
   events: readonly ActivityEvent[],
@@ -454,16 +497,15 @@ export function scoreHolders(
   rules: ClubRules = DEFAULT_CLUB_RULES,
 ): HolderInput[] {
   return inputs.holders.map(({ userId, wallet, wallets, shares, held, joinedAt, days, backed, backers, base, challenge, engaged }) => {
-    const { points, bonusBps, x, swaps, backed: backedPoints, challenge: challengePoints = 0, engaged: engagedPoints = 0 } = activityPoints(
-      events,
-      reach,
-      wallets,
-      days,
-      backed,
-      rules,
-      challenge ?? 0,
-      engaged ?? 0,
-    );
+    const {
+      points,
+      bonusBps,
+      x,
+      swaps,
+      backed: backedPoints,
+      challenge: challengePoints = 0,
+      engaged: engagedPoints = 0,
+    } = activityPoints(events, reach, wallets, days, backed, rules, challenge ?? 0, engaged ?? 0);
     return {
       userId,
       wallet,
@@ -517,14 +559,22 @@ export async function holderInputs(
 }
 
 /** Freezes one Club's inputs for epoch `n` and keeps them. Throws when balances can't be read. */
-async function closeClub(store: Store, club: ClubEntry, n: number, holdings: Holdings, window: { end: number }, rules: ClubRules, now: number): Promise<Closing> {
+async function closeClub(
+  store: Store,
+  club: ClubEntry,
+  n: number,
+  holdings: Holdings,
+  window: { end: number },
+  rules: ClubRules,
+  now: number,
+): Promise<Closing> {
   const { read, ...inputs } = await readInputs(store, club, n, holdings, verifiedBy(window.end), rules);
   const closing: Closing = { n, closedAt: now, rules, ...inputs, backing: await publishBacking(store, read, read.voices, read.wallets) };
   await store.set(closingKey(club.address, n), closing);
   return closing;
 }
 
-export type CloseResult =
+type CloseResult =
   | { status: "closed"; closed: string[]; existing: string[]; failed: string[] }
   /** The epoch hasn't ended yet. */
   | { status: "open"; endsAt: number }
@@ -563,7 +613,8 @@ export async function closeEpoch(store: Store, n: number, deps: RewardsDeps = {}
   }
 }
 
-const rulesOf = async (store: Store, deps: Pick<RewardsDeps, "rules">, club: string, n: number) => (deps.rules ?? ((c: string, k: number) => rulesFor(store, c, k)))(club, n);
+const rulesOf = async (store: Store, deps: Pick<RewardsDeps, "rules">, club: string, n: number) =>
+  (deps.rules ?? ((c: string, k: number) => rulesFor(store, c, k)))(club, n);
 
 async function compute(
   store: Store,
@@ -620,7 +671,8 @@ async function compute(
     const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
     const prev = await readStreaks(store, key);
     // The inputs frozen when the epoch closed, or frozen now if the close job didn't run (ADR 0040).
-    const closing = (await store.get<Closing>(closingKey(key, n))) ?? (await closeClub(store, club, n, holdings, window, await rulesOf(store, deps, key, n), now));
+    const closing =
+      (await store.get<Closing>(closingKey(key, n))) ?? (await closeClub(store, club, n, holdings, window, await rulesOf(store, deps, key, n), now));
     closings.set(key, closing);
     const { rules, samples } = closing;
     const holders = scoreHolders(closing, n, activity.get(key) ?? [], reach, prev, rules);
@@ -680,13 +732,7 @@ async function compute(
       held: averageHeld(h.held ?? h.shares, closing.samples),
       points: h.points,
       days: h.days,
-      xPoints: h.xPoints,
-      swapPoints: h.swapPoints,
-      backedPoints: h.backedPoints,
-      ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
-      ...(h.engagedPoints ? { engagedPoints: h.engagedPoints } : {}),
-      backers: h.backers,
-      basePoints: h.basePoints,
+      ...pointsBreakdown(h),
       bonusBps: holder ? totalBonusBps(h, rules) : 0,
       streak: h.streak,
       paid: paid.has(h.wallet.toLowerCase()),
@@ -756,7 +802,11 @@ async function compute(
  * collection. A Club's memecoin earns the Holder badge but no shares (ADR 0025). Throws when the
  * whole read fails; a single wallet whose balanceOf fails counts as zero.
  */
-export async function holderShares(store: Store, club: ClubEntry, holdings: Holdings): Promise<{ userId: string; wallet: string; wallets: string[]; shares: bigint; joinedAt: number }[]> {
+export async function holderShares(
+  store: Store,
+  club: ClubEntry,
+  holdings: Holdings,
+): Promise<{ userId: string; wallet: string; wallets: string[]; shares: bigint; joinedAt: number }[]> {
   const rows = (await allRows(store, club.address)).filter((r) => r.displayWallet && r.wallets.length > 0);
   if (rows.length === 0) return [];
   const balances = await holdings(
@@ -770,7 +820,9 @@ export async function holderShares(store: Store, club: ClubEntry, holdings: Hold
     at += row.wallets.length;
     return held;
   });
-  return rows.map((row, i) => ({ userId: row.userId, wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]!, joinedAt: row.joinedAt })).filter((h) => h.shares > 0n);
+  return rows
+    .map((row, i) => ({ userId: row.userId, wallet: row.displayWallet!, wallets: row.wallets, shares: shares[i]!, joinedAt: row.joinedAt }))
+    .filter((h) => h.shares > 0n);
 }
 
 /** The Owner's display wallet, from the roles and their member row (not the claim, which can go stale). */
@@ -785,7 +837,7 @@ export async function ownerWallet(store: Store, club: ClubEntry): Promise<string
 export const readEpoch = (store: Store, n: number) => store.get<EpochRecord>(epochKey(n));
 
 /** The newest built epochs, newest first. */
-export async function latestEpochs(store: Store, limit = 2): Promise<EpochRecord[]> {
+async function latestEpochs(store: Store, limit = 2): Promise<EpochRecord[]> {
   const ns = await store.ranked(epochsKey(), limit);
   const records = await store.getMany<EpochRecord>(ns.map((n) => epochKey(Number(n))));
   return records.filter((r): r is EpochRecord => r !== null);
@@ -834,7 +886,21 @@ export async function clubRewards(store: Store, club: string, now = Math.floor(D
     const line = r.clubs.find((c) => c.club === key);
     if (!line) return [];
     const { fees, signedFees, sponsored, sponsors, holderPool, fundPool, paidHolders, paidFund, holderCount } = line;
-    return [{ n: r.n, start: r.start, end: r.end, fees, ...(signedFees ? { signedFees } : {}), ...(sponsored ? { sponsored, sponsors: sponsors ?? [] } : {}), holderPool, fundPool, paidHolders, paidFund, holderCount }];
+    return [
+      {
+        n: r.n,
+        start: r.start,
+        end: r.end,
+        fees,
+        ...(signedFees ? { signedFees } : {}),
+        ...(sponsored ? { sponsored, sponsors: sponsors ?? [] } : {}),
+        holderPool,
+        fundPool,
+        paidHolders,
+        paidFund,
+        holderCount,
+      },
+    ];
   });
   const running = epochAt(now);
   const openLine = running >= 0 ? sponsorsByClub(await readSponsors(store, running)).get(key) : undefined;
@@ -843,7 +909,13 @@ export async function clubRewards(store: Store, club: string, now = Math.floor(D
     .flatMap((l) =>
       l.breakdown
         .filter((b) => b.club === key)
-        .map((b) => ({ account: l.account, kind: b.kind, amount: b.amount, ...(b.bonusBps ? { bonusBps: b.bonusBps } : {}), ...(b.points ? { points: b.points } : {}) })),
+        .map((b) => ({
+          account: l.account,
+          kind: b.kind,
+          amount: b.amount,
+          ...(b.bonusBps ? { bonusBps: b.bonusBps } : {}),
+          ...(b.points ? { points: b.points } : {}),
+        })),
     )
     .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : BigInt(b.amount) < BigInt(a.amount) ? -1 : 0))
     .slice(0, 10);

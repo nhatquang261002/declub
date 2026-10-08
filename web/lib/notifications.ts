@@ -28,7 +28,16 @@ export type NotificationKind =
   | "challenge-prize-owed";
 
 /** Kinds that report something that already happened and need nothing from the user. */
-export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped", "club-like", "club-pinned", "club-reply", "club-xshare", "challenge-results"];
+export const NEWS_KINDS: readonly NotificationKind[] = [
+  "filled",
+  "intent-settled",
+  "intent-dropped",
+  "club-like",
+  "club-pinned",
+  "club-reply",
+  "club-xshare",
+  "challenge-results",
+];
 
 export type AppNotification = {
   /** Stable per (kind, deal or intent), so read state survives reloads. */
@@ -44,18 +53,16 @@ export type AppNotification = {
 };
 
 /** A maker's open deal is "expiring" inside this window. */
-export const EXPIRING_WINDOW_SEC = 3_600;
+const EXPIRING_WINDOW_SEC = 3_600;
 
 /** "#12, #40 + 2 tokens + 1.5 MON". Token amounts need their decimals, so ERC-20s are only counted. */
 const offerSummary = (deal: DealV2) => {
   const ids = deal.offered.flatMap((a) => (a.kind === "erc721" ? [a.id] : []));
   const tokens = deal.offered.filter((a) => a.kind === "erc20").length;
   const mon = deal.offered.reduce((sum, a) => (a.kind === "native" ? sum + a.amount : sum), 0n);
-  const parts = [
-    ids.length ? formatIds(ids) : null,
-    tokens ? `${tokens} token${tokens === 1 ? "" : "s"}` : null,
-    mon > 0n ? formatMon(mon) : null,
-  ].filter(Boolean);
+  const parts = [ids.length ? formatIds(ids) : null, tokens ? `${tokens} token${tokens === 1 ? "" : "s"}` : null, mon > 0n ? formatMon(mon) : null].filter(
+    Boolean,
+  );
   return parts.join(" + ") || "assets";
 };
 
@@ -69,11 +76,7 @@ const offerSummary = (deal: DealV2) => {
  * - expiring: my open deal ends within EXPIRING_WINDOW_SEC
  * - expired:  my open deal ran out; the escrow is still locked until someone reclaims it
  */
-export function deriveNotifications(
-  deals: readonly DealV2[],
-  account: string | undefined,
-  nowSec: number,
-): AppNotification[] {
+export function deriveNotifications(deals: readonly DealV2[], account: string | undefined, nowSec: number): AppNotification[] {
   if (!account) return [];
   const out: AppNotification[] = [];
 
@@ -146,13 +149,19 @@ export type ClubInboxItem = {
 
 /** The Club inbox as notifications: news, except what the server marks as waiting on the member. */
 export const clubNotifications = (items: readonly ClubInboxItem[]): AppNotification[] =>
-  items.map((i) => ({ key: i.key, kind: i.kind, recency: BigInt(Math.floor(i.at)), title: i.title, body: i.body, href: i.href, actionable: i.actionable === true }));
+  items.map((i) => ({
+    key: i.key,
+    kind: i.kind,
+    recency: BigInt(Math.floor(i.at)),
+    title: i.title,
+    body: i.body,
+    href: i.href,
+    actionable: i.actionable === true,
+  }));
 
 /** Actionable first, then newest first. */
 export function sortNotifications(list: AppNotification[]): AppNotification[] {
-  return list.sort(
-    (a, b) => Number(b.actionable) - Number(a.actionable) || (a.recency < b.recency ? 1 : a.recency > b.recency ? -1 : 0),
-  );
+  return list.sort((a, b) => Number(b.actionable) - Number(a.actionable) || (a.recency < b.recency ? 1 : a.recency > b.recency ? -1 : 0));
 }
 
 /**
@@ -161,11 +170,7 @@ export function sortNotifications(list: AppNotification[]): AppNotification[] {
  * - intent-paused:  the matcher skips it because the wallet can't honour it; fixing that revives it
  * - intent-dropped: the matcher gave up on it after repeated on-chain failures
  */
-export function deriveIntentNotifications(
-  rows: readonly PoolIntent[],
-  account: string | undefined,
-  nowSec: number,
-): AppNotification[] {
+export function deriveIntentNotifications(rows: readonly PoolIntent[], account: string | undefined, nowSec: number): AppNotification[] {
   if (!account) return [];
   const out: AppNotification[] = [];
 
@@ -175,11 +180,32 @@ export function deriveIntentNotifications(
     const base = { href: `/intent/${row.hash}`, recency: BigInt(row.createdAt) };
 
     if (row.status === "settled") {
-      out.push({ ...base, key: `intent-settled:${row.hash}`, kind: "intent-settled", title: `Signed swap ${id} settled`, body: "It was matched and swapped on-chain.", actionable: false });
+      out.push({
+        ...base,
+        key: `intent-settled:${row.hash}`,
+        kind: "intent-settled",
+        title: `Signed swap ${id} settled`,
+        body: "It was matched and swapped on-chain.",
+        actionable: false,
+      });
     } else if (row.status === "stale" && row.intent.deadline >= BigInt(nowSec)) {
-      out.push({ ...base, key: `intent-paused:${row.hash}`, kind: "intent-paused", title: `Signed swap ${id} is paused`, body: reasonText(row.reason) ?? "Your wallet can't honour it right now.", actionable: true });
+      out.push({
+        ...base,
+        key: `intent-paused:${row.hash}`,
+        kind: "intent-paused",
+        title: `Signed swap ${id} is paused`,
+        body: reasonText(row.reason) ?? "Your wallet can't honour it right now.",
+        actionable: true,
+      });
     } else if (row.status === "rejected") {
-      out.push({ ...base, key: `intent-dropped:${row.hash}`, kind: "intent-dropped", title: `Signed swap ${id} was dropped`, body: reasonText(row.reason) ?? "It failed on-chain checks too often.", actionable: false });
+      out.push({
+        ...base,
+        key: `intent-dropped:${row.hash}`,
+        kind: "intent-dropped",
+        title: `Signed swap ${id} was dropped`,
+        body: reasonText(row.reason) ?? "It failed on-chain checks too often.",
+        actionable: false,
+      });
     }
   }
   return out;

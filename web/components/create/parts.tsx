@@ -21,7 +21,7 @@ export function StepHeading({ title, blurb }: { title: string; blurb?: string })
 }
 
 /** Back on the left, the forward action (`children`) on the right, and why it's blocked above. */
-export function StepNav({ onBack, hint, children }: { onBack?: () => void; hint?: string | null; children?: ReactNode }) {
+function StepNav({ onBack, hint, children }: { onBack?: () => void; hint?: string | null; children?: ReactNode }) {
   return (
     <div className="space-y-3">
       {hint && <p className="text-sm text-muted">{hint}</p>}
@@ -39,11 +39,20 @@ export function StepNav({ onBack, hint, children }: { onBack?: () => void; hint?
   );
 }
 
-export function NextButton({ onClick, disabled, children = "Continue" }: { onClick: () => void; disabled?: boolean; children?: ReactNode }) {
+function NextButton({ onClick, disabled, children = "Continue" }: { onClick: () => void; disabled?: boolean; children?: ReactNode }) {
   return (
     <button type="button" className="btn-primary min-w-40" disabled={disabled} onClick={onClick}>
       {children}
     </button>
+  );
+}
+
+/** A `StepNav` whose Continue waits until `error` (what is still wrong with this step) is empty. */
+export function StepContinue({ onBack, error, onNext }: { onBack?: () => void; error?: string | null; onNext: () => void }) {
+  return (
+    <StepNav onBack={onBack} hint={error}>
+      <NextButton disabled={!!error} onClick={onNext} />
+    </StepNav>
   );
 }
 
@@ -53,7 +62,9 @@ export function TermsFields({ terms, onChange, takerLabel }: { terms: Terms; onC
     <section className="page-section grid gap-6 p-4 md:grid-cols-2">
       <TakerField label={takerLabel} value={terms.taker} onChange={(taker) => onChange({ ...terms, taker })} />
       <div>
-        <label className="label" htmlFor="expiry">Expiry</label>
+        <label className="label" htmlFor="expiry">
+          Expiry
+        </label>
         <Select
           id="expiry"
           value={terms.expiry}
@@ -98,7 +109,12 @@ function TakerField({ label, value, onChange }: { label: string; value: string; 
   const note = (children: ReactNode) => <p className="mt-1 text-xs text-muted">{children}</p>;
   let hint: ReactNode;
   if (!text) hint = note(PRIVY_APP_ID ? "Leave empty to let anyone, or type someone's @handle to find their wallet." : "Leave empty to let anyone.");
-  else if (isAddress(text)) hint = note(<>Only <Who address={text} /></>);
+  else if (isAddress(text))
+    hint = note(
+      <>
+        Only <Who address={text} />
+      </>,
+    );
   else if (!handle) hint = null;
   else if (!getToken) hint = note("Sign in to find a trader by handle, or enter their wallet address.");
   else if (found?.error) hint = <p className="mt-1 text-xs text-danger">{found.error}</p>;
@@ -114,7 +130,9 @@ function TakerField({ label, value, onChange }: { label: string; value: string; 
 
   return (
     <div>
-      <label className="label" htmlFor="taker">{label}</label>
+      <label className="label" htmlFor="taker">
+        {label}
+      </label>
       <div className="flex gap-2">
         <input
           id="taker"
@@ -199,6 +217,20 @@ export function ReviewCard({ title, note, children }: { title: string; note?: st
   );
 }
 
+/** Label and value pairs, one per line. */
+export function ReviewRows({ rows }: { rows: ReadonlyArray<readonly [string, ReactNode]> }) {
+  return (
+    <dl className="space-y-1.5">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex flex-wrap justify-between gap-x-4 text-sm">
+          <dt className="text-muted">{label}</dt>
+          <dd className="font-semibold">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** The deal kind, who can accept and the expiry, as the final review shows them. */
 export function ReviewTerms({ kindLabel, terms, whoLabel }: { kindLabel: string; terms: Terms; whoLabel: string }) {
   const taker = terms.taker.trim();
@@ -210,14 +242,7 @@ export function ReviewTerms({ kindLabel, terms, whoLabel }: { kindLabel: string;
   ];
   return (
     <ReviewCard title="Terms">
-      <dl className="space-y-1.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex flex-wrap justify-between gap-x-4 text-sm">
-            <dt className="text-muted">{label}</dt>
-            <dd className="font-semibold">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <ReviewRows rows={rows} />
     </ReviewCard>
   );
 }

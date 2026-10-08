@@ -103,17 +103,7 @@ export function ProposalList({
   );
 }
 
-function ProposalRow({
-  proposal,
-  info,
-  dealId,
-  canDecide,
-}: {
-  proposal: ProposalV2;
-  info: Info;
-  dealId: bigint;
-  canDecide: boolean;
-}) {
+function ProposalRow({ proposal, info, dealId, canDecide }: { proposal: ProposalV2; info: Info; dealId: bigint; canDecide: boolean }) {
   const { address } = useConnection();
   const decide = useTxFlow();
   const mine = sameAddress(proposal.proposer, address);
@@ -148,7 +138,9 @@ function ProposalRow({
               <TxButton state={decide.state} disabled={acceptBlocked} onClick={() => call("acceptProposal")}>
                 Accept &amp; swap
               </TxButton>
-              <TxButton state={decide.state} variant="secondary" onClick={() => call("rejectProposal")}>Reject</TxButton>
+              <TxButton state={decide.state} variant="secondary" onClick={() => call("rejectProposal")}>
+                Reject
+              </TxButton>
             </>
           )}
           {mine && (
@@ -218,8 +210,8 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
         )}
         {problems.length > 0 && !validation && <p className="text-xs text-muted">{problems[0]}</p>}
         <FeeNote amount={fee} units={feeUnits(draft.assets)}>
-          Sent with your offer and held with it, once for each NFT in it. It&apos;s only charged if the maker accepts. If you
-          withdraw it, or the maker rejects it, it comes back to you.
+          Sent with your offer and held with it, once for each NFT in it. It&apos;s only charged if the maker accepts. If you withdraw it, or the maker rejects
+          it, it comes back to you.
         </FeeNote>
         {nextApproval ? (
           <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>
@@ -227,7 +219,9 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap} onClick={send}>Send offer</TxButton>
+          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap} onClick={send}>
+            Send offer
+          </TxButton>
         )}
         <TxStatus state={approval.state} success="Approved." />
         <TxStatus state={tx.state} success="Offer sent." />

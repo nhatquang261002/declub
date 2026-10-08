@@ -55,6 +55,12 @@ describe("the NFT cap", () => {
     const token = [erc20Asset(USD, 1n)];
     assert.equal(intentProblem(nfts(5), token), null);
     assert.equal(intentProblem(nfts(6), token), "Up to 5 NFTs per side.");
-    assert.equal(intentProblem(token, nfts(6).map((a) => ({ ...a, token: getAddress("0x00000000000000000000000000000000000000c9") }))), "Up to 5 NFTs per side.");
+    assert.equal(
+      intentProblem(
+        token,
+        nfts(6).map((a) => ({ ...a, token: getAddress("0x00000000000000000000000000000000000000c9") })),
+      ),
+      "Up to 5 NFTs per side.",
+    );
   });
 });

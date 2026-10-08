@@ -1,15 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type Address, getAddress } from "viem";
-import {
-  cancelDigest,
-  covers,
-  feeProblem,
-  feeUnits,
-  intentDigest,
-  intentHash,
-  shapeProblem,
-} from "../src/intent.ts";
+import { getAddress } from "viem";
+import { cancelDigest, covers, feeProblem, feeUnits, intentDigest, intentHash, shapeProblem } from "../src/intent.ts";
 import { verifyEcdsa } from "../src/signature.ts";
 import { AssetType, type Asset, type Intent } from "../src/types.ts";
 import { WireError, intentFromWire, intentToWire } from "../src/wire.ts";
@@ -129,14 +121,7 @@ describe("covers", () => {
 describe("hashing", () => {
   it("changes with any signed field", () => {
     const h = intentHash(base);
-    for (const patch of [
-      { nonce: 8n },
-      { maxFee: 3n },
-      { feeToken: T },
-      { deadline: 101n },
-      { want: [erc20(6n)] },
-      { give: [nft(2n)] },
-    ] as Partial<Intent>[]) {
+    for (const patch of [{ nonce: 8n }, { maxFee: 3n }, { feeToken: T }, { deadline: 101n }, { want: [erc20(6n)] }, { give: [nft(2n)] }] as Partial<Intent>[]) {
       assert.notEqual(intentHash({ ...base, ...patch }), h);
     }
   });
@@ -165,8 +150,7 @@ describe("verifyEcdsa", () => {
     const N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
     const s = BigInt(`0x${sig.slice(66, 130)}`);
     const v = Number(`0x${sig.slice(130)}`);
-    const twin =
-      `${sig.slice(0, 66)}${(N - s).toString(16).padStart(64, "0")}${(v === 27 ? 28 : 27).toString(16)}` as `0x${string}`;
+    const twin = `${sig.slice(0, 66)}${(N - s).toString(16).padStart(64, "0")}${(v === 27 ? 28 : 27).toString(16)}` as `0x${string}`;
     assert.ok(!(await verifyEcdsa(acct.address, digest, twin)), "high-s twin");
     assert.ok(!(await verifyEcdsa(acct.address, digest, `${sig.slice(0, 130)}00` as `0x${string}`)));
     assert.ok(!(await verifyEcdsa(acct.address, digest, sig.slice(0, 130) as `0x${string}`)));

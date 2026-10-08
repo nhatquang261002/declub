@@ -27,7 +27,7 @@ export const trophiesKey = (userId: string) => `declub:challenge:${CHAIN_ID}:tro
 /** A transaction that paid an asset prize: it pays one prize only (ADR 0050). */
 export const prizeTxKey = (tx: string) => `declub:challenge:${CHAIN_ID}:prize-tx:${tx.toLowerCase()}`;
 /** At most this many trophies are kept for a member. */
-export const TROPHIES_KEPT = 200;
+const TROPHIES_KEPT = 200;
 
 export async function readTrophies(store: Store, userId: string): Promise<Trophy[]> {
   return (await store.get<Trophy[]>(trophiesKey(userId))) ?? [];
@@ -42,7 +42,7 @@ export async function addTrophy(store: Store, userId: string, trophy: Trophy): P
   await store.set(trophiesKey(userId), [trophy, ...kept].sort((a, b) => b.at - a.at).slice(0, TROPHIES_KEPT));
 }
 
-export type EpochAwards = Record<string, ChallengeAward>;
+type EpochAwards = Record<string, ChallengeAward>;
 
 export async function readAwards(store: Store, club: string, n: number): Promise<EpochAwards> {
   return (await store.get<EpochAwards>(awardsKey(club, n))) ?? {};

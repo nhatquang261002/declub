@@ -13,7 +13,7 @@ import { clientId, getStore, withinLimit } from "./store";
  * The Club membership routes, built over a registry like the read routes (lib/server/clubRoutes.ts)
  * so the rules can be tried against a list of their own. The route files bind the shipped one.
  */
-export type RouteDeps = Deps &
+type RouteDeps = Deps &
   MemberDeps &
   BoardDeps & {
     /** Who is calling. Privy in production; a stand-in in tests. */
@@ -23,11 +23,33 @@ export type RouteDeps = Deps &
 export type Ctx = { params: Promise<{ token: string }> };
 
 /** The Club for `token`, or the response that says why there isn't one. */
-export async function clubOf(registry: Registry, ctx: Ctx) {
+async function clubOf(registry: Registry, ctx: Ctx) {
   const { token } = await ctx.params;
   if (!isAddress(token, { strict: false })) return fail(400, "bad_request", "Give a token address.");
   // Blocked, unlisted and listed-without-a-Club assets all read the same: there is no Club.
   return registry.clubFor(token) ?? fail(404, "not_found", "No Club for this asset.");
+}
+
+/**
+ * The start of a public read of a Club: its entry and the store, or the response that ends the call
+ * (no such Club, no store, which answers `off` uncached, or too many requests).
+ */
+export async function publicRead(registry: Registry, ctx: Ctx, request: Request, off: object) {
+  const entry = await clubOf(registry, ctx);
+  if (entry instanceof Response) return entry;
+  const store = getStore();
+  if (!store) return Response.json(off, { headers: { "Cache-Control": "no-store" } });
+  if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+  return { entry, store };
+}
+
+/** The Club for `token` and the signed-in caller, or the response that ends the call (no such Club, not signed in, or too many requests). */
+export async function gatedClub(registry: Registry, ctx: Ctx, request: Request, deps: Pick<RouteDeps, "gate">, name: string, limit: number) {
+  const entry = await clubOf(registry, ctx);
+  if (entry instanceof Response) return entry;
+  const g = await (deps.gate ?? gateUser)(request, name, limit);
+  if (g instanceof Response) return g;
+  return { entry, store: g.store, user: g.user };
 }
 
 /** What the signed-in user's own membership looks like to them. */
@@ -47,11 +69,9 @@ const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number },
 export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-member", 60);
-      if (g instanceof Response) return g;
-      const { store, user } = g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-member", 60);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
 
       await syncMemberships(store, user.id, linkedEthereumWallets(user.linked_accounts));
       // A member without the badge is read fresh (at most once a minute), so an NFT they just
@@ -64,11 +84,9 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
     },
 
     async POST(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-join", 20);
-      if (g instanceof Response) return g;
-      const { store, user } = g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
 
       const result = await joinClub(store, entry, user.id, linkedEthereumWallets(user.linked_accounts), deps);
       if (result.ok) return json({ enabled: true, ...mine(result.row, await roleIn(store, entry.address, user.id, deps)) });
@@ -79,14 +97,13 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
     },
 
     async DELETE(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-join", 20);
-      if (g instanceof Response) return g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
       // An admin outranks any Club role, so only a real Owner is held back.
-      const role = await roleIn(g.store, entry.address, g.user.id, deps);
+      const role = await roleIn(store, entry.address, user.id, deps);
       if (role === "owner") return fail(409, "owner_cannot_leave", "Hand the Club to another member before you leave.");
-      await leaveClub(g.store, entry.address, g.user.id);
+      await leaveClub(store, entry.address, user.id);
       return json({ enabled: true, member: false });
     },
   };
@@ -113,16 +130,17 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
     if (query.length > MEMBERS_QUERY_MAX) return fail(400, "bad_request", `q is at most ${MEMBERS_QUERY_MAX} characters.`);
 
     const store = getStore();
-    if (!store) return Response.json({ enabled: false, members: [], total: 0, matches: 0, holders: 0, topMomentum: 0, page: 1, size }, { headers: { "Cache-Control": "no-store" } });
+    if (!store)
+      return Response.json(
+        { enabled: false, members: [], total: 0, matches: 0, holders: 0, topMomentum: 0, page: 1, size },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
     const nowSec = deps.now?.() ?? Math.floor(Date.now() / 1000);
     const events = await clubEvents(store, entry, deps);
     const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps, { page, size, query });
-    return Response.json(
-      { enabled: true, ...view },
-      { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
-    );
+    return Response.json({ enabled: true, ...view }, { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } });
   };
 }
 

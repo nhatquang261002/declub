@@ -9,30 +9,40 @@ export const chog = { address: CHOG_ADDRESS, abi: mockChogAbi, chainId: CHAIN_ID
 // no errors, so the OpenZeppelin ones are declared here.
 const chogErrors = mockChogAbi.filter((item) => item.type === "error");
 const erc20Errors = [
-  { type: "error", name: "ERC20InsufficientBalance", inputs: [{ name: "sender", type: "address" }, { name: "balance", type: "uint256" }, { name: "needed", type: "uint256" }] },
-  { type: "error", name: "ERC20InsufficientAllowance", inputs: [{ name: "spender", type: "address" }, { name: "allowance", type: "uint256" }, { name: "needed", type: "uint256" }] },
+  {
+    type: "error",
+    name: "ERC20InsufficientBalance",
+    inputs: [
+      { name: "sender", type: "address" },
+      { name: "balance", type: "uint256" },
+      { name: "needed", type: "uint256" },
+    ],
+  },
+  {
+    type: "error",
+    name: "ERC20InsufficientAllowance",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "allowance", type: "uint256" },
+      { name: "needed", type: "uint256" },
+    ],
+  },
   { type: "error", name: "SafeERC20FailedOperation", inputs: [{ name: "token", type: "address" }] },
 ] as const satisfies Abi;
 export const swapV2Abi = [...deClubEscrowAbi, ...chogErrors, ...erc20Errors] as const;
 
 /** Spread into read/write calls: `{ ...swapV2, functionName, args }`. Undefined until NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is set. */
-export const swapV2 = DECLUB_ESCROW_ADDRESS
-  ? ({ address: DECLUB_ESCROW_ADDRESS, abi: swapV2Abi, chainId: CHAIN_ID } as const)
-  : undefined;
+export const swapV2 = DECLUB_ESCROW_ADDRESS ? ({ address: DECLUB_ESCROW_ADDRESS, abi: swapV2Abi, chainId: CHAIN_ID } as const) : undefined;
 
 /**
  * DeClubIntents (ADR 0008). It holds no assets, so the only call the app makes is
  * `invalidateNonces`; everything else it does is signed off-chain and sent by the matcher.
  * Undefined until NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS is set.
  */
-export const swapIntents = DECLUB_INTENTS_ADDRESS
-  ? ({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, chainId: CHAIN_ID } as const)
-  : undefined;
+export const swapIntents = DECLUB_INTENTS_ADDRESS ? ({ address: DECLUB_INTENTS_ADDRESS, abi: deClubIntentsAbi, chainId: CHAIN_ID } as const) : undefined;
 
 /** The Club rewards distributor (ADR 0022), when configured. */
-export const clubRewards = DECLUB_REWARDS_ADDRESS
-  ? ({ address: DECLUB_REWARDS_ADDRESS, abi: deClubRewardsAbi, chainId: CHAIN_ID } as const)
-  : undefined;
+export const clubRewards = DECLUB_REWARDS_ADDRESS ? ({ address: DECLUB_REWARDS_ADDRESS, abi: deClubRewardsAbi, chainId: CHAIN_ID } as const) : undefined;
 
 /**
  * Wrapped MON, the fee token of DeClubIntents (ADR 0015). `deposit` wraps native MON one to

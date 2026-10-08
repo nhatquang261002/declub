@@ -22,12 +22,7 @@ export function Pagination({
 }) {
   return (
     <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label={label}>
-      <button
-        className="btn-secondary btn-sm"
-        onClick={() => onPage(page - 1)}
-        disabled={page === 1 || loading}
-        aria-label="Previous page"
-      >
+      <button className="btn-secondary btn-sm" onClick={() => onPage(page - 1)} disabled={page === 1 || loading} aria-label="Previous page">
         <span aria-hidden>←</span>
       </button>
       <div className="tabbar">
@@ -79,17 +74,7 @@ function pageList(page: number, totalPages: number): Array<number | null> {
  * "Page [3] of 12", where the number is an input: type a page and press Enter (or leave the
  * field) to go there. Out-of-range numbers clamp to the first or last page; anything else snaps back.
  */
-function PageJump({
-  page,
-  totalPages,
-  onPage,
-  disabled,
-}: {
-  page: number;
-  totalPages: number;
-  onPage: (page: number) => void;
-  disabled: boolean;
-}) {
+function PageJump({ page, totalPages, onPage, disabled }: { page: number; totalPages: number; onPage: (page: number) => void; disabled: boolean }) {
   // What's typed, while it's being typed; otherwise the field shows the current page.
   const [draft, setDraft] = useState<string | null>(null);
   // Escape blurs the field too; this keeps that blur from jumping to what was typed.

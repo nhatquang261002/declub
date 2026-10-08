@@ -5,7 +5,27 @@ import type { ActivityEvent } from "../lib/clubs";
 import { buildMerkleSet, buildMerkleTree } from "../lib/merkle";
 import type { MemberRow } from "../lib/members";
 import { recapLink, recapText } from "../lib/recap";
-import { CLUB_RULE_BOUNDS, DEFAULT_CLUB_RULES, REWARDS, checkRules, ownerRulesOf, rampBps, rampGap, seatsFor, whoIsPaid, entryGap, epochAt, epochWindow, leavesOf, pools, rankHolders, rewardLeaf, splitClub, streakBps, type ClubInput } from "../lib/rewards";
+import {
+  CLUB_RULE_BOUNDS,
+  DEFAULT_CLUB_RULES,
+  REWARDS,
+  checkRules,
+  ownerRulesOf,
+  rampBps,
+  rampGap,
+  seatsFor,
+  whoIsPaid,
+  entryGap,
+  epochAt,
+  epochWindow,
+  leavesOf,
+  pools,
+  rankHolders,
+  rewardLeaf,
+  splitClub,
+  streakBps,
+  type ClubInput,
+} from "../lib/rewards";
 import { activeDays, activeKey, recordActive } from "../lib/server/activeDays";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "../lib/server/streaks";
 import { postKey } from "../lib/server/board";
@@ -105,10 +125,22 @@ describe("splitClub", () => {
   });
 
   it("pays Holders by shares, and the fund to the Owner", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 3n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }], owner: carol }));
+    const split = splitClub(
+      input({
+        holders: [
+          { wallet: alice, shares: 3n, points: 12 },
+          { wallet: bob, shares: 1n, points: 12 },
+        ],
+        owner: carol,
+      }),
+    );
     assert.deepEqual(
       split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
-      [[alice, "holder", (375n * ETH) / 100n], [bob, "holder", (125n * ETH) / 100n], [carol, "fund", (25n * ETH) / 10n]],
+      [
+        [alice, "holder", (375n * ETH) / 100n],
+        [bob, "holder", (125n * ETH) / 100n],
+        [carol, "fund", (25n * ETH) / 10n],
+      ],
     );
     assert.deepEqual(split.carry, { holders: 0n, fund: 0n });
     assert.equal(split.holderCount, 2);
@@ -116,11 +148,24 @@ describe("splitClub", () => {
 
   it("adds a sponsor's money to the Holder pool only: none to the fund, none to the protocol (ADR 0035)", () => {
     assert.deepEqual(pools(10n * ETH, { holders: 0n, fund: 0n }, 7n * ETH), { holderPool: 12n * ETH, fundPool: (25n * ETH) / 10n });
-    const split = splitClub(input({ sponsored: 7n * ETH, holders: [{ wallet: alice, shares: 3n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }], owner: carol }));
+    const split = splitClub(
+      input({
+        sponsored: 7n * ETH,
+        holders: [
+          { wallet: alice, shares: 3n, points: 12 },
+          { wallet: bob, shares: 1n, points: 12 },
+        ],
+        owner: carol,
+      }),
+    );
     assert.equal(split.sponsored, 7n * ETH);
     assert.deepEqual(
       split.payouts.map((p) => [p.wallet, p.kind, p.amount]),
-      [[alice, "holder", 9n * ETH], [bob, "holder", 3n * ETH], [carol, "fund", (25n * ETH) / 10n]],
+      [
+        [alice, "holder", 9n * ETH],
+        [bob, "holder", 3n * ETH],
+        [carol, "fund", (25n * ETH) / 10n],
+      ],
     );
   });
 
@@ -137,7 +182,16 @@ describe("splitClub", () => {
   });
 
   it("rolls rounding dust over and never pays more than the pool", () => {
-    const split = splitClub(input({ fees: 10n, holders: [{ wallet: alice, shares: 1n, points: 12 }, { wallet: bob, shares: 1n, points: 12 }, { wallet: carol, shares: 1n, points: 12 }] }));
+    const split = splitClub(
+      input({
+        fees: 10n,
+        holders: [
+          { wallet: alice, shares: 1n, points: 12 },
+          { wallet: bob, shares: 1n, points: 12 },
+          { wallet: carol, shares: 1n, points: 12 },
+        ],
+      }),
+    );
     // A 5-wei pool over 3 equal Holders: 1 each, 2 left.
     assert.equal(split.holderPool, 5n);
     assert.equal(split.paidHolders, 3n);
@@ -145,8 +199,18 @@ describe("splitClub", () => {
   });
 
   it("leaves zero-share members out", () => {
-    const split = splitClub(input({ holders: [{ wallet: alice, shares: 0n, points: 12 }, { wallet: bob, shares: 2n, points: 12 }] }));
-    assert.deepEqual(split.payouts.map((p) => p.wallet), [bob]);
+    const split = splitClub(
+      input({
+        holders: [
+          { wallet: alice, shares: 0n, points: 12 },
+          { wallet: bob, shares: 2n, points: 12 },
+        ],
+      }),
+    );
+    assert.deepEqual(
+      split.payouts.map((p) => p.wallet),
+      [bob],
+    );
     assert.equal(split.holderCount, 1);
   });
 });
@@ -159,7 +223,10 @@ describe("who is paid, and how much (ADR 0040, ADR 0044)", () => {
   const rules = (over: Partial<typeof DEFAULT_CLUB_RULES>) => ({ ...DEFAULT_CLUB_RULES, ...over });
 
   it("pays every Holder with some activity by default, and nobody with none", () => {
-    const quiet = [{ wallet: w(90), shares: 500n, points: 0.5, joinedAt: 0 }, { wallet: w(91), shares: 500n, points: 0, joinedAt: 0 }];
+    const quiet = [
+      { wallet: w(90), shares: 500n, points: 0.5, joinedAt: 0 },
+      { wallet: w(91), shares: 500n, points: 0, joinedAt: 0 },
+    ];
     const split = splitClub({ ...base, holders: [...many(15).reverse(), ...quiet] });
     assert.equal(split.holderCount, 15);
     assert.deepEqual(new Set(split.payouts.map((p) => p.wallet)), new Set(many(15).map((h) => h.wallet)), `under ${REWARDS.minPaidPoints} point isn't paid`);
@@ -181,7 +248,10 @@ describe("who is paid, and how much (ADR 0040, ADR 0044)", () => {
     const split = splitClub({ ...base, holders });
     assert.equal(amount(split, 2) * 2n, amount(split, 1));
     assert.equal(amount(split, 3), amount(split, 1), "past the ramp, more points don't add to the share");
-    assert.deepEqual([0, 0.5, 1, 2.5, 5, 50].map((p) => rampBps(p)), [0, 0, 2_000, 5_000, 10_000, 10_000]);
+    assert.deepEqual(
+      [0, 0.5, 1, 2.5, 5, 50].map((p) => rampBps(p)),
+      [0, 0, 2_000, 5_000, 10_000, 10_000],
+    );
     // The Owner sets the ramp.
     assert.equal(rampBps(5, rules({ rampPoints: 20 })), 2_500);
   });
@@ -193,11 +263,18 @@ describe("who is paid, and how much (ADR 0040, ADR 0044)", () => {
       { wallet: w(40), shares: 1n, points: 1, joinedAt: 3 },
       { wallet: w(60), shares: 2n, points: 1, joinedAt: 9 },
     ];
-    assert.deepEqual(rankHolders(tied).map((h) => h.wallet), [w(60), w(40), w(51), w(50)]);
+    assert.deepEqual(
+      rankHolders(tied).map((h) => h.wallet),
+      [w(60), w(40), w(51), w(50)],
+    );
   });
 
   it("pays only the most active Holders when the Owner limits the places, by number, percentage or both", () => {
-    assert.deepEqual([0, 1, 9, 10, 15].map((n) => seatsFor(n)), [0, 1, 9, 10, 15], "no limit by default");
+    assert.deepEqual(
+      [0, 1, 9, 10, 15].map((n) => seatsFor(n)),
+      [0, 1, 9, 10, 15],
+      "no limit by default",
+    );
     assert.equal(seatsFor(15, rules({ maxPaid: 3 })), 3);
     assert.equal(seatsFor(15, rules({ maxPaidPercent: 20 })), 3, "20% of 15");
     assert.equal(seatsFor(11, rules({ maxPaidPercent: 20 })), 3, "rounded up");
@@ -246,14 +323,26 @@ describe("who is paid, and how much (ADR 0040, ADR 0044)", () => {
 
   it("checks rules an Owner sends against their bounds", () => {
     assert.deepEqual(checkRules({ rampPoints: 8, maxPaid: 10 }), { ok: true, rules: { ...DEFAULT_CLUB_RULES, rampPoints: 8, maxPaid: 10 } });
-    assert.deepEqual(checkRules({ maxPaid: 3 }, rules({ rampPoints: 8 })), { ok: true, rules: rules({ rampPoints: 8, maxPaid: 3 }) }, "rules not sent keep their value");
+    assert.deepEqual(
+      checkRules({ maxPaid: 3 }, rules({ rampPoints: 8 })),
+      { ok: true, rules: rules({ rampPoints: 8, maxPaid: 3 }) },
+      "rules not sent keep their value",
+    );
     assert.equal(checkRules({ nonHolderBps: 5_000 }).ok, false, "at most 30% to members without NFTs");
     assert.equal(checkRules({ maxPaid: 2.5 }).ok, false, "a count is whole");
     assert.equal(checkRules({ holderBps: 9_000 }).ok, false, "the fee split isn't a Club rule");
     for (const rule of ["voicePerNft", "pairCap", "fullBonusPoints", "dayPoints", "swapPoints", "streakStepBps"]) {
-      assert.equal(checkRules({ [rule]: DEFAULT_CLUB_RULES[rule as keyof typeof DEFAULT_CLUB_RULES] }).ok, false, `${rule}: how points count is the same in every Club`);
+      assert.equal(
+        checkRules({ [rule]: DEFAULT_CLUB_RULES[rule as keyof typeof DEFAULT_CLUB_RULES] }).ok,
+        false,
+        `${rule}: how points count is the same in every Club`,
+      );
     }
-    assert.deepEqual(ownerRulesOf({ ...DEFAULT_CLUB_RULES, maxPaid: 4, voicePerNft: 50, pairCap: 60 }), { ...DEFAULT_CLUB_RULES, maxPaid: 4 }, "a save can't carry anything but the paying rules");
+    assert.deepEqual(
+      ownerRulesOf({ ...DEFAULT_CLUB_RULES, maxPaid: 4, voicePerNft: 50, pairCap: 60 }),
+      { ...DEFAULT_CLUB_RULES, maxPaid: 4 },
+      "a save can't carry anything but the paying rules",
+    );
     assert.equal(checkRules({ rampPoints: "5" }).ok, false);
     assert.equal(checkRules([]).ok, false);
     for (const [key, [least, most]] of Object.entries(CLUB_RULE_BOUNDS)) {
@@ -292,12 +381,21 @@ describe("who is paid, and how much (ADR 0040, ADR 0044)", () => {
     assert.equal(a!.shares, 5n, "what they hold now is still published");
     assert.equal(split.samples, 7);
     // Without samples, held is the holding and nothing changes.
-    const none = splitClub({ ...base, holders: [{ wallet: w(1), shares: 5n, points: 20 }, { wallet: w(2), shares: 5n, points: 20 }] });
+    const none = splitClub({
+      ...base,
+      holders: [
+        { wallet: w(1), shares: 5n, points: 20 },
+        { wallet: w(2), shares: 5n, points: 20 },
+      ],
+    });
     assert.equal(none.payouts[0]!.amount, none.payouts[1]!.amount);
   });
 
   it("adds the streak bonus on top of the activity bonus, each capped", () => {
-    assert.deepEqual([0, 1, 2, 3, 5, 40].map((n) => streakBps(n)), [0, 0, 250, 500, 1_000, 1_000]);
+    assert.deepEqual(
+      [0, 1, 2, 3, 5, 40].map((n) => streakBps(n)),
+      [0, 0, 250, 500, 1_000, 1_000],
+    );
     assert.equal(REWARDS.maxBonusBps, 2_500, "the activity bonus is at most +25% (ADR 0044)");
     const holders = [
       { wallet: w(1), shares: 1n, points: 10, bonusBps: 99_999, streak: 99 },
@@ -332,7 +430,13 @@ describe("active days and streaks", () => {
     const store = memoryStore();
     const day = 86_400;
     const epochs = [GENESIS, WEEK] as const;
-    const posts = [post("a1", "ua", GENESIS + 10), post("a2", "ua", GENESIS + 20), post("a3", "ua", GENESIS + day + 5), post("a4", "ua", GENESIS + 2 * day, { hidden: "moderator" }), post("b1", "ub", GENESIS + 3 * day)];
+    const posts = [
+      post("a1", "ua", GENESIS + 10),
+      post("a2", "ua", GENESIS + 20),
+      post("a3", "ua", GENESIS + day + 5),
+      post("a4", "ua", GENESIS + 2 * day, { hidden: "moderator" }),
+      post("b1", "ub", GENESIS + 3 * day),
+    ];
     for (const p of posts) {
       await store.set(postKey(club, p.id), p);
       await recordActive(store, club, p, ...epochs);
@@ -391,7 +495,13 @@ describe("leavesOf", () => {
     const a = splitClub({ club: "0x1", fees: 10n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: bob, shares: 1n, points: 12 }], owner: alice });
     const b = splitClub({ club: "0x2", fees: 5n * ETH, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: alice, shares: 1n, points: 12 }], owner: null });
     const leaves = leavesOf([a, b]);
-    assert.deepEqual(leaves.map((l) => [l.account, l.amount]), [[getAddress(alice), (25n * ETH) / 10n + (25n * ETH) / 10n], [getAddress(bob), 5n * ETH]]);
+    assert.deepEqual(
+      leaves.map((l) => [l.account, l.amount]),
+      [
+        [getAddress(alice), (25n * ETH) / 10n + (25n * ETH) / 10n],
+        [getAddress(bob), 5n * ETH],
+      ],
+    );
     assert.deepEqual(leaves[0]!.breakdown, [
       { club: "0x1", kind: "fund", amount: (25n * ETH) / 10n },
       { club: "0x2", kind: "holder", amount: (25n * ETH) / 10n, shares: 1n, bonusBps: 0, points: 12 },
@@ -406,7 +516,18 @@ const WEEK = 604_800;
 
 const entries = parseAssets([
   { chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" },
-  { chainId: 10143, address: COIN, kind: "erc20", category: "memecoin", name: "Chog coin", symbol: "CHOG", status: "verified", note: "x", club: NFT, minHolding: "100" },
+  {
+    chainId: 10143,
+    address: COIN,
+    kind: "erc20",
+    category: "memecoin",
+    name: "Chog coin",
+    symbol: "CHOG",
+    status: "verified",
+    note: "x",
+    club: NFT,
+    minHolding: "100",
+  },
   { chainId: 10143, address: OTHER, kind: "erc721", name: "Other", symbol: "OTH", status: "verified", note: "x" },
 ]);
 const clubs = makeRegistry(entries).clubs(10143);
@@ -432,8 +553,10 @@ async function join(store: Store, club: Address, userId: string, wallets: string
 }
 
 /** Balances by token, then by wallet. Anything unlisted holds nothing. */
-const holdingsOf = (table: Record<string, Record<string, bigint>>): Holdings => async (token, wallets) =>
-  wallets.map((w) => table[token.toLowerCase()]?.[w.toLowerCase()] ?? 0n);
+const holdingsOf =
+  (table: Record<string, Record<string, bigint>>): Holdings =>
+  async (token, wallets) =>
+    wallets.map((w) => table[token.toLowerCase()]?.[w.toLowerCase()] ?? 0n);
 
 /** A visible Board post, so the member has an active day (and so some points) in that epoch. */
 async function postOnBoard(store: Store, userId: string, wallet: string, at: number, club: Address = NFT) {
@@ -606,7 +729,11 @@ describe("buildEpoch", () => {
     assert.equal((await recordSponsor(store, -1, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" })).status, "invalid");
     await buildEpoch(store, 0, deps);
     assert.deepEqual(await recordSponsor(store, 0, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" }), { status: "built" });
-    assert.equal((await recordSponsor(store, 1, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" })).status, "recorded", "the next epoch still takes it");
+    assert.equal(
+      (await recordSponsor(store, 1, { club: NFT, amount: ETH, sponsor: "A", kind: "partner" })).status,
+      "recorded",
+      "the next epoch still takes it",
+    );
   });
 
   it("keeps sponsor names to one short line", async () => {
@@ -622,7 +749,11 @@ describe("buildEpoch", () => {
     const genesis = 1_791_158_400;
     await recordSponsor(store, 0, { club: NFT, amount: 6n * ETH, sponsor: "Monad Foundation", kind: "partner" });
     const view = await clubRewards(store, NFT, genesis + 100);
-    assert.deepEqual(view.open, { n: 0, sponsored: (6n * ETH).toString(), sponsors: [{ sponsor: "Monad Foundation", kind: "partner", amount: (6n * ETH).toString() }] });
+    assert.deepEqual(view.open, {
+      n: 0,
+      sponsored: (6n * ETH).toString(),
+      sponsors: [{ sponsor: "Monad Foundation", kind: "partner", amount: (6n * ETH).toString() }],
+    });
     assert.equal((await clubRewards(store, OTHER, genesis + 100)).open, undefined);
     assert.equal((await clubRewards(store, NFT, genesis + WEEK + 100)).open, undefined, "the next epoch has none");
   });
@@ -639,7 +770,10 @@ describe("buildEpoch", () => {
     await postOnBoard(store, "ud", dave, GENESIS + WEEK + 10, OTHER);
     const result = await buildEpoch(store, 1, { ...deps, now: () => GENESIS + 2 * WEEK, holdings: holdingsOf({ [OTHER.toLowerCase()]: { [dave]: 1n } }) });
     const record = result.status === "built" ? result.record : undefined!;
-    assert.deepEqual(record.leaves.map((l) => [l.account.toLowerCase(), l.amount]), [[dave, (2n * ETH).toString()]]);
+    assert.deepEqual(
+      record.leaves.map((l) => [l.account.toLowerCase(), l.amount]),
+      [[dave, (2n * ETH).toString()]],
+    );
     assert.deepEqual(await store.get(carryKey(OTHER)), { holders: "0", fund: (1n * ETH).toString() });
   });
 
@@ -647,7 +781,12 @@ describe("buildEpoch", () => {
     events.set(NFT, [swap()]);
     const first = await buildEpoch(store, 0, deps);
     assert.equal(first.status, "built");
-    const again = await buildEpoch(store, 0, { ...deps, holdings: async () => { throw new Error("must not read again"); } });
+    const again = await buildEpoch(store, 0, {
+      ...deps,
+      holdings: async () => {
+        throw new Error("must not read again");
+      },
+    });
     assert.equal(again.status, "exists");
     assert.deepEqual(await buildEpoch(store, 2, { ...deps, now: () => GENESIS + 3 * WEEK }), { status: "out_of_order", expected: 1 });
     assert.equal(await store.get(lastKey()), 0);
@@ -701,7 +840,7 @@ const FIXTURE = {
 };
 
 describe("rewards routes", () => {
-  const params = <T,>(value: T) => ({ params: Promise.resolve(value) });
+  const params = <T>(value: T) => ({ params: Promise.resolve(value) });
   const req = (path: string) => new Request(`http://localhost${path}`);
   let store: Store;
 
@@ -739,7 +878,10 @@ describe("rewards routes", () => {
     const res = await claimableHandler({ store: () => store })(req(`/api/rewards/me?account=${alice}`));
     const body = (await res.json()) as { enabled: boolean; leaves: { epoch: number; amount: string }[] };
     assert.equal(body.enabled, true);
-    assert.deepEqual(body.leaves.map((l) => [l.epoch, l.amount]), [[0, (3n * ETH).toString()]]);
+    assert.deepEqual(
+      body.leaves.map((l) => [l.epoch, l.amount]),
+      [[0, (3n * ETH).toString()]],
+    );
     assert.equal((await claimableHandler({ store: () => store })(req("/api/rewards/me?account=nope"))).status, 400);
     const off = (await (await claimableHandler({ store: () => null })(req(`/api/rewards/me?account=${alice}`))).json()) as { enabled: boolean };
     assert.equal(off.enabled, false);

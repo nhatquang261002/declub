@@ -11,15 +11,14 @@ import { sponsorMessage } from "@/lib/rewards";
 import { chain } from "@/lib/wagmi";
 import type { TxState } from "./useTxFlow";
 
-
 // Sponsoring an epoch (ADR 0036): pay the operator, then sign to put your name on the payment.
 //   idle → switching-chain → awaiting-signature → pending → awaiting-signature → posting → confirmed
 //                       ╰──────────────┴──────────────┴──────────────┴────────────► error (decoded)
 // It reuses TxState so TxButton and TxStatus work unchanged. If the payment lands but the signing or
 // the recording fails, `unrecorded` keeps the hash so "Finish recording" can retry without paying again.
 
-export type SponsorInfo = { enabled: boolean; to: Address | null; min: string; epoch: number; endsAt: number };
-export type SponsorRecorded = { epoch: number; amount: string; sponsor: string; kind: "owner" | "partner"; already?: boolean };
+type SponsorInfo = { enabled: boolean; to: Address | null; min: string; epoch: number; endsAt: number };
+type SponsorRecorded = { epoch: number; amount: string; sponsor: string; kind: "owner" | "partner"; already?: boolean };
 
 /** Where a sponsor sends the money, and the least that can be sent. */
 export function useSponsorInfo(token: string) {
@@ -82,6 +81,16 @@ export function useSponsorFlow(token: string) {
     [queryClient, record],
   );
 
+  const fail = useCallback(
+    (error: unknown, hash?: Hash): null => {
+      const described = describeError(error);
+      setState({ status: "error", ...described, hash });
+      toast.error(described);
+      return null;
+    },
+    [toast],
+  );
+
   /** Pays `amount` wei to `to`, then records it under `name`. */
   const run = useCallback(
     async (to: Address, amount: bigint, name: string): Promise<SponsorRecorded | null> => {
@@ -103,13 +112,10 @@ export function useSponsorFlow(token: string) {
         if (receipt.status !== "success") throw new Error("The payment reverted on-chain.");
         return await finish(hash, name, from);
       } catch (error) {
-        const described = describeError(error);
-        setState({ status: "error", ...described, hash });
-        toast.error(described);
-        return null;
+        return fail(error, hash);
       }
     },
-    [config, finish, toast],
+    [config, fail, finish],
   );
 
   /** Retries the signing and recording of a payment that already went through (nothing is paid again). */
@@ -120,13 +126,10 @@ export function useSponsorFlow(token: string) {
         if (!connection.address) throw new Error("Connect the wallet that paid.");
         return await finish(hash, name, connection.address);
       } catch (error) {
-        const described = describeError(error);
-        setState({ status: "error", ...described, hash });
-        toast.error(described);
-        return null;
+        return fail(error, hash);
       }
     },
-    [config, finish, toast],
+    [config, fail, finish],
   );
 
   const reset = useCallback(() => {

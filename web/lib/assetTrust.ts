@@ -14,15 +14,38 @@ export type AssetTrust = {
 };
 
 /** What a contract says it's called. Either may be missing while it hasn't answered. */
-export type Claimed = { name?: string | null; symbol?: string | null };
-
-/** MON is the chain's own coin: there is no contract to copy. */
-export const NATIVE_TRUST: AssetTrust = { tier: "verified", lookalike: null };
+type Claimed = { name?: string | null; symbol?: string | null };
 
 // Letters from other scripts that render like Latin ones, the usual trick in a fake name.
 const HOMOGLYPHS: Record<string, string> = {
-  а: "a", в: "b", с: "c", е: "e", һ: "h", і: "i", ј: "j", к: "k", м: "m", н: "h", о: "o", р: "p", ѕ: "s", т: "t", у: "y", х: "x",
-  α: "a", β: "b", ε: "e", η: "n", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x",
+  а: "a",
+  в: "b",
+  с: "c",
+  е: "e",
+  һ: "h",
+  і: "i",
+  ј: "j",
+  к: "k",
+  м: "m",
+  н: "h",
+  о: "o",
+  р: "p",
+  ѕ: "s",
+  т: "t",
+  у: "y",
+  х: "x",
+  α: "a",
+  β: "b",
+  ε: "e",
+  η: "n",
+  ι: "i",
+  κ: "k",
+  ν: "v",
+  ο: "o",
+  ρ: "p",
+  τ: "t",
+  υ: "u",
+  χ: "x",
 };
 // Digits standing in for letters: "CH0G", "M0NAD".
 const DIGITS: Record<string, string> = { "0": "o", "1": "l", "3": "e", "5": "s", "7": "t" };
@@ -51,9 +74,8 @@ export function trustOf(token: string, claimed: Claimed, registry: Registry = de
   const keys = new Set([glyphKey(claimed.name), glyphKey(claimed.symbol)].filter(Boolean));
   if (keys.size === 0) return { tier, lookalike: null };
   const lookalike =
-    registry
-      .verified(chainId)
-      .find((e) => e.address.toLowerCase() !== token.toLowerCase() && (keys.has(glyphKey(e.name)) || keys.has(glyphKey(e.symbol)))) ?? null;
+    registry.verified(chainId).find((e) => e.address.toLowerCase() !== token.toLowerCase() && (keys.has(glyphKey(e.name)) || keys.has(glyphKey(e.symbol)))) ??
+    null;
   return { tier, lookalike };
 }
 

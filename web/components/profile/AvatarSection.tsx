@@ -13,6 +13,7 @@ import { showOwnAvatar } from "@/hooks/useProfiles";
 import { UPLOAD_SIZE, type AvatarView } from "@/lib/avatars";
 import { collectionLabel } from "@/lib/collections";
 import { shortAddress } from "@/lib/format";
+import { profileCall } from "./api";
 
 type AvatarState = { enabled: false } | { enabled: true; avatar?: AvatarView; held?: boolean | null };
 type Answer = AvatarState & { wallets?: string[]; message?: string };
@@ -30,17 +31,7 @@ function useOwnAvatar() {
   const [busy, setBusy] = useState(false);
 
   const call = useCallback(
-    async (method: "GET" | "PUT" | "DELETE", body?: unknown): Promise<Answer> => {
-      const token = await getAccessToken();
-      const response = await fetch("/api/avatar", {
-        method,
-        headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = (await response.json()) as Answer;
-      if (!response.ok) throw new Error(data.message ?? "Couldn't update your avatar.");
-      return data;
-    },
+    (method: "GET" | "PUT" | "DELETE", body?: unknown) => profileCall<Answer>(getAccessToken, "/api/avatar", "Couldn't update your avatar.", method, body),
     [getAccessToken],
   );
 
@@ -138,16 +129,12 @@ export function AvatarSection() {
     <section className="page-section px-5 py-5">
       <h2 className="text-lg font-semibold">Your avatar</h2>
       <p className="mt-1 text-sm text-muted">
-        Shown on your wallet across DeClub: posts, Club members, rewards and the header. Pick an NFT you hold, or upload a
-        picture. It shows beside every wallet linked to this sign-in, so others can tell those wallets are the same person.
+        Shown on your wallet across DeClub: posts, Club members, rewards and the header. Pick an NFT you hold, or upload a picture. It shows beside every wallet
+        linked to this sign-in, so others can tell those wallets are the same person.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <span
-          className="avatar"
-          style={{ width: "4.5rem", height: "4.5rem", background: "linear-gradient(135deg, #475066, #2b3446)" }}
-          aria-hidden
-        >
+        <span className="avatar" style={{ width: "4.5rem", height: "4.5rem", background: "linear-gradient(135deg, #475066, #2b3446)" }} aria-hidden>
           {avatar && (
             // Arbitrary hosts from token metadata, so next/image's domain list doesn't apply.
             // eslint-disable-next-line @next/next/no-img-element
@@ -195,13 +182,7 @@ export function AvatarSection() {
         An NFT shows only while one of your linked wallets holds it. {active && `“Pick from my NFTs” lists what ${shortAddress(active)} holds.`}
       </p>
 
-      <input
-        ref={file}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        className="hidden"
-        onChange={(e) => onFile(e.target.files?.[0])}
-      />
+      <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
 
       {picking && active && (
         <NftPicker
@@ -224,8 +205,7 @@ function NftLabel({ collection, tokenId }: { collection: Address; tokenId: strin
   const { info } = useCollectionInfo(collection);
   return (
     <>
-      <span className="font-semibold">{collectionLabel(info, shortAddress(collection))}</span>{" "}
-      <span className="font-mono text-muted">#{tokenId}</span>
+      <span className="font-semibold">{collectionLabel(info, shortAddress(collection))}</span> <span className="font-mono text-muted">#{tokenId}</span>
     </>
   );
 }

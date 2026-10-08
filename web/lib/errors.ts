@@ -1,11 +1,4 @@
-import {
-  BaseError,
-  ContractFunctionRevertedError,
-  HttpRequestError,
-  InsufficientFundsError,
-  TimeoutError,
-  UserRejectedRequestError,
-} from "viem";
+import { BaseError, ContractFunctionRevertedError, HttpRequestError, InsufficientFundsError, TimeoutError, UserRejectedRequestError } from "viem";
 import { PoolError } from "./pool";
 
 // Contract error name → UI copy. Kept in sync with docs/05-frontend.md#error-messages.
@@ -97,8 +90,7 @@ export function describeError(error: unknown): AppError {
 
   const rejected =
     (error as { code?: number } | null)?.code === 4001 ||
-    (error instanceof BaseError &&
-      error.walk((e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001));
+    (error instanceof BaseError && error.walk((e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001));
   if (rejected) {
     return { kind: "rejected", title: "Request cancelled", message: "You rejected the request in your wallet. Nothing was sent." };
   }
@@ -107,9 +99,7 @@ export function describeError(error: unknown): AppError {
     const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
     if (reverted instanceof ContractFunctionRevertedError) {
       const name = reverted.data?.errorName;
-      const message =
-        (name && COPY[name]) ||
-        (name ? `The contract rejected this (${name}).` : (reverted.reason ?? "The contract rejected this transaction."));
+      const message = (name && COPY[name]) || (name ? `The contract rejected this (${name}).` : (reverted.reason ?? "The contract rejected this transaction."));
       return {
         kind: "reverted",
         title: "This can't go through",
@@ -150,9 +140,4 @@ export function describeError(error: unknown): AppError {
 
   const message = error instanceof BaseError ? error.shortMessage || error.message : raw;
   return { kind: "unknown", title: "Something went wrong", message, details: details(message) };
-}
-
-/** Just the one readable sentence from `describeError`. */
-export function errorMessage(error: unknown): string {
-  return describeError(error).message;
 }

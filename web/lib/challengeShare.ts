@@ -32,7 +32,7 @@ export function namesText(names: readonly string[], total = names.length): strin
   return `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}`;
 }
 
-export type ShareOptions = {
+type ShareOptions = {
   /** The Club's name ("Chog"): the post says "the Chog Club". */
   club: string;
   /** The viewer's wallets, any case: a winner among them makes it their win. */
@@ -72,7 +72,10 @@ export function challengeShareText(c: PublicChallenge, { club, viewerWallets = [
   if (c.phase === "settled" && winners.length > 0) {
     // The first three are named, only when every one of them has a name: a gap would misplace the rest.
     const shown = winners.slice(0, 3);
-    const names = shown.map((w) => nameOf?.(w.wallet)).filter((n): n is string => !!n).map((n) => clip(n, 20));
+    const names = shown
+      .map((w) => nameOf?.(w.wallet))
+      .filter((n): n is string => !!n)
+      .map((n) => clip(n, 20));
     const named = names.length === shown.length;
     const head = `Results are in for ${title} in ${where} 🏆`;
     if (flat) {
@@ -86,7 +89,8 @@ export function challengeShareText(c: PublicChallenge, { club, viewerWallets = [
 }
 
 /** The challenge's page, which the post links: its preview card is the podium, or the prize. */
-export const challengePageUrl = (token: string, id: string, origin: string = SITE_URL) => `${origin.replace(/\/+$/, "")}/clubs/${token.toLowerCase()}/challenges/${id}`;
+export const challengePageUrl = (token: string, id: string, origin: string = SITE_URL) =>
+  `${origin.replace(/\/+$/, "")}/clubs/${token.toLowerCase()}/challenges/${id}`;
 
 /** The X compose link: the post's text, and the challenge's page. `origin` defaults to where the app is served. */
 export function challengeShareUrl(c: PublicChallenge, options: ShareOptions & { token: string; origin?: string }): string {

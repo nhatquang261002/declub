@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { getAddress, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { useBrowseTokenIds, useCollectionInfo, useCollectionInfos, useOwnedTokenIds, useTokenOwner, useTokenViews } from "@/hooks/useCollection";
@@ -9,6 +9,7 @@ import { collectionLabel, featuredCollections, isFeatured, type CollectionInfo }
 import { useRecentCollections } from "@/hooks/useRecentCollections";
 import { CopyAddress } from "@/components/CopyAddress";
 import { AssetSearch } from "@/components/AssetSearch";
+import { PickerDialog } from "@/components/PickerDialog";
 import type { SearchHit } from "@/lib/search";
 import { MAX_NFTS_PER_SIDE } from "@/lib/config";
 import { registry } from "@/lib/verifiedAssets";
@@ -16,7 +17,7 @@ import { registry } from "@/lib/verifiedAssets";
 const PAGE = 12;
 const OWNED_STEP = 24;
 
-export type NftPickerProps = {
+type NftPickerProps = {
   /** The wallet whose NFTs are offered. Omit to browse a collection (the "you want" side). */
   owner?: Address;
   /** Start inside this collection instead of the search. */
@@ -43,71 +44,37 @@ const isFull = (selected: readonly bigint[], room: number) => room > 1 && select
 export function NftPicker({ owner, collection: initial, room, taken, onConfirm, onClose, confirmLabel }: NftPickerProps) {
   const [collection, setCollection] = useState<Address | null>(initial ?? null);
   const [selected, setSelected] = useState<bigint[]>([]);
-  const panel = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panel.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
-    };
-  }, [onClose]);
 
   // With room for one, picking another NFT swaps it in.
   const toggle = (id: bigint) =>
-    setSelected((current) =>
-      current.includes(id) ? current.filter((x) => x !== id) : room === 1 ? [id] : current.length < room ? [...current, id] : current,
-    );
+    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : room === 1 ? [id] : current.length < room ? [...current, id] : current));
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    <PickerDialog
+      label="Choose NFTs"
+      title={collection ? "Choose NFTs" : "Choose a collection"}
+      hint={<>{owner ? "Pick from your wallet." : "Pick the NFTs you want in return."} Names come from each contract, so check the address.</>}
+      onClose={onClose}
     >
-      <div
-        ref={panel}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Choose NFTs"
-        className="page-section flex max-h-[90vh] w-full max-w-3xl flex-col gap-4 overflow-y-auto p-5 outline-none"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">{collection ? "Choose NFTs" : "Choose a collection"}</h2>
-            <p className="mt-1 text-xs text-muted">
-              {owner ? "Pick from your wallet." : "Pick the NFTs you want in return."} Names come from each contract, so check the address.
-            </p>
-          </div>
-          <button type="button" className="btn-secondary btn-sm" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-
-        {collection ? (
-          <TokenStep
-            collection={collection}
-            owner={owner}
-            room={room}
-            taken={taken}
-            selected={selected}
-            onToggle={toggle}
-            onChangeCollection={() => {
-              setCollection(null);
-              setSelected([]);
-            }}
-            onConfirm={() => onConfirm(collection, selected)}
-            confirmLabel={confirmLabel}
-          />
-        ) : (
-          <CollectionStep owner={owner} onSelect={setCollection} />
-        )}
-      </div>
-    </div>
+      {collection ? (
+        <TokenStep
+          collection={collection}
+          owner={owner}
+          room={room}
+          taken={taken}
+          selected={selected}
+          onToggle={toggle}
+          onChangeCollection={() => {
+            setCollection(null);
+            setSelected([]);
+          }}
+          onConfirm={() => onConfirm(collection, selected)}
+          confirmLabel={confirmLabel}
+        />
+      ) : (
+        <CollectionStep owner={owner} onSelect={setCollection} />
+      )}
+    </PickerDialog>
   );
 }
 
@@ -249,7 +216,15 @@ function TokenStep({
       ) : mine ? (
         <OwnedGrid collection={collection} owner={owner} enumerable={enumerable} taken={taken} selected={selected} onToggle={onToggle} room={room} />
       ) : (
-        <BrowseGrid collection={collection} enumerable={enumerable} supply={info?.totalSupply ?? null} taken={taken} selected={selected} onToggle={onToggle} room={room} />
+        <BrowseGrid
+          collection={collection}
+          enumerable={enumerable}
+          supply={info?.totalSupply ?? null}
+          taken={taken}
+          selected={selected}
+          onToggle={onToggle}
+          room={room}
+        />
       )}
 
       {info?.isErc721 && <ManualId collection={collection} owner={owner} taken={taken} selected={selected} room={room} onAdd={onToggle} />}
@@ -294,7 +269,15 @@ function OwnedGrid({ collection, owner, enumerable, taken, selected, onToggle, r
       </p>
       <TileGrid>
         {ids.slice(0, shown).map((id) => (
-          <Tile key={id.toString()} id={id} view={views.get(id.toString())} taken={taken.has(tokenKey(collection, id))} selected={selected.includes(id)} full={isFull(selected, room)} onClick={() => onToggle(id)} />
+          <Tile
+            key={id.toString()}
+            id={id}
+            view={views.get(id.toString())}
+            taken={taken.has(tokenKey(collection, id))}
+            selected={selected.includes(id)}
+            full={isFull(selected, room)}
+            onClick={() => onToggle(id)}
+          />
         ))}
       </TileGrid>
       {ids.length > shown && (
@@ -326,7 +309,13 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
             key={id.toString()}
             id={id}
             view={views.get(id.toString())}
-            caption={views.get(id.toString())?.owner ? <>held by <CopyAddress address={views.get(id.toString())!.owner!} inLink /></> : undefined}
+            caption={
+              views.get(id.toString())?.owner ? (
+                <>
+                  held by <CopyAddress address={views.get(id.toString())!.owner!} inLink />
+                </>
+              ) : undefined
+            }
             taken={taken.has(tokenKey(collection, id))}
             selected={selected.includes(id)}
             full={isFull(selected, room)}
@@ -339,7 +328,9 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
           <button type="button" className="btn-secondary btn-sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
             Previous
           </button>
-          <span className="text-muted">Page {page + 1} of {pages}</span>
+          <span className="text-muted">
+            Page {page + 1} of {pages}
+          </span>
           <button type="button" className="btn-secondary btn-sm" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>
             Next
           </button>
@@ -349,9 +340,7 @@ function BrowseGrid({ collection, enumerable, supply, taken, selected, onToggle,
   );
 }
 
-const TileGrid = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{children}</div>
-);
+const TileGrid = ({ children }: { children: React.ReactNode }) => <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{children}</div>;
 
 function Tile({
   id,
@@ -442,16 +431,11 @@ function ManualId({
 
   return (
     <div className="space-y-1.5">
-      <label className="label" htmlFor="manual-id">Or enter a token id</label>
+      <label className="label" htmlFor="manual-id">
+        Or enter a token id
+      </label>
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          id="manual-id"
-          className="input w-40"
-          inputMode="numeric"
-          placeholder="Token id"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <input id="manual-id" className="input w-40" inputMode="numeric" placeholder="Token id" value={text} onChange={(e) => setText(e.target.value)} />
         <button
           type="button"
           className="btn-secondary"
@@ -466,7 +450,12 @@ function ManualId({
         {ok && (
           <span className="text-xs text-mint">
             {view?.name ?? `#${id}`}
-            {!owner && check.owner && <> · held by <CopyAddress address={check.owner} /></>}
+            {!owner && check.owner && (
+              <>
+                {" "}
+                · held by <CopyAddress address={check.owner} />
+              </>
+            )}
           </span>
         )}
         {id !== null && problem && <span className={`text-xs ${problem === "Checking…" ? "text-muted" : "text-warn"}`}>{problem}</span>}

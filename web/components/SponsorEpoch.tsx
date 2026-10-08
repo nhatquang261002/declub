@@ -93,10 +93,10 @@ export function SponsorEpoch({ token, symbol, isOwner, onClose }: { token: strin
           </button>
         </div>
         <p className="text-sm">
-          Add MON to {symbol}’s Holder pool for epoch {info.epoch}. It goes to the Holders with enough points that week, on top of the swap fees, split the same way, and none of it
-          goes to the protocol.
-          {isOwner ? " As the Owner, it shows as your Club’s own top-up." : " Your name shows on the Club’s Rewards tab and in its weekly recap."} The MON is sent to the rewards
-          operator, who funds the epoch with it; it can’t be refunded.
+          Add MON to {symbol}’s Holder pool for epoch {info.epoch}. It goes to the Holders with enough points that week, on top of the swap fees, split the same
+          way, and none of it goes to the protocol.
+          {isOwner ? " As the Owner, it shows as your Club’s own top-up." : " Your name shows on the Club’s Rewards tab and in its weekly recap."} The MON is
+          sent to the rewards operator, who funds the epoch with it; it can’t be refunded.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-[8rem_1fr]">
           <label className="flex flex-col gap-1 text-xs font-semibold">
@@ -158,11 +158,16 @@ export function SponsorEpoch({ token, symbol, isOwner, onClose }: { token: strin
         <details className="mt-3 text-xs text-muted">
           <summary className="cursor-pointer font-semibold">Already paid the operator?</summary>
           <p className="mt-2">
-            Paste the transaction hash of a payment to <span className="break-all font-mono">{info.to}</span> from the connected wallet, and sign to record it. A payment is
-            recorded once.
+            Paste the transaction hash of a payment to <span className="break-all font-mono">{info.to}</span> from the connected wallet, and sign to record it.
+            A payment is recorded once.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input className="input min-w-0 flex-1 border-2 border-[#111318]/25 bg-white font-mono" placeholder="0x…" value={paid} onChange={(e) => setPaid(e.target.value)} />
+            <input
+              className="input min-w-0 flex-1 border-2 border-[#111318]/25 bg-white font-mono"
+              placeholder="0x…"
+              value={paid}
+              onChange={(e) => setPaid(e.target.value)}
+            />
             <button
               type="button"
               className="btn-secondary"

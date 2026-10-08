@@ -15,7 +15,10 @@ const W3 = "0x00000000000000000000000000000000000000c3";
 async function share(store: Store, userId: string, provider: ProfileProvider, handle: string, wallets: string[]) {
   const row: StoredProfile = { provider, handle, userId, updatedAt: 1 };
   for (const wallet of wallets) await store.set(profileKey(wallet), row);
-  await store.setMembers(userWalletsKey(userId), wallets.map((w) => w.toLowerCase()));
+  await store.setMembers(
+    userWalletsKey(userId),
+    wallets.map((w) => w.toLowerCase()),
+  );
 }
 
 /** Privy as a table of `provider:username` → user id, recording the lookups made. */
@@ -109,7 +112,10 @@ describe("lookupHandle", () => {
     const r = await lookupHandle(store, "alice", "sam", find);
     assert.deepEqual(
       r?.matches.map((m) => [m.provider, m.wallets]),
-      [["twitter", [getAddress(W1)]], ["discord", [getAddress(W3)]]],
+      [
+        ["twitter", [getAddress(W1)]],
+        ["discord", [getAddress(W3)]],
+      ],
     );
   });
 

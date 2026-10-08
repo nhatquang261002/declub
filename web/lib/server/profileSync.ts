@@ -1,11 +1,4 @@
-import {
-  linkedEthereumWallets,
-  pickProfile,
-  profileKey,
-  userWalletsKey,
-  type Profile,
-  type StoredProfile,
-} from "../profiles";
+import { linkedEthereumWallets, pickProfile, profileKey, userWalletsKey, type Profile, type StoredProfile } from "../profiles";
 import type { Store } from "./store";
 
 /** Privy's linked accounts as its server SDK returns them (snake_case). */
@@ -19,9 +12,7 @@ export async function ownedRows(store: Store, userId: string, wallets: string[])
   return list.map((address, i) => ({ address, row: rows[i] })).filter((entry) => entry.row?.userId === userId);
 }
 
-export type SyncResult =
-  | { shared: true; profile: Profile }
-  | { shared: false; reason?: "nothing_to_share" };
+type SyncResult = { shared: true; profile: Profile } | { shared: false; reason?: "nothing_to_share" };
 
 /**
  * Brings a user's stored profile rows in line with their linked accounts (ADR 0011). Rows for
@@ -32,12 +23,7 @@ export type SyncResult =
  * Idempotent and based only on `accounts`, so running it twice, or out of order with another
  * sync that read newer accounts, converges on the latest state as long as `accounts` is current.
  */
-export async function syncProfile(
-  store: Store,
-  userId: string,
-  accounts: LinkedAccounts,
-  refresh: boolean,
-): Promise<SyncResult> {
+export async function syncProfile(store: Store, userId: string, accounts: LinkedAccounts, refresh: boolean): Promise<SyncResult> {
   const wallets = linkedEthereumWallets(accounts);
   const profile = pickProfile(accounts);
   const owned = await ownedRows(store, userId, wallets);
@@ -57,6 +43,9 @@ export async function syncProfile(
   const since = Math.min(now, ...owned.map((entry) => entry.row!.since ?? entry.row!.updatedAt));
   const row: StoredProfile = { ...profile, userId, updatedAt: now, since };
   await Promise.all(wallets.map((wallet) => store.set(profileKey(wallet), row)));
-  await store.setMembers(userWalletsKey(userId), wallets.map((w) => w.toLowerCase()));
+  await store.setMembers(
+    userWalletsKey(userId),
+    wallets.map((w) => w.toLowerCase()),
+  );
   return { shared: true, profile };
 }

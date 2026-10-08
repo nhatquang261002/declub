@@ -38,12 +38,12 @@ const WATCHED: Address[] = [...new Set([...FILL_CONTRACTS, ...ACTIVITY_CONTRACTS
 const EVENTS = [getAbiItem({ abi: deClubEscrowAbi, name: "TradeFilled" }), getAbiItem({ abi: deClubEscrowAbi, name: "TradeCreated" })];
 
 /** The public RPC answers `eth_getLogs` for at most 100 blocks (ADR 0004). */
-export const DEFAULT_RANGE = 100;
+const DEFAULT_RANGE = 100;
 
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-export function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
+function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
   return {
     async head() {
       return (await client().getBlock({ blockTag: "finalized" })).number;
@@ -76,7 +76,7 @@ export type WatchOptions = {
   now?: () => number;
 };
 
-export type WatchResult =
+type WatchResult =
   /** Another run holds the lock. */
   | { status: "busy" }
   | {

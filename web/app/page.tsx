@@ -32,9 +32,21 @@ const STEPS = [
 /** What the market does that a marketplace doesn't: the reason to trade here. */
 const MARKET = [
   { icon: <SwapIcon className="size-5" />, title: "NFT for NFT", body: "Swap NFTs, tokens and MON in any mix, bundles included. Not just NFTs for tokens." },
-  { icon: <TagIcon className="size-5" />, title: "Ask by trait", body: "Request any NFT with a trait, like any Chog with a Crown hat. Whoever holds a match can accept." },
-  { icon: <InboxIcon className="size-5" />, title: "Open offers", body: "Show what you're giving and let people offer their own assets. You pick the one you like." },
-  { icon: <ShieldIcon className="size-5" />, title: "Can't half-happen", body: "Both sides move in one transaction, or nothing moves. No middleman, no trust needed." },
+  {
+    icon: <TagIcon className="size-5" />,
+    title: "Ask by trait",
+    body: "Request any NFT with a trait, like any Chog with a Crown hat. Whoever holds a match can accept.",
+  },
+  {
+    icon: <InboxIcon className="size-5" />,
+    title: "Open offers",
+    body: "Show what you're giving and let people offer their own assets. You pick the one you like.",
+  },
+  {
+    icon: <ShieldIcon className="size-5" />,
+    title: "Can't half-happen",
+    body: "Both sides move in one transaction, or nothing moves. No middleman, no trust needed.",
+  },
 ];
 
 export default function HomePage() {
@@ -52,8 +64,8 @@ export default function HomePage() {
               <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              A new way to have fun with your community. Grow together as a Club — your own market and social circle, where members talk,
-              make deals, climb the leaderboard and get rewarded along the way.
+              A new way to have fun with your community. Grow together as a Club — your own market and social circle, where members talk, make deals, climb the
+              leaderboard and get rewarded along the way.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/clubs" className="btn-primary">
@@ -68,9 +80,18 @@ export default function HomePage() {
           <DeClubArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>{percent(PROTOCOL.holderBps)} to active Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
-          <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
-          <div className="hero-stat"><strong>Escrowed by a contract</strong><span>Assets move only in transactions or signatures you approve</span></div>
+          <div className="hero-stat">
+            <strong>{percent(PROTOCOL.holderBps)} to active Holders</strong>
+            <span>Of the fees your Club’s swaps pay, every week</span>
+          </div>
+          <div className="hero-stat">
+            <strong>Posts you own</strong>
+            <span>Signed by your wallet, exportable anywhere</span>
+          </div>
+          <div className="hero-stat">
+            <strong>Escrowed by a contract</strong>
+            <span>Assets move only in transactions or signatures you approve</span>
+          </div>
         </div>
       </section>
 
@@ -101,8 +122,8 @@ export default function HomePage() {
         </h2>
         <p className="mt-3 max-w-2xl leading-7 text-muted">
           Marketplaces sell NFTs for tokens. DeClub swaps them, wallet to wallet, settled by a contract
-          {swapIntents ? ": lock your assets in a deal, or just sign and keep them until a match" : ""}. And every swap&apos;s fee feeds the Club
-          whose asset was traded.
+          {swapIntents ? ": lock your assets in a deal, or just sign and keep them until a match" : ""}. And every swap&apos;s fee feeds the Club whose asset
+          was traded.
         </p>
         <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {MARKET.map((item) => (
@@ -126,7 +147,6 @@ export default function HomePage() {
 
       <ClubsIntro />
 
-
       <footer className="relative mt-12 overflow-hidden rounded-2xl border-2 border-[#111318] bg-[#171a22] p-6 text-sm text-white sm:p-9">
         <div className="absolute -right-12 -top-16 size-44 rounded-full border-[18px] border-[#315ea8]/40" aria-hidden />
         <div className="absolute -bottom-20 left-1/3 size-40 rounded-full bg-[#d83b45]/10" aria-hidden />
@@ -137,12 +157,8 @@ export default function HomePage() {
                 <LogoMark className="size-11" />
                 <Wordmark className="text-2xl" />
               </div>
-              <p className="mt-5 text-xl font-semibold leading-tight text-[#fff4cf] sm:text-2xl">
-                Communities that own their market.
-              </p>
-              <p className="mt-2 leading-6 text-white/60">
-                Clubs, swaps and rewards for Monad’s NFT collections and their coins, on {NETWORK.name}.
-              </p>
+              <p className="mt-5 text-xl font-semibold leading-tight text-[#fff4cf] sm:text-2xl">Communities that own their market.</p>
+              <p className="mt-2 leading-6 text-white/60">Clubs, swaps and rewards for Monad’s NFT collections and their coins, on {NETWORK.name}.</p>
             </div>
             <a
               href={SUPPORT_MAILTO}
@@ -156,10 +172,18 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Explore</p>
               <nav className="mt-3 grid gap-2 text-white/70">
-                <Link href="/clubs" className="hover:text-white">Clubs <span aria-hidden>↗</span></Link>
-                <Link href="/deals" className="hover:text-white">Browse deals</Link>
-                <Link href="/history" className="hover:text-white">History</Link>
-                <Link href="/guide" className="hover:text-white">Guide</Link>
+                <Link href="/clubs" className="hover:text-white">
+                  Clubs <span aria-hidden>↗</span>
+                </Link>
+                <Link href="/deals" className="hover:text-white">
+                  Browse deals
+                </Link>
+                <Link href="/history" className="hover:text-white">
+                  History
+                </Link>
+                <Link href="/guide" className="hover:text-white">
+                  Guide
+                </Link>
               </nav>
             </div>
             <div>
@@ -177,7 +201,9 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f0b735]">Contact</p>
               <nav className="mt-3 grid gap-2 text-white/70">
-                <a href={SUPPORT_MAILTO} className="break-all hover:text-white">{SUPPORT_EMAIL}</a>
+                <a href={SUPPORT_MAILTO} className="break-all hover:text-white">
+                  {SUPPORT_EMAIL}
+                </a>
                 <a href={X_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-white">
                   <XLogoIcon className="size-3.5" /> @{X_HANDLE} <span aria-hidden>↗</span>
                 </a>
@@ -190,9 +216,7 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-          <p className="mt-8 border-t border-white/15 pt-4 text-xs text-white/40">
-            Assets move only in transactions or signatures you approve.
-          </p>
+          <p className="mt-8 border-t border-white/15 pt-4 text-xs text-white/40">Assets move only in transactions or signatures you approve.</p>
         </div>
       </footer>
     </>

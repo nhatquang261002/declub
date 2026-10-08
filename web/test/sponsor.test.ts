@@ -22,8 +22,10 @@ const TX = `0x${"11".repeat(32)}` as Hex;
 const TX2 = `0x${"22".repeat(32)}` as Hex;
 const SIG = `0x${"ab".repeat(65)}` as Hex;
 
-const registry = makeRegistry(parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" }]));
-const params = <T,>(value: T) => ({ params: Promise.resolve(value) });
+const registry = makeRegistry(
+  parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" }]),
+);
+const params = <T>(value: T) => ({ params: Promise.resolve(value) });
 const post = (body: unknown) => new Request("http://localhost/api/clubs/x/sponsor", { method: "POST", body: JSON.stringify(body) });
 
 describe("sponsoring from the app (ADR 0036)", () => {
@@ -58,7 +60,10 @@ describe("sponsoring from the app (ADR 0036)", () => {
     assert.deepEqual(await res.json(), { ok: true, already: false, epoch: 0, amount: (5n * ETH).toString(), sponsor: "Monad Foundation", kind: "partner" });
     assert.deepEqual(verified, [{ address: PAYER, message: sponsorMessage(NFT, TX, "Monad Foundation") }]);
     const [entry] = await readSponsors(store, 0);
-    assert.deepEqual({ club: entry!.club, by: entry!.by, tx: entry!.tx, kind: entry!.kind }, { club: NFT.toLowerCase(), by: PAYER.toLowerCase(), tx: TX, kind: "partner" });
+    assert.deepEqual(
+      { club: entry!.club, by: entry!.by, tx: entry!.tx, kind: entry!.kind },
+      { club: NFT.toLowerCase(), by: PAYER.toLowerCase(), tx: TX, kind: "partner" },
+    );
   });
 
   it("takes the amount from the chain, never from the request", async () => {
@@ -74,7 +79,14 @@ describe("sponsoring from the app (ADR 0036)", () => {
   });
 
   it("labels the Owner's own top-up", async () => {
-    const row: MemberRow = { userId: "uo", wallets: [OWNER_WALLET.toLowerCase()], displayWallet: OWNER_WALLET.toLowerCase(), holder: true, holderCheckedAt: 1, joinedAt: 1 };
+    const row: MemberRow = {
+      userId: "uo",
+      wallets: [OWNER_WALLET.toLowerCase()],
+      displayWallet: OWNER_WALLET.toLowerCase(),
+      holder: true,
+      holderCheckedAt: 1,
+      joinedAt: 1,
+    };
     await store.set(memberKey(NFT, "uo"), row);
     await store.addMember(membersKey(NFT), "uo");
     await store.set(rolesKey(NFT), { owner: "uo", moderators: [] });

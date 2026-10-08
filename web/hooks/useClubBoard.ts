@@ -46,7 +46,8 @@ function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, 
   const next = <T extends { liked: boolean; likes: number }>(p: T): T =>
     count !== undefined ? { ...p, liked, likes: count } : p.liked !== liked ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p;
   const flip = <P extends PublicPost & { club?: string }>(p: P): P => (p.id === id && (p.club === undefined || p.club === club) ? next(p) : p);
-  const board = (data: InfiniteData<{ posts: PublicPost[] }> | undefined) => data && { ...data, pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(flip) })) };
+  const board = (data: InfiniteData<{ posts: PublicPost[] }> | undefined) =>
+    data && { ...data, pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(flip) })) };
   queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["club-posts", club] }, board);
   // The timeline's key doesn't carry a Club: its posts say which one they are from.
   queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["timeline"] }, board);
@@ -56,7 +57,8 @@ function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, 
     c.entries.some((e) => e.post === id) ? { ...c, entries: c.entries.map((e) => (e.post === id ? next(e) : e)) } : c;
   queryClient.setQueriesData<{ challenges?: PublicChallenge[]; challenge?: PublicChallenge }>(
     { queryKey: ["club-challenges", club] },
-    (data) => data && { ...data, ...(data.challenges && { challenges: data.challenges.map(entries) }), ...(data.challenge && { challenge: entries(data.challenge) }) },
+    (data) =>
+      data && { ...data, ...(data.challenges && { challenges: data.challenges.map(entries) }), ...(data.challenge && { challenge: entries(data.challenge) }) },
   );
 }
 
@@ -71,7 +73,11 @@ export function useClubPosts(token: string, lens: LensId = "newest", as?: string
     queryKey: ["club-posts", key, !!getToken, lens, as?.toLowerCase()],
     initialPageParam: 0,
     queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams({ limit: String(POSTS_PAGE), offset: String(pageParam), ...(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }) });
+      const params = new URLSearchParams({
+        limit: String(POSTS_PAGE),
+        offset: String(pageParam),
+        ...(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }),
+      });
       return read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null; total: number }>(`/api/clubs/${token}/posts?${params}`, getToken);
     },
     getNextPageParam: (last, all) => {
@@ -110,12 +116,20 @@ export function useClubReplies(token: string, postId: string, enabled: boolean) 
 }
 
 /** The Club's X signals (ADR 0024): its linked project accounts, its tags, and "what counts" in words. */
-export type ClubX = { accounts: { handle: string; proof: string; linkedAt: number }[]; tags: string[]; hint: string };
+type ClubX = { accounts: { handle: string; proof: string; linkedAt: number }[]; tags: string[]; hint: string };
 
 /** Whether the Club's memecoin earns the Holder badge (ADR 0026): `min` in base units; `set` once the Owner chose. */
 export type ClubCoin = { token: string; symbol: string; on: boolean; min: string; set: boolean };
 
-export type ClubPage = { enabled: boolean; description: string; links: string[]; holdersOnlyPosts: boolean; hasOwner: boolean; x: ClubX; coin: ClubCoin | null };
+type ClubPage = {
+  enabled: boolean;
+  description: string;
+  links: string[];
+  holdersOnlyPosts: boolean;
+  hasOwner: boolean;
+  x: ClubX;
+  coin: ClubCoin | null;
+};
 
 /** Why a member's own X post didn't count, in words. */
 const NOT_COUNTED: Record<NonNullable<XShareVerdict["reason"]>, string> = {
@@ -164,54 +178,67 @@ export function useClubActions(token: string) {
       },
       onError: (error) => toast.error(error),
     });
-  const send = <T,>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
+  const send = <T>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
 
   return {
     postStage,
     replyStage,
     // A post is signed by the member's Club wallet before it's sent (ADR 0023).
-    post: useAct(async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
-      const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
-      if (!draft.ok) {
-        throw new Error(
-          draft.reason !== "bad_link" ? "Write something first, at most 280 characters." : v.kind === "note" ? "Paste the link of an X post." : "Link a deal id or a signed-swap hash.",
-        );
-      }
-      let result: { xShare?: XShareVerdict };
-      try {
-        setPostStage("signing");
-        const { signature } = await sign(postTypedData(draft.message), v.wallet);
-        setPostStage("sending");
-        result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
-      } finally {
-        setPostStage(undefined);
-      }
-      // Tell the author whether their own X post counted (ADR 0024); someone else's is just a card.
-      const share = result.xShare;
-      if (share?.counted) {
-        toast.show({
-          tone: "success",
-          title: "Your X post counts for the Club",
-          message: share.counted === "weak" ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full." : "It adds to your Momentum, and to your Holder bonus if you hold the Club’s NFT.",
-        });
-      } else if (share?.own && share.reason && NOT_COUNTED[share.reason]) {
-        toast.show({ tone: "info", title: "Posted, not counted", message: NOT_COUNTED[share.reason] });
-      }
-      return result;
-    }, ["club-posts", "clubs", "club-members"]),
+    post: useAct(
+      async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
+        const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
+        if (!draft.ok) {
+          throw new Error(
+            draft.reason !== "bad_link"
+              ? "Write something first, at most 280 characters."
+              : v.kind === "note"
+                ? "Paste the link of an X post."
+                : "Link a deal id or a signed-swap hash.",
+          );
+        }
+        let result: { xShare?: XShareVerdict };
+        try {
+          setPostStage("signing");
+          const { signature } = await sign(postTypedData(draft.message), v.wallet);
+          setPostStage("sending");
+          result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
+        } finally {
+          setPostStage(undefined);
+        }
+        // Tell the author whether their own X post counted (ADR 0024); someone else's is just a card.
+        const share = result.xShare;
+        if (share?.counted) {
+          toast.show({
+            tone: "success",
+            title: "Your X post counts for the Club",
+            message:
+              share.counted === "weak"
+                ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full."
+                : "It adds to your Momentum, and to your Holder bonus if you hold the Club’s NFT.",
+          });
+        } else if (share?.own && share.reason && NOT_COUNTED[share.reason]) {
+          toast.show({ tone: "info", title: "Posted, not counted", message: NOT_COUNTED[share.reason] });
+        }
+        return result;
+      },
+      ["club-posts", "clubs", "club-members"],
+    ),
     // A reply is signed too, with its own type (ADR 0032).
-    reply: useAct(async (v: { parent: string; text: string; wallet?: string }) => {
-      const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
-      if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
-      try {
-        setReplyStage("signing");
-        const { signature } = await sign(replyTypedData(draft.message), v.wallet);
-        setReplyStage("sending");
-        return await send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
-      } finally {
-        setReplyStage(undefined);
-      }
-    }, ["club-replies", "club-posts"]),
+    reply: useAct(
+      async (v: { parent: string; text: string; wallet?: string }) => {
+        const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
+        if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
+        try {
+          setReplyStage("signing");
+          const { signature } = await sign(replyTypedData(draft.message), v.wallet);
+          setReplyStage("sending");
+          return await send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
+        } finally {
+          setReplyStage(undefined);
+        }
+      },
+      ["club-replies", "club-posts"],
+    ),
     remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log", "club-reported"]),
     report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies", "club-reported"], "Reported. Thank you."),
     // A like shows at once and is taken back if the server refuses it (a heart that waits for the
@@ -228,18 +255,30 @@ export function useClubActions(token: string) {
       },
       // The exact count, unless another tap is still queued (it already shows, and would be undone for a moment).
       onSuccess: (result, v) => {
-        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1 && typeof result?.likes === "number") showLike(queryClient, key, v.id, v.like, result.likes);
+        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1 && typeof result?.likes === "number")
+          showLike(queryClient, key, v.id, v.like, result.likes);
       },
       onError: (error, v) => {
         showLike(queryClient, key, v.id, !v.like);
         toast.error(error);
       },
     }),
-    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log", "club-reported"]),
+    hide: useAct(
+      (v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }),
+      ["club-posts", "club-replies", "club-log", "club-reported"],
+    ),
     pin: useAct((v: { id: string; pinned: boolean }) => send("POST", `/posts/${v.id}/pin`, { pinned: v.pinned }), ["club-posts", "club-log"]),
-    ban: useAct((v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v), ["club-posts", "club-bans", "club-log", "club-members", "clubs"], "Banned."),
+    ban: useAct(
+      (v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v),
+      ["club-posts", "club-bans", "club-log", "club-members", "clubs"],
+      "Banned.",
+    ),
     unban: useAct((v: { wallet: string; everywhere?: boolean }) => send("DELETE", "/bans", v), ["club-bans", "club-log"], "Ban lifted."),
-    role: useAct((v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v), ["club-members", "club-membership", "club-log", "club-posts"], "Done."),
+    role: useAct(
+      (v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v),
+      ["club-members", "club-membership", "club-log", "club-posts"],
+      "Done.",
+    ),
     claim: useAct(() => send("POST", "/claim"), ["club-members", "club-membership", "club-profile", "club-log"], "You’re the Owner of this Club."),
     // The Club's reward rules and bans from rewards (ADR 0044): the Owner or an app admin.
     rules: useAct((v: Partial<OwnerRules>) => send("PATCH", "/rules", v), ["club-rules", "club-log"], "Saved. The new rules apply from the next epoch."),
@@ -261,7 +300,7 @@ export function useClubActions(token: string) {
   };
 }
 
-export type StaffView = { enabled: boolean; log: LogEntry[]; ownership: { claimed: string; onchain: string | null; changed: boolean } | null };
+type StaffView = { enabled: boolean; log: LogEntry[]; ownership: { claimed: string; onchain: string | null; changed: boolean } | null };
 
 /** The moderation log and bans. Only staff are allowed to ask. */
 export function useClubStaff(token: string, enabled: boolean) {
@@ -288,7 +327,13 @@ export function useClubStaff(token: string, enabled: boolean) {
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
-  return { log: log.data?.log ?? [], ownership: log.data?.ownership ?? null, bans: bans.data, reported: reported.data?.reported ?? [], isLoading: log.isLoading };
+  return {
+    log: log.data?.log ?? [],
+    ownership: log.data?.ownership ?? null,
+    bans: bans.data,
+    reported: reported.data?.reported ?? [],
+    isLoading: log.isLoading,
+  };
 }
 
 /** The Club's reward rules now, any change waiting for the next epoch, and the bounds (public, ADR 0044). */

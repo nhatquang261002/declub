@@ -1,11 +1,4 @@
-import {
-  type Address,
-  type Hex,
-  hashStruct,
-  hashTypedData,
-  isAddressEqual,
-  zeroAddress,
-} from "viem";
+import { type Address, type Hex, hashStruct, hashTypedData, isAddressEqual, zeroAddress } from "viem";
 import { type Asset, AssetType, type Intent } from "./types.ts";
 
 export const MAX_CYCLE = 4;
@@ -22,9 +15,10 @@ export const nftCount = (assets: Asset[]): number => assets.filter((a) => a.asse
  */
 export const feeUnits = (give: Asset[]): bigint => BigInt(Math.max(nftCount(give), 1));
 
-export const domain = (chainId: number, verifyingContract: Address) =>
-  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
+export const domain = (chainId: number, verifyingContract: Address) => ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
 
+// The EIP-712 types are written out in each package on purpose: the app and the matcher deploy on their own, and e2e checks both against a third copy (IN-01).
+// jscpd:ignore-start
 export const types = {
   Asset: [
     { name: "assetType", type: "uint8" },
@@ -42,6 +36,7 @@ export const types = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+// jscpd:ignore-end
 
 /** Not part of the contract: a maker-signed request to the pool to drop an intent. */
 export const cancelTypes = {

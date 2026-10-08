@@ -75,10 +75,7 @@ export function ClubMarket({ market, symbol, recent, now }: { market: Market; sy
   const { address } = useConnection();
   const [view, setView] = useState<View>("have");
 
-  const tokens = useMemo(
-    () => erc20Tokens([...market.have, ...market.wanted].flatMap((d) => [...d.offered, ...d.requested])),
-    [market.have, market.wanted],
-  );
+  const tokens = useMemo(() => erc20Tokens([...market.have, ...market.wanted].flatMap((d) => [...d.offered, ...d.requested])), [market.have, market.wanted]);
   const { info } = useTokenInfo(tokens);
 
   const options = [

@@ -12,17 +12,7 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
  * address, so a wallet looks the same everywhere. With `link`, it opens that wallet's profile
  * (ADR 0042); leave it off inside a link or a button.
  */
-export function WalletAvatar({
-  seed,
-  size = "1.9rem",
-  link = false,
-  children,
-}: {
-  seed?: string;
-  size?: string;
-  link?: boolean;
-  children?: React.ReactNode;
-}) {
+export function WalletAvatar({ seed, size = "1.9rem", link = false, children }: { seed?: string; size?: string; link?: boolean; children?: React.ReactNode }) {
   const avatar = useAvatar(seed && ADDRESS.test(seed) ? seed : undefined);
   // A picture that won't load (a dead host, a gateway timeout) falls back to the colours.
   const [broken, setBroken] = useState<string>();
@@ -37,9 +27,7 @@ export function WalletAvatar({
       style={{
         width: size,
         height: size,
-        background: seed
-          ? `linear-gradient(135deg, hsl(${hue} 85% 64%), hsl(${hue2} 80% 52%))`
-          : "linear-gradient(135deg, #475066, #2b3446)",
+        background: seed ? `linear-gradient(135deg, hsl(${hue} 85% 64%), hsl(${hue2} 80% 52%))` : "linear-gradient(135deg, #475066, #2b3446)",
       }}
     >
       {image && (

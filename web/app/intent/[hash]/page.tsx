@@ -22,16 +22,7 @@ import { swapIntents } from "@/lib/contracts";
 import { sameAddress } from "@/lib/deals";
 import { erc20Asset, feeUnits, formatAsset } from "@/lib/assets";
 import { formatDate } from "@/lib/format";
-import {
-  isLive,
-  nonceBit,
-  reasonText,
-  ringLegs,
-  STATUS_HELP,
-  STATUS_LABEL,
-  type IntentStatus,
-  type PoolIntent,
-} from "@/lib/intents";
+import { isLive, nonceBit, reasonText, ringLegs, STATUS_HELP, STATUS_LABEL, type IntentStatus, type PoolIntent } from "@/lib/intents";
 import { CopyAddress } from "@/components/CopyAddress";
 
 export default function IntentPage() {
@@ -50,7 +41,7 @@ function IntentDetail({ hash }: { hash: Hex }) {
     <>
       <BackToDeals />
       {error ? (
-        <LoadError title="Couldn&apos;t load this signed swap" error={error} />
+        <LoadError title="Couldn't load this signed swap" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading signed swap…</EmptyState>
       ) : !row ? (
@@ -71,10 +62,7 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
 
   // The cycle this intent settled in, from the pool's settlements for its maker.
   const { settlements } = useSettlements({ maker: intent.maker, enabled: status === "settled" });
-  const settlement = useMemo(
-    () => settlements.find((s) => s.txHash === row.settlementTx || s.cycle.some((r) => r.hash === row.hash)),
-    [settlements, row],
-  );
+  const settlement = useMemo(() => settlements.find((s) => s.txHash === row.settlementTx || s.cycle.some((r) => r.hash === row.hash)), [settlements, row]);
   const { info } = useIntentsTokenInfo(useMemo(() => [row, ...(settlement?.cycle ?? [])], [row, settlement]));
   // The fee charged is the contract's at settlement, which can be below what was signed (ADR 0018).
   const { fee: currentFee } = useIntentFee();
@@ -130,10 +118,7 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
               ? [
                   {
                     label: "Protocol fee",
-                    value:
-                      currentFee && currentFee.amount < intent.maxFee
-                        ? feeText(currentFee.amount)
-                        : `Up to ${feeText(intent.maxFee)}`,
+                    value: currentFee && currentFee.amount < intent.maxFee ? feeText(currentFee.amount) : `Up to ${feeText(intent.maxFee)}`,
                     hint:
                       currentFee && currentFee.amount < intent.maxFee
                         ? `Signed for up to ${feeText(intent.maxFee)}. Maker pays, only if it settles`
@@ -148,7 +133,13 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
               value: (
                 <span className="inline-flex flex-wrap items-baseline gap-x-2">
                   <CopyAddress address={intent.maker} full className="text-xs font-semibold" />
-                  <a href={explorerAddress(intent.maker)} target="_blank" rel="noreferrer" className="font-mono text-xs font-semibold" title="View on the explorer">
+                  <a
+                    href={explorerAddress(intent.maker)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-xs font-semibold"
+                    title="View on the explorer"
+                  >
                     ↗
                   </a>
                 </span>
@@ -179,8 +170,7 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
       {mine && status === "cancelled" && intent.deadline >= BigInt(now) && swapIntents && (
         <DealDock tone="warn" eyebrow="Your signed swap" title="Removed from the pool">
           <p className="text-sm text-muted">
-            This pool won&apos;t match it any more, but a copy of your signature that already left could still settle until{" "}
-            {formatDate(intent.deadline)}.
+            This pool won&apos;t match it any more, but a copy of your signature that already left could still settle until {formatDate(intent.deadline)}.
           </p>
           <OnChainCancel maker={intent.maker} nonce={intent.nonce} />
         </DealDock>
@@ -188,8 +178,7 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
       {!mine && live && (
         <DealDock tone="blocked" eyebrow="How this settles" title="A matcher settles this, not a button">
           <p className="text-sm text-muted">
-            Signed swaps aren&apos;t accepted by hand. When a wallet&apos;s own signed swap fits this one, the matcher settles
-            both in one transaction.
+            Signed swaps aren&apos;t accepted by hand. When a wallet&apos;s own signed swap fits this one, the matcher settles both in one transaction.
           </p>
           <ConsentNotice />
         </DealDock>
@@ -222,7 +211,6 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
 
   return (
     <DealDock tone={stale ? "warn" : "maker"} eyebrow="Your signed swap" title={stale ? "Your swap is on hold" : "Your swap is in the pool"}>
-
       {stale && (
         <div className="space-y-2">
           {readiness.problems.length > 0 && <p className="text-sm text-warn">{readiness.problems[0]}</p>}
@@ -240,8 +228,8 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
 
       <div className="space-y-2">
         <p className="text-sm text-muted">
-          Removing it from the pool is free (you sign a message), but it only stops this pool from using it. A copy of
-          your signature that already left could still settle until the deadline.
+          Removing it from the pool is free (you sign a message), but it only stops this pool from using it. A copy of your signature that already left could
+          still settle until the deadline.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <TxButton variant="secondary" state={sign.state} onClick={() => sign.cancel(row.hash)}>
@@ -278,8 +266,8 @@ function OnChainCancel({ maker, nonce }: { maker: `0x${string}`; nonce: bigint }
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted">
-        To be certain it can never settle, cancel it permanently on-chain. That costs gas. Revoking the approval in your
-        wallet also stops the assets from moving.
+        To be certain it can never settle, cancel it permanently on-chain. That costs gas. Revoking the approval in your wallet also stops the assets from
+        moving.
       </p>
       <TxButton
         variant="danger"

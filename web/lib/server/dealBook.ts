@@ -34,9 +34,9 @@ export type BookReader = {
 };
 
 /** The pool's book (matcher/). null when the intents contract isn't configured. */
-export type IntentReader = ((status: "open" | "all") => Promise<PoolIntent[]>) | null;
+type IntentReader = ((status: "open" | "all") => Promise<PoolIntent[]>) | null;
 
-export type BookOptions = {
+type BookOptions = {
   /** How old the book may get before a request refreshes it. */
   ttlMs?: number;
   /** `getTrade` reads per multicall. A deal holds up to 20 assets, so this keeps a response small. */
@@ -165,9 +165,15 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     async source(tab) {
       const [list, open, all] = await Promise.all([
         currentDeals(),
-        currentIntents("open").then((rows) => ({ rows, error: null }), (error: unknown) => ({ rows: [], error })),
+        currentIntents("open").then(
+          (rows) => ({ rows, error: null }),
+          (error: unknown) => ({ rows: [], error }),
+        ),
         tab === "all"
-          ? currentIntents("all").then((rows) => ({ rows, error: null }), (error: unknown) => ({ rows: [], error }))
+          ? currentIntents("all").then(
+              (rows) => ({ rows, error: null }),
+              (error: unknown) => ({ rows: [], error }),
+            )
           : Promise.resolve(null),
       ]);
       const failed = open.error ?? all?.error;
@@ -185,7 +191,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
 let cachedClient: PublicClient | undefined;
 const client = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-export function viemBookReader(contract: Address): BookReader {
+function viemBookReader(contract: Address): BookReader {
   return {
     tradeCount: () => client().readContract({ address: contract, abi: deClubEscrowAbi, functionName: "tradeCount" }),
     async trades(ids) {
@@ -197,10 +203,13 @@ export function viemBookReader(contract: Address): BookReader {
     },
     async tokenInfo(list) {
       const results = await client().multicall({
-        contracts: list.flatMap((address) => [
-          { address, abi: erc20Abi, functionName: "symbol" },
-          { address, abi: erc20Abi, functionName: "decimals" },
-        ] as const),
+        contracts: list.flatMap(
+          (address) =>
+            [
+              { address, abi: erc20Abi, functionName: "symbol" },
+              { address, abi: erc20Abi, functionName: "decimals" },
+            ] as const,
+        ),
         allowFailure: true,
       });
       const out = new Map<string, TokenInfo>();

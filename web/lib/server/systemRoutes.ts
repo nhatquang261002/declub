@@ -2,7 +2,7 @@ import type { Registry } from "../verifiedAssets";
 import { softViewer, type RouteDeps } from "./boardRoutes";
 import { liveChallenges } from "./challenges";
 import { fail } from "./gate";
-import { clubOf, type Ctx } from "./memberRoutes";
+import { publicRead, type Ctx } from "./memberRoutes";
 import { clubsOf } from "./members";
 import { clientId, getStore, withinLimit } from "./store";
 import { listSystem } from "./system";
@@ -15,14 +15,22 @@ import type { Deps } from "./clubs";
 const SHARED = "public, s-maxage=15, stale-while-revalidate=60";
 const OFF = { "Cache-Control": "no-store" };
 
+/** The start of a timeline read: the `scope` asked for and the store, or the response that ends the call (bad scope, no store, which answers `off`, or too many requests). */
+async function timelineRead(request: Request, off: object) {
+  const scope = new URL(request.url).searchParams.get("scope") ?? "joined";
+  if (scope !== "joined" && scope !== "all") return fail(400, "bad_request", "scope is joined or all.");
+  const store = getStore();
+  if (!store) return Response.json(off, { headers: OFF });
+  if (!(await withinLimit(store, "timeline-read", clientId(request), 120, 60))) return fail(429, "rate_limited", "Too many requests.");
+  return { scope, store };
+}
+
 /** GET /api/clubs/[token]/system   { enabled, events, since }: what happened in one Club lately. */
 export function clubSystemHandler(registry: Registry, deps: Deps = {}) {
   return async function GET(request: Request, ctx: Ctx) {
-    const entry = await clubOf(registry, ctx);
-    if (entry instanceof Response) return entry;
-    const store = getStore();
-    if (!store) return Response.json({ enabled: false, events: [], since: 0 }, { headers: OFF });
-    if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const read = await publicRead(registry, ctx, request, { enabled: false, events: [], since: 0 });
+    if (read instanceof Response) return read;
+    const { entry, store } = read;
     const { events, since } = await listSystem(store, [entry], deps);
     return Response.json({ enabled: true, events, since }, { headers: { "Cache-Control": SHARED } });
   };
@@ -35,15 +43,17 @@ export function clubSystemHandler(registry: Registry, deps: Deps = {}) {
  */
 export function timelineSystemHandler(registry: Registry, deps: Pick<RouteDeps, "viewer"> & Deps = {}) {
   return async function GET(request: Request) {
-    const scope = new URL(request.url).searchParams.get("scope") ?? "joined";
-    if (scope !== "joined" && scope !== "all") return fail(400, "bad_request", "scope is joined or all.");
-    const store = getStore();
-    if (!store) return Response.json({ enabled: false, events: [], since: 0 }, { headers: OFF });
     // It reads every Club the reader is in, or every Club, so it is limited like the timeline itself.
-    if (!(await withinLimit(store, "timeline-read", clientId(request), 120, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const read = await timelineRead(request, { enabled: false, events: [], since: 0 });
+    if (read instanceof Response) return read;
+    const { scope, store } = read;
     if (scope === "all") {
       // An archived Club's Board is frozen, so it has nothing new to tell.
-      const { events, since } = await listSystem(store, registry.clubs().filter((club) => club.club !== "archived"), deps);
+      const { events, since } = await listSystem(
+        store,
+        registry.clubs().filter((club) => club.club !== "archived"),
+        deps,
+      );
       return Response.json({ enabled: true, events, since }, { headers: { "Cache-Control": SHARED } });
     }
     const viewer = await softViewer(request, deps);
@@ -60,11 +70,9 @@ export function timelineSystemHandler(registry: Registry, deps: Pick<RouteDeps, 
  */
 export function timelineChallengesHandler(registry: Registry, deps: RouteDeps = {}) {
   return async function GET(request: Request) {
-    const scope = new URL(request.url).searchParams.get("scope") ?? "joined";
-    if (scope !== "joined" && scope !== "all") return fail(400, "bad_request", "scope is joined or all.");
-    const store = getStore();
-    if (!store) return Response.json({ enabled: false, challenges: [] }, { headers: OFF });
-    if (!(await withinLimit(store, "timeline-read", clientId(request), 120, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const read = await timelineRead(request, { enabled: false, challenges: [] });
+    if (read instanceof Response) return read;
+    const { scope, store } = read;
     const viewer = await softViewer(request, deps);
     const clubs =
       scope === "all"

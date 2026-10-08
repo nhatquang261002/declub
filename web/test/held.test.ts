@@ -56,7 +56,11 @@ describe("holdings sampling (ADR 0040)", () => {
     const holdings: Holdings = async (t, ws) => (reads++, chain(table)(t, ws));
     const now = GENESIS + 60;
     assert.deepEqual(await sampleHoldings(store, [club], holdings, now, epochs), { sampled: [token], skipped: [], failed: [] });
-    assert.deepEqual(await sampleHoldings(store, [club], holdings, now + 600, epochs), { sampled: [], skipped: [token], failed: [] }, "the second call the same day skips");
+    assert.deepEqual(
+      await sampleHoldings(store, [club], holdings, now + 600, epochs),
+      { sampled: [], skipped: [token], failed: [] },
+      "the second call the same day skips",
+    );
     assert.equal(reads, 1);
     await sampleHoldings(store, [club], holdings, now + DAY, epochs);
     assert.deepEqual(await readHeld(store, token, 0), { days: [Math.floor(now / DAY), Math.floor(now / DAY) + 1], sums: { g: "6" } });
@@ -69,12 +73,24 @@ describe("holdings sampling (ADR 0040)", () => {
     const result = await sampleHoldings(store, [club], async () => null, GENESIS + 60, epochs);
     assert.deepEqual(result.failed, [token]);
     assert.equal(await store.get(heldKey(token, 0)), null);
-    assert.equal((await sampleHoldings(store, [club], chain({ [wallet(1)]: 1n }), GENESIS + 120, epochs)).sampled.length, 1, "retried, and the failure left no lock behind");
+    assert.equal(
+      (await sampleHoldings(store, [club], chain({ [wallet(1)]: 1n }), GENESIS + 120, epochs)).sampled.length,
+      1,
+      "retried, and the failure left no lock behind",
+    );
   });
 
   it("gives about 1/8 of the voice and the weight for NFTs bought on the last day", async () => {
     const store = memoryStore();
-    for (const [u, n] of [["g", 1], ["h", 2], ["s", 3], ["a", 4], ["b", 5], ["c", 6]] as const) await member(store, u, n);
+    for (const [u, n] of [
+      ["g", 1],
+      ["h", 2],
+      ["s", 3],
+      ["a", 4],
+      ["b", 5],
+      ["c", 6],
+    ] as const)
+      await member(store, u, n);
     const table: Record<string, bigint> = { [wallet(1)]: 5n, [wallet(3)]: 5n, [wallet(4)]: 1n, [wallet(5)]: 1n, [wallet(6)]: 1n };
     // g held 5 all week; s held 5 all week and sold before close; h held nothing until close.
     for (let d = 0; d < 7; d++) await sampleHoldings(store, [club], chain(table), GENESIS + d * DAY, epochs);
@@ -103,10 +119,24 @@ describe("holdings sampling (ADR 0040)", () => {
 
   it("matches today's behaviour with no samples", async () => {
     const store = memoryStore();
-    for (const [u, n] of [["g", 1], ["a", 2]] as const) await member(store, u, n);
+    for (const [u, n] of [
+      ["g", 1],
+      ["a", 2],
+    ] as const)
+      await member(store, u, n);
     const p = await post(store, "a", 60);
     await likePost(store, club, "g", p, true, at(120));
-    const { holders, samples } = await holderInputs(store, club, 0, [], null, chain({ [wallet(1)]: 5n, [wallet(2)]: 1n }), {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
+    const { holders, samples } = await holderInputs(
+      store,
+      club,
+      0,
+      [],
+      null,
+      chain({ [wallet(1)]: 5n, [wallet(2)]: 1n }),
+      {},
+      verifiedBy(GENESIS + WEEK),
+      UNCAPPED,
+    );
     assert.equal(samples, 0);
     assert.equal(holders.find((h) => h.userId === "g")!.held, 5n, "the average is the holding");
     assert.equal(holders.find((h) => h.userId === "a")!.backedPoints, 50 + 3);
@@ -116,7 +146,13 @@ describe("holdings sampling (ADR 0040)", () => {
 describe("the published backing (ADR 0040)", () => {
   it("gives the rules and samples with the epoch, and backing that recomputes to the published points", async () => {
     const store = memoryStore();
-    for (const [u, n] of [["g", 1], ["a", 2], ["mod", 3], ["x", 4]] as const) await member(store, u, n);
+    for (const [u, n] of [
+      ["g", 1],
+      ["a", 2],
+      ["mod", 3],
+      ["x", 4],
+    ] as const)
+      await member(store, u, n);
     const table: Record<string, bigint> = { [wallet(1)]: 4n, [wallet(2)]: 2n };
     for (let d = 0; d < 3; d++) await sampleHoldings(store, [club], chain(table), GENESIS + d * DAY, epochs);
     const pa = await post(store, "a", 60);
@@ -128,7 +164,17 @@ describe("the published backing (ADR 0040)", () => {
     // A moderator hid x's post: g's like on it is removed, and published as such.
     await store.set(`declub:club-post:10143:${token}:${px}`, { ...(await store.get<object>(`declub:club-post:10143:${token}:${px}`))!, hidden: "moderator" });
 
-    const swap = { id: "0x1:0", kind: "swapped" as const, contract: "0xswap", deal: "1", block: 1, at: GENESIS + 100, parties: [wallet(1), wallet(9)], tokens: [token], fee: (4n * 10n ** 18n).toString() };
+    const swap = {
+      id: "0x1:0",
+      kind: "swapped" as const,
+      contract: "0xswap",
+      deal: "1",
+      block: 1,
+      at: GENESIS + 100,
+      parties: [wallet(1), wallet(9)],
+      tokens: [token],
+      fee: (4n * 10n ** 18n).toString(),
+    };
     const rules = UNCAPPED;
     const result = await buildEpoch(store, 0, {
       now: () => GENESIS + WEEK,
@@ -152,7 +198,11 @@ describe("the published backing (ADR 0040)", () => {
 
     // Anyone can recompute each Holder's backed points from what is published: and they match the leaves.
     const voices = new Map<string, Voice>(Object.entries(published.voices));
-    const recomputed = backingPoints(published.actions.map((a) => ({ giver: a.from, receiver: a.to, kind: a.kind })), voices, record.clubs[0]!.rules);
+    const recomputed = backingPoints(
+      published.actions.map((a) => ({ giver: a.from, receiver: a.to, kind: a.kind })),
+      voices,
+      record.clubs[0]!.rules,
+    );
     for (const leaf of record.leaves) {
       const holder = leaf.breakdown.find((b) => b.kind === "holder");
       if (holder) assert.equal(holder.backed, recomputed.get(leaf.account.toLowerCase())!.points, `${leaf.account}`);

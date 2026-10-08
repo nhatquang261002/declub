@@ -50,13 +50,29 @@ export async function publicImage(image?: string): Promise<string | null> {
 
 /** The Club's round avatar: its art, or the first letter of its name when it has none. */
 export function Avatar({ src, name, size }: { src: string | null; name: string; size: number }) {
-  const frame = { display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, width: size, height: size, border: `${Math.max(4, size / 18)}px solid ${INK}`, borderRadius: 999, overflow: "hidden", background: YELLOW } as const;
-  // eslint-disable-next-line @next/next/no-img-element -- drawn by satori, not rendered in a page
-  if (src) return <div style={frame}><img src={src} width={size} height={size} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>;
+  const frame = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    width: size,
+    height: size,
+    border: `${Math.max(4, size / 18)}px solid ${INK}`,
+    borderRadius: 999,
+    overflow: "hidden",
+    background: YELLOW,
+  } as const;
+  if (src)
+    return (
+      <div style={frame}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- drawn by satori, not rendered in a page */}
+        <img src={src} width={size} height={size} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      </div>
+    );
   return <div style={{ ...frame, fontSize: size * 0.5 }}>{(name.match(/[\p{L}\p{N}]/u)?.[0] ?? "•").toUpperCase()}</div>;
 }
 
-export function LogoMark({ size = 48 }: { size?: number }) {
+function LogoMark({ size = 48 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
       <rect x="2" y="2" width="36" height="36" rx="10" fill="#fff4cf" stroke={INK} strokeWidth="2.5" />
@@ -75,7 +91,20 @@ export function LogoMark({ size = 48 }: { size?: number }) {
 
 export function Pill({ children, fill = YELLOW, size = 30 }: { children: ReactNode; fill?: string; size?: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, border: `5px solid ${INK}`, borderRadius: 999, background: fill, padding: "8px 26px", fontSize: size, fontWeight: 800, letterSpacing: 1 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        border: `5px solid ${INK}`,
+        borderRadius: 999,
+        background: fill,
+        padding: "8px 26px",
+        fontSize: size,
+        fontWeight: 800,
+        letterSpacing: 1,
+      }}
+    >
       {children}
     </div>
   );
@@ -88,8 +117,31 @@ export function Pill({ children, fill = YELLOW, size = 30 }: { children: ReactNo
 export function CardFrame({ badge, footer, children }: { badge: ReactNode; footer: ReactNode; children: ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: INK, color: INK, padding: 30, fontFamily: FONT }}>
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative", overflow: "hidden", borderRadius: 28, background: CREAM, padding: "40px 46px 34px" }}>
-        <div style={{ display: "flex", position: "absolute", right: -100, bottom: -210, width: 500, height: 500, border: `42px solid ${YELLOW}`, borderRadius: 999, opacity: 0.4 }} />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 28,
+          background: CREAM,
+          padding: "40px 46px 34px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            right: -100,
+            bottom: -210,
+            width: 500,
+            height: 500,
+            border: `42px solid ${YELLOW}`,
+            borderRadius: 999,
+            opacity: 0.4,
+          }}
+        />
         <div style={{ display: "flex", position: "absolute", left: -110, top: 150, width: 240, height: 240, borderRadius: 999, background: `${BLUE}1f` }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

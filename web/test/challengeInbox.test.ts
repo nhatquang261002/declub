@@ -23,7 +23,13 @@ const NOW = 1_800_000_000_000;
 /** An Owner ("own"), a Moderator ("mod"), members "m1" (a Holder) and "m2", and an app admin ("adm"), all joined. */
 async function world() {
   const store = memoryStore();
-  for (const [u, n, holder] of [["own", 1, false], ["mod", 2, false], ["m1", 3, true], ["m2", 4, false], ["adm", 9, false]] as const) {
+  for (const [u, n, holder] of [
+    ["own", 1, false],
+    ["mod", 2, false],
+    ["m1", 3, true],
+    ["m2", 4, false],
+    ["adm", 9, false],
+  ] as const) {
     assert.ok((await joinClub(store, club, u, [wallet(n)], { holdings: async () => [holder ? 1n : 0n] })).ok);
   }
   await saveRoles(store, token, { owner: "own", moderators: ["mod"] });
@@ -36,7 +42,18 @@ const inbox = async (store: Store, userId: string, n: number, now = NOW) =>
 let seq = 0;
 async function challenge(store: Store, over: Partial<StoredChallenge> = {}) {
   const id = `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
-  const c: StoredChallenge = { id, title: "Best Chog meme", brief: "Post your funniest Chog.", judging: "likes", prizes: [10, 5], startsAt: NOW - DAY, endsAt: NOW + 3 * DAY, by: wallet(1), state: "live", ...over };
+  const c: StoredChallenge = {
+    id,
+    title: "Best Chog meme",
+    brief: "Post your funniest Chog.",
+    judging: "likes",
+    prizes: [10, 5],
+    startsAt: NOW - DAY,
+    endsAt: NOW + 3 * DAY,
+    by: wallet(1),
+    state: "live",
+    ...over,
+  };
   await store.set(challengeKey(token, id), c);
   await store.rank(challengesKey(token), [{ member: id, score: c.startsAt }], CHALLENGE_RULES.kept);
   return c;
@@ -54,8 +71,16 @@ describe("challenge notifications", () => {
     assert.equal(item!.title, "New challenge in Chogs: “Best Chog meme”");
     assert.equal(item!.href, `/clubs/${token}/challenges/${c.id}`);
     assert.equal(item!.actionable, undefined);
-    assert.deepEqual((await inbox(store, "mod", 2)).map((i) => i.kind), ["challenge-new"], "Moderators can enter");
-    assert.deepEqual((await inbox(store, "m2", 4, NOW + 3_600_000)).map((i) => i.key), [item!.key], "the key doesn't move with the clock");
+    assert.deepEqual(
+      (await inbox(store, "mod", 2)).map((i) => i.kind),
+      ["challenge-new"],
+      "Moderators can enter",
+    );
+    assert.deepEqual(
+      (await inbox(store, "m2", 4, NOW + 3_600_000)).map((i) => i.key),
+      [item!.key],
+      "the key doesn't move with the clock",
+    );
   });
 
   it("says nothing to the Owner or an admin about their own challenge, nor after entering", async () => {
@@ -77,7 +102,10 @@ describe("challenge notifications", () => {
     assert.equal(forHolder!.key, `challenge-new:${token}:${h.id}`);
     assert.match(forHolder!.body, /^For Holders\./);
     await store.set(rewardBansKey(token), { m1: { wallet: wallet(3), at: 1, by: wallet(1) } });
-    assert.deepEqual((await inbox(store, "m1", 3)).filter((i) => i.key.includes(h.id)), []);
+    assert.deepEqual(
+      (await inbox(store, "m1", 3)).filter((i) => i.key.includes(h.id)),
+      [],
+    );
   });
 
   it("nudges in the last day if not entered, once, then not after entering", async () => {
@@ -140,8 +168,16 @@ describe("challenge notifications", () => {
     assert.equal(pick!.title, "Pick the winners of “Best Chog meme”");
     assert.equal(pick!.actionable, true);
     assert.equal(clubNotifications([pick!])[0]!.actionable, true, "the bell shows it as needing them");
-    assert.deepEqual((await inbox(store, "adm", 9)).map((i) => i.kind), ["challenge-pick"]);
-    for (const [u, n] of [["mod", 2], ["m1", 3], ["m2", 4]] as const) assert.deepEqual(await inbox(store, u, n), [], `not for ${u}`);
+    assert.deepEqual(
+      (await inbox(store, "adm", 9)).map((i) => i.kind),
+      ["challenge-pick"],
+    );
+    for (const [u, n] of [
+      ["mod", 2],
+      ["m1", 3],
+      ["m2", 4],
+    ] as const)
+      assert.deepEqual(await inbox(store, u, n), [], `not for ${u}`);
 
     const late = c.endsAt + CHALLENGE_RULES.pickWindowMs - 2 * DAY;
     const [soon, ...rest] = await inbox(store, "own", 1, late);
@@ -172,12 +208,22 @@ describe("challenge notifications", () => {
     assert.deepEqual([owed!.kind, owed!.key, owed!.actionable], ["challenge-prize-owed", `challenge-prize-owed:${token}:${c.id}`, true]);
     assert.equal(owed!.title, "Send the prize for “Best Chog meme”");
     assert.equal(clubNotifications([owed!])[0]!.actionable, true, "the bell shows it as needing them");
-    assert.deepEqual((await inbox(store, "adm", 9)).map((i) => i.kind), ["challenge-prize-owed"]);
+    assert.deepEqual(
+      (await inbox(store, "adm", 9)).map((i) => i.kind),
+      ["challenge-prize-owed"],
+    );
     assert.deepEqual(await inbox(store, "mod", 2), [], "not a Moderator's to send");
     const later = await inbox(store, "own", 1, NOW + 20 * DAY);
-    assert.deepEqual(later.map((i) => i.key), [`challenge-prize-owed:${token}:${c.id}:overdue`], "still asked, as news again, once overdue");
+    assert.deepEqual(
+      later.map((i) => i.key),
+      [`challenge-prize-owed:${token}:${c.id}:overdue`],
+      "still asked, as news again, once overdue",
+    );
 
-    await store.set(challengeKey(token, c.id), { ...c, settled: { ...c.settled!, winners: [{ ...c.settled!.winners[0]!, sent: { tx: "0x" + "1".repeat(64), at: NOW } }] } });
+    await store.set(challengeKey(token, c.id), {
+      ...c,
+      settled: { ...c.settled!, winners: [{ ...c.settled!.winners[0]!, sent: { tx: "0x" + "1".repeat(64), at: NOW } }] },
+    });
     assert.deepEqual(await inbox(store, "own", 1), [], "nothing left to send");
     const sent = (await inbox(store, "m1", 3)).find((i) => i.kind === "challenge-prize-sent")!;
     assert.equal(sent.key, `challenge-prize-sent:${token}:${c.id}`);
@@ -194,6 +240,11 @@ describe("challenge notifications", () => {
     const ended = await challenge(store, { judging: "owner", endsAt: NOW - DAY, state: "cancelled" });
     await enter(store, open, "m1");
     await enter(store, ended, "m1");
-    for (const [u, n] of [["own", 1], ["m1", 3], ["m2", 4]] as const) assert.deepEqual(await inbox(store, u, n), [], `nothing for ${u}`);
+    for (const [u, n] of [
+      ["own", 1],
+      ["m1", 3],
+      ["m2", 4],
+    ] as const)
+      assert.deepEqual(await inbox(store, u, n), [], `nothing for ${u}`);
   });
 });

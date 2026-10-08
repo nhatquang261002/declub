@@ -11,7 +11,7 @@ import { readTrophies } from "./challengeState";
 import type { PublicTrophy } from "../challenges";
 import { softViewer, type RouteDeps } from "./boardRoutes";
 import { listWalletPosts } from "./timeline";
-import { parseCursor, TIMELINE_MAX_PAGE, TIMELINE_PAGE } from "../timeline";
+import { pageParams } from "./timelineRoutes";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 
 /**
@@ -19,7 +19,7 @@ import { clientId, getStore, withinLimit, type Store } from "./store";
  * public profile in one read. What the page shows is only what each owner chose to show: the
  * handle they shared (ADR 0011), the avatar they set (ADR 0028) and the text they wrote.
  */
-export type ProfilePageDeps = {
+type ProfilePageDeps = {
   store?: () => Store | null;
   gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
 };
@@ -64,19 +64,28 @@ export function aboutHandlers(deps: ProfilePageDeps = {}) {
   };
 }
 
-const PUBLIC = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" };
+/** Public, but the owner's own page asks for `fresh`, so what they just saved isn't hidden behind the CDN's copy. */
+const publicCache = (request: Request) => ({
+  headers: { "Cache-Control": new URL(request.url).searchParams.get("fresh") === "1" ? "no-store" : "public, s-maxage=30, stale-while-revalidate=120" },
+});
+
+/** The start of a wallet page read: the wallet and the store, or the response that ends the call (bad address, no store, which answers `off`, or too many requests). */
+async function walletRead(deps: ProfilePageDeps, request: Request, ctx: { params: Promise<{ address: string }> }, limit: string, off: object) {
+  const { address } = await ctx.params;
+  if (!isAddress(address, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
+  const store = (deps.store ?? getStore)();
+  if (!store) return Response.json(off, { headers: { "Cache-Control": "no-store" } });
+  if (!(await withinLimit(store, limit, clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+  return { wallet: address.toLowerCase(), store };
+}
 
 /** GET /api/wallets/[address]/profile: what a wallet's owner shows about themselves. Public. */
 export function walletProfileHandler(deps: ProfilePageDeps & { registry?: Pick<Registry, "clubFor"> } = {}) {
   const clubs = deps.registry ?? defaultRegistry;
   return async function GET(request: Request, ctx: { params: Promise<{ address: string }> }) {
-    const { address } = await ctx.params;
-    if (!isAddress(address, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
-    const store = (deps.store ?? getStore)();
-    if (!store) return Response.json({ enabled: false, profile: null, avatar: null, about: null } satisfies WalletProfile, { headers: { "Cache-Control": "no-store" } });
-    if (!(await withinLimit(store, "wallet-profile", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-
-    const wallet = address.toLowerCase();
+    const read = await walletRead(deps, request, ctx, "wallet-profile", { enabled: false, profile: null, avatar: null, about: null } satisfies WalletProfile);
+    if (read instanceof Response) return read;
+    const { wallet, store } = read;
     // Each part is cosmetic: one that can't be read leaves a plainer page, not an error.
     const [row, avatars, about] = await Promise.all([
       store.get<StoredProfile>(profileKey(wallet)).catch(() => null),
@@ -91,9 +100,7 @@ export function walletProfileHandler(deps: ProfilePageDeps & { registry?: Pick<R
       about,
       ...(trophies.length > 0 ? { trophies } : {}),
     };
-    // The owner's own page asks for `fresh`, so what they just saved isn't hidden behind the CDN's copy.
-    const fresh = new URL(request.url).searchParams.get("fresh") === "1";
-    return Response.json(body, { headers: fresh ? { "Cache-Control": "no-store" } : PUBLIC });
+    return Response.json(body, publicCache(request));
   };
 }
 
@@ -117,20 +124,17 @@ async function walletTrophies(store: Store, wallet: string, row: StoredProfile |
 export function walletClubsHandler(deps: ProfilePageDeps & { registry?: Pick<Registry, "clubFor"> } = {}) {
   const clubs = deps.registry ?? defaultRegistry;
   return async function GET(request: Request, ctx: { params: Promise<{ address: string }> }) {
-    const { address } = await ctx.params;
-    if (!isAddress(address, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
-    const store = (deps.store ?? getStore)();
-    if (!store) return Response.json({ enabled: false, clubs: [] }, { headers: { "Cache-Control": "no-store" } });
-    if (!(await withinLimit(store, "wallet-clubs", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const read = await walletRead(deps, request, ctx, "wallet-clubs", { enabled: false, clubs: [] });
+    if (read instanceof Response) return read;
+    const { wallet, store } = read;
 
-    const rows = await membershipsOfWallet(store, address.toLowerCase());
+    const rows = await membershipsOfWallet(store, wallet);
     const list: WalletClub[] = rows
       // A Club that has left the list isn't shown, as it isn't on the Clubs page.
       .filter(({ token }) => clubs.clubFor(token))
       .map(({ token, row }) => ({ token, holder: row.holder, joinedAt: row.joinedAt }))
       .sort((a, b) => b.joinedAt - a.joinedAt);
-    const fresh = new URL(request.url).searchParams.get("fresh") === "1";
-    return Response.json({ enabled: true, clubs: list }, { headers: fresh ? { "Cache-Control": "no-store" } : PUBLIC });
+    return Response.json({ enabled: true, clubs: list }, publicCache(request));
   };
 }
 
@@ -144,13 +148,9 @@ export function walletBoardHandler(registry: Registry = defaultRegistry, deps: P
   return async function GET(request: Request, ctx: { params: Promise<{ address: string }> }) {
     const { address } = await ctx.params;
     if (!isAddress(address, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
-    const url = new URL(request.url);
-    const limit = url.searchParams.get("limit") === null ? TIMELINE_PAGE : Number(url.searchParams.get("limit"));
-    const askedBefore = url.searchParams.get("before");
-    const before = askedBefore === null ? undefined : parseCursor(askedBefore);
-    if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_PAGE || before === null) {
-      return fail(400, "bad_request", `limit is 1 to ${TIMELINE_MAX_PAGE}, and before is the next of an earlier page.`);
-    }
+    const page = pageParams(new URL(request.url));
+    if (page instanceof Response) return page;
+    const { limit, before } = page;
     const store = (deps.store ?? getStore)();
     if (!store) return Response.json({ enabled: false, posts: [], next: null }, { headers: { "Cache-Control": "no-store" } });
     if (!(await withinLimit(store, "wallet-board", clientId(request), 120, 60))) return fail(429, "rate_limited", "Too many requests.");

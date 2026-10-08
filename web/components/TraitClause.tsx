@@ -25,9 +25,7 @@ export function TraitClauseSummary({
   return (
     <div className="rounded-xl border border-[#d83b45]/30 bg-[#fff4cf] p-3 text-[#111318]">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-white">
-          trait request
-        </span>
+        <span className="rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-white">trait request</span>
         <span className="font-semibold">
           {clause.amount} NFT{clause.amount === 1 ? "" : "s"} with {clause.picks.length > 1 ? (clause.mode === "all" ? "all of: " : "any of: ") : ""}
           {describePicks(clause)}
@@ -37,9 +35,7 @@ export function TraitClauseSummary({
         From <CopyAddress address={clause.token} />
         {matches !== undefined && ` · ${matches.toLocaleString()} NFT${matches === 1 ? "" : "s"} match today`}
       </p>
-      {check && (
-        <p className={`mt-1 text-xs ${check === "differs" ? "font-semibold text-[#a9282f]" : "text-[#5d6270]"}`}>{CHECK_TEXT[check]}</p>
-      )}
+      {check && <p className={`mt-1 text-xs ${check === "differs" ? "font-semibold text-[#a9282f]" : "text-[#5d6270]"}`}>{CHECK_TEXT[check]}</p>}
     </div>
   );
 }

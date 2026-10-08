@@ -1,0 +1,7 @@
+{
+  "path": ["web/app", "web/components", "web/hooks", "web/lib", "web/scripts", "matcher/src", "e2e/src"],
+  "ignore": ["**/abi.ts", "**/node_modules/**", "**/.next*/**"],
+  "minLines": 5,
+  "minTokens": 50,
+  "reporters": ["console"]
+}

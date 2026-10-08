@@ -7,10 +7,9 @@ import { usePrivy } from "@privy-io/react-auth";
 import { XLogoIcon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { PROFILE_LABEL, type Profile } from "@/lib/profiles";
+import { profileCall } from "./api";
 
-type ShareState =
-  | { enabled: false }
-  | { enabled: true; shared: boolean; profile?: Profile; available?: Profile; stale: boolean };
+type ShareState = { enabled: false } | { enabled: true; shared: boolean; profile?: Profile; available?: Profile; stale: boolean };
 
 /**
  * The signed-in user's shared profile (ADR 0011). The server reads their linked accounts from Privy
@@ -24,17 +23,8 @@ function useSharedProfile() {
   const [busy, setBusy] = useState(false);
 
   const call = useCallback(
-    async (method: "GET" | "PUT" | "DELETE", body?: unknown) => {
-      const token = await getAccessToken();
-      const response = await fetch("/api/profile", {
-        method,
-        headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const data = (await response.json()) as ShareState & { message?: string };
-      if (!response.ok) throw new Error(data.message ?? "Couldn't update your profile.");
-      return data;
-    },
+    (method: "GET" | "PUT" | "DELETE", body?: unknown) =>
+      profileCall<ShareState & { message?: string }>(getAccessToken, "/api/profile", "Couldn't update your profile.", method, body),
     [getAccessToken],
   );
 
@@ -90,10 +80,9 @@ export function ShareHandle() {
         {shared && <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[0.65rem] font-normal text-mint">On</span>}
       </h2>
       <p className="mt-1 text-sm text-muted">
-        Next to your wallet on deals, others see the X or Discord account you linked, so they know who they are
-        trading with, and signed-in traders can find your wallet by that handle to make you a private deal. It only
-        shows that the account and the wallet belong to the same person, not that either is trustworthy. Off until you
-        turn it on, and you can turn it off at any time.
+        Next to your wallet on deals, others see the X or Discord account you linked, so they know who they are trading with, and signed-in traders can find
+        your wallet by that handle to make you a private deal. It only shows that the account and the wallet belong to the same person, not that either is
+        trustworthy. Off until you turn it on, and you can turn it off at any time.
       </p>
       {shared && profile ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/70 px-3 py-2.5">
@@ -109,8 +98,8 @@ export function ShareHandle() {
       ) : available ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm text-muted">
-            Would show <span className="font-semibold text-[#111318]">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside
-            every wallet linked to this sign-in.
+            Would show <span className="font-semibold text-[#111318]">{label(available)}</span> ({PROFILE_LABEL[available.provider]}) beside every wallet linked
+            to this sign-in.
           </span>
           <button className="btn-primary" disabled={busy} onClick={share}>
             {busy ? "Working…" : "Show my handle"}
@@ -118,7 +107,11 @@ export function ShareHandle() {
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted">
-          Link an X account in your <Link href="/settings" className="font-bold underline">account settings</Link> to turn this on. Discord works too; Google and email are never shown.
+          Link an X account in your{" "}
+          <Link href="/settings" className="font-bold underline">
+            account settings
+          </Link>{" "}
+          to turn this on. Discord works too; Google and email are never shown.
         </p>
       )}
     </section>

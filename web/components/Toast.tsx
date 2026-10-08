@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { describeError, type AppError } from "@/lib/errors";
 import { Alert, toneOf, type AlertTone } from "./Alert";
 
@@ -55,10 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback((input: ToastInput) => {
     // The same failure twice in a row is one toast that starts over, not a growing stack.
     const id = `${input.tone}|${input.title}|${input.message ?? ""}`;
-    setToasts((all) => [
-      ...all.filter((t) => t.id !== id).slice(-(MAX_VISIBLE - 1)),
-      { ...input, id, seq: Date.now() + Math.random() },
-    ]);
+    setToasts((all) => [...all.filter((t) => t.id !== id).slice(-(MAX_VISIBLE - 1)), { ...input, id, seq: Date.now() + Math.random() }]);
   }, []);
 
   const error = useCallback(
@@ -101,20 +90,8 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
   }, [held, duration, toast.id, onDismiss]);
 
   return (
-    <div
-      className="toast"
-      onMouseEnter={() => setHeld(true)}
-      onMouseLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={() => setHeld(false)}
-    >
-      <Alert
-        tone={toast.tone}
-        title={toast.title}
-        details={toast.details}
-        actions={toast.actions}
-        onDismiss={() => onDismiss(toast.id)}
-      >
+    <div className="toast" onMouseEnter={() => setHeld(true)} onMouseLeave={() => setHeld(false)} onFocus={() => setHeld(true)} onBlur={() => setHeld(false)}>
+      <Alert tone={toast.tone} title={toast.title} details={toast.details} actions={toast.actions} onDismiss={() => onDismiss(toast.id)}>
         {toast.message}
       </Alert>
     </div>

@@ -75,8 +75,21 @@ async function main() {
 
   const w = await makeWorld(cfg);
   try {
-    Object.assign(meta, { chainId: String(w.chainId), v2: w.v2, intents: w.intents, nft: w.nft, erc20: w.usd, feeToken: w.feeToken, pool: w.poolUrl ?? "none" });
-    for (const [label, a] of [["DeClubEscrow", w.v2], ["DeClubIntents", w.intents], ["NFT", w.nft], ["ERC-20", w.usd]] as const) {
+    Object.assign(meta, {
+      chainId: String(w.chainId),
+      v2: w.v2,
+      intents: w.intents,
+      nft: w.nft,
+      erc20: w.usd,
+      feeToken: w.feeToken,
+      pool: w.poolUrl ?? "none",
+    });
+    for (const [label, a] of [
+      ["DeClubEscrow", w.v2],
+      ["DeClubIntents", w.intents],
+      ["NFT", w.nft],
+      ["ERC-20", w.usd],
+    ] as const) {
       const code = await w.pub.getCode({ address: a });
       if (!code || code === "0x") throw new Error(`${label} ${a} has no code on chain ${w.chainId}`);
     }

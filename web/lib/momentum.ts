@@ -129,7 +129,7 @@ export function score(events: ScoredEvent[], now: number, options: { decay?: boo
   };
 }
 
-export type Trend = { score: number; previous: number; change: number };
+type Trend = { score: number; previous: number; change: number };
 
 /** Club Momentum now, a week ago, and the difference. */
 export function trend(events: ScoredEvent[], now: number): Trend {

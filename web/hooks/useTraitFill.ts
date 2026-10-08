@@ -29,10 +29,7 @@ export function useTraitFill(requested: readonly Asset[], clauses: readonly Trai
   const [picked, setPicked] = useState<Record<number, bigint[]>>({});
 
   // The spec has to line up with the deal: one clause per trait asset, same collection.
-  const aligned =
-    !!clauses &&
-    clauses.length === traitAssets.length &&
-    clauses.every((c, i) => c.token.toLowerCase() === traitAssets[i].token.toLowerCase());
+  const aligned = !!clauses && clauses.length === traitAssets.length && clauses.every((c, i) => c.token.toLowerCase() === traitAssets[i].token.toLowerCase());
 
   const statuses = useCollectionCatalogs(aligned ? traitAssets.map((a) => a.token) : []);
 

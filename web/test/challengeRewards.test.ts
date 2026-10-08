@@ -6,7 +6,17 @@ import { profileKey, userWalletsKey } from "../lib/profiles";
 import { createPost, likePost, type Deps } from "../lib/server/board";
 import { challengeHandlers } from "../lib/server/boardRoutes";
 import { TRANSFER_TOPIC, prizeProblem, type PrizeChain, type PrizeReceipt } from "../lib/server/challengePrizes";
-import { cancelChallenge, createChallenge, enterChallenge, getChallenge, pickWinners, sendPrize, settleDue, type BlockReader, type ChallengeDeps } from "../lib/server/challenges";
+import {
+  cancelChallenge,
+  createChallenge,
+  enterChallenge,
+  getChallenge,
+  pickWinners,
+  sendPrize,
+  settleDue,
+  type BlockReader,
+  type ChallengeDeps,
+} from "../lib/server/challenges";
 import { challengeKey, readAwards, readTrophies } from "../lib/server/challengeState";
 import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
@@ -91,12 +101,34 @@ async function post(store: Store, userId: string, s: number) {
 /** An Owner (1), a Moderator (2), members g (3), a (4) and x (5). */
 async function world() {
   const store = memoryStore();
-  for (const [u, n] of [["own", 1], ["mod", 2], ["g", 3], ["a", 4], ["x", 5]] as const) await member(store, u, n);
+  for (const [u, n] of [
+    ["own", 1],
+    ["mod", 2],
+    ["g", 3],
+    ["a", 4],
+    ["x", 5],
+  ] as const)
+    await member(store, u, n);
   await saveRoles(store, token, { owner: "own", moderators: ["mod"] });
   return store;
 }
-const ranked = (over: Record<string, unknown> = {}) => ({ title: "Best Chog meme", brief: "Post your funniest Chog.", judging: "likes", prizes: [10, 5], epochs: 1, ...over });
-const flat = (judging: string, over: Record<string, unknown> = {}) => ({ title: "Giveaway", brief: "Post a Chog.", judging, winners: 2, prize: 3, epochs: 1, ...over });
+const ranked = (over: Record<string, unknown> = {}) => ({
+  title: "Best Chog meme",
+  brief: "Post your funniest Chog.",
+  judging: "likes",
+  prizes: [10, 5],
+  epochs: 1,
+  ...over,
+});
+const flat = (judging: string, over: Record<string, unknown> = {}) => ({
+  title: "Giveaway",
+  brief: "Post a Chog.",
+  judging,
+  winners: 2,
+  prize: 3,
+  epochs: 1,
+  ...over,
+});
 
 async function start(store: Store, input: Record<string, unknown>, deps = at(START)) {
   const r = await createChallenge(store, club, actor("own", 1), input, deps);
@@ -107,12 +139,25 @@ async function start(store: Store, input: Record<string, unknown>, deps = at(STA
 async function played(store: Store, id: string) {
   const posts = { g: await post(store, "g", 60), a: await post(store, "a", 61), x: await post(store, "x", 62) };
   for (const u of ["g", "a", "x"] as const) assert.ok((await enterChallenge(store, club, u, id, posts[u], at(63))).ok, u);
-  for (const [who, p] of [["a", posts.g], ["x", posts.g], ["g", posts.a]] as const) assert.ok((await likePost(store, club, who, p, true, at(100) as Deps)).ok);
+  for (const [who, p] of [
+    ["a", posts.g],
+    ["x", posts.g],
+    ["g", posts.a],
+  ] as const)
+    assert.ok((await likePost(store, club, who, p, true, at(100) as Deps)).ok);
   return posts;
 }
 
-const erc20Log = (asset: string, to: string, value: bigint) => ({ address: asset, topics: [TRANSFER_TOPIC, pad(wallet(1) as Hex), pad(to as Hex)] as Hex[], data: numberToHex(value, { size: 32 }) });
-const nftLog = (asset: string, to: string, id: bigint) => ({ address: asset, topics: [TRANSFER_TOPIC, pad(wallet(1) as Hex), pad(to as Hex), numberToHex(id, { size: 32 })] as Hex[], data: "0x" as Hex });
+const erc20Log = (asset: string, to: string, value: bigint) => ({
+  address: asset,
+  topics: [TRANSFER_TOPIC, pad(wallet(1) as Hex), pad(to as Hex)] as Hex[],
+  data: numberToHex(value, { size: 32 }),
+});
+const nftLog = (asset: string, to: string, id: bigint) => ({
+  address: asset,
+  topics: [TRANSFER_TOPIC, pad(wallet(1) as Hex), pad(to as Hex), numberToHex(id, { size: 32 })] as Hex[],
+  data: "0x" as Hex,
+});
 const receipt = (logs: PrizeReceipt["logs"], s = END + 100, status: PrizeReceipt["status"] = "success"): PrizeReceipt => ({ status, at: GENESIS + s, logs });
 const txHash = (label: string) => keccak256(stringToHex(label));
 
@@ -126,7 +171,10 @@ describe("an asset prize, checked", () => {
     assert.deepEqual(nft.challenge.rewards, { asset: { token: OTHER_NFT.toLowerCase(), kind: "erc721", name: "Moles", symbol: "MOLE", amounts: ["2", "1"] } });
     const usdc = check({ rewards: { asset: { token: USDC, amounts: ["2.5", "0"] }, pinWinner: true } });
     assert.ok(usdc.ok);
-    assert.deepEqual(usdc.challenge.rewards, { pinWinner: true, asset: { token: USDC.toLowerCase(), kind: "erc20", name: "USD Coin", symbol: "USDC", decimals: 6, amounts: ["2500000", "0"] } });
+    assert.deepEqual(usdc.challenge.rewards, {
+      pinWinner: true,
+      asset: { token: USDC.toLowerCase(), kind: "erc20", name: "USD Coin", symbol: "USDC", decimals: 6, amounts: ["2500000", "0"] },
+    });
     assert.equal(assetText(usdc.challenge.rewards!.asset!, "2500000"), "2.5 USDC");
     assert.equal(assetText(nft.challenge.rewards!.asset!, "1"), "1 NFT from Moles");
     // Old inputs, and pinning alone, still check.
@@ -185,7 +233,13 @@ describe("an asset prize, checked", () => {
     assert.match(log.detail ?? "", /plus 2 USDC\/1 USDC/);
     // A token that doesn't answer can't be a prize.
     const silent = fakeChain(null);
-    const r = await createChallenge(store, club, actor("own", 1), ranked({ rewards: { asset: { token: USDC, amounts: ["2", "1"] } } }), at(START, silent.chain));
+    const r = await createChallenge(
+      store,
+      club,
+      actor("own", 1),
+      ranked({ rewards: { asset: { token: USDC, amounts: ["2", "1"] } } }),
+      at(START, silent.chain),
+    );
     assert.equal(r.ok, false);
     assert.equal((r as { reason: string }).reason, "invalid");
   });
@@ -200,7 +254,10 @@ describe("trophies", () => {
     assert.equal(await settleDue(store, club, at(END + 6)), 0);
     const g = await readTrophies(store, "g");
     assert.deepEqual(g, [{ club: token, challenge: id, title: "Best Chog meme", place: 1, at: (GENESIS + END + 5) * 1000, wallet: wallet(3) }]);
-    assert.deepEqual((await readTrophies(store, "a")).map((t) => t.place), [2]);
+    assert.deepEqual(
+      (await readTrophies(store, "a")).map((t) => t.place),
+      [2],
+    );
     assert.deepEqual(await readTrophies(store, "x"), [], "x had no likes");
     assert.deepEqual(await readAwards(store, token, 0), {}, "a trophy-only win adds nothing to the epoch");
     assert.ok(posts.g);
@@ -224,9 +281,16 @@ describe("trophies", () => {
       assert.ok(won > 0, judging);
       const all = [...(await readTrophies(store, "g")), ...(await readTrophies(store, "a")), ...(await readTrophies(store, "x"))];
       assert.equal(all.length, won, `${judging}: one trophy per winner`);
-      assert.ok(all.every((t) => t.place === (judging === "owner" ? 1 : null)), judging);
+      assert.ok(
+        all.every((t) => t.place === (judging === "owner" ? 1 : null)),
+        judging,
+      );
       await settleDue(store, club, { ...at(END + 8), blocks });
-      assert.equal([...(await readTrophies(store, "g")), ...(await readTrophies(store, "a")), ...(await readTrophies(store, "x"))].length, won, `${judging}: once`);
+      assert.equal(
+        [...(await readTrophies(store, "g")), ...(await readTrophies(store, "a")), ...(await readTrophies(store, "x"))].length,
+        won,
+        `${judging}: once`,
+      );
     }
   });
 
@@ -274,10 +338,22 @@ describe("an asset prize, owed and sent", () => {
   it("is owed to each winner from the settle, outside the epoch's points", async () => {
     const { store, id, posts } = await owed();
     const c = (await getChallenge(store, club, id, {}, at(END + 6)))!;
-    assert.deepEqual(c.settled!.winners.map((w) => [w.post, w.prize, w.sent]), [[posts.g, "2000000", undefined], [posts.a, "1000000", undefined]]);
+    assert.deepEqual(
+      c.settled!.winners.map((w) => [w.post, w.prize, w.sent]),
+      [
+        [posts.g, "2000000", undefined],
+        [posts.a, "1000000", undefined],
+      ],
+    );
     assert.equal(c.prizeDueBy, (GENESIS + END + 5) * 1000 + CHALLENGE_RULES.prizeDueMs);
     assert.equal(JSON.stringify(c).includes("prizeUsers"), false, "user ids never leave the server");
-    assert.deepEqual(Object.values(await readAwards(store, token, 0)).map((x) => x.points).sort(), [10, 5], "the points are unchanged");
+    assert.deepEqual(
+      Object.values(await readAwards(store, token, 0))
+        .map((x) => x.points)
+        .sort(),
+      [10, 5],
+      "the points are unchanged",
+    );
     assert.equal(prizeStatus(c.settled!.winners[0]!, c.settled!.at, c.settled!.at + 1), "owed");
     assert.equal(prizeStatus(c.settled!.winners[0]!, c.settled!.at, c.settled!.at + CHALLENGE_RULES.prizeDueMs), "overdue");
   });
@@ -329,7 +405,10 @@ describe("an asset prize, owed and sent", () => {
     const mole = OTHER_NFT.toLowerCase();
     const one = txHash("one");
     fake.receipts.set(one, receipt([nftLog(mole, wallet(3), 7n), nftLog(mole, wallet(3), 7n)]));
-    assert.deepEqual(await sendPrize(store, club, actor("own", 1), id, { post: posts.g, tx: one }, at(END + 200, fake.chain)), { ok: false, reason: "too_little" });
+    assert.deepEqual(await sendPrize(store, club, actor("own", 1), id, { post: posts.g, tx: one }, at(END + 200, fake.chain)), {
+      ok: false,
+      reason: "too_little",
+    });
     const two = txHash("two");
     fake.receipts.set(two, receipt([nftLog(mole, wallet(3), 7n), nftLog(mole, wallet(0x33), 8n)]));
     assert.ok((await sendPrize(store, club, actor("own", 1), id, { post: posts.g, tx: two }, at(END + 200, fake.chain))).ok);
@@ -340,7 +419,8 @@ describe("an asset prize, owed and sent", () => {
     const { store, id, posts, fake } = await owed();
     const tx = txHash("route");
     fake.receipts.set(tx, receipt([erc20Log(USDC.toLowerCase(), wallet(3), 2_000_000n)]));
-    const gate = async () => ({ store, user: { id: "own", linked_accounts: [{ type: "wallet", chain_type: "ethereum", address: wallet(1) }] } }) as unknown as UserGate;
+    const gate = async () =>
+      ({ store, user: { id: "own", linked_accounts: [{ type: "wallet", chain_type: "ethereum", address: wallet(1) }] } }) as unknown as UserGate;
     const routes = challengeHandlers(reg, { ...at(END + 200, fake.chain), gate });
     const ctx = { params: Promise.resolve({ token: NFT, id }) };
     const res = await routes.POST(new Request("http://x", { method: "POST", body: JSON.stringify({ action: "prize_sent", post: posts.g, tx }) }), ctx);
@@ -358,10 +438,17 @@ describe("an asset prize, owed and sent", () => {
     const asset = { rewards: { asset: { token: USDC, amounts: ["1", "0"] } } };
     const refused = await createChallenge(store, club, actor("own", 1), ranked(asset), at(late, fake.chain));
     assert.deepEqual(refused, { ok: false, reason: "prize_overdue" });
-    assert.equal((await createChallenge(store, club, actor("own", 1), ranked({ ...asset, epochs: 2 }), at(late - 10, fake.chain))).ok, true, "before the due time it's only owed");
+    assert.equal(
+      (await createChallenge(store, club, actor("own", 1), ranked({ ...asset, epochs: 2 }), at(late - 10, fake.chain))).ok,
+      true,
+      "before the due time it's only owed",
+    );
     assert.ok((await createChallenge(store, club, actor("own", 1), ranked(), at(late, fake.chain))).ok, "a points-only challenge is still fine");
     // Paying both (late is fine) lifts the block.
-    for (const [p, to, amount] of [[posts.g, wallet(3), 2_000_000n], [posts.a, wallet(4), 1_000_000n]] as const) {
+    for (const [p, to, amount] of [
+      [posts.g, wallet(3), 2_000_000n],
+      [posts.a, wallet(4), 1_000_000n],
+    ] as const) {
       const tx = txHash(`late ${p}`);
       fake.receipts.set(tx, receipt([erc20Log(USDC.toLowerCase(), to, amount)], late + 1));
       assert.ok((await sendPrize(store, club, actor("own", 1), id, { post: p, tx }, at(late + 2, fake.chain))).ok);
@@ -373,9 +460,14 @@ describe("an asset prize, owed and sent", () => {
     const { store, id, posts, fake } = await owed();
     const settledAt = (GENESIS + END + 5) * 1000;
     const inbox = async (userId: string, n: number, nowMs: number) =>
-      (await clubInbox(store, userId, [wallet(n)], { registry: reg, standings: async () => null, admins: new Set(["adm"]), now: () => nowMs })).filter((i) => i.kind.startsWith("challenge-prize"));
+      (await clubInbox(store, userId, [wallet(n)], { registry: reg, standings: async () => null, admins: new Set(["adm"]), now: () => nowMs })).filter((i) =>
+        i.kind.startsWith("challenge-prize"),
+      );
     const [ask] = await inbox("own", 1, settledAt + DAY_MS);
-    assert.deepEqual([ask!.kind, ask!.key, ask!.actionable, ask!.href], ["challenge-prize-owed", `challenge-prize-owed:${token}:${id}`, true, `/clubs/${token}/challenges/${id}`]);
+    assert.deepEqual(
+      [ask!.kind, ask!.key, ask!.actionable, ask!.href],
+      ["challenge-prize-owed", `challenge-prize-owed:${token}:${id}`, true, `/clubs/${token}/challenges/${id}`],
+    );
     assert.match(ask!.title, /Send the prizes for “Best Chog meme”/);
     assert.deepEqual(await inbox("g", 3, settledAt + DAY_MS), [], "nothing sent yet");
     const [overdue] = await inbox("own", 1, settledAt + CHALLENGE_RULES.prizeDueMs);
@@ -421,6 +513,9 @@ describe("pinned results", () => {
   it("leave both the start and the result out of the feed while pinned", () => {
     const ev = (id: string, kind: SystemEvent["kind"], challenge: string) => ({ id, kind, challenge, at: 1, clubs: [token] }) as unknown as SystemEvent;
     const events = [ev("s:a", "challenge", "a"), ev("w:a", "winner", "a"), ev("s:b", "challenge", "b"), ev("w:b", "winner", "b")];
-    assert.deepEqual(withoutPinned(events, new Set(["a", "b"]), new Set(["b"])).map((e) => e.id), ["w:a"]);
+    assert.deepEqual(
+      withoutPinned(events, new Set(["a", "b"]), new Set(["b"])).map((e) => e.id),
+      ["w:a"],
+    );
   });
 });

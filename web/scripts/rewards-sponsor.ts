@@ -19,21 +19,12 @@
  * Reads the root .env and web/.env*, like the app, and needs the same Upstash credentials.
  */
 import path from "node:path";
-import { loadEnv } from "./env";
+import { flag, loadEnv, option, requireStore } from "./env";
 
 loadEnv(path.resolve(import.meta.dirname, ".."));
 
-const args = process.argv.slice(2);
-const flag = (name: string) => args.includes(`--${name}`);
-const option = (name: string) => {
-  const i = args.indexOf(`--${name}`);
-  return i >= 0 ? args[i + 1] : undefined;
-};
-
 async function main() {
-  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
-    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
-  }
+  requireStore();
   const { formatEther, isAddress, parseEther } = await import("viem");
   const { epochAt } = await import("../lib/rewards");
   const { recordSponsor } = await import("../lib/server/rewards");
@@ -49,7 +40,10 @@ async function main() {
   if (flag("list")) {
     const entries = await readSponsors(store, n);
     console.log(entries.length === 0 ? `epoch ${n}: no sponsors` : `epoch ${n}:`);
-    for (const e of entries) console.log(`  ${e.club}  ${formatEther(BigInt(e.amount))} MON  ${e.sponsor}${e.kind === "owner" ? " (Owner)" : ""}${e.by ? `  from ${e.by}  ${e.tx ?? ""}` : ""}`);
+    for (const e of entries)
+      console.log(
+        `  ${e.club}  ${formatEther(BigInt(e.amount))} MON  ${e.sponsor}${e.kind === "owner" ? " (Owner)" : ""}${e.by ? `  from ${e.by}  ${e.tx ?? ""}` : ""}`,
+      );
     return;
   }
 
@@ -59,7 +53,9 @@ async function main() {
     const out = await removeSponsor(store, n, removeTx);
     if (out.status === "built") throw new Error(`Epoch ${n} is already built, so its ledger is fixed.`);
     if (out.status === "missing") throw new Error(`No sponsorship with that transaction in epoch ${n}.`);
-    console.log(`removed ${formatEther(BigInt(out.entry.amount))} MON from "${out.entry.sponsor}" in epoch ${n}. The MON is still with the operator: record it again under another name, or refund it.`);
+    console.log(
+      `removed ${formatEther(BigInt(out.entry.amount))} MON from "${out.entry.sponsor}" in epoch ${n}. The MON is still with the operator: record it again under another name, or refund it.`,
+    );
     return;
   }
 
@@ -69,7 +65,12 @@ async function main() {
   if (!entry) throw new Error(`No Club for ${club}.`);
   const amountText = option("amount") ?? "";
   if (!/^\d+(\.\d{1,18})?$/.test(amountText)) throw new Error("Give --amount in MON, for example 5 or 0.25.");
-  const result = await recordSponsor(store, n, { club: entry.address, amount: parseEther(amountText), sponsor: option("name") ?? "", kind: flag("owner") ? "owner" : "partner" }, now);
+  const result = await recordSponsor(
+    store,
+    n,
+    { club: entry.address, amount: parseEther(amountText), sponsor: option("name") ?? "", kind: flag("owner") ? "owner" : "partner" },
+    now,
+  );
   if (result.status === "invalid") throw new Error(result.message);
   if (result.status === "busy") throw new Error("Another sponsorship is being recorded for this epoch. Try again in a moment.");
   if (result.status === "built") throw new Error(`Epoch ${n} is already built, so its pools are fixed. Record it for epoch ${n + 1} instead.`);

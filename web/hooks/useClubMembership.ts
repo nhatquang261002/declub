@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/Toast";
 import { useAccessToken, type GetAccessToken } from "@/hooks/useAccessToken";
+import { bearerInit } from "@/lib/bearer";
 import { MEMBERS_PAGE, type MemberSort, type MembersView } from "@/lib/members";
 
 // Membership is per user, so it needs the Privy access token (ADR 0012's pattern). Without sign-in
@@ -11,11 +12,7 @@ import { MEMBERS_PAGE, type MemberSort, type MembersView } from "@/lib/members";
 export async function call<T>(getToken: GetAccessToken, method: string, path: string, body?: unknown): Promise<T> {
   const token = await getToken();
   if (!token) throw new Error("Sign in again to continue.");
-  const res = await fetch(path, {
-    method,
-    headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "content-type": "application/json" }) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const res = await fetch(path, bearerInit(token, method, body));
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const message = (data as { message?: unknown } | null)?.message;

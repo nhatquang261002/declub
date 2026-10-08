@@ -34,25 +34,36 @@ import type { ClubEntry } from "../verifiedAssets";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { getMember } from "./members";
 import { coinRule } from "../members";
-import { clubOf, type Ctx } from "./memberRoutes";
+import { gatedClub, publicRead, type Ctx } from "./memberRoutes";
 import { authenticate } from "./privy";
-import { clientId, getStore, withinLimit, type Store } from "./store";
+import type { Store } from "./store";
 import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
-import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, sendPrize, withdrawEntry, type ChallengeDeps } from "./challenges";
+import {
+  cancelChallenge,
+  createChallenge,
+  enterChallenge,
+  getChallenge,
+  listChallenges,
+  pickWinners,
+  sendPrize,
+  withdrawEntry,
+  type ChallengeDeps,
+} from "./challenges";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
  * list of their own. Writes need the caller's Privy access token; reads are public, and a reader
  * who sends a token also sees their own hidden posts (and, as staff, every hidden one).
  */
-export type RouteDeps = BoardDeps & Pick<ChallengeDeps, "blocks" | "prizeChain"> & {
-  gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
-  /** Who is reading, if they said: Privy in production, a stand-in in tests. */
-  viewer?: (request: Request) => Promise<{ id: string } | null>;
-};
+export type RouteDeps = BoardDeps &
+  Pick<ChallengeDeps, "blocks" | "prizeChain"> & {
+    gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
+    /** Who is reading, if they said: Privy in production, a stand-in in tests. */
+    viewer?: (request: Request) => Promise<{ id: string } | null>;
+  };
 
 type ItemCtx = { params: Promise<{ token: string; id: string }> };
 
@@ -149,12 +160,9 @@ async function actorOf(store: Store, token: string, user: { id: string; linked_a
 
 /** The common front of a write: the Club exists, the caller is signed in, and who they are. */
 async function front(registry: Registry, ctx: Ctx, request: Request, deps: RouteDeps, name: string, limit = 30) {
-  const entry = await clubOf(registry, ctx);
-  if (entry instanceof Response) return entry;
-  const g = await (deps.gate ?? gateUser)(request, name, limit);
-  if (g instanceof Response) return g;
-  const actor = await actorOf(g.store, entry.address, g.user);
-  return { entry, store: g.store, user: g.user, actor };
+  const f = await gatedClub(registry, ctx, request, deps, name, limit);
+  if (f instanceof Response) return f;
+  return { ...f, actor: await actorOf(f.store, f.entry.address, f.user) };
 }
 
 export async function softViewer(request: Request, deps: Pick<RouteDeps, "viewer">): Promise<{ id: string } | null> {
@@ -166,11 +174,9 @@ export async function softViewer(request: Request, deps: Pick<RouteDeps, "viewer
 export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false, posts: [], role: null }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const read = await publicRead(registry, ctx, request, { enabled: false, posts: [], role: null });
+      if (read instanceof Response) return read;
+      const { entry, store } = read;
 
       const viewer = await softViewer(request, deps);
       const url = new URL(request.url);
@@ -180,7 +186,12 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       const limit = Number(url.searchParams.get("limit"));
       const offset = Number(url.searchParams.get("offset"));
       const page = Number.isInteger(limit) && limit > 0 ? { limit: Math.min(limit, 100), offset: Number.isInteger(offset) && offset > 0 ? offset : 0 } : {};
-      const { posts, role, total } = await listPosts(store, entry, { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined, ...page }, deps);
+      const { posts, role, total } = await listPosts(
+        store,
+        entry,
+        { userId: viewer?.id, lens, as: as && isAddress(as, { strict: false }) ? as : undefined, ...page },
+        deps,
+      );
       // Anonymous readers share one cached answer; a signed-in reader's depends on who they are.
       const cache = viewer ? "private, no-store" : "public, s-maxage=15, stale-while-revalidate=60";
       return Response.json({ enabled: true, posts, role, total }, { headers: { "Cache-Control": cache } });
@@ -202,11 +213,9 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
 export function repliesHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     async GET(request: Request, ctx: ItemCtx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false, replies: [] }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const read = await publicRead(registry, ctx, request, { enabled: false, replies: [] });
+      if (read instanceof Response) return read;
+      const { entry, store } = read;
       const viewer = await softViewer(request, deps);
       const result = await listReplies(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
       if (!result.ok) return refuse(result.reason);
@@ -218,7 +227,14 @@ export function repliesHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-reply");
       if (f instanceof Response) return f;
       const body = await bodyOf(request);
-      const result = await createSignedReply(f.store, f.entry, f.user.id, (await ctx.params).id, { message: parseReplyMessage(body.message), signature: body.signature }, deps);
+      const result = await createSignedReply(
+        f.store,
+        f.entry,
+        f.user.id,
+        (await ctx.params).id,
+        { message: parseReplyMessage(body.message), signature: body.signature },
+        deps,
+      );
       if (result.ok) return json({ enabled: true, post: result.post }, 201);
       if (result.reason === "hidden") return refuse("hidden", "A hidden post can’t take replies.");
       if (result.reason === "not_found") return refuse("not_found", "That post wasn’t found, or it’s a reply: replies go under the post.");
@@ -234,11 +250,9 @@ export function repliesHandlers(registry: Registry, deps: RouteDeps = {}) {
  */
 export function feedHandler(registry: Registry) {
   return async function GET(request: Request, ctx: Ctx) {
-    const entry = await clubOf(registry, ctx);
-    if (entry instanceof Response) return entry;
-    const store = getStore();
-    if (!store) return Response.json({ enabled: false, posts: [] }, { headers: { "Cache-Control": "no-store" } });
-    if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+    const read = await publicRead(registry, ctx, request, { enabled: false, posts: [] });
+    if (read instanceof Response) return read;
+    const { entry, store } = read;
     const [posts, replies] = await Promise.all([exportPosts(store, entry), exportReplies(store, entry)]);
     return Response.json(
       { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post, Reply: SOCIAL_TYPES.Reply }, posts, replies },
@@ -289,29 +303,23 @@ export function likeHandlers(registry: Registry, deps: RouteDeps = {}) {
   return { POST: act(true), DELETE: act(false) };
 }
 
-/** POST /api/clubs/[token]/posts/[id]/hide  { hidden: boolean } */
-export function hideHandler(registry: Registry, deps: RouteDeps = {}) {
-  return async function POST(request: Request, ctx: ItemCtx) {
+/** A staff POST that sets one yes/no flag on a post: `{ [key]: boolean }`. */
+const flagHandler = (registry: Registry, deps: RouteDeps, key: "hidden" | "pinned", act: typeof hidePost) =>
+  async function POST(request: Request, ctx: ItemCtx) {
     const f = await front(registry, ctx, request, deps, "club-mod");
     if (f instanceof Response) return f;
     const body = await bodyOf(request);
-    if (typeof body.hidden !== "boolean") return refuse("invalid", "Send { hidden: true } or { hidden: false }.");
-    const result = await hidePost(f.store, f.entry, f.actor, (await ctx.params).id, body.hidden, deps);
+    const on = body[key];
+    if (typeof on !== "boolean") return refuse("invalid", `Send { ${key}: true } or { ${key}: false }.`);
+    const result = await act(f.store, f.entry, f.actor, (await ctx.params).id, on, deps);
     return result.ok ? json({ enabled: true }) : refuse(result.reason);
   };
-}
+
+/** POST /api/clubs/[token]/posts/[id]/hide  { hidden: boolean } */
+export const hideHandler = (registry: Registry, deps: RouteDeps = {}) => flagHandler(registry, deps, "hidden", hidePost);
 
 /** POST /api/clubs/[token]/posts/[id]/pin  { pinned: boolean } */
-export function pinHandler(registry: Registry, deps: RouteDeps = {}) {
-  return async function POST(request: Request, ctx: ItemCtx) {
-    const f = await front(registry, ctx, request, deps, "club-mod");
-    if (f instanceof Response) return f;
-    const body = await bodyOf(request);
-    if (typeof body.pinned !== "boolean") return refuse("invalid", "Send { pinned: true } or { pinned: false }.");
-    const result = await pinPost(f.store, f.entry, f.actor, (await ctx.params).id, body.pinned, deps);
-    return result.ok ? json({ enabled: true }) : refuse(result.reason);
-  };
-}
+export const pinHandler = (registry: Registry, deps: RouteDeps = {}) => flagHandler(registry, deps, "pinned", pinPost);
 
 /** GET (staff), POST and DELETE /api/clubs/[token]/bans. */
 export function bansHandlers(registry: Registry, deps: RouteDeps = {}) {
@@ -385,29 +393,44 @@ function publicProfile(entry: ClubEntry, profile: ClubProfile) {
   return { description, links, holdersOnlyPosts, x, coin };
 }
 
-/** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */
-export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
+type Fronted = Exclude<Awaited<ReturnType<typeof front>>, Response>;
+
+/** GET (public, cached) and PATCH (staff, `club-mod`) of one Club document that can be edited: what `read` shows, what `write` saves. */
+function clubDocHandlers(
+  registry: Registry,
+  deps: RouteDeps,
+  read: (store: Store, entry: Fronted["entry"]) => Promise<object>,
+  write: (f: Fronted, body: Record<string, unknown>) => Promise<{ ok: true; body: object } | { ok: false; reason: string; message?: string }>,
+) {
   return {
     async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-      const profile = await loadProfile(store, entry.address);
-      const roles = await loadRoles(store, entry.address);
+      const found = await publicRead(registry, ctx, request, { enabled: false });
+      if (found instanceof Response) return found;
       return Response.json(
-        { enabled: true, ...publicProfile(entry, profile), hasOwner: !!roles.owner },
+        { enabled: true, ...(await read(found.store, found.entry)) },
         { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
       );
     },
     async PATCH(request: Request, ctx: Ctx) {
       const f = await front(registry, ctx, request, deps, "club-mod");
       if (f instanceof Response) return f;
-      const result = await updateProfile(f.store, f.entry, f.actor, await bodyOf(request), deps);
-      return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason, result.message);
+      const result = await write(f, await bodyOf(request));
+      return result.ok ? json({ enabled: true, ...result.body }) : refuse(result.reason, result.message);
     },
   };
+}
+
+/** GET (public) and PATCH (Owner) /api/clubs/[token]/profile. */
+export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return clubDocHandlers(
+    registry,
+    deps,
+    async (store, entry) => ({ ...publicProfile(entry, await loadProfile(store, entry.address)), hasOwner: !!(await loadRoles(store, entry.address)).owner }),
+    async (f, body) => {
+      const result = await updateProfile(f.store, f.entry, f.actor, body, deps);
+      return result.ok ? { ok: true, body: publicProfile(f.entry, result.profile) } : result;
+    },
+  );
 }
 
 /**
@@ -416,22 +439,15 @@ export function profileHandlers(registry: Registry, deps: RouteDeps = {}) {
  * epoch (ADR 0044).
  */
 export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
-  return {
-    async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
-      return Response.json({ enabled: true, ...(await clubRulesView(store, entry, deps)) }, { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } });
+  return clubDocHandlers(
+    registry,
+    deps,
+    (store, entry) => clubRulesView(store, entry, deps),
+    async (f, body) => {
+      const result = await updateRules(f.store, f.entry, f.actor, body, deps);
+      return result.ok ? { ok: true, body: result.view } : result;
     },
-    async PATCH(request: Request, ctx: Ctx) {
-      const f = await front(registry, ctx, request, deps, "club-mod");
-      if (f instanceof Response) return f;
-      const result = await updateRules(f.store, f.entry, f.actor, await bodyOf(request), deps);
-      return result.ok ? json({ enabled: true, ...result.view }) : refuse(result.reason, result.message);
-    },
-  };
+  );
 }
 
 /**
@@ -444,11 +460,9 @@ export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
 export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false, challenges: [] }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const read = await publicRead(registry, ctx, request, { enabled: false, challenges: [] });
+      if (read instanceof Response) return read;
+      const { entry, store } = read;
       const viewer = await softViewer(request, deps);
       const challenges = await listChallenges(store, entry, { userId: viewer?.id }, deps);
       const cache = viewer ? "private, no-store" : "public, s-maxage=10, stale-while-revalidate=30";
@@ -476,11 +490,9 @@ export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     /** GET (public): the challenge with its entries, or 404. */
     async GET(request: Request, ctx: ItemCtx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const store = getStore();
-      if (!store) return Response.json({ enabled: false }, { headers: { "Cache-Control": "no-store" } });
-      if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+      const read = await publicRead(registry, ctx, request, { enabled: false });
+      if (read instanceof Response) return read;
+      const { entry, store } = read;
       const viewer = await softViewer(request, deps);
       const challenge = await getChallenge(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
       if (!challenge) return refuse("not_found");
@@ -504,9 +516,12 @@ export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
                 : body.action === "prize_sent"
                   ? await sendPrize(f.store, f.entry, f.actor, id, { post: body.post, tx: body.tx }, deps)
                   : null;
-      if (!result) return refuse("invalid", "Send { action: \"enter\" | \"withdraw\" | \"pick\" | \"cancel\" | \"prize_sent\" }.");
-      if (!result.ok && result.reason === "holders_only") return refuse("holders_only", "This challenge is for Holders: you need to hold the Club’s asset to enter.");
-      return result.ok ? json({ enabled: true }) : refuse(result.reason, "message" in result && typeof result.message === "string" ? result.message : undefined);
+      if (!result) return refuse("invalid", 'Send { action: "enter" | "withdraw" | "pick" | "cancel" | "prize_sent" }.');
+      if (!result.ok && result.reason === "holders_only")
+        return refuse("holders_only", "This challenge is for Holders: you need to hold the Club’s asset to enter.");
+      return result.ok
+        ? json({ enabled: true })
+        : refuse(result.reason, "message" in result && typeof result.message === "string" ? result.message : undefined);
     },
   };
 }
@@ -521,7 +536,9 @@ export function rewardBansHandlers(registry: Registry, deps: RouteDeps = {}) {
       const f = await front(registry, ctx, request, deps, "club-mod");
       if (f instanceof Response) return f;
       const result = await setRewardBan(f.store, f.entry, f.actor, (await bodyOf(request)).wallet, ban, deps);
-      return result.ok ? json({ enabled: true, wallet: result.wallet }) : refuse(result.reason, result.reason === "invalid" ? "Give the member's Club wallet (not your own)." : undefined);
+      return result.ok
+        ? json({ enabled: true, wallet: result.wallet })
+        : refuse(result.reason, result.reason === "invalid" ? "Give the member's Club wallet (not your own)." : undefined);
     };
   return {
     async GET(request: Request, ctx: Ctx) {
@@ -554,7 +571,7 @@ export function xLinkHandlers(registry: Registry, deps: RouteDeps = {}) {
         const result = await verifyXLink(f.store, f.entry, f.actor, { handle: body.handle, url: body.url }, deps);
         return result.ok ? json({ enabled: true, ...publicProfile(f.entry, result.profile) }) : refuse(result.reason);
       }
-      return refuse("invalid", "Send { action: \"start\", handle } or { action: \"verify\", handle, url }.");
+      return refuse("invalid", 'Send { action: "start", handle } or { action: "verify", handle, url }.');
     },
     async DELETE(request: Request, ctx: Ctx) {
       const f = await front(registry, ctx, request, deps, "club-mod");

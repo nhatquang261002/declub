@@ -78,13 +78,7 @@ export function Alert({ tone = "danger", title, children, details, actions, onDi
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
             {actions}
             {details && (
-              <button
-                type="button"
-                className="alert-link"
-                aria-expanded={open}
-                aria-controls={detailsId}
-                onClick={() => setOpen((value) => !value)}
-              >
+              <button type="button" className="alert-link" aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen((value) => !value)}>
                 {open ? "Hide details" : "Details"}
               </button>
             )}

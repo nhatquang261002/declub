@@ -14,9 +14,7 @@ const POLL_MS = 5_000;
 export function usePoolInfo() {
   const query = useQuery({ queryKey: ["pool", "info"], queryFn: getInfo, retry: false, refetchInterval: 30_000 });
   const info = query.data;
-  const mismatch =
-    !!info &&
-    (info.chainId !== CHAIN_ID || info.swap.toLowerCase() !== DECLUB_INTENTS_ADDRESS?.toLowerCase());
+  const mismatch = !!info && (info.chainId !== CHAIN_ID || info.swap.toLowerCase() !== DECLUB_INTENTS_ADDRESS?.toLowerCase());
   return { info, mismatch, isLoading: query.isLoading, error: query.error };
 }
 

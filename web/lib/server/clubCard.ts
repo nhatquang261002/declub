@@ -5,7 +5,7 @@ import { clubRewards } from "./rewards";
 import { getStore } from "./store";
 
 /** What a Club's preview card says: who it is, and its latest paid epoch when it has one. */
-export type ClubFacts = { name: string; symbol: string; image?: string; recap: Recap | null };
+type ClubFacts = { name: string; symbol: string; image?: string; recap: Recap | null };
 
 /**
  * What a Club's link preview needs, read on the server. `null` for an address that has no Club:

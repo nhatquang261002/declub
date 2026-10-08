@@ -9,15 +9,7 @@ import { TraitClauseSummary } from "./TraitClause";
  * One trait request on a deal, and (for a taker who can accept) the picker for which of their
  * own NFTs to send. `onToggle` is omitted for anyone who can't fill.
  */
-export function TraitSlotView({
-  slot,
-  account,
-  onToggle,
-}: {
-  slot: TraitSlot;
-  account?: Address;
-  onToggle?: (id: bigint) => void;
-}) {
+export function TraitSlotView({ slot, account, onToggle }: { slot: TraitSlot; account?: Address; onToggle?: (id: bigint) => void }) {
   const ids = slot.resolved?.ids ?? [];
   const enumerable = slot.status.state === "ready" && slot.status.catalog.enumerable;
   const { owned, tooLarge, isLoading } = useOwnedInSet(slot.asset.token, onToggle ? account : undefined, ids, enumerable);
@@ -33,9 +25,7 @@ export function TraitSlotView({
           </div>
           {isLoading && <p className="text-xs text-muted">Looking for matching NFTs in your wallet…</p>}
           {tooLarge && <p className="text-xs text-warn">This set is too large to check your wallet from here.</p>}
-          {!isLoading && !tooLarge && owned.length === 0 && (
-            <p className="text-xs text-warn">You don&apos;t hold an NFT that matches this request.</p>
-          )}
+          {!isLoading && !tooLarge && owned.length === 0 && <p className="text-xs text-warn">You don&apos;t hold an NFT that matches this request.</p>}
           <div className="flex flex-wrap gap-2">
             {owned.map((id) => {
               const on = slot.chosen.includes(id);

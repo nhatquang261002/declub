@@ -72,6 +72,25 @@ function chooseView(next: View) {
   viewListeners.forEach((listener) => listener());
 }
 
+/** Clubs as a grid of cards, each with its Momentum rank and whether the reader has joined. */
+function ClubCards({ rows, now, rank, mineSet }: { rows: Row[]; now: number; rank: Map<string, number>; mineSet: Set<string> }) {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {rows.map((r) => (
+        <ClubCard
+          key={r.info.token}
+          club={r.info}
+          stats={r.stats}
+          members={r.members}
+          now={now}
+          rank={rank.get(r.info.token)}
+          joined={mineSet.has(r.info.token)}
+        />
+      ))}
+    </div>
+  );
+}
+
 /**
  * Every Club (ADR 0016). The most active ones up top, then the whole directory to search, filter
  * and sort. What Clubs are and how Momentum works is on the home page; this page is for using
@@ -212,19 +231,7 @@ export default function ClubsPage() {
             <p className="mt-1 text-sm text-muted">No Club has traded in the last 30 days. The first swap puts a Club on top.</p>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.map((r) => (
-              <ClubCard
-                key={r.info.token}
-                club={r.info}
-                stats={r.stats}
-                members={r.members}
-                now={now}
-                rank={rank.get(r.info.token)}
-                joined={mineSet.has(r.info.token)}
-              />
-            ))}
-          </div>
+          <ClubCards rows={featured} now={now} rank={rank} mineSet={mineSet} />
         )}
 
         {clubs && (
@@ -294,9 +301,7 @@ export default function ClubsPage() {
         </div>
 
         <p className="mb-3 text-xs text-muted" aria-live="polite">
-          {found.length === rows.length
-            ? `${rows.length.toLocaleString()} Clubs`
-            : `${found.length.toLocaleString()} of ${rows.length.toLocaleString()} Clubs`}
+          {found.length === rows.length ? `${rows.length.toLocaleString()} Clubs` : `${found.length.toLocaleString()} of ${rows.length.toLocaleString()} Clubs`}
         </p>
 
         {found.length === 0 ? (
@@ -317,19 +322,7 @@ export default function ClubsPage() {
             </ol>
           </>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {shown.map((r) => (
-              <ClubCard
-                key={r.info.token}
-                club={r.info}
-                stats={r.stats}
-                members={r.members}
-                now={now}
-                rank={rank.get(r.info.token)}
-                joined={mineSet.has(r.info.token)}
-              />
-            ))}
-          </div>
+          <ClubCards rows={shown} now={now} rank={rank} mineSet={mineSet} />
         )}
 
         {found.length > shown.length && (

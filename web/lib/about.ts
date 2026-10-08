@@ -26,7 +26,7 @@ const INVISIBLE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤
 
 const length = (text: string) => Array.from(text).length;
 
-export type AboutResult = { ok: true; about: About } | { ok: false; message: string };
+type AboutResult = { ok: true; about: About } | { ok: false; message: string };
 
 /**
  * A name and bio as they will be kept, or why they can't be. The name is one line; the bio keeps

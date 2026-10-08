@@ -48,7 +48,14 @@ export function ShareDeal({ deal, info, now }: { deal: DealV2; info: ReadonlyMap
           Then paste the post on the {club.symbol} Club’s Board: your own post about the Club counts toward your Holder bonus.
         </span>
       )}
-      {open && <SharePreviewDialog imageUrl={imageUrl} shareUrl={href} title={status === "filled" ? "Share the swap" : "Share the deal"} onClose={() => setOpen(false)} />}
+      {open && (
+        <SharePreviewDialog
+          imageUrl={imageUrl}
+          shareUrl={href}
+          title={status === "filled" ? "Share the swap" : "Share the deal"}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -16,8 +16,8 @@ function AboutSection() {
     <section className="page-section px-5 py-5">
       <h2 className="text-lg font-semibold">About you</h2>
       <p className="mt-1 text-sm text-muted">
-        A name and a few lines for your profile. They show on every wallet linked to your sign-in. Anyone can write any name,
-        so it is never used to tell traders apart: deals and posts keep showing your verified handle and your address.
+        A name and a few lines for your profile. They show on every wallet linked to your sign-in. Anyone can write any name, so it is never used to tell
+        traders apart: deals and posts keep showing your verified handle and your address.
       </p>
       {/* The form starts from what the server has, so it waits for it rather than being filled in afterwards. */}
       {own.isLoading ? <p className="mt-4 text-sm text-muted">Loading…</p> : <AboutForm own={own} />}

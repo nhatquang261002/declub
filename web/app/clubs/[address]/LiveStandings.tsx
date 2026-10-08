@@ -25,7 +25,19 @@ const plural = (n: number | bigint, one: string, many = `${one}s`) => `${n} ${n 
  * and how much follows the Club's rules (ADR 0044): every active Holder, or the most active ones,
  * with a whole share from `rampPoints`, and a slice for members without NFTs if the Owner pays them.
  */
-export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { token: string; symbol: string; wallet?: string; now: number; sponsoredBy?: string }) {
+export function LiveStandings({
+  token,
+  symbol,
+  wallet,
+  now,
+  sponsoredBy,
+}: {
+  token: string;
+  symbol: string;
+  wallet?: string;
+  now: number;
+  sponsoredBy?: string;
+}) {
   const { standings: s } = useClubStandings(token, wallet);
   if (!s) return null;
   const sponsored = wei(s.sponsored);
@@ -57,7 +69,11 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
         <Closing endsAt={s.endsAt} now={now} />
       </div>
       <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-t-2 border-[#111318]/10 pt-3">
-        <Stat label="Fees so far" value={formatMon(wei(s.fees))} hint={wei(s.signedFees) > 0n ? `${formatMon(wei(s.signedFees))} from signed swaps, paid out as MON` : undefined} />
+        <Stat
+          label="Fees so far"
+          value={formatMon(wei(s.fees))}
+          hint={wei(s.signedFees) > 0n ? `${formatMon(wei(s.signedFees))} from signed swaps, paid out as MON` : undefined}
+        />
         {sponsored > 0n && <Stat label="Sponsored" value={`+ ${formatMon(sponsored)}`} hint={sponsoredBy ? `by ${sponsoredBy}` : "Added to the Holder pool"} />}
         <Stat label="Club fund" value={formatMon(wei(s.fundPool))} hint="For the Owner" />
       </dl>
@@ -72,7 +88,8 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
       </div>
       {ranked.length === 0 ? (
         <p className="mt-2 rounded-lg bg-[#111318]/5 px-3 py-4 text-center text-sm">
-          No Holder has points yet this epoch. Post, like and reply on the Board: active Holders are paid, a whole share from {rules.rampPoints} points, and the first one others back takes #1.
+          No Holder has points yet this epoch. Post, like and reply on the Board: active Holders are paid, a whole share from {rules.rampPoints} points, and the
+          first one others back takes #1.
         </p>
       ) : (
         <>
@@ -121,8 +138,8 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
       {rules.nonHolderBps > 0 && s.members && <MembersSlice s={s} rules={rules} me={me} />}
 
       <p className="mt-4 text-xs text-muted">
-        Points come from Holders backing your posts and replies, engaging with other members, active days, your X posts about the Club, swaps and
-        challenges. An estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
+        Points come from Holders backing your posts and replies, engaging with other members, active days, your X posts about the Club, swaps and challenges. An
+        estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
         <Link href="/guide#rewards" className="font-semibold underline underline-offset-2">
           How points work
         </Link>
@@ -140,7 +157,14 @@ function Closing({ endsAt, now }: { endsAt: number; now: number }) {
   const left = Math.max(0, endsAt - now);
   const done = Math.min(100, Math.max(0, ((REWARDS_EPOCH_SECONDS - left) / REWARDS_EPOCH_SECONDS) * 100));
   const soon = left < 3600 * 6;
-  const exact = new Date(endsAt * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  const exact = new Date(endsAt * 1000).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
   return (
     <div title={`Closes ${exact}`}>
       <div className="flex items-baseline justify-between gap-2">
@@ -185,7 +209,8 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
       ? `You hold ${plural(BigInt(me.shares), "NFT")} but nothing counted yet. Post, like or reply on the Board today, and write something others will back.`
       : "Nothing counted yet. Post, like or reply on the Board today.";
   else if (Number(me.gap) > 0) hint = `About ${me.gap} more points would put you in the paid places. Posts and replies others back count the most.`;
-  else if (holder && Number(me.toFull) > 0) hint = `${me.toFull} more points and your whole share counts: it’s ${Math.floor((me.points / rules.rampPoints) * 100)}% now.`;
+  else if (holder && Number(me.toFull) > 0)
+    hint = `${me.toFull} more points and your whole share counts: it’s ${Math.floor((me.points / rules.rampPoints) * 100)}% now.`;
   else if (me.backers === 0) hint = "Nobody has backed you yet this epoch. Answer someone on the Board: replies people like count the most.";
   else if (streak === 0 && carried > 0) hint = `${plural(rules.streakMinDays - days, "more active day")} keeps your ${carried}-week streak.`;
   else if (days < 7) hint = `Post, reply or like today to make it ${days + 1} of 7 days.`;
@@ -220,7 +245,11 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
           )}
           <div className="mt-auto flex flex-wrap gap-1.5">
             {holder && <span className="chip">{plural(BigInt(me.shares), "NFT")}</span>}
-            {holder && differs(me) && <span className="chip" title="Your voice and your share of the pool count the NFTs you held on average over the week">avg {me.held} this week</span>}
+            {holder && differs(me) && (
+              <span className="chip" title="Your voice and your share of the pool count the NFTs you held on average over the week">
+                avg {me.held} this week
+              </span>
+            )}
             {(streak > 0 || carried > 0) && (
               <span className="chip chip-peach">
                 <FlameIcon />
@@ -260,7 +289,9 @@ function MembersSlice({ s, rules, me }: { s: StandingsView; rules: ClubRules; me
         </p>
       </div>
       {members.length === 0 ? (
-        <p className="mt-2 rounded-lg bg-[#111318]/5 px-3 py-3 text-center text-sm">No member without NFTs has points yet. Until one does, the slice stays with the Holders.</p>
+        <p className="mt-2 rounded-lg bg-[#111318]/5 px-3 py-3 text-center text-sm">
+          No member without NFTs has points yet. Until one does, the slice stays with the Holders.
+        </p>
       ) : (
         <ol className="mt-2">
           {members.map((r) => (
@@ -272,12 +303,46 @@ function MembersSlice({ s, rules, me }: { s: StandingsView; rules: ClubRules; me
   );
 }
 
+/** A holder's name with its "You" and streak chips; `plain` is the weight when it isn't the reader's own row. */
+function StandingName({ r, mine, plain, className = "" }: { r: StandingRow; mine: boolean; plain: string; className?: string }) {
+  return (
+    <span className={`flex min-w-0 items-center gap-1.5 text-sm ${className} ${mine ? "font-black" : plain}`}>
+      <span className="min-w-0 truncate">
+        <Who address={r.wallet as `0x${string}`} />
+      </span>
+      {mine && <span className="chip chip-dark shrink-0 text-[10px]">You</span>}
+      {r.streak >= 2 && (
+        <span className="chip chip-peach shrink-0 text-[10px]" aria-label={`${plural(r.streak, "week")} streak`}>
+          <FlameIcon />
+          {r.streak}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Progress to the full bonus, the same scale as "Your place", so it says something when everyone is close. */
+function BonusBar({ points, full, tone = "bg-[#111318]" }: { points: number; full: number; tone?: string }) {
+  const fill = points > 0 ? Math.max(3, Math.min(100, (points / full) * 100)) : 0;
+  return (
+    <span
+      className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#111318]/10"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={full}
+      aria-valuenow={Math.min(full, points)}
+      aria-label={`${pts(points)} of ${full} for the full bonus`}
+    >
+      <span className={`block h-full rounded-full ${tone}`} style={{ width: `${fill}%` }} />
+    </span>
+  );
+}
+
 const MEDAL = ["bg-[#f0b735]", "bg-[#d9dde3]", "bg-[#d8996a]"];
 
 /** The three leaders as cards: a phone gets them as stacked rows, a wider screen as a podium. */
 function PodiumCard({ r, mine, rules }: { r: StandingRow; mine: boolean; rules: ClubRules }) {
   const full = rules.fullBonusPoints;
-  const fill = Math.max(3, Math.min(100, (r.points / full) * 100));
   return (
     <li
       className={`relative flex items-center gap-3 rounded-xl border-2 border-[#111318] p-3 sm:flex-col sm:gap-2 sm:pt-5 sm:text-center ${mine ? "bg-[#f0b735]/30" : "bg-white"}`}
@@ -292,29 +357,9 @@ function PodiumCard({ r, mine, rules }: { r: StandingRow; mine: boolean; rules: 
         <WalletAvatar seed={r.wallet} size="2.75rem" link />
       </span>
       <span className="min-w-0 flex-1 sm:w-full sm:flex-none">
-        <span className={`flex min-w-0 items-center gap-1.5 text-sm sm:justify-center ${mine ? "font-black" : "font-bold"}`}>
-          <span className="min-w-0 truncate">
-            <Who address={r.wallet as `0x${string}`} />
-          </span>
-          {mine && <span className="chip chip-dark shrink-0 text-[10px]">You</span>}
-          {r.streak >= 2 && (
-            <span className="chip chip-peach shrink-0 text-[10px]" aria-label={`${plural(r.streak, "week")} streak`}>
-              <FlameIcon />
-              {r.streak}
-            </span>
-          )}
-        </span>
+        <StandingName r={r} mine={mine} plain="font-bold" className="sm:justify-center" />
         <span className="mt-0.5 block text-[11px] text-muted">{nfts(r)}</span>
-        <span
-          className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#111318]/10"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={full}
-          aria-valuenow={Math.min(full, r.points)}
-          aria-label={`${pts(r.points)} of ${full} for the full bonus`}
-        >
-          <span className="block h-full rounded-full bg-[#111318]" style={{ width: `${fill}%` }} />
-        </span>
+        <BonusBar points={r.points} full={full} />
       </span>
       <span className="shrink-0 text-right sm:text-center">
         <span className="block text-xl leading-none font-black tabular-nums">{pts(r.points)}</span>
@@ -333,10 +378,10 @@ const PODIUM = ["bg-[#f0b735]", "bg-[#d9dde3]", "bg-[#d8996a]"];
 function Row({ r, mine, paid = true, rules }: { r: StandingRow; mine: boolean; paid?: boolean; rules: ClubRules }) {
   const podium = r.rank <= 3 && r.points > 0;
   const full = rules.fullBonusPoints;
-  // The bar is progress to the full bonus, the same scale as "Your place", so it says something when everyone is close.
-  const fill = r.points > 0 ? Math.max(3, Math.min(100, (r.points / full) * 100)) : 0;
   return (
-    <li className={`${ROW_GRID} rounded-lg px-2 py-2.5 transition-colors ${mine ? "bg-[#f0b735]/30" : "hover:bg-[#111318]/[0.04]"} ${paid ? "" : "opacity-70"}`}>
+    <li
+      className={`${ROW_GRID} rounded-lg px-2 py-2.5 transition-colors ${mine ? "bg-[#f0b735]/30" : "hover:bg-[#111318]/[0.04]"} ${paid ? "" : "opacity-70"}`}
+    >
       <span
         className={`grid size-7 place-items-center rounded-full text-xs font-black tabular-nums ${podium ? `border-2 border-[#111318] ${PODIUM[r.rank - 1]}` : "text-muted"}`}
         aria-label={`Rank ${r.rank}`}
@@ -345,28 +390,8 @@ function Row({ r, mine, paid = true, rules }: { r: StandingRow; mine: boolean; p
       </span>
       <WalletAvatar seed={r.wallet} link />
       <span className="min-w-0">
-        <span className={`flex min-w-0 items-center gap-1.5 text-sm ${mine ? "font-black" : "font-semibold"}`}>
-          <span className="min-w-0 truncate">
-            <Who address={r.wallet as `0x${string}`} />
-          </span>
-          {mine && <span className="chip chip-dark shrink-0 text-[10px]">You</span>}
-          {r.streak >= 2 && (
-            <span className="chip chip-peach shrink-0 text-[10px]" aria-label={`${plural(r.streak, "week")} streak`}>
-              <FlameIcon />
-              {r.streak}
-            </span>
-          )}
-        </span>
-        <span
-          className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#111318]/10"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={full}
-          aria-valuenow={Math.min(full, r.points)}
-          aria-label={`${pts(r.points)} of ${full} for the full bonus`}
-        >
-          <span className={`block h-full rounded-full ${paid ? "bg-[#111318]" : "bg-[#111318]/40"}`} style={{ width: `${fill}%` }} />
-        </span>
+        <StandingName r={r} mine={mine} plain="font-semibold" />
+        <BonusBar points={r.points} full={full} tone={paid ? "bg-[#111318]" : "bg-[#111318]/40"} />
         <span className="mt-0.5 block text-[11px] text-muted sm:hidden">{nfts(r)}</span>
       </span>
       <span className="hidden text-right text-xs tabular-nums text-muted sm:block" title={differs(r) ? `${r.held} on average over the week` : undefined}>
@@ -377,7 +402,9 @@ function Row({ r, mine, paid = true, rules }: { r: StandingRow; mine: boolean; p
         <span className="block font-black tabular-nums">{pts(r.points)}</span>
         <span className="block text-[11px] tabular-nums text-muted sm:hidden">{r.estimate ? formatMon(wei(r.estimate)) : "—"}</span>
       </span>
-      <span className={`hidden text-right text-sm tabular-nums sm:block ${r.estimate ? "font-black" : "text-muted"}`}>{r.estimate ? formatMon(wei(r.estimate)) : "—"}</span>
+      <span className={`hidden text-right text-sm tabular-nums sm:block ${r.estimate ? "font-black" : "text-muted"}`}>
+        {r.estimate ? formatMon(wei(r.estimate)) : "—"}
+      </span>
     </li>
   );
 }

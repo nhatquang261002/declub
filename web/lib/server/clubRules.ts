@@ -11,16 +11,16 @@ import type { Store } from "./store";
  */
 
 /** One save: the rules from epoch `from` on, until a later save. */
-export type SavedRules = { from: number; rules: ClubRules; at: number; by: string };
+type SavedRules = { from: number; rules: ClubRules; at: number; by: string };
 
-export const clubRulesKey = (club: string) => `declub:club-rules:${CHAIN_ID}:${club.toLowerCase()}`;
+const clubRulesKey = (club: string) => `declub:club-rules:${CHAIN_ID}:${club.toLowerCase()}`;
 /** The Club members banned from rewards, by user id (ADR 0044). */
 export const rewardBansKey = (club: string) => `declub:reward-bans:${CHAIN_ID}:${club.toLowerCase()}`;
 
 /** Saves kept per Club. Years of weekly changes fit. */
 const SAVES_KEPT = 200;
 
-export async function rulesHistory(store: Store, club: string): Promise<SavedRules[]> {
+async function rulesHistory(store: Store, club: string): Promise<SavedRules[]> {
   return (await store.get<SavedRules[]>(clubRulesKey(club))) ?? [];
 }
 

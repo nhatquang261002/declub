@@ -31,7 +31,7 @@ export const handleLabel = (profile: Profile) => (profile.provider === "twitter"
 export type HandleMatch = Profile & { wallets: `0x${string}`[] };
 
 /** The usernames to look up for what someone typed. */
-export type HandleQuery = Partial<Record<ProfileProvider, string>>;
+type HandleQuery = Partial<Record<ProfileProvider, string>>;
 
 /**
  * Reads a handle typed into "who can accept" (ADR 0017): `@bob`, `bob` or an x.com / twitter.com

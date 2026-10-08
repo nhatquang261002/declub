@@ -16,7 +16,14 @@ function sponsoredLine(r: Recap): string {
   if (!r.sponsored || r.sponsored <= 0n) return "";
   // Names are kept short here so the post stays within X's limit however long a sponsor's is.
   const names = (r.sponsors ?? []).map((n) => (n.length > 20 ? `${n.slice(0, 19).trimEnd()}…` : n));
-  const by = names.length === 0 ? "" : names.length === 1 ? ` by ${names[0]}` : names.length === 2 ? ` by ${names[0]} and ${names[1]}` : ` by ${names[0]}, ${names[1]} and ${names.length - 2} more`;
+  const by =
+    names.length === 0
+      ? ""
+      : names.length === 1
+        ? ` by ${names[0]}`
+        : names.length === 2
+          ? ` by ${names[0]} and ${names[1]}`
+          : ` by ${names[0]}, ${names[1]} and ${names.length - 2} more`;
   return `\n\n🎁 ${short(r.sponsored)} sponsored${by}`;
 }
 

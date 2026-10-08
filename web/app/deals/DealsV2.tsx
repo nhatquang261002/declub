@@ -17,7 +17,7 @@ import type { BookKind, DealTab } from "@/lib/dealBook";
 import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
-export const PAGE = 4;
+const PAGE = 4;
 /** Typing waits this long before it asks the server, so a search isn't sent per keystroke. */
 const SEARCH_DELAY_MS = 250;
 
@@ -104,7 +104,7 @@ export function DealsV2() {
       )}
 
       {error && items.length === 0 ? (
-        <LoadError title="Couldn&apos;t load deals" error={error} />
+        <LoadError title="Couldn't load deals" error={error} />
       ) : !book.enabled ? (
         <EmptyState>Deals aren&apos;t enabled on this deployment yet.</EmptyState>
       ) : isLoading ? (
@@ -126,9 +126,7 @@ export function DealsV2() {
         <ListingGrid listings={items} now={now} me={address} info={info} />
       )}
 
-      {total > 0 && (
-        <Pagination page={page} totalPages={totalPages} onPage={setPage} loading={isLoading || book.isFetching} />
-      )}
+      {total > 0 && <Pagination page={page} totalPages={totalPages} onPage={setPage} loading={isLoading || book.isFetching} />}
     </>
   );
 }

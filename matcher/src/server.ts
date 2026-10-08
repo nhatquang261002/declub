@@ -9,9 +9,7 @@ import type { Status } from "./types.ts";
 import { WireError, hexString, intentToWire } from "./wire.ts";
 
 const MAX_BODY = 256 * 1024;
-const STATUSES = new Set<string>([
-  "open", "stale", "settled", "cancelled", "expired", "consumed", "rejected", "all",
-]);
+const STATUSES = new Set<string>(["open", "stale", "settled", "cancelled", "expired", "consumed", "rejected", "all"]);
 
 export interface ServerInfo {
   chainId: number;
@@ -58,7 +56,11 @@ export function clientIp(req: IncomingMessage, trustProxy = false): string {
   if (trustProxy) {
     const xff = req.headers["x-forwarded-for"];
     const raw = Array.isArray(xff) ? xff.join(",") : xff;
-    const last = raw?.split(",").map((s) => s.trim()).filter(Boolean).pop();
+    const last = raw
+      ?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .pop();
     if (last) return last;
   }
   return req.socket.remoteAddress ?? "unknown";
@@ -133,12 +135,7 @@ export function createPoolServer(pool: Pool, info: ServerInfo, opts: ServerOptio
       if (wait > 0) {
         const sec = Math.ceil(wait / 1000);
         // Don't read the body: closing the request early is the point.
-        return send(
-          res,
-          429,
-          { error: "rate_limited", message: `too many requests; retry in ${sec}s` },
-          { "retry-after": String(sec) },
-        );
+        return send(res, 429, { error: "rate_limited", message: `too many requests; retry in ${sec}s` }, { "retry-after": String(sec) });
       }
     }
 

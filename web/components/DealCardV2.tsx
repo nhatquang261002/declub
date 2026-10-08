@@ -66,9 +66,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
   const token = info.get(asset.token.toLowerCase());
   return (
     <span className={chip}>
-      <span className="max-w-full truncate text-[11px] font-semibold">
-        {token ? formatUnits(asset.amount, token.decimals) : asset.amount.toString()}
-      </span>
+      <span className="max-w-full truncate text-[11px] font-semibold">{token ? formatUnits(asset.amount, token.decimals) : asset.amount.toString()}</span>
       <span className="max-w-full truncate text-[10px] font-black tracking-wider text-[#a9282f] uppercase">
         {token?.symbol ?? <CopyAddress address={asset.token} inLink />}
       </span>
@@ -104,19 +102,7 @@ function OpenToOffers() {
   );
 }
 
-export function DealCardV2({
-  deal,
-  now,
-  me,
-  info,
-  tag,
-}: {
-  deal: DealV2;
-  now: number;
-  me?: string;
-  info: Info;
-  tag?: ReactNode;
-}) {
+export function DealCardV2({ deal, now, me, info, tag }: { deal: DealV2; now: number; me?: string; info: Info; tag?: ReactNode }) {
   return (
     <DealCardFrame
       href={`/v2/deal/${deal.id}`}
@@ -127,15 +113,5 @@ export function DealCardV2({
       gives={<AssetSide assets={deal.offered} info={info} />}
       wants={isOpenOffer(deal) ? <OpenToOffers /> : <AssetSide assets={deal.requested} info={info} />}
     />
-  );
-}
-
-export function DealGridV2({ deals, now, me, info }: { deals: DealV2[]; now: number; me?: string; info: Info }) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {deals.map((t) => (
-        <DealCardV2 key={t.id.toString()} deal={t} now={now} me={me} info={info} />
-      ))}
-    </div>
   );
 }

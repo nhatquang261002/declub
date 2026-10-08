@@ -24,8 +24,7 @@ export function onlyValid<T>(list: unknown, ok: (value: unknown) => value is T, 
 export const isAddressString = (value: unknown): value is string => typeof value === "string" && isAddress(value, { strict: false });
 
 // Notification keys name deal ids, so read markers are kept per deal contract.
-const scope = (userId: string, account: string) =>
-  `${userId}:${CHAIN_ID}:${(DECLUB_ESCROW_ADDRESS ?? "none").toLowerCase()}:${account.toLowerCase()}`;
+const scope = (userId: string, account: string) => `${userId}:${CHAIN_ID}:${(DECLUB_ESCROW_ADDRESS ?? "none").toLowerCase()}:${account.toLowerCase()}`;
 export const seenKey = (userId: string, account: string) => `declub:seen:${scope(userId, account)}`;
 export const seenInitKey = (userId: string, account: string) => `declub:seen-init:${scope(userId, account)}`;
 export const recentsKey = (userId: string) => `declub:recents:${userId}`;

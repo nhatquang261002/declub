@@ -36,7 +36,7 @@ export const avatarWalletsKey = (userId: string) => `declub:avatar-user:${userId
 export const avatarImageKey = (userId: string) => `declub:avatar-img:${userId}`;
 
 /** Where a kept picture is served from. */
-export const keptImageUrl = (address: string, version: number) => `/api/avatars/${address.toLowerCase()}?v=${version}`;
+const keptImageUrl = (address: string, version: number) => `/api/avatars/${address.toLowerCase()}?v=${version}`;
 
 export function avatarView(address: string, row: StoredAvatar): AvatarView {
   const image = row.image ?? keptImageUrl(address, row.version);

@@ -21,7 +21,9 @@
     "rewards:sponsor": "node --import ./test/register.mjs scripts/rewards-sponsor.ts",
     "rewards:verify": "node --import ./test/register.mjs scripts/rewards-verify.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs --test --test-concurrency=1 \"test/**/*.test.ts\""
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs}\" \"../matcher/**/*.ts\" \"../e2e/**/*.ts\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mjs}\" \"../matcher/**/*.ts\" \"../e2e/**/*.ts\""
   },
   "dependencies": {
     "@next/env": "^16.3.6",
@@ -46,6 +48,7 @@
     "@wagmi/cli": "^2.10.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

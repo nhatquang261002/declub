@@ -9,7 +9,7 @@ import { swapIntents } from "@/lib/contracts";
 import { NETWORK } from "@/lib/network";
 import { PROTOCOL, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
-import { CARD, CardGrid, Checklist, Faq, GuideBody, GuideFooter, GuideHero, MUTED, Section, Steps, type GuideSection } from "../parts";
+import { CARD, CardGrid, GuideBody, GuideEnd, GuideHero, MUTED, Section, Steps, type GuideSection } from "../parts";
 
 // The Deals guide, beside the main Clubs guide at /guide. The create screen's settlement chips link here by anchor
 // (/guide/deals#cant-fail and the rest, from lib/settlementTerms.ts).
@@ -30,15 +30,23 @@ const START = [
     icon: <WalletIcon className="size-4" />,
     title: PRIVY_APP_ID ? "Sign in" : "Connect a wallet",
     body: PRIVY_APP_ID ? (
-      <>Press <b>Sign in</b> and use Google, X, Discord or a wallet. Then link the wallet that holds your assets.</>
+      <>
+        Press <b>Sign in</b> and use Google, X, Discord or a wallet. Then link the wallet that holds your assets.
+      </>
     ) : (
-      <>Press <b>Connect wallet</b> and pick the wallet installed in your browser.</>
+      <>
+        Press <b>Connect wallet</b> and pick the wallet installed in your browser.
+      </>
     ),
   },
   {
     icon: <SwapIcon className="size-4" />,
     title: `Use ${NETWORK.name}`,
-    body: <>If the button says <b>Switch to {NETWORK.walletName}</b>, press it. Every deal here runs on {NETWORK.mainnet ? "mainnet" : "testnet"}.</>,
+    body: (
+      <>
+        If the button says <b>Switch to {NETWORK.walletName}</b>, press it. Every deal here runs on {NETWORK.mainnet ? "mainnet" : "testnet"}.
+      </>
+    ),
   },
   {
     icon: <Image src="/brand/mon.svg" alt="" width={20} height={20} className="size-5" />,
@@ -48,7 +56,10 @@ const START = [
     ) : (
       <>
         You need a little test MON for gas, plus any MON you want to put in a deal. Get some from the{" "}
-        <a href="https://faucet.monad.xyz" target="_blank" rel="noreferrer" className="font-bold underline">Monad faucet</a>.
+        <a href="https://faucet.monad.xyz" target="_blank" rel="noreferrer" className="font-bold underline">
+          Monad faucet
+        </a>
+        .
       </>
     ),
   },
@@ -67,8 +78,8 @@ const MAKE_STEPS = [
     title: "Your assets",
     body: (
       <>
-        Add what you give with <b>+ MON</b>, <b>+ Token</b> or <b>+ NFT</b>. Choose who can take it (anyone, or one
-        wallet) and when it expires: 1 hour, 24 hours, 7 days or never.
+        Add what you give with <b>+ MON</b>, <b>+ Token</b> or <b>+ NFT</b>. Choose who can take it (anyone, or one wallet) and when it expires: 1 hour, 24
+        hours, 7 days or never.
       </>
     ),
   },
@@ -77,7 +88,11 @@ const MAKE_STEPS = [
     body: (
       <>
         Check the summary, <b>Approve</b> each asset you offer, then <b>Create deal</b> (<b>Post open offer</b> for an open offer). Your side and your share of
-        the <a href="#fees" className="font-bold underline">fee</a> are now held by the contract.
+        the{" "}
+        <a href="#fees" className="font-bold underline">
+          fee
+        </a>{" "}
+        are now held by the contract.
       </>
     ),
   },
@@ -95,7 +110,10 @@ const TAKE = [
     body: (
       <>
         Approve what you send if asked, then press <b>Accept &amp; swap</b>. Any MON asked for, plus your share of the{" "}
-        <a href="#fees" className="font-bold underline">fee</a>, goes in the same transaction.
+        <a href="#fees" className="font-bold underline">
+          fee
+        </a>
+        , goes in the same transaction.
       </>
     ),
   },
@@ -107,8 +125,8 @@ const TAKE = [
     kind: "Open offer",
     body: (
       <>
-        Build an offer from your own assets and press <b>Send offer</b>. It&apos;s held until the maker accepts or
-        rejects it. <b>Withdraw my offer</b> works at any time.
+        Build an offer from your own assets and press <b>Send offer</b>. It&apos;s held until the maker accepts or rejects it. <b>Withdraw my offer</b> works at
+        any time.
       </>
     ),
   },
@@ -135,8 +153,7 @@ const AFTER: ReadonlyArray<{ title: string; body: ReactNode; signed?: boolean }>
     title: "Held for you",
     body: (
       <>
-        If a payout to you was refused (some contract wallets do this), the deal page shows it as waiting. Press{" "}
-        <b>Claim</b> to collect it.
+        If a payout to you was refused (some contract wallets do this), the deal page shows it as waiting. Press <b>Claim</b> to collect it.
       </>
     ),
   },
@@ -145,8 +162,8 @@ const AFTER: ReadonlyArray<{ title: string; body: ReactNode; signed?: boolean }>
     signed: true,
     body: (
       <>
-        <b>Remove from pool</b> is free. <b>Cancel on-chain</b> costs gas but makes your signature useless for good. It stays
-        on the swap&apos;s page after you remove it, until the deadline.
+        <b>Remove from pool</b> is free. <b>Cancel on-chain</b> costs gas but makes your signature useless for good. It stays on the swap&apos;s page after you
+        remove it, until the deadline.
       </>
     ),
   },
@@ -161,8 +178,14 @@ const FEES = [
 ];
 
 const FEE_MODES: ReadonlyArray<[string, string]> = [
-  ["Locked deals", "Paid in MON with your side, held with it, and refunded if the deal doesn't complete. The fee a deal was listed with is the fee both sides pay, for each NFT they give."],
-  ["Signed swaps", "Paid in WMON (wrapped MON) when the swap settles, for each NFT you give. You sign the most you'll pay per NFT; if the fee drops first, you pay less."],
+  [
+    "Locked deals",
+    "Paid in MON with your side, held with it, and refunded if the deal doesn't complete. The fee a deal was listed with is the fee both sides pay, for each NFT they give.",
+  ],
+  [
+    "Signed swaps",
+    "Paid in WMON (wrapped MON) when the swap settles, for each NFT you give. You sign the most you'll pay per NFT; if the fee drops first, you pay less.",
+  ],
 ];
 
 const SAFETY = [
@@ -180,8 +203,16 @@ const COMPARE: ReadonlyArray<[string, string, string]> = [
   ["What it costs", "Gas to create, and again to cancel. Approvals cost gas too.", "Nothing to post or remove. You only pay for approvals."],
   ["Your assets", "Held by the contract until it's accepted, cancelled or expires.", "Stay in your wallet the whole time."],
   ["What you can use", "MON, NFTs, tokens, trait requests and open offers.", "NFTs and tokens. MON must be wrapped as WMON. No trait requests."],
-  ["Who can take it", "Anyone, one named wallet, or you pick from the offers you receive.", "Anyone that meets your terms. A matcher finds pairs and rings of up to 4 wallets."],
-  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, cancelled on-chain, or its deadline passes (10 minutes to 7 days). Removing it from the pool only stops this pool using it."],
+  [
+    "Who can take it",
+    "Anyone, one named wallet, or you pick from the offers you receive.",
+    "Anyone that meets your terms. A matcher finds pairs and rings of up to 4 wallets.",
+  ],
+  [
+    "How it ends",
+    "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.",
+    "Settled by a match, cancelled on-chain, or its deadline passes (10 minutes to 7 days). Removing it from the pool only stops this pool using it.",
+  ],
 ];
 
 const MODES = [
@@ -192,10 +223,22 @@ const MODES = [
 /** Only shown where signed swaps exist. */
 const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
   ["Where are my assets in a signed swap?", "They never leave your wallet. They only move at the moment a match settles, and only if they are still there."],
-  ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post."],
-  ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
-  ["Can I sign several swaps with the same NFT?", "No. Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool also takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives."],
-  ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. You can still do that from the swap's page after removing it, until its deadline. A short deadline is the best protection."],
+  [
+    "Should I lock my assets or just sign?",
+    "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post.",
+  ],
+  [
+    "Why can a signed swap fail?",
+    "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it.",
+  ],
+  [
+    "Can I sign several swaps with the same NFT?",
+    "No. Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool also takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives.",
+  ],
+  [
+    "Can I take back a signed swap?",
+    "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. You can still do that from the swap's page after removing it, until its deadline. A short deadline is the best protection.",
+  ],
 ];
 
 /** Only shown with Privy sign-in, which the handle lookup needs. */
@@ -205,23 +248,35 @@ const HANDLE_FAQ: [string, string] = [
 ];
 
 const FAQ: ReadonlyArray<[string, string]> = [
-  ["What is DeClub?", "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets."],
-  ["Do I have to trust the other person?", "No. The swap is atomic: every transfer in it succeeds, or the whole transaction is undone. The other side can never take your assets without sending theirs."],
-  ["Where are my assets while a deal is open?", "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it."],
-  ["Why do I need to approve DeClub?", "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas."],
-  ["What is an open offer?", "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders."],
-  ["Is this mainnet?", NETWORK.mainnet
-    ? "Yes. This is Monad mainnet: deals move real assets and the fee is real. Check every deal twice, and never send valuable assets to an unfamiliar contract."
-    : "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract."],
+  [
+    "What is DeClub?",
+    "A peer-to-peer way to swap NFTs, tokens and MON on Monad. You agree the terms with someone, and a smart contract swaps both sides at once. There's no middleman holding your assets.",
+  ],
+  [
+    "Do I have to trust the other person?",
+    "No. The swap is atomic: every transfer in it succeeds, or the whole transaction is undone. The other side can never take your assets without sending theirs.",
+  ],
+  [
+    "Where are my assets while a deal is open?",
+    "In a locked deal, inside the DeClub contract, until the deal is accepted, you cancel it, or it expires and you reclaim it.",
+  ],
+  [
+    "Why do I need to approve DeClub?",
+    "A contract can only move your NFTs or tokens with your permission. For an NFT collection, one approval covers all its NFTs, so you usually do it once. For a token, you approve the exact amount in the deal. Each approval costs a little gas.",
+  ],
+  [
+    "What is an open offer?",
+    "A deal where you only say what you're giving. Others send offers from their own assets, and their side is held in the contract too. You accept the one you like, and the rest can be withdrawn by their senders.",
+  ],
+  [
+    "Is this mainnet?",
+    NETWORK.mainnet
+      ? "Yes. This is Monad mainnet: deals move real assets and the fee is real. Check every deal twice, and never send valuable assets to an unfamiliar contract."
+      : "No. This is a demo on Monad testnet with test assets. Treat them as disposable, and never send valuable assets to an unfamiliar contract.",
+  ],
 ];
 
-const FAQ_ITEMS = [
-  ...FAQ.slice(0, 3),
-  ...(swapIntents ? SIGNED_FAQ : []),
-  ...FAQ.slice(3, 5),
-  ...(PRIVY_APP_ID ? [HANDLE_FAQ] : []),
-  ...FAQ.slice(5),
-];
+const FAQ_ITEMS = [...FAQ.slice(0, 3), ...(swapIntents ? SIGNED_FAQ : []), ...FAQ.slice(3, 5), ...(PRIVY_APP_ID ? [HANDLE_FAQ] : []), ...FAQ.slice(5)];
 
 export const metadata: Metadata = { title: "Deals guide" };
 
@@ -241,7 +296,11 @@ export default function GuidePage() {
             </Link>
           </>
         }
-        summary={["Both sides move together, or nothing moves.", "You only pay the fee when a deal completes.", NETWORK.mainnet ? "Real assets: check every deal." : "Testnet only: use test assets."]}
+        summary={[
+          "Both sides move together, or nothing moves.",
+          "You only pay the fee when a deal completes.",
+          NETWORK.mainnet ? "Real assets: check every deal." : "Testnet only: use test assets.",
+        ]}
         sections={SECTIONS}
       />
 
@@ -250,15 +309,24 @@ export default function GuidePage() {
           <CardGrid items={START} />
         </Section>
 
-        <Section sections={SECTIONS} id="make" title="Make a deal in three steps" intro={<>Press <b>Create deal</b> and follow the steps.</>}>
+        <Section
+          sections={SECTIONS}
+          id="make"
+          title="Make a deal in three steps"
+          intro={
+            <>
+              Press <b>Create deal</b> and follow the steps.
+            </>
+          }
+        >
           <Steps items={MAKE_STEPS} />
 
           <h3 className="mt-10 mb-4 text-lg font-black">Three kinds of deal</h3>
           <CardGrid items={KINDS} />
           <p className="mt-4 text-sm leading-6 text-muted">
-            Each side holds up to 10 assets, at most 5 of them NFTs: any mix of NFTs, tokens and MON. To make a deal for one person, put their
-            wallet{PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b> (<b>Only this wallet can send offers</b> on an open offer). A live or settled deal can be shared
-            with <b>Share on X</b>, which shows a preview card first.
+            Each side holds up to 10 assets, at most 5 of them NFTs: any mix of NFTs, tokens and MON. To make a deal for one person, put their wallet
+            {PRIVY_APP_ID ? " or their X or Discord handle" : ""} in <b>Only this wallet can accept</b> (<b>Only this wallet can send offers</b> on an open
+            offer). A live or settled deal can be shared with <b>Share on X</b>, which shows a preview card first.
           </p>
         </Section>
 
@@ -266,7 +334,11 @@ export default function GuidePage() {
           sections={SECTIONS}
           id="take"
           title="Take a deal"
-          intro={<>Open a deal from <b>Deals</b>. The page shows what you get, what you give, and your next move.</>}
+          intro={
+            <>
+              Open a deal from <b>Deals</b>. The page shows what you get, what you give, and your next move.
+            </>
+          }
         >
           <dl className={`${CARD} divide-y divide-[#111318]/10`}>
             {TAKE.map((row) => (
@@ -279,8 +351,7 @@ export default function GuidePage() {
           <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
             <ShieldIcon className="mt-0.5 size-5 shrink-0 text-[#1f7a55]" />
             <span>
-              <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is
-              undone and everyone keeps what they had.
+              <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is undone and everyone keeps what they had.
             </span>
           </p>
         </Section>
@@ -290,12 +361,7 @@ export default function GuidePage() {
             sections={SECTIONS}
             id="settlement"
             title="Lock your assets, or just sign"
-            intro={
-              <>
-                Every deal settles one of two ways, and you choose when you create it. Both show up in the same list,
-                tagged Locked or Signed.
-              </>
-            }
+            intro={<>Every deal settles one of two ways, and you choose when you create it. Both show up in the same list, tagged Locked or Signed.</>}
           >
             <div className="grid gap-4 md:grid-cols-2">
               {MODES.map(({ mode, title, bestFor }) => (
@@ -333,13 +399,17 @@ export default function GuidePage() {
             <details className={`${CARD} group mt-4`}>
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-black">
                 Compare them side by side
-                <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
+                <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>
+                  +
+                </span>
               </summary>
               <div className="overflow-x-auto border-t border-[#111318]/10">
                 <table className="w-full min-w-[34rem] text-left text-sm">
                   <thead>
                     <tr className="text-xs tracking-wider text-[#4e5968] uppercase">
-                      <th className="px-5 py-3"><span className="sr-only">Feature</span></th>
+                      <th className="px-5 py-3">
+                        <span className="sr-only">Feature</span>
+                      </th>
                       <th className="px-5 py-3 font-black">Lock assets now</th>
                       <th className="px-5 py-3 font-black">Sign only</th>
                     </tr>
@@ -347,7 +417,9 @@ export default function GuidePage() {
                   <tbody className="divide-y divide-[#111318]/10">
                     {COMPARE.map(([row, locked, signed]) => (
                       <tr key={row} className="align-top">
-                        <th scope="row" className="px-5 py-3.5 font-black whitespace-nowrap">{row}</th>
+                        <th scope="row" className="px-5 py-3.5 font-black whitespace-nowrap">
+                          {row}
+                        </th>
                         <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{locked}</td>
                         <td className={`px-5 py-3.5 leading-6 ${MUTED}`}>{signed}</td>
                       </tr>
@@ -381,21 +453,15 @@ export default function GuidePage() {
                 </div>
               ))}
             </dl>
-            <p className={`mt-5 border-t border-[#111318]/10 pt-4 text-sm ${MUTED}`}>
-              You also pay Monad&apos;s network gas for each transaction.
-            </p>
+            <p className={`mt-5 border-t border-[#111318]/10 pt-4 text-sm ${MUTED}`}>You also pay Monad&apos;s network gas for each transaction.</p>
           </div>
         </Section>
 
-        <Section sections={SECTIONS} id="safety" title="Before you confirm">
-          <Checklist items={SAFETY} />
-        </Section>
-
-        <Section sections={SECTIONS} id="faq" title="Questions, answered">
-          <Faq items={FAQ_ITEMS} />
-        </Section>
-
-        <GuideFooter
+        <GuideEnd
+          sections={SECTIONS}
+          safetyTitle="Before you confirm"
+          safety={SAFETY}
+          faq={FAQ_ITEMS}
           other={{ href: "/guide", title: "Clubs guide", body: "Join a Club, share in its fees, and post what you're after." }}
         />
       </GuideBody>

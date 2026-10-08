@@ -79,7 +79,12 @@ function Profile({ address }: { address: string }) {
                   Verified {PROFILE_LABEL[profile.provider]}
                 </span>
                 {xUrl ? (
-                  <a href={xUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold underline decoration-dotted underline-offset-2">
+                  <a
+                    href={xUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-bold underline decoration-dotted underline-offset-2"
+                  >
                     {profile.provider === "twitter" && <XLogoIcon className="size-3.5" />}
                     {handle}
                     <ExternalIcon className="size-3 opacity-60" />
@@ -92,7 +97,12 @@ function Profile({ address }: { address: string }) {
             {about?.bio && <p className="mt-1 max-w-prose whitespace-pre-line break-words text-[0.95rem] leading-6">{about.bio}</p>}
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted">
               <CopyAddress address={address} full className="text-left" />
-              <a href={explorerAddress(address)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-sans font-bold underline underline-offset-2">
+              <a
+                href={explorerAddress(address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-sans font-bold underline underline-offset-2"
+              >
                 Explorer <ExternalIcon className="size-3" />
               </a>
             </p>

@@ -27,7 +27,7 @@ async function writeRows(store: Store, userId: string, wallets: string[], row: S
   await store.setMembers(aboutWalletsKey(userId), [...now]);
 }
 
-export type SetAboutResult = { ok: true; about: About; wallets: string[] } | { ok: false; reason: "no_wallet" };
+type SetAboutResult = { ok: true; about: About; wallets: string[] } | { ok: false; reason: "no_wallet" };
 
 /** Keeps `about` for the user's wallets; an empty one removes what was there. */
 export async function setAbout(store: Store, userId: string, wallets: Address[], about: About, now = Date.now()): Promise<SetAboutResult> {
@@ -48,7 +48,12 @@ export async function syncAbout(store: Store, userId: string, wallets: Address[]
     if (row || (await store.countMembers(aboutWalletsKey(userId))) > 0) await clearAbout(store, userId);
     return;
   }
-  await writeRows(store, userId, wallets.map((w) => w.toLowerCase()), row);
+  await writeRows(
+    store,
+    userId,
+    wallets.map((w) => w.toLowerCase()),
+    row,
+  );
 }
 
 /** What a wallet's owner has written, as others see it. */

@@ -37,30 +37,33 @@ export default async function Image({ params }: { params: Promise<{ address: str
   const recap = facts?.recap ?? null;
   const paid = recap !== null && recap.paidHolders > 0n;
   return new ImageResponse(
-    (
-      <CardFrame
-        footer="Hold it. Post about it. Get paid."
-        badge={<Pill>{recap ? `WEEKLY RECAP · EPOCH ${recap.epoch}` : "CLUB"}</Pill>}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 26, marginTop: 20 }}>
-          {facts && <Avatar src={avatar} name={facts.name} size={112} />}
-          <div style={{ display: "flex", flex: 1, minWidth: 0, fontSize: fit(facts?.name ?? "Club"), lineHeight: 1.05 }}>
-            {facts ? `${facts.name} Club` : "A Club on Monad"}
+    <CardFrame footer="Hold it. Post about it. Get paid." badge={<Pill>{recap ? `WEEKLY RECAP · EPOCH ${recap.epoch}` : "CLUB"}</Pill>}>
+      <div style={{ display: "flex", alignItems: "center", gap: 26, marginTop: 20 }}>
+        {facts && <Avatar src={avatar} name={facts.name} size={112} />}
+        <div style={{ display: "flex", flex: 1, minWidth: 0, fontSize: fit(facts?.name ?? "Club"), lineHeight: 1.05 }}>
+          {facts ? `${facts.name} Club` : "A Club on Monad"}
+        </div>
+      </div>
+      {recap && paid ? (
+        <div style={{ display: "flex", flex: 1, marginTop: 20, marginBottom: 26 }}>
+          <Rewarded
+            label={`REWARDED THIS WEEK TO ${recap.holderCount} ${recap.holderCount === 1 ? "HOLDER" : "HOLDERS"}`}
+            value={short(recap.paidHolders)}
+            mon={mon}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "flex", fontSize: 54, lineHeight: 1.1 }}>
+            {recap
+              ? recap.fees > 0n
+                ? "Nothing to reward yet this week."
+                : "A quiet week. Be first to swap."
+              : "Swap fees go back to the Club’s Holders every week."}
           </div>
         </div>
-        {recap && paid ? (
-          <div style={{ display: "flex", flex: 1, marginTop: 20, marginBottom: 26 }}>
-            <Rewarded label={`REWARDED THIS WEEK TO ${recap.holderCount} ${recap.holderCount === 1 ? "HOLDER" : "HOLDERS"}`} value={short(recap.paidHolders)} mon={mon} />
-          </div>
-        ) : (
-          <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", gap: 12, marginBottom: 20 }}>
-            <div style={{ display: "flex", fontSize: 54, lineHeight: 1.1 }}>
-              {recap ? (recap.fees > 0n ? "Nothing to reward yet this week." : "A quiet week. Be first to swap.") : "Swap fees go back to the Club’s Holders every week."}
-            </div>
-          </div>
-        )}
-      </CardFrame>
-    ),
+      )}
+    </CardFrame>,
     { ...size, fonts },
   );
 }

@@ -24,7 +24,9 @@ export type Intent = {
   nonce: bigint;
 };
 
-export const INTENT_TYPES = {
+// The EIP-712 types are written out in each package on purpose: the app and the matcher deploy on their own, and e2e checks both against a third copy (IN-01).
+// jscpd:ignore-start
+const INTENT_TYPES = {
   Asset: [
     { name: "assetType", type: "uint8" },
     { name: "token", type: "address" },
@@ -41,14 +43,14 @@ export const INTENT_TYPES = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+// jscpd:ignore-end
 
 /** Not part of the contract: a maker-signed request that the pool drop an intent. */
-export const CANCEL_TYPES = {
+const CANCEL_TYPES = {
   CancelIntent: [{ name: "intentHash", type: "bytes32" }],
 } as const;
 
-export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
+const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) => ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,
@@ -79,14 +81,13 @@ export const cancelTypedData = (verifyingContract: Address, intentHash: Hex) =>
   }) as const;
 
 /** The EIP-712 struct hash: the id the pool uses and the contract emits in `IntentFilled`. */
-export const intentHash = (intent: Intent): Hex =>
-  hashStruct({ data: message(intent), primaryType: "Intent", types: INTENT_TYPES });
+export const intentHash = (intent: Intent): Hex => hashStruct({ data: message(intent), primaryType: "Intent", types: INTENT_TYPES });
 
 // ─────────────────────────────────────────────────────────────── The pool's JSON
 
 /** Every bigint is a decimal string. */
 export type WireAsset = { assetType: number; token: Address; id: string; amount: string };
-export type WireIntent = {
+type WireIntent = {
   maker: Address;
   give: WireAsset[];
   want: WireAsset[];
@@ -96,7 +97,7 @@ export type WireIntent = {
   nonce: string;
 };
 
-const wireAsset = (a: Asset): WireAsset => {
+export const wireAsset = (a: Asset): WireAsset => {
   const raw = toRawAsset(a);
   return { assetType: raw.assetType, token: raw.token, id: raw.id.toString(), amount: raw.amount.toString() };
 };
@@ -143,9 +144,7 @@ export function intentFromWire(v: unknown): Intent | null {
 }
 
 export type IntentStatus = "open" | "stale" | "settled" | "cancelled" | "expired" | "consumed" | "rejected";
-const STATUSES: ReadonlySet<string> = new Set<IntentStatus>([
-  "open", "stale", "settled", "cancelled", "expired", "consumed", "rejected",
-]);
+const STATUSES: ReadonlySet<string> = new Set<IntentStatus>(["open", "stale", "settled", "cancelled", "expired", "consumed", "rejected"]);
 
 /** One row of the pool's book. */
 export type PoolIntent = {

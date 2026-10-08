@@ -38,8 +38,7 @@ const node = (maker: number, give: Asset[], want: Asset[], createdAt = ++seq): N
   } satisfies Intent,
 });
 
-const ids = (nodes: Node[], cycles: number[][]) =>
-  cycles.map((c) => c.map((i) => Number(nodes[i]!.intent.maker)));
+const ids = (nodes: Node[], cycles: number[][]) => cycles.map((c) => c.map((i) => Number(nodes[i]!.intent.maker)));
 
 describe("findCycles", () => {
   it("finds a plain swap exactly once", () => {
@@ -62,28 +61,18 @@ describe("findCycles", () => {
   });
 
   it("accepts surplus: the giver may give more than was asked", () => {
-    const nodes = [
-      node(1, [nft(1)], [erc20(100)]),
-      node(2, [erc20(100), nft(7)], [nft(1)]),
-    ];
+    const nodes = [node(1, [nft(1)], [erc20(100)]), node(2, [erc20(100), nft(7)], [nft(1)])];
     assert.equal(findCycles(nodes).length, 1);
   });
 
   it("needs every wanted asset covered by one giver", () => {
-    const nodes = [
-      node(1, [nft(1)], [erc20(100), nft(5)]),
-      node(2, [erc20(100)], [nft(1)]),
-    ];
+    const nodes = [node(1, [nft(1)], [erc20(100), nft(5)]), node(2, [erc20(100)], [nft(1)])];
     assert.equal(findCycles(nodes).length, 0);
   });
 
   it("finds a ring of three that no pair could settle", () => {
     // 1 gives NFT#1 wants WETH, 2 gives WETH wants USD, 3 gives USD wants NFT#1.
-    const nodes = [
-      node(1, [nft(1)], [erc20(1, WETH)]),
-      node(2, [erc20(1, WETH)], [erc20(5)]),
-      node(3, [erc20(5)], [nft(1)]),
-    ];
+    const nodes = [node(1, [nft(1)], [erc20(1, WETH)]), node(2, [erc20(1, WETH)], [erc20(5)]), node(3, [erc20(5)], [nft(1)])];
     const cycles = findCycles(nodes);
     assert.equal(cycles.length, 1);
     // cycle[i].give goes to cycle[i+1].maker, and 3 is the one who wants 1's NFT: 1 → 3 → 2.
@@ -91,12 +80,7 @@ describe("findCycles", () => {
   });
 
   it("finds a ring of four and stops at MAX_CYCLE", () => {
-    const four = [
-      node(1, [nft(1)], [nft(4)]),
-      node(2, [nft(2)], [nft(1)]),
-      node(3, [nft(3)], [nft(2)]),
-      node(4, [nft(4)], [nft(3)]),
-    ];
+    const four = [node(1, [nft(1)], [nft(4)]), node(2, [nft(2)], [nft(1)]), node(3, [nft(3)], [nft(2)]), node(4, [nft(4)], [nft(3)])];
     assert.equal(findCycles(four).length, 1);
     assert.equal(findCycles(four)[0]!.length, 4);
 
@@ -114,21 +98,13 @@ describe("findCycles", () => {
 
   it("never puts one maker in a cycle twice", () => {
     // Maker 1 has two intents that would otherwise close a ring through each other.
-    const nodes = [
-      node(1, [nft(1)], [nft(2)]),
-      node(1, [nft(2)], [nft(1)]),
-      node(2, [nft(9)], [nft(8)]),
-    ];
+    const nodes = [node(1, [nft(1)], [nft(2)]), node(1, [nft(2)], [nft(1)]), node(2, [nft(9)], [nft(8)])];
     assert.deepEqual(findCycles(nodes), []);
   });
 
   it("finds every distinct cycle, each once", () => {
     // Two sellers of the same NFT for the same price: 1 can pair with 2 or with 3.
-    const nodes = [
-      node(1, [nft(1)], [erc20(100)]),
-      node(2, [erc20(100)], [nft(1)]),
-      node(3, [erc20(120)], [nft(1)]),
-    ];
+    const nodes = [node(1, [nft(1)], [erc20(100)]), node(2, [erc20(100)], [nft(1)]), node(3, [erc20(120)], [nft(1)])];
     assert.equal(findCycles(nodes).length, 2);
   });
 
@@ -162,8 +138,7 @@ function referenceCycles(nodes: Node[], maxCycle = 4, maxCycles = 5000): number[
     }
   });
   const out: number[][] = [];
-  const makerIn = (path: number[], idx: number) =>
-    path.some((p) => isAddressEqual(nodes[p]!.intent.maker, nodes[idx]!.intent.maker));
+  const makerIn = (path: number[], idx: number) => path.some((p) => isAddressEqual(nodes[p]!.intent.maker, nodes[idx]!.intent.maker));
   for (let start = 0; start < nodes.length && out.length < maxCycles; start++) {
     const path = [start];
     const walk = () => {
@@ -242,8 +217,7 @@ describe("the cycle search's work bound", () => {
       seed = (seed * 1103515245 + 12345) % 2 ** 31;
       return (seed >>> 16) % n; // the high bits: an LCG's low bits cycle fast
     };
-    const asset = (): Asset =>
-      rand(2) === 0 ? nft(rand(3)) : erc20(10 * (1 + rand(3)), [USD, WETH][rand(2)]!);
+    const asset = (): Asset => (rand(2) === 0 ? nft(rand(3)) : erc20(10 * (1 + rand(3)), [USD, WETH][rand(2)]!));
     let total = 0;
     for (let round = 0; round < 200; round++) {
       const nodes: Node[] = [];

@@ -31,7 +31,7 @@ export type VerifyInput = {
   previousTotal?: bigint | null;
 };
 
-export type VerifyResult = { problems: string[]; notes: string[]; total: bigint };
+type VerifyResult = { problems: string[]; notes: string[]; total: bigint };
 
 const KINDS = ["holder", "member", "fund"] as const;
 type Kind = (typeof KINDS)[number];
@@ -206,7 +206,8 @@ export function verifyEpochRecord(input: VerifyInput): VerifyResult {
     if (!clubsSeen.has(club)) problems.push(`Leaves pay out for ${club}, which isn't one of the epoch's Clubs.`);
   }
   for (const club of input.sponsored.keys()) {
-    if (!clubsSeen.has(club) && (input.sponsored.get(club) ?? 0n) > 0n) problems.push(`The sponsors ledger has money for ${club}, which isn't one of the epoch's Clubs.`);
+    if (!clubsSeen.has(club) && (input.sponsored.get(club) ?? 0n) > 0n)
+      problems.push(`The sponsors ledger has money for ${club}, which isn't one of the epoch's Clubs.`);
   }
   if (sumPaid !== total) problems.push(`The Clubs pay out ${sumPaid} wei in all, but the total is ${total}.`);
 
@@ -218,9 +219,7 @@ export function verifyEpochRecord(input: VerifyInput): VerifyResult {
   }
   if (input.previousTotal !== undefined && input.previousTotal !== null) {
     notes.push(
-      input.previousTotal === 0n
-        ? "The previous epoch paid nothing."
-        : `The total is ${percent(total, input.previousTotal)} of the previous epoch's.`,
+      input.previousTotal === 0n ? "The previous epoch paid nothing." : `The total is ${percent(total, input.previousTotal)} of the previous epoch's.`,
     );
   }
 

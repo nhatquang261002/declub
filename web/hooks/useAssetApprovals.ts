@@ -8,7 +8,7 @@ import { erc20Abi, erc721Abi } from "@/lib/contracts";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import type { WriteCall } from "./useTxFlow";
 
-export type ApprovalStep = {
+type ApprovalStep = {
   key: string;
   label: string;
   call: WriteCall;
@@ -21,11 +21,7 @@ export type ApprovalStep = {
  *
  * Run `steps[0]` and the list shrinks by itself: useTxFlow refetches every query after a write.
  */
-export function useAssetApprovals(
-  owner: Address | undefined,
-  assets: readonly Asset[],
-  info: ReadonlyMap<string, TokenInfo>,
-) {
+export function useAssetApprovals(owner: Address | undefined, assets: readonly Asset[], info: ReadonlyMap<string, TokenInfo>) {
   const spender = DECLUB_ESCROW_ADDRESS;
 
   const { erc20s, collections } = useMemo(() => {

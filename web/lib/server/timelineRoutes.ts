@@ -5,6 +5,17 @@ import { fail } from "./gate";
 import { clientId, getStore, withinLimit } from "./store";
 import { listTimeline } from "./timeline";
 
+/** The `limit` and `before` a page of posts is asked with (`before` is the `next` of the page before), or the 400 that says they're wrong. */
+export function pageParams(url: URL) {
+  const limit = url.searchParams.get("limit") === null ? TIMELINE_PAGE : Number(url.searchParams.get("limit"));
+  const askedBefore = url.searchParams.get("before");
+  const before = askedBefore === null ? undefined : parseCursor(askedBefore);
+  if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_PAGE || before === null) {
+    return fail(400, "bad_request", `limit is 1 to ${TIMELINE_MAX_PAGE}, and before is the next of an earlier page.`);
+  }
+  return { limit, before };
+}
+
 /**
  * GET /api/timeline?scope=joined|all|others&limit=&before=   { enabled, scope, posts, next }: a page
  * of Board posts from many Clubs, newest first (ADR 0041). `before` is the `next` of the page before
@@ -18,12 +29,9 @@ export function timelineHandler(registry: Registry, deps: Pick<RouteDeps, "viewe
     const url = new URL(request.url);
     const asked = url.searchParams.get("scope") ?? "all";
     if (!isScope(asked)) return fail(400, "bad_request", "scope is joined, all or others.");
-    const limit = url.searchParams.get("limit") === null ? TIMELINE_PAGE : Number(url.searchParams.get("limit"));
-    const askedBefore = url.searchParams.get("before");
-    const before = askedBefore === null ? undefined : parseCursor(askedBefore);
-    if (!Number.isInteger(limit) || limit < 1 || limit > TIMELINE_MAX_PAGE || before === null) {
-      return fail(400, "bad_request", `limit is 1 to ${TIMELINE_MAX_PAGE}, and before is the next of an earlier page.`);
-    }
+    const page = pageParams(url);
+    if (page instanceof Response) return page;
+    const { limit, before } = page;
 
     const store = getStore();
     if (!store) return Response.json({ enabled: false, scope: asked, posts: [], next: null }, { headers: { "Cache-Control": "no-store" } });

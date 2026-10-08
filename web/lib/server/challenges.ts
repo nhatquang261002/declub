@@ -61,7 +61,7 @@ export type BlockReader = {
 let cachedClient: PublicClient | undefined;
 const client = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-export function viemBlocks(): BlockReader {
+function viemBlocks(): BlockReader {
   return {
     async latest() {
       return client().getBlockNumber({ cacheTime: 0 });
@@ -83,20 +83,66 @@ export type ChallengeDeps = Deps & { blocks?: BlockReader; prizeChain?: PrizeCha
 const nowOf = (deps: Pick<Deps, "now">) => deps.now?.() ?? Date.now();
 const toEpoch = (ms: number, deps: Pick<Deps, "epochs">) => Math.max(0, epochAt(Math.floor(ms / 1000), deps.epochs?.genesis, deps.epochs?.length));
 
-export type ChallengeRefusal =
-  | "archived" | "forbidden" | "not_found" | "invalid" | "not_member" | "banned" | "reward_banned" | "closed"
-  | "holders_only" | "too_many_open" | "owner_entry" | "bad_post" | "not_x" | "x_not_own" | "x_too_old" | "already_entered" | "full" | "not_judging" | "no_entry" | "busy" | "drawing"
-  | "prize_overdue" | "no_prize" | "prize_sent" | "tx_used" | "tx_not_found" | "chain_unavailable" | PrizeProblem;
+type ChallengeRefusal =
+  | "archived"
+  | "forbidden"
+  | "not_found"
+  | "invalid"
+  | "not_member"
+  | "banned"
+  | "reward_banned"
+  | "closed"
+  | "holders_only"
+  | "too_many_open"
+  | "owner_entry"
+  | "bad_post"
+  | "not_x"
+  | "x_not_own"
+  | "x_too_old"
+  | "already_entered"
+  | "full"
+  | "not_judging"
+  | "no_entry"
+  | "busy"
+  | "drawing"
+  | "prize_overdue"
+  | "no_prize"
+  | "prize_sent"
+  | "tx_used"
+  | "tx_not_found"
+  | "chain_unavailable"
+  | PrizeProblem;
 
 async function load(store: Store, token: string, id: string) {
   return /^[0-9a-f-]{36}$/.test(id) ? store.get<StoredChallenge>(challengeKey(token, id)) : null;
 }
 
-const entriesOf = async (store: Store, token: string, id: string) =>
+export const entriesOf = async (store: Store, token: string, id: string) =>
   (await store.members(entriesKey(token, id))).flatMap((m) => {
     const at = m.indexOf("|");
     return at > 0 ? [{ post: m.slice(0, at), userId: m.slice(at + 1) }] : [];
   });
+
+/** Whether `userId` is the Owner of the Club (or an app admin), who run its challenges. */
+const runsChallenges = async (store: Store, token: string, userId: string, deps: Deps) => isOwnerOrAdmin(await roleIn(store, token, userId, deps));
+
+/** The challenge `id` for its Owner (or an app admin) to act on: or why they can't. */
+async function ownChallenge(store: Store, entry: AssetEntry, actor: Actor, id: string, deps: Deps) {
+  const token = entry.address.toLowerCase();
+  if (!(await runsChallenges(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" } as const;
+  const c = await load(store, token, id);
+  return c ? ({ ok: true, token, c } as const) : ({ ok: false, reason: "not_found" } as const);
+}
+
+/** Runs `run` holding the challenge's settle lock, or says it is busy; the lock is let go after. */
+async function whileLocked<T>(store: Store, token: string, id: string, run: () => Promise<T>): Promise<T | { ok: false; reason: "busy" }> {
+  if ((await store.hit(settleLockKey(token, id), 30)) > 1) return { ok: false, reason: "busy" };
+  try {
+    return await run();
+  } finally {
+    await store.del(settleLockKey(token, id));
+  }
+}
 
 /** The Owner (or an app admin) starts a challenge that runs from now. */
 export async function createChallenge(
@@ -107,7 +153,7 @@ export async function createChallenge(
   deps: ChallengeDeps = {},
 ): Promise<{ ok: true; id: string } | { ok: false; reason: ChallengeRefusal; message?: string }> {
   const token = entry.address.toLowerCase();
-  if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
+  if (!(await runsChallenges(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   // An ERC-20 prize is checked with the decimals its contract reports, read here: never the form's, never assumed.
   const registry = deps.registry ?? defaultRegistry;
@@ -134,15 +180,31 @@ export async function createChallenge(
   const challenge: StoredChallenge = { id, ...rest, startsAt: now, endsAt, by: actor.wallet, state: "live" };
   await store.set(challengeKey(token, id), challenge);
   await store.rank(challengesKey(token), [{ member: id, score: now }], CHALLENGE_RULES.kept);
-  const pays = isFlat(challenge.judging) ? `${challenge.winners} × ${challenge.prize} points${challenge.minLikes ? ` · ${challenge.minLikes}+ likes` : ""}` : `${challenge.prizes.join("/")} points`;
+  const pays = isFlat(challenge.judging)
+    ? `${challenge.winners} × ${challenge.prize} points${challenge.minLikes ? ` · ${challenge.minLikes}+ likes` : ""}`
+    : `${challenge.prizes.join("/")} points`;
   const asset = challenge.rewards?.asset;
   const extra = `${asset ? ` · plus ${asset.amounts.map((a) => assetText(asset, a)).join("/")}${isFlat(challenge.judging) ? " each" : ""}` : ""}${challenge.rewards?.pinWinner ? " · results pinned" : ""}`;
-  await appendLog(store, token, { actor: actor.wallet, action: "create_challenge", target: id, detail: `${challenge.title} · ${pays}${extra} · judged by ${challenge.judging}${challenge.holdersOnly ? " · Holders only" : ""}` }, now);
+  await appendLog(
+    store,
+    token,
+    {
+      actor: actor.wallet,
+      action: "create_challenge",
+      target: id,
+      detail: `${challenge.title} · ${pays}${extra} · judged by ${challenge.judging}${challenge.holdersOnly ? " · Holders only" : ""}`,
+    },
+    now,
+  );
   return { ok: true, id };
 }
 
 /** The decimals of the ERC-20 an Owner named as a prize, read from its contract; null for anything else. */
-async function prizeDecimals(input: unknown, registry: Pick<Registry, "entry">, deps: Pick<ChallengeDeps, "prizeChain">): Promise<{ token: string; value: number | null } | null> {
+async function prizeDecimals(
+  input: unknown,
+  registry: Pick<Registry, "entry">,
+  deps: Pick<ChallengeDeps, "prizeChain">,
+): Promise<{ token: string; value: number | null } | null> {
   const rewards = typeof input === "object" && input !== null ? (input as { rewards?: unknown }).rewards : undefined;
   const token = typeof rewards === "object" && rewards !== null ? (rewards as { asset?: { token?: unknown } }).asset?.token : undefined;
   if (typeof token !== "string" || !isAddress(token, { strict: false })) return null;
@@ -152,11 +214,16 @@ async function prizeDecimals(input: unknown, registry: Pick<Registry, "entry">, 
 }
 
 /** The Owner cancels a challenge that hasn't been settled: nobody earns anything from it. */
-export async function cancelChallenge(store: Store, entry: AssetEntry, actor: Actor, id: string, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: ChallengeRefusal }> {
-  const token = entry.address.toLowerCase();
-  if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  const c = await load(store, token, id);
-  if (!c) return { ok: false, reason: "not_found" };
+export async function cancelChallenge(
+  store: Store,
+  entry: AssetEntry,
+  actor: Actor,
+  id: string,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: ChallengeRefusal }> {
+  const own = await ownChallenge(store, entry, actor, id, deps);
+  if (!own.ok) return own;
+  const { token, c } = own;
   if (c.state !== "live") return { ok: false, reason: "closed" };
   // Once a raffle's block is committed its result is fixed (anyone can work it out as soon as the block
   // exists), so calling it off then would be choosing the result (ADR 0049).
@@ -188,7 +255,17 @@ async function candidates(store: Store, token: string, c: StoredChallenge): Prom
     if (!post || post.userId !== e.userId || post.parent || post.hidden || !row?.displayWallet || banned.has(e.userId) || noRewards.has(e.userId)) continue;
     const likers = (await store.members(likesKey(token, e.post))).filter((u) => u !== e.userId && rows.has(u) && !noRewards.has(u));
     const votes = likers.filter((u) => rows.get(u)?.holder).length;
-    out.push({ post: e.post, userId: e.userId, wallet: row.displayWallet, at: post.at, likes: likers.length, votes, text: post.text, ...(post.x ? { x: post.x } : {}), likers });
+    out.push({
+      post: e.post,
+      userId: e.userId,
+      wallet: row.displayWallet,
+      at: post.at,
+      likes: likers.length,
+      votes,
+      text: post.text,
+      ...(post.x ? { x: post.x } : {}),
+      likers,
+    });
   }
   return out;
 }
@@ -230,12 +307,31 @@ async function finish(
     return prize ? { ...w, prize } : w;
   });
   const prizeUsers = Object.fromEntries(named.filter((w) => w.prize).map((w) => [w.post, userOf.get(w.post)!]));
-  const settlement: Settlement = { at, ...(paying.length > 0 ? { epoch } : {}), winners: named, ...(expired ? { expired: true as const } : {}), ...(draw ? { draw } : {}) };
-  await store.set(challengeKey(token, c.id), { ...c, state: "settled", settled: settlement, ...(Object.keys(prizeUsers).length > 0 ? { prizeUsers } : {}) } satisfies StoredChallenge);
+  const settlement: Settlement = {
+    at,
+    ...(paying.length > 0 ? { epoch } : {}),
+    winners: named,
+    ...(expired ? { expired: true as const } : {}),
+    ...(draw ? { draw } : {}),
+  };
+  await store.set(challengeKey(token, c.id), {
+    ...c,
+    state: "settled",
+    settled: settlement,
+    ...(Object.keys(prizeUsers).length > 0 ? { prizeUsers } : {}),
+  } satisfies StoredChallenge);
   // Every winner gets a trophy, whatever the prize (a 0-point win too), keyed by the challenge so a repeat gives one.
   for (const w of named) {
     const userId = userOf.get(w.post);
-    if (userId) await addTrophy(store, userId, { club: token, challenge: c.id, title: c.title, place: trophyPlace(c.judging, w.place), at, wallet: w.wallet.toLowerCase() });
+    if (userId)
+      await addTrophy(store, userId, {
+        club: token,
+        challenge: c.id,
+        title: c.title,
+        place: trophyPlace(c.judging, w.place),
+        at,
+        wallet: w.wallet.toLowerCase(),
+      });
   }
   await appendLog(
     store,
@@ -268,7 +364,10 @@ function winnersOf(c: StoredChallenge, cands: readonly Entrant[]): Winner[] {
   switch (c.judging) {
     case "holders":
       // Only Holders' likes count (ADR 0049): the same ranking, on the votes.
-      return winnersByLikes(cands.map((x) => ({ ...x, likes: x.votes })), c.prizes);
+      return winnersByLikes(
+        cands.map((x) => ({ ...x, likes: x.votes })),
+        c.prizes,
+      );
     case "first":
       return winnersByTime(cands, c.winners ?? c.prizes.length, c.prize ?? c.prizes[0] ?? 0);
     case "everyone":
@@ -314,10 +413,26 @@ async function draw(store: Store, token: string, c: StoredChallenge, now: number
   const cands = await candidates(store, token, committed);
   const pool = committed.drawPool ?? [];
   const prize = committed.prize ?? committed.prizes[0] ?? 0;
-  const winners = drawWinners(seed, cands, committed.winners ?? committed.prizes.length, pool).map((x, i): Winner => ({ post: x.post, wallet: x.wallet, place: i + 1, points: prize, likes: x.likes }));
-  await finish(store, token, committed, winners, new Map(cands.map((x) => [x.post, x.userId])), now, await awardEpoch(store, token, committed, now, deps), committed.by, {
-    draw: { block: committed.drawBlock!, hash, seed, pool },
-  });
+  const winners = drawWinners(seed, cands, committed.winners ?? committed.prizes.length, pool).map((x, i): Winner => ({
+    post: x.post,
+    wallet: x.wallet,
+    place: i + 1,
+    points: prize,
+    likes: x.likes,
+  }));
+  await finish(
+    store,
+    token,
+    committed,
+    winners,
+    new Map(cands.map((x) => [x.post, x.userId])),
+    now,
+    await awardEpoch(store, token, committed, now, deps),
+    committed.by,
+    {
+      draw: { block: committed.drawBlock!, hash, seed, pool },
+    },
+  );
   return true;
 }
 
@@ -350,7 +465,16 @@ export async function settleDue(store: Store, entry: AssetEntry, deps: Pick<Chal
         if (!(await draw(store, token, fresh, now, deps))) continue;
       } else {
         const cands = await candidates(store, token, fresh);
-        await finish(store, token, fresh, winnersOf(fresh, cands), new Map(cands.map((x) => [x.post, x.userId])), now, await awardEpoch(store, token, fresh, now, deps), fresh.by);
+        await finish(
+          store,
+          token,
+          fresh,
+          winnersOf(fresh, cands),
+          new Map(cands.map((x) => [x.post, x.userId])),
+          now,
+          await awardEpoch(store, token, fresh, now, deps),
+          fresh.by,
+        );
       }
       settled++;
     } finally {
@@ -427,7 +551,13 @@ async function cover(store: Store, token: string, postId: string, id: string | n
 }
 
 /** A member takes their entry back while the challenge is open. */
-export async function withdrawEntry(store: Store, entry: AssetEntry, userId: string, id: string, deps: Deps = {}): Promise<{ ok: true } | { ok: false; reason: ChallengeRefusal }> {
+export async function withdrawEntry(
+  store: Store,
+  entry: AssetEntry,
+  userId: string,
+  id: string,
+  deps: Deps = {},
+): Promise<{ ok: true } | { ok: false; reason: ChallengeRefusal }> {
   const token = entry.address.toLowerCase();
   const c = await load(store, token, id);
   if (!c) return { ok: false, reason: "not_found" };
@@ -451,15 +581,14 @@ export async function pickWinners(
   picked: unknown,
   deps: Deps = {},
 ): Promise<{ ok: true; winners: Winner[] } | { ok: false; reason: ChallengeRefusal; message?: string }> {
-  const token = entry.address.toLowerCase();
-  if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  const c = await load(store, token, id);
-  if (!c) return { ok: false, reason: "not_found" };
+  const own = await ownChallenge(store, entry, actor, id, deps);
+  if (!own.ok) return own;
+  const { token, c } = own;
   const now = nowOf(deps);
   if (c.judging !== "owner" || phaseOf(c, now) !== "judging" || now >= c.endsAt + CHALLENGE_RULES.pickWindowMs) return { ok: false, reason: "not_judging" };
-  if (!Array.isArray(picked) || picked.some((p) => typeof p !== "string")) return { ok: false, reason: "invalid", message: "Send the post ids of the winners, best first." };
-  if ((await store.hit(settleLockKey(token, id), 30)) > 1) return { ok: false, reason: "busy" };
-  try {
+  if (!Array.isArray(picked) || picked.some((p) => typeof p !== "string"))
+    return { ok: false, reason: "invalid", message: "Send the post ids of the winners, best first." };
+  return whileLocked(store, token, id, async () => {
     const fresh = await load(store, token, id);
     if (!fresh || fresh.state !== "live") return { ok: false, reason: "closed" };
     const cands = await candidates(store, token, fresh);
@@ -467,9 +596,7 @@ export async function pickWinners(
     if (!result.ok) return { ok: false, reason: "invalid", message: result.message };
     await finish(store, token, fresh, result.winners, new Map(cands.map((x) => [x.post, x.userId])), now, toEpoch(now, deps), actor.wallet);
     return { ok: true, winners: result.winners };
-  } finally {
-    await store.del(settleLockKey(token, id));
-  }
+  });
 }
 
 /** One challenge as `viewer` sees it, with its entries. */
@@ -488,20 +615,18 @@ async function viewOf(store: Store, token: string, c: StoredChallenge, viewer: {
     const byTime = isFlat(c.judging);
     const holders = c.judging === "holders";
     entries = cands
-      .map(
-        (x): PublicEntry => ({
-          post: x.post,
-          wallet: x.wallet,
-          at: x.at,
-          likes: x.likes,
-          liked: !!viewer.userId && x.likers.includes(viewer.userId),
-          mine: x.userId === viewer.userId,
-          text: x.text,
-          ...(x.x ? { x: x.x } : {}),
-          ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}),
-          ...(holders ? { votes: x.votes } : {}),
-        }),
-      )
+      .map((x): PublicEntry => ({
+        post: x.post,
+        wallet: x.wallet,
+        at: x.at,
+        likes: x.likes,
+        liked: !!viewer.userId && x.likers.includes(viewer.userId),
+        mine: x.userId === viewer.userId,
+        text: x.text,
+        ...(x.x ? { x: x.x } : {}),
+        ...(winnerPlace.has(x.post) ? { place: winnerPlace.get(x.post)! } : {}),
+        ...(holders ? { votes: x.votes } : {}),
+      }))
       .sort(
         (a, b) =>
           (winnerPlace.get(a.post) ?? 99) - (winnerPlace.get(b.post) ?? 99) ||
@@ -549,19 +674,18 @@ export async function sendPrize(
   body: { post?: unknown; tx?: unknown },
   deps: ChallengeDeps = {},
 ): Promise<{ ok: true; winner: Winner } | { ok: false; reason: ChallengeRefusal; message?: string }> {
-  const token = entry.address.toLowerCase();
-  if (!isOwnerOrAdmin(await roleIn(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  const c = await load(store, token, id);
-  if (!c) return { ok: false, reason: "not_found" };
+  const own = await ownChallenge(store, entry, actor, id, deps);
+  if (!own.ok) return own;
+  const { token, c } = own;
   const { post, tx } = body;
-  if (typeof post !== "string" || typeof tx !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(tx)) return { ok: false, reason: "invalid", message: "Send the winning entry and the transaction hash (0x…)." };
+  if (typeof post !== "string" || typeof tx !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(tx))
+    return { ok: false, reason: "invalid", message: "Send the winning entry and the transaction hash (0x…)." };
   const asset = c.rewards?.asset;
   const won = c.settled?.winners.find((w) => w.post === post);
   if (c.state !== "settled" || !asset || !won?.prize) return { ok: false, reason: "no_prize" };
   if (won.sent) return { ok: false, reason: "prize_sent" };
   if (await store.get(prizeTxKey(tx))) return { ok: false, reason: "tx_used" };
-  if ((await store.hit(settleLockKey(token, id), 30)) > 1) return { ok: false, reason: "busy" };
-  try {
+  return whileLocked(store, token, id, async () => {
     const fresh = await load(store, token, id);
     const w = fresh?.settled?.winners.find((x) => x.post === post);
     if (!fresh?.settled || !w?.prize) return { ok: false, reason: "no_prize" };
@@ -585,15 +709,24 @@ export async function sendPrize(
     await store.set(prizeTxKey(tx), { club: token, challenge: id, post });
     const winners = fresh.settled.winners.map((x) => (x.post === post ? { ...x, sent } : x));
     await store.set(challengeKey(token, id), { ...fresh, settled: { ...fresh.settled, winners } } satisfies StoredChallenge);
-    await appendLog(store, token, { actor: actor.wallet, action: "prize_sent", target: id, detail: `${fresh.title} · ${assetText(asset, w.prize)} to ${w.wallet} · ${sent.tx}` }, now);
+    await appendLog(
+      store,
+      token,
+      { actor: actor.wallet, action: "prize_sent", target: id, detail: `${fresh.title} · ${assetText(asset, w.prize)} to ${w.wallet} · ${sent.tx}` },
+      now,
+    );
     return { ok: true, winner: { ...w, sent } };
-  } finally {
-    await store.del(settleLockKey(token, id));
-  }
+  });
 }
 
 /** One challenge with its entries, settling it first if it has ended; null when the Club has no such challenge. */
-export async function getChallenge(store: Store, entry: AssetEntry, id: string, viewer: { userId?: string }, deps: ChallengeDeps = {}): Promise<PublicChallenge | null> {
+export async function getChallenge(
+  store: Store,
+  entry: AssetEntry,
+  id: string,
+  viewer: { userId?: string },
+  deps: ChallengeDeps = {},
+): Promise<PublicChallenge | null> {
   const token = entry.address.toLowerCase();
   await settleDue(store, entry, deps);
   const c = await load(store, token, id);
@@ -635,7 +768,9 @@ export async function liveChallenges(
       const token = entry.address.toLowerCase();
       const read = async () => {
         const ids = await store.ranked(challengesKey(token), 30);
-        return (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter((c): c is StoredChallenge => !!c && isLive(phaseOf(c, now)));
+        return (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter(
+          (c): c is StoredChallenge => !!c && isLive(phaseOf(c, now)),
+        );
       };
       let live = await read();
       if (live.some((c) => now >= c.endsAt) && (await settleDue(store, entry, deps)) > 0) live = await read();

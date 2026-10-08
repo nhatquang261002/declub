@@ -23,10 +23,7 @@ export function Header() {
     href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/v2/deal") || pathname.startsWith("/intent") : pathname.startsWith(href);
 
   return (
-    <header
-      className="sticky top-0 z-20 border-b border-line/70 backdrop-blur-xl"
-      style={{ background: "var(--surface-overlay)" }}
-    >
+    <header className="sticky top-0 z-20 border-b border-line/70 backdrop-blur-xl" style={{ background: "var(--surface-overlay)" }}>
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3 sm:px-6">
         <Link href="/" aria-label="De(al) Club home">
           <Logo />

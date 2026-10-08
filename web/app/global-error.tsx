@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLogError, type ErrorBoundaryProps } from "@/hooks/useLogError";
 import "./globals.css";
 
 // Last resort: the root layout itself failed, so this brings its own <html> and <body>.
-export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
+export default function GlobalError({ error, retry }: ErrorBoundaryProps) {
+  useLogError(error);
 
   return (
     <html lang="en">

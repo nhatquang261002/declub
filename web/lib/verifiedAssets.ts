@@ -54,7 +54,7 @@ const KIND = new Set(["erc721", "erc20"]);
 const CATEGORY = new Set<string>(["memecoin", "stablecoin", "wrapped", "other"]);
 
 /** A collection or a memecoin: the assets that can be in a Club. Only a collection has one of its own. */
-export const isCommunityAsset = (e: Pick<AssetEntry, "kind" | "category">) => e.kind === "erc721" || e.category === "memecoin";
+const isCommunityAsset = (e: Pick<AssetEntry, "kind" | "category">) => e.kind === "erc721" || e.category === "memecoin";
 
 /** Throws on the first problem, so a bad edit to the file fails the build and the tests. */
 export function parseAssets(list: unknown): AssetEntry[] {

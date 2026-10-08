@@ -25,12 +25,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
   };
 
   /** Set up `who` to give an NFT, approve it, and post. Returns the intent hash. */
-  async function postNft(
-    pool: ReturnType<World["fresh"]>["pool"],
-    who: World["alice"],
-    id: bigint,
-    want: ReturnType<World["tokenOf"]>[],
-  ) {
+  async function postNft(pool: ReturnType<World["fresh"]>["pool"], who: World["alice"], id: bigint, want: ReturnType<World["tokenOf"]>[]) {
     await w.approveChog(who, id);
     const intent = w.intent(who.address, [w.chogOf(id)], want);
     return (await pool.submit(await w.body(who, intent))).hash;
@@ -56,15 +51,14 @@ describe("pool and matcher against a local chain", { skip }, () => {
     const intent = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.usd, 5n * ONE)]);
     const call = { address: w.swap, abi: intentsAbi, args: [intent] } as const;
     assert.equal(await w.reader.readContract({ ...call, functionName: "hashIntent" }), intentHash(intent));
-    assert.equal(
-      await w.reader.readContract({ ...call, functionName: "intentDigest" }),
-      intentDigest(CHAIN_ID, w.swap, intent),
-    );
+    assert.equal(await w.reader.readContract({ ...call, functionName: "intentDigest" }), intentDigest(CHAIN_ID, w.swap, intent));
   });
 
   it("uses the contract's domain separator", async () => {
     const onChain = await w.reader.readContract({
-      address: w.swap, abi: intentsAbi, functionName: "DOMAIN_SEPARATOR",
+      address: w.swap,
+      abi: intentsAbi,
+      functionName: "DOMAIN_SEPARATOR",
     });
     const d = domain(CHAIN_ID, w.swap);
     assert.equal(
@@ -84,9 +78,9 @@ describe("pool and matcher against a local chain", { skip }, () => {
   });
 
   it("has an ABI that is a subset of the built contract's", () => {
-    const built = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, "../../contracts/out/DeClubIntents.sol/DeClubIntents.json"), "utf8"),
-    ) as { abi: Parameters<typeof formatAbiItem>[0][] };
+    const built = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../contracts/out/DeClubIntents.sol/DeClubIntents.json"), "utf8")) as {
+      abi: Parameters<typeof formatAbiItem>[0][];
+    };
     const sig = (i: Parameters<typeof formatAbiItem>[0]) => `${i.type} ${formatAbiItem(i)}`;
     const have = new Set(built.abi.filter((i) => ["function", "event", "error"].includes(i.type)).map(sig));
     for (const item of intentsAbi) {
@@ -108,7 +102,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
     assert.equal(report.settled.length, 1);
     assert.deepEqual(report.settled[0]!.hashes.slice().sort(), [a, b].sort());
     assert.equal(await w.ownerOf(chogId!), w.bob.address);
-    assert.equal(await w.balanceOf(w.usd, w.alice.address) >= 100n * ONE, true);
+    assert.equal((await w.balanceOf(w.usd, w.alice.address)) >= 100n * ONE, true);
     assert.equal(await w.balanceOf(w.usd, w.bob.address), bobBefore);
     assert.equal(store.get(a)!.status, "settled");
     assert.equal(store.get(b)!.settlementTx, report.settled[0]!.txHash);
@@ -197,7 +191,10 @@ describe("pool and matcher against a local chain", { skip }, () => {
 
     const report = await matcher.runOnce();
 
-    assert.deepEqual(report.dropped.map((d) => [d.hash, d.status]), [[bobHash, "stale"]]);
+    assert.deepEqual(
+      report.dropped.map((d) => [d.hash, d.status]),
+      [[bobHash, "stale"]],
+    );
     assert.equal(report.settled.length, 1);
     assert.ok(report.settled[0]!.hashes.includes(daveHash));
     assert.equal(await w.ownerOf(chogId!), w.dave.address);
@@ -215,12 +212,18 @@ describe("pool and matcher against a local chain", { skip }, () => {
     await w.approveToken(w.bob, w.usd, 0n);
 
     const first = await pool.prune();
-    assert.deepEqual(first.changed.map((c) => c.status), ["stale"]);
+    assert.deepEqual(
+      first.changed.map((c) => c.status),
+      ["stale"],
+    );
     assert.equal(store.list().length, 0, "stale intents are not matched");
 
     await w.approveToken(w.bob, w.usd, 7n * ONE);
     const second = await pool.prune();
-    assert.deepEqual(second.changed.map((c) => c.status), ["open"]);
+    assert.deepEqual(
+      second.changed.map((c) => c.status),
+      ["open"],
+    );
     assert.equal(store.get(bobHash)!.status, "open");
 
     await postNft(pool, w.alice, chogId!, [w.tokenOf(w.usd, 7n * ONE)]);
@@ -253,7 +256,10 @@ describe("pool and matcher against a local chain", { skip }, () => {
 
     const report = await matcher.runOnce();
 
-    assert.deepEqual(report.dropped.map((d) => [d.hash, d.status]), [[aliceHash, "consumed"]]);
+    assert.deepEqual(
+      report.dropped.map((d) => [d.hash, d.status]),
+      [[aliceHash, "consumed"]],
+    );
     assert.equal(report.settled.length, 0);
     assert.equal(store.failureCount(w.alice.address, 0), 0);
   });
@@ -263,9 +269,21 @@ describe("pool and matcher against a local chain", { skip }, () => {
     const [chogId] = await w.mintChogs(w.alice.address, 1);
     const hash = await postNft(pool, w.alice, chogId!, [w.tokenOf(w.usd, 5n * ONE)]);
     const data = encodeFunctionData({
-      abi: [{ type: "function", name: "transferFrom", stateMutability: "nonpayable",
-        inputs: [{ name: "from", type: "address" }, { name: "to", type: "address" }, { name: "id", type: "uint256" }], outputs: [] }],
-      functionName: "transferFrom", args: [w.alice.address, w.bob.address, chogId!],
+      abi: [
+        {
+          type: "function",
+          name: "transferFrom",
+          stateMutability: "nonpayable",
+          inputs: [
+            { name: "from", type: "address" },
+            { name: "to", type: "address" },
+            { name: "id", type: "uint256" },
+          ],
+          outputs: [],
+        },
+      ],
+      functionName: "transferFrom",
+      args: [w.alice.address, w.bob.address, chogId!],
     });
     await w.tx(w.alice.wallet.sendTransaction({ to: w.chog, data }));
 
@@ -291,7 +309,10 @@ describe("pool and matcher against a local chain", { skip }, () => {
     // And round again from the start.
     for (const id of ids) await w.approveChog(w.alice, id);
     const third = await pool.prune();
-    assert.deepEqual(third.changed.map((c) => c.hash), hashes.slice(0, 2));
+    assert.deepEqual(
+      third.changed.map((c) => c.hash),
+      hashes.slice(0, 2),
+    );
   });
 
   it("won't send a cycle that needs more gas than its cap", async () => {
@@ -425,10 +446,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
       const [id] = await w.mintChogs(w.alice.address, 1);
       const first = await postNft(pool, w.alice, id!, [w.tokenOf(w.usd, ONE)]);
       const again = w.intent(w.alice.address, [w.chogOf(id!)], [w.tokenOf(w.weth, ONE)]);
-      await assert.rejects(
-        pool.submit(await w.body(w.alice, again)),
-        (e) => e instanceof PoolError && e.code === "nft_committed" && e.message.includes(first),
-      );
+      await assert.rejects(pool.submit(await w.body(w.alice, again)), (e) => e instanceof PoolError && e.code === "nft_committed" && e.message.includes(first));
     });
 
     it("won't let a maker's live intents together give more of a token than they hold", async () => {
@@ -454,10 +472,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
       // Someone posting in carol's name with their own signature doesn't use up her budget.
       await reject(pool.submit({ ...(await w.body(w.carol, one)), signature: await w.sign(w.bob, one) }), "bad_signature");
       assert.equal((await pool.submit(await w.body(w.carol, one))).status, "open");
-      await assert.rejects(
-        pool.submit(await w.body(w.carol, two)),
-        (e) => e instanceof PoolError && e.code === "rate_limited" && e.status === 429,
-      );
+      await assert.rejects(pool.submit(await w.body(w.carol, two)), (e) => e instanceof PoolError && e.code === "rate_limited" && e.status === 429);
       // Another maker has a budget of their own.
       const [mine] = await w.mintChogs(w.dave.address, 1);
       await postNft(pool, w.dave, mine!, [w.tokenOf(w.usd, ONE)]);
@@ -490,15 +505,36 @@ describe("pool and matcher against a local chain", { skip }, () => {
     // The wallet holds mUSD and approves via `exec`, signing happens with its owner's key.
     await w.mintToken(w.usd, wallet, 40n * ONE);
     await w.mintToken(w.wmon, wallet, FEE); // and the protocol fee
-    for (const [token, amount] of [[w.usd, 40n * ONE], [w.wmon, FEE]] as const) {
-      await w.tx(w.alice.wallet.writeContract({
-        address: wallet, abi: walletAbi, functionName: "exec",
-        args: [token, encodeFunctionData({
-          abi: [{ type: "function", name: "approve", stateMutability: "nonpayable",
-            inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] }],
-          functionName: "approve", args: [w.swap, amount],
-        })],
-      }));
+    for (const [token, amount] of [
+      [w.usd, 40n * ONE],
+      [w.wmon, FEE],
+    ] as const) {
+      await w.tx(
+        w.alice.wallet.writeContract({
+          address: wallet,
+          abi: walletAbi,
+          functionName: "exec",
+          args: [
+            token,
+            encodeFunctionData({
+              abi: [
+                {
+                  type: "function",
+                  name: "approve",
+                  stateMutability: "nonpayable",
+                  inputs: [
+                    { name: "s", type: "address" },
+                    { name: "a", type: "uint256" },
+                  ],
+                  outputs: [{ type: "bool" }],
+                },
+              ],
+              functionName: "approve",
+              args: [w.swap, amount],
+            }),
+          ],
+        }),
+      );
     }
     const walletIntent = w.intent(wallet, [w.tokenOf(w.usd, 40n * ONE)], [w.chogOf(chogId!)]);
     await pool.submit(await w.body(w.alice, walletIntent)); // alice signs for her wallet
@@ -516,10 +552,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
     const [chogId] = await w.mintChogs(w.bob.address, 1);
     await w.tx(w.alice.wallet.writeContract({ address: wallet, abi: walletAbi, functionName: "setReject", args: [true] }));
     const intent = w.intent(wallet, [w.tokenOf(w.usd, ONE)], [w.chogOf(chogId!)]);
-    await assert.rejects(
-      pool.submit(await w.body(w.alice, intent)),
-      (e) => e instanceof PoolError && e.code === "bad_signature",
-    );
+    await assert.rejects(pool.submit(await w.body(w.alice, intent)), (e) => e instanceof PoolError && e.code === "bad_signature");
   });
 
   // ── The protocol fee (ADR 0015) ─────────────────────────────────────────
@@ -531,10 +564,7 @@ describe("pool and matcher against a local chain", { skip }, () => {
     assert.equal(intent.feeToken, w.wmon);
     const other = { ...intent, maxFee: FEE + 1n };
     assert.notEqual(intentHash(other), intentHash(intent));
-    assert.equal(
-      await w.reader.readContract({ address: w.swap, abi: intentsAbi, functionName: "hashIntent", args: [other] }),
-      intentHash(other),
-    );
+    assert.equal(await w.reader.readContract({ address: w.swap, abi: intentsAbi, functionName: "hashIntent", args: [other] }), intentHash(other));
   });
 
   it("rejects an intent whose maxFee is below the fee, or that signs another fee token", async () => {
@@ -661,7 +691,10 @@ describe("pool and matcher against a local chain", { skip }, () => {
 
     const report = await matcher.runOnce();
 
-    assert.deepEqual(report.dropped.map((d) => [d.hash, d.status]), [[hash, "expired"]]);
+    assert.deepEqual(
+      report.dropped.map((d) => [d.hash, d.status]),
+      [[hash, "expired"]],
+    );
     assert.equal(report.settled.length, 0);
     assert.equal(store.failureCount(w.alice.address, 0), 0);
   });

@@ -8,6 +8,7 @@ import type { StoredPost } from "../clubPosts";
 import { strengthFactor } from "../xPosts";
 import { likesKey, postKey, repliesKey, walletPostsKey } from "./board";
 import { challengeKey, challengesKey, entriesKey } from "./challengeState";
+import { entriesOf } from "./challenges";
 import { rewardBans } from "./clubRules";
 import { adminIds, loadProfile, loadRoles } from "./clubState";
 import { getMember, userClubsKey } from "./members";
@@ -22,7 +23,7 @@ import { readXShares } from "./xPosts";
  * pushed or stored here, so it can be recomputed on any device. The browser keeps which keys were
  * seen. A like's key carries the count, so the next like is news again.
  */
-export type InboxItem = {
+type InboxItem = {
   key: string;
   kind: InboxKind;
   /** Epoch ms of the thing, for ordering. */
@@ -34,32 +35,36 @@ export type InboxItem = {
   actionable?: true;
 };
 
-export type InboxKind =
-  | "club-like" | "club-pinned" | "club-reward" | "club-reply" | "club-xshare" | "club-rank" | "club-closing"
-  | ChallengeKind;
+type InboxKind = "club-like" | "club-pinned" | "club-reward" | "club-reply" | "club-xshare" | "club-rank" | "club-closing" | ChallengeKind;
 
 /** What a Club's challenges (ADR 0045) have to say to one member: see `challengeNews`. */
-export type ChallengeKind =
-  | "challenge-new" | "challenge-ending" | "challenge-won" | "challenge-results" | "challenge-pick" | "challenge-pick-soon"
-  | "challenge-prize-sent" | "challenge-prize-owed";
+type ChallengeKind =
+  | "challenge-new"
+  | "challenge-ending"
+  | "challenge-won"
+  | "challenge-results"
+  | "challenge-pick"
+  | "challenge-pick-soon"
+  | "challenge-prize-sent"
+  | "challenge-prize-owed";
 
 /** Posts older than this don't send news about likes or pins. */
-export const INBOX_DAYS = 14;
+const INBOX_DAYS = 14;
 /** At most this many of a member's recent posts are looked at. */
 const POSTS_LOOKED_AT = 60;
 
 /** The standings are read for at most this many of a member's Clubs. */
-export const STANDINGS_CLUBS = 5;
+const STANDINGS_CLUBS = 5;
 /** The last stretch of an epoch, when a nudge to post is worth sending. */
-export const CLOSING_SEC = 86_400;
+const CLOSING_SEC = 86_400;
 
 /** The challenges are read for at most this many of a member's Clubs, the latest few in each. */
-export const CHALLENGE_CLUBS = 10;
+const CHALLENGE_CLUBS = 10;
 const CHALLENGES_LOOKED_AT = 20;
 /** An open challenge the member hasn't entered is "ending" in its last day. */
-export const CHALLENGE_ENDING_MS = 86_400_000;
+const CHALLENGE_ENDING_MS = 86_400_000;
 /** The Owner is reminded to pick when this little is left of the pick window. */
-export const PICK_SOON_MS = 3 * 86_400_000;
+const PICK_SOON_MS = 3 * 86_400_000;
 
 export type InboxDeps = {
   now?: () => number;
@@ -80,7 +85,9 @@ export async function clubInbox(store: Store, userId: string, wallets: readonly 
   // The member's own recent posts, across their wallets.
   const refs = [...new Set((await Promise.all(wallets.map((w) => store.ranked(walletPostsKey(w), POSTS_LOOKED_AT)))).flat())].slice(0, POSTS_LOOKED_AT);
   const rows = await store.getMany<StoredPost>(refs.map((ref) => postKey(ref.split(":")[0]!, ref.split(":")[1]!)));
-  const posts = rows.flatMap((post, i) => (post && post.userId === userId && !post.hidden && post.at >= since ? [{ post, token: refs[i]!.split(":")[0]! }] : []));
+  const posts = rows.flatMap((post, i) =>
+    post && post.userId === userId && !post.hidden && post.at >= since ? [{ post, token: refs[i]!.split(":")[0]! }] : [],
+  );
 
   const pinnedBy = new Map<string, Set<string>>();
   for (const token of new Set(posts.map((p) => p.token))) pinnedBy.set(token, new Set((await loadProfile(store, token)).pinned));
@@ -193,20 +200,18 @@ const timeLeft = (ms: number) => (ms >= 2 * 86_400_000 ? `${Math.floor(ms / 86_4
  * an admin is asked to send it while any is owed (`challenge-prize-owed`, news again once overdue).
  * Keys are per challenge, so each is news once. A cancelled challenge says nothing.
  */
-export async function challengeNews(store: Store, club: ClubEntry, userId: string, wallets: ReadonlySet<string>, admin: boolean, nowMs: number): Promise<InboxItem[]> {
+async function challengeNews(store: Store, club: ClubEntry, userId: string, wallets: ReadonlySet<string>, admin: boolean, nowMs: number): Promise<InboxItem[]> {
   const token = club.address.toLowerCase();
   const ids = await store.ranked(challengesKey(token), CHALLENGES_LOOKED_AT);
   if (ids.length === 0) return [];
-  const challenges = (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter((c): c is StoredChallenge => !!c && c.state !== "cancelled");
+  const challenges = (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter(
+    (c): c is StoredChallenge => !!c && c.state !== "cancelled",
+  );
   if (challenges.length === 0) return [];
   const since = nowMs - INBOX_DAYS * 86_400_000;
   const staff = isOwnerOrAdmin(roleOf(await loadRoles(store, token), userId, admin));
   const out: InboxItem[] = [];
   const href = (c: StoredChallenge) => `/clubs/${token}/challenges/${c.id}`;
-  const entriesOf = async (c: StoredChallenge) => (await store.members(entriesKey(token, c.id))).flatMap((m) => {
-    const at = m.indexOf("|");
-    return at > 0 ? [{ post: m.slice(0, at), userId: m.slice(at + 1) }] : [];
-  });
   // Who can enter at all, read once and only when an open challenge asks: the Owner and admins
   // don't compete, nor a member banned from rewards, and a Holders-only one wants the badge.
   let canEnter: { any: boolean; holder: boolean } | undefined;
@@ -221,7 +226,7 @@ export async function challengeNews(store: Store, club: ClubEntry, userId: strin
   for (const c of challenges) {
     const phase = phaseOf(c, nowMs);
     if (phase === "open") {
-      if (!(await eligible(c)) || (await entriesOf(c)).some((e) => e.userId === userId)) continue;
+      if (!(await eligible(c)) || (await entriesOf(store, token, c.id)).some((e) => e.userId === userId)) continue;
       const left = c.endsAt - nowMs;
       if (left <= CHALLENGE_ENDING_MS) {
         out.push({
@@ -279,7 +284,7 @@ export async function challengeNews(store: Store, club: ClubEntry, userId: strin
           });
         }
       }
-      const mine = await entriesOf(c);
+      const mine = await entriesOf(store, token, c.id);
       const posts = new Set(mine.filter((e) => e.userId === userId).map((e) => e.post));
       const won = settled.winners.find((w) => wallets.has(w.wallet.toLowerCase()) || posts.has(w.post));
       if (won?.sent && asset && won.prize && won.sent.at >= since) {
@@ -318,7 +323,6 @@ export async function challengeNews(store: Store, club: ClubEntry, userId: strin
   return out;
 }
 
-
 /**
  * Where a member stands in a Club's running epoch, as news: their place in (or out of) the paid
  * Holders, which is new news each time it changes, and a nudge to post in the epoch's last day.
@@ -330,12 +334,21 @@ export function standingsNews(s: ClubStandings, name: string, wallets: ReadonlyS
   const row = s.rows.find((r) => wallets.has(r.wallet));
   if (row && BigInt(s.holderPool) > 0n) {
     const paid = row.estimate !== undefined;
-    const gap = entryGap(s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })), row.wallet, rules) ?? 0;
+    const gap =
+      entryGap(
+        s.rows.map((r) => ({ wallet: r.wallet, shares: BigInt(r.shares), points: r.points, joinedAt: r.joinedAt })),
+        row.wallet,
+        rules,
+      ) ?? 0;
     out.push({
       key: `club-rank:${s.club}:${s.n}:${paid ? "in" : "out"}`,
       kind: "club-rank",
       at: s.computedAt * 1000,
-      title: paid ? `You’re #${row.rank} in ${name} this epoch` : row.points > 0 ? `You’re #${row.rank} in ${name}, outside the paid places` : `You’re not earning in ${name} yet`,
+      title: paid
+        ? `You’re #${row.rank} in ${name} this epoch`
+        : row.points > 0
+          ? `You’re #${row.rank} in ${name}, outside the paid places`
+          : `You’re not earning in ${name} yet`,
       body: paid
         ? `About ${formatMon(BigInt(row.estimate ?? "0"))} so far, if the epoch closed now.${row.points < rules.rampPoints ? ` ${rampGap(row.points, rules)} more points pays your whole share.` : ""}`
         : row.points > 0

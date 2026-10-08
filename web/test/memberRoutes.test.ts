@@ -7,7 +7,15 @@ import { profileKey, userWalletsKey } from "../lib/profiles";
 import { activityKey } from "../lib/server/activity";
 import type { UserGate } from "../lib/server/gate";
 import {
-  clubsOf, getMember, holderCount, joinClub, leaveClub, listMembers, memberKey, membersKey, syncMemberships,
+  clubsOf,
+  getMember,
+  holderCount,
+  joinClub,
+  leaveClub,
+  listMembers,
+  memberKey,
+  membersKey,
+  syncMemberships,
   type Holdings,
 } from "../lib/server/members";
 import { handlePrivyEvent } from "../lib/server/privyWebhook";
@@ -24,7 +32,14 @@ const NOCLUB = "0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298";
 const W1 = "0x00000000000000000000000000000000000000a1";
 const W2 = "0x00000000000000000000000000000000000000b2";
 const entry = (address: string, over: Record<string, unknown> = {}) => ({
-  chainId: 10143, address, kind: "erc721", name: "Name", symbol: "SYM", status: "verified", note: "Why.", ...over,
+  chainId: 10143,
+  address,
+  kind: "erc721",
+  name: "Name",
+  symbol: "SYM",
+  status: "verified",
+  note: "Why.",
+  ...over,
 });
 const reg = makeRegistry(parseAssets([entry(NFT), entry(PETS), entry(OLD, { club: "archived" }), entry(NOCLUB, { club: false })]));
 const club = reg.clubFor(NFT)!;
@@ -46,7 +61,9 @@ describe("a paired Club", () => {
   const paired = makeRegistry(parseAssets([entry(NFT), entry(COIN, { kind: "erc20", category: "memecoin", minHolding: "100", club: NFT })])).clubFor(COIN)!;
 
   it("makes a holder of either asset a Holder", async () => {
-    const byToken = (balances: Record<string, bigint>): Holdings => async (token) => [balances[token.toLowerCase()] ?? 0n];
+    const byToken =
+      (balances: Record<string, bigint>): Holdings =>
+      async (token) => [balances[token.toLowerCase()] ?? 0n];
     const coinOnly = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [COIN.toLowerCase()]: 100n }) });
     const nftOnly = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [NFT.toLowerCase()]: 1n }) });
     const tooFew = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: byToken({ [COIN.toLowerCase()]: 99n }) });
@@ -56,7 +73,10 @@ describe("a paired Club", () => {
   });
 
   it("settles Holder from one asset when the other can't be read, and waits when neither says so", async () => {
-    const half = (answer: bigint): Holdings => async (token) => (token.toLowerCase() === NFT.toLowerCase() ? null : [answer]);
+    const half =
+      (answer: bigint): Holdings =>
+      async (token) =>
+        token.toLowerCase() === NFT.toLowerCase() ? null : [answer];
     const yes = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: half(100n), now: () => 7 });
     const unsure = await joinClub(memoryStore(), paired, "u1", [W1], { holdings: half(0n), now: () => 7 });
     assert.ok(yes.ok && yes.row.holder && yes.row.holderCheckedAt === 7);
@@ -64,7 +84,9 @@ describe("a paired Club", () => {
   });
 
   it("follows the Owner's coin rule: their minimum, or no coin at all", async () => {
-    const byToken = (balances: Record<string, bigint>): Holdings => async (token) => [balances[token.toLowerCase()] ?? 0n];
+    const byToken =
+      (balances: Record<string, bigint>): Holdings =>
+      async (token) => [balances[token.toLowerCase()] ?? 0n];
     const coin500 = byToken({ [COIN.toLowerCase()]: 500n });
     const ruled = async (coinHolders: { on: boolean; min: string; at: number }) => {
       const store = memoryStore();
@@ -140,7 +162,14 @@ describe("joinClub / leaveClub", () => {
     assert.deepEqual(await joinClub(store, club, "u1", [W1], deps), { ok: false, reason: "full" });
     // Someone already in can still re-join (re-sync) when it is full.
     await store.addMember(membersKey(NFT), "u2");
-    await store.set(memberKey(NFT, "u2"), { userId: "u2", wallets: [W2], displayWallet: W2, holder: false, holderCheckedAt: 1, joinedAt: 1 } satisfies MemberRow);
+    await store.set(memberKey(NFT, "u2"), {
+      userId: "u2",
+      wallets: [W2],
+      displayWallet: W2,
+      holder: false,
+      holderCheckedAt: 1,
+      joinedAt: 1,
+    } satisfies MemberRow);
     assert.ok((await joinClub(store, club, "u2", [W2], deps)).ok);
   });
 
@@ -219,11 +248,24 @@ describe("listMembers", () => {
   const nowMs = 100 * HOLDER_RECHECK_MS;
   const nowSec = Math.floor(nowMs / 1000);
   const swap = (parties: string[]): ActivityEvent => ({
-    id: "s", kind: "swapped", contract: "0xc", deal: "s", block: 1, at: nowSec - 60, parties, tokens: [NFT.toLowerCase()],
+    id: "s",
+    kind: "swapped",
+    contract: "0xc",
+    deal: "s",
+    block: 1,
+    at: nowSec - 60,
+    parties,
+    tokens: [NFT.toLowerCase()],
   });
   const seed = async (store = memoryStore()) => {
     const row = (id: string, w: string, over: Partial<MemberRow> = {}): MemberRow => ({
-      userId: id, wallets: [w], displayWallet: w, holder: false, holderCheckedAt: nowMs, joinedAt: 1, ...over,
+      userId: id,
+      wallets: [w],
+      displayWallet: w,
+      holder: false,
+      holderCheckedAt: nowMs,
+      joinedAt: 1,
+      ...over,
     });
     for (const r of [row("u1", W1), row("u2", W2, { joinedAt: 2 })]) {
       await store.addMember(membersKey(NFT), r.userId);
@@ -234,8 +276,14 @@ describe("listMembers", () => {
 
   it("ranks members by their wallets' Momentum", async () => {
     const store = await seed();
-    const view = await listMembers(store, club, [swap([W2, "0x00000000000000000000000000000000000000c3"])], "momentum", nowSec, { now: () => nowMs, holdings: holdings({}).fn });
-    assert.deepEqual(view.members.map((m) => m.wallet), [W2, W1]);
+    const view = await listMembers(store, club, [swap([W2, "0x00000000000000000000000000000000000000c3"])], "momentum", nowSec, {
+      now: () => nowMs,
+      holdings: holdings({}).fn,
+    });
+    assert.deepEqual(
+      view.members.map((m) => m.wallet),
+      [W2, W1],
+    );
     assert.equal(view.members[0]!.swaps, 1);
     assert.ok(view.members[0]!.momentum > 0);
     assert.equal(view.members[1]!.momentum, 0);
@@ -243,7 +291,14 @@ describe("listMembers", () => {
 
   it("re-reads balances older than a day and saves the new badge", async () => {
     const store = await seed();
-    await store.set(memberKey(NFT, "u1"), { userId: "u1", wallets: [W1], displayWallet: W1, holder: false, holderCheckedAt: nowMs - HOLDER_RECHECK_MS - 1, joinedAt: 1 });
+    await store.set(memberKey(NFT, "u1"), {
+      userId: "u1",
+      wallets: [W1],
+      displayWallet: W1,
+      holder: false,
+      holderCheckedAt: nowMs - HOLDER_RECHECK_MS - 1,
+      joinedAt: 1,
+    });
     const h = holdings({ [W1]: 3n });
     const view = await listMembers(store, club, [], "new", nowSec, { now: () => nowMs, holdings: h.fn });
     assert.equal(h.calls.length, 1, "only the stale row is read");
@@ -357,7 +412,25 @@ describe("the routes", () => {
   it("serves the leaderboard publicly, validating sort and the Club", async () => {
     const m = membershipHandlers(reg, { gate: gateAs("route-u5", [account(getAddress(W2))]), holdings: h.fn });
     await m.POST(req("POST"), ctx(NFT));
-    await store.rank(activityKey(NFT), [{ member: JSON.stringify({ id: "r:0", kind: "swapped", contract: "0xc", deal: "1", block: 1, at: Math.floor(Date.now() / 1000) - 60, parties: [W2, "0x00000000000000000000000000000000000000c3"], tokens: [NFT.toLowerCase()] }), score: Math.floor(Date.now() / 1000) - 60 }], 10);
+    await store.rank(
+      activityKey(NFT),
+      [
+        {
+          member: JSON.stringify({
+            id: "r:0",
+            kind: "swapped",
+            contract: "0xc",
+            deal: "1",
+            block: 1,
+            at: Math.floor(Date.now() / 1000) - 60,
+            parties: [W2, "0x00000000000000000000000000000000000000c3"],
+            tokens: [NFT.toLowerCase()],
+          }),
+          score: Math.floor(Date.now() / 1000) - 60,
+        },
+      ],
+      10,
+    );
     const get = membersHandler(reg, { settlements: async () => [] });
     const res = await get(req("GET", "http://x/api?sort=momentum"), ctx(NFT));
     assert.equal(res.status, 200);

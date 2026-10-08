@@ -6,7 +6,7 @@ import path from "node:path";
  * The app's flavors (testnet, mainnet): the same code with another network's settings. A flavor owns
  * its chain id, its build folder and its default ports, so both can be built and served side by side.
  */
-export const FLAVORS = {
+const FLAVORS = {
   testnet: { chainId: 10143, webPort: 3000, matcherPort: 8787, distDir: ".next" },
   mainnet: { chainId: 143, webPort: 3001, matcherPort: 8788, distDir: ".next-mainnet" },
 };
@@ -68,7 +68,8 @@ export function flavorEnv(flavor, { root, web, base = process.env }) {
     }
     const testnetStore = upstash({ ...read(path.join(root, ".env")), ...read(path.join(web, ".env.local")) });
     if (testnetStore && upstash(env) === testnetStore) problems.push("Mainnet shares its Upstash database with the testnet one. Create a separate database.");
-    if (blank(env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS)) warnings.push("NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is blank: the app will show no deals until the contracts are deployed.");
+    if (blank(env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS))
+      warnings.push("NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS is blank: the app will show no deals until the contracts are deployed.");
     if (blank(env.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS)) warnings.push("NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS is blank: Rewards can't be claimed.");
     if (blank(env.NEXT_PUBLIC_REWARDS_GENESIS)) warnings.push("NEXT_PUBLIC_REWARDS_GENESIS is blank: epochs would count from the testnet default, 2026-10-05.");
     if (blank(env.NEXT_PUBLIC_PRIVY_APP_ID)) warnings.push("NEXT_PUBLIC_PRIVY_APP_ID is blank: no social sign-in, so no Club posts.");

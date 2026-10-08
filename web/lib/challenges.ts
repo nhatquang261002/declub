@@ -66,9 +66,8 @@ export const CHALLENGE_CAP_PER_EPOCH = 20;
  * the members' likes, only Holders' likes, or the Owner's pick after the end. Flat ones pay every
  * winner the same: a verifiable random draw, the first entries in, or everyone who completes it.
  */
-export const RANKED_JUDGING = ["likes", "holders", "owner"] as const;
-export const FLAT_JUDGING = ["raffle", "first", "everyone"] as const;
-export type RankedJudging = (typeof RANKED_JUDGING)[number];
+const FLAT_JUDGING = ["raffle", "first", "everyone"] as const;
+export type RankedJudging = "likes" | "holders" | "owner";
 export type FlatJudging = (typeof FLAT_JUDGING)[number];
 export type Judging = RankedJudging | FlatJudging;
 
@@ -138,7 +137,7 @@ export type ChallengeInput = RankedInput | FlatInput;
  * A checked challenge, in the shape it is kept: `prizes` is always the points of each place, best
  * first (a flat one's are `winners` equal ones), so the settling and the ledger read one list.
  */
-export type CheckedChallenge = {
+type CheckedChallenge = {
   title: string;
   brief: string;
   judging: Judging;
@@ -158,7 +157,7 @@ const whole = (v: unknown, min: number, max: number): v is number => typeof v ==
  * as its contract reports them (the server reads them itself; the form passes what it read). Never
  * assumed: a token whose decimals aren't known can't be a prize yet.
  */
-export type RewardsContext = { registry?: Pick<Registry, "entry">; decimals?: (token: string) => number | null | undefined };
+type RewardsContext = { registry?: Pick<Registry, "entry">; decimals?: (token: string) => number | null | undefined };
 
 /** "3" or 3 NFTs: a whole number from 0 to `maxPrizeNfts`. */
 function parseCount(v: unknown): bigint | null {
@@ -177,7 +176,12 @@ function parseTokens(v: unknown, decimals: number): bigint | null {
 }
 
 /** Checks the rewards beside the points (ADR 0050) against `places` paid places, or one amount for a flat prize. */
-export function checkRewards(raw: unknown, places: number, flat: boolean, ctx: RewardsContext = {}): { ok: true; rewards?: ChallengeRewards } | { ok: false; message: string } {
+export function checkRewards(
+  raw: unknown,
+  places: number,
+  flat: boolean,
+  ctx: RewardsContext = {},
+): { ok: true; rewards?: ChallengeRewards } | { ok: false; message: string } {
   if (raw === undefined || raw === null) return { ok: true };
   if (typeof raw !== "object" || Array.isArray(raw)) return { ok: false, message: "Send the rewards as an object." };
   const { asset, pinWinner } = raw as Record<string, unknown>;
@@ -195,7 +199,8 @@ export function checkRewards(raw: unknown, places: number, flat: boolean, ctx: R
     let decimals: number | undefined;
     if (entry.kind === "erc20") {
       const d = ctx.decimals?.(token);
-      if (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > 36) return { ok: false, message: `Reading ${entry.symbol}’s decimals from its contract. Try again in a moment.` };
+      if (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > 36)
+        return { ok: false, message: `Reading ${entry.symbol}’s decimals from its contract. Try again in a moment.` };
       decimals = d;
     }
     const parsed: bigint[] = [];
@@ -214,7 +219,14 @@ export function checkRewards(raw: unknown, places: number, flat: boolean, ctx: R
       parsed.push(v);
     }
     if (parsed[0] === 0n) return { ok: false, message: flat ? "Give each winner more than 0." : "The 1st place gets more than 0." };
-    out.asset = { token: token.toLowerCase(), kind: entry.kind, name: entry.name, symbol: entry.symbol, ...(decimals !== undefined ? { decimals } : {}), amounts: parsed.map(String) };
+    out.asset = {
+      token: token.toLowerCase(),
+      kind: entry.kind,
+      name: entry.name,
+      symbol: entry.symbol,
+      ...(decimals !== undefined ? { decimals } : {}),
+      amounts: parsed.map(String),
+    };
   }
   return { ok: true, ...(Object.keys(out).length > 0 ? { rewards: out } : {}) };
 }
@@ -224,28 +236,39 @@ export function checkChallenge(input: unknown, ctx: RewardsContext = {}): { ok: 
   if (typeof input !== "object" || input === null || Array.isArray(input)) return { ok: false, message: "Send the challenge as an object." };
   const { title, brief, judging, prizes, winners, prize, minLikes, epochs, holdersOnly, rewards } = input as Record<string, unknown>;
   const t = cleanLine(title, CHALLENGE_RULES.titleMax);
-  if (!t.ok) return { ok: false, message: t.reason === "empty" ? "Give the challenge a title." : `The title is at most ${CHALLENGE_RULES.titleMax} characters.` };
+  if (!t.ok)
+    return { ok: false, message: t.reason === "empty" ? "Give the challenge a title." : `The title is at most ${CHALLENGE_RULES.titleMax} characters.` };
   const b = cleanLine(brief, CHALLENGE_RULES.briefMax);
-  if (!b.ok) return { ok: false, message: b.reason === "empty" ? "Say what members should do." : `The brief is at most ${CHALLENGE_RULES.briefMax} characters.` };
+  if (!b.ok)
+    return { ok: false, message: b.reason === "empty" ? "Say what members should do." : `The brief is at most ${CHALLENGE_RULES.briefMax} characters.` };
   if (typeof judging !== "string" || !(judging in JUDGING)) return { ok: false, message: "Choose how the winners are picked." };
   const task = { title: t.text, brief: b.text, judging: judging as Judging };
   let paid: Pick<CheckedChallenge, "prizes" | "winners" | "prize" | "minLikes">;
   if (isFlat(task.judging)) {
     if (prizes !== undefined) return { ok: false, message: "This way of picking pays every winner the same: send winners and prize, not places." };
     if (!whole(winners, 1, CHALLENGE_RULES.maxWinners)) return { ok: false, message: `Have between 1 and ${CHALLENGE_RULES.maxWinners} winners.` };
-    if (!whole(prize, 0, CHALLENGE_RULES.maxFlatPoints)) return { ok: false, message: `Each winner gets a whole number of points, 0 to ${CHALLENGE_RULES.maxFlatPoints}.` };
+    if (!whole(prize, 0, CHALLENGE_RULES.maxFlatPoints))
+      return { ok: false, message: `Each winner gets a whole number of points, 0 to ${CHALLENGE_RULES.maxFlatPoints}.` };
     if (task.judging === "everyone") {
-      if (minLikes !== undefined && !whole(minLikes, 0, CHALLENGE_RULES.maxMinLikes)) return { ok: false, message: `Ask for 0 to ${CHALLENGE_RULES.maxMinLikes} likes.` };
+      if (minLikes !== undefined && !whole(minLikes, 0, CHALLENGE_RULES.maxMinLikes))
+        return { ok: false, message: `Ask for 0 to ${CHALLENGE_RULES.maxMinLikes} likes.` };
     } else if (minLikes !== undefined) return { ok: false, message: "Only “Everyone who completes” asks for likes." };
-    paid = { prizes: Array.from({ length: winners }, () => prize), winners, prize, ...(task.judging === "everyone" ? { minLikes: (minLikes as number | undefined) ?? 0 } : {}) };
+    paid = {
+      prizes: Array.from({ length: winners }, () => prize),
+      winners,
+      prize,
+      ...(task.judging === "everyone" ? { minLikes: (minLikes as number | undefined) ?? 0 } : {}),
+    };
   } else {
-    if (winners !== undefined || prize !== undefined || minLikes !== undefined) return { ok: false, message: "This way of picking pays places: send prizes, best first." };
+    if (winners !== undefined || prize !== undefined || minLikes !== undefined)
+      return { ok: false, message: "This way of picking pays places: send prizes, best first." };
     if (!Array.isArray(prizes) || prizes.length < 1 || prizes.length > CHALLENGE_RULES.maxPlaces) {
       return { ok: false, message: `Pay between 1 and ${CHALLENGE_RULES.maxPlaces} places.` };
     }
     let last = Infinity;
     for (const p of prizes) {
-      if (!whole(p, 0, CHALLENGE_RULES.maxPoints)) return { ok: false, message: `Each place pays a whole number of points, 0 to ${CHALLENGE_RULES.maxPoints}.` };
+      if (!whole(p, 0, CHALLENGE_RULES.maxPoints))
+        return { ok: false, message: `Each place pays a whole number of points, 0 to ${CHALLENGE_RULES.maxPoints}.` };
       if (p > last) return { ok: false, message: "A lower place can't pay more than a higher one." };
       last = p;
     }
@@ -322,7 +345,6 @@ export type Settlement = {
 };
 
 /** An entry as the server keeps it. */
-export type StoredEntry = { post: string; userId: string; wallet: string; at: number };
 
 /** Where a challenge stands now: before its end it is open; after, judged by the Owner or being settled. */
 export type Phase = "open" | "judging" | "closing" | "settled" | "cancelled";
@@ -340,7 +362,8 @@ export const isLive = (phase: Phase) => phase === "open" || phase === "closing" 
  * Whether the likes on its entries decide who wins, so they lock when it ends (`votingClosed`): by
  * likes, by Holders' likes, and "everyone who completes" when it asks for likes.
  */
-export const likesDecide = (c: Pick<StoredChallenge, "judging" | "minLikes">) => c.judging === "likes" || c.judging === "holders" || (c.judging === "everyone" && (c.minLikes ?? 0) > 0);
+export const likesDecide = (c: Pick<StoredChallenge, "judging" | "minLikes">) =>
+  c.judging === "likes" || c.judging === "holders" || (c.judging === "everyone" && (c.minLikes ?? 0) > 0);
 
 /**
  * Why a Board post can't be a challenge's entry as an X post, or null when it can: an entry is the
@@ -348,7 +371,10 @@ export const likesDecide = (c: Pick<StoredChallenge, "judging" | "minLikes">) =>
  * and posted on X while the challenge runs, so a challenge sends the Club out onto X and an old post
  * can't be recycled.
  */
-export function xEntryProblem(post: Pick<StoredPost, "link" | "x">, c: Pick<StoredChallenge, "startsAt" | "endsAt">): "not_x" | "x_not_own" | "x_too_old" | null {
+export function xEntryProblem(
+  post: Pick<StoredPost, "link" | "x">,
+  c: Pick<StoredChallenge, "startsAt" | "endsAt">,
+): "not_x" | "x_not_own" | "x_too_old" | null {
   if (post.link?.kind !== "x" || !post.x) return "not_x";
   if (!post.x.own) return "x_not_own";
   if (post.x.postedAt === null || post.x.postedAt < c.startsAt || post.x.postedAt >= c.endsAt) return "x_too_old";
@@ -454,7 +480,8 @@ export function prizeStatus(w: Pick<Winner, "prize" | "sent">, settledAt: number
 }
 
 /** Whether any winner of `c` is still owed their asset prize past the due time. */
-export const prizeOverdue = (c: { settled?: Settlement }, now: number) => !!c.settled && c.settled.winners.some((w) => prizeStatus(w, c.settled!.at, now) === "overdue");
+export const prizeOverdue = (c: { settled?: Settlement }, now: number) =>
+  !!c.settled && c.settled.winners.some((w) => prizeStatus(w, c.settled!.at, now) === "overdue");
 
 /** On top of the Board: still running or waiting on its result, or results the Owner pinned, for `pinResultsMs`. */
 export const isPinned = (c: Pick<PublicChallenge, "phase" | "pinUntil">, nowMs: number) => isLive(c.phase) || (c.pinUntil !== undefined && nowMs < c.pinUntil);
@@ -488,7 +515,11 @@ export function winnersByLikes(candidates: readonly Candidate[], prizes: readonl
 }
 
 /** The winners an Owner picked: `picked` post ids, best first, each an eligible entry, one per member, at most `prizes.length`. */
-export function winnersByPick(picked: readonly string[], eligible: readonly Candidate[], prizes: readonly number[]): { ok: true; winners: Winner[] } | { ok: false; message: string } {
+export function winnersByPick(
+  picked: readonly string[],
+  eligible: readonly Candidate[],
+  prizes: readonly number[],
+): { ok: true; winners: Winner[] } | { ok: false; message: string } {
   if (picked.length < 1 || picked.length > prizes.length) return { ok: false, message: `Pick between 1 and ${prizes.length} entries.` };
   const byPost = new Map(eligible.map((c) => [c.post, c]));
   const seen = new Set<string>();
@@ -548,7 +579,12 @@ export function drawOrder(seed: Hex, posts: readonly string[]): string[] {
  * default) in draw order, keeping the first `n` that are still among `candidates`, a member once.
  * An entry that dropped out after the commit is skipped, not redrawn, so nobody can reroll it.
  */
-export function drawWinners<T extends { post: string; userId?: string }>(seed: Hex, candidates: readonly T[], n: number, pool: readonly string[] = candidates.map((c) => c.post)): T[] {
+export function drawWinners<T extends { post: string; userId?: string }>(
+  seed: Hex,
+  candidates: readonly T[],
+  n: number,
+  pool: readonly string[] = candidates.map((c) => c.post),
+): T[] {
   const byPost = new Map(candidates.map((c) => [c.post, c]));
   const out: T[] = [];
   const seen = new Set<string>();

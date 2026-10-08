@@ -3,8 +3,27 @@ import { describe, it } from "node:test";
 import { MAX_PINNED, POSTS_PER_HOUR, POST_MAX, REPORTS_PER_DAY, type PostLink } from "../lib/clubPosts";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import {
-  banUser, claimOwner, createPost, deletePost, hidePost, likePost, listBans, listPosts, listReported, ownershipCheck, pinPost, purgeClub,
-  reportPost, roleIn, setRole, unbanUser, updateProfile, postsKey, postKey, type Actor, type Deps,
+  banUser,
+  claimOwner,
+  createPost,
+  deletePost,
+  hidePost,
+  likePost,
+  listBans,
+  listPosts,
+  listReported,
+  ownershipCheck,
+  pinPost,
+  purgeClub,
+  reportPost,
+  roleIn,
+  setRole,
+  unbanUser,
+  updateProfile,
+  postsKey,
+  postKey,
+  type Actor,
+  type Deps,
 } from "../lib/server/board";
 import { activityKey } from "../lib/server/activity";
 import { activeKey } from "../lib/server/activeDays";
@@ -22,10 +41,12 @@ import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const OLD = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
-const reg = makeRegistry(parseAssets([
-  { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
-  { chainId: 10143, address: OLD, kind: "erc721", name: "O", symbol: "O", status: "verified", note: "Why.", club: "archived" },
-]));
+const reg = makeRegistry(
+  parseAssets([
+    { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
+    { chainId: 10143, address: OLD, kind: "erc721", name: "O", symbol: "O", status: "verified", note: "Why.", club: "archived" },
+  ]),
+);
 const club = reg.clubFor(NFT)!;
 const archived = reg.clubFor(OLD)!;
 const token = NFT.toLowerCase();
@@ -88,7 +109,14 @@ describe("createPost", () => {
     const { store, deps, mod } = await club1();
     await banUser(store, club, mod, { wallet: wallet(3) }, false, deps);
     // Put the row back, as a race between a ban and a join would.
-    await store.set(`declub:club-member:10143:${token}:m1`, { userId: "m1", wallets: [wallet(3)], displayWallet: wallet(3), holder: false, holderCheckedAt: 1, joinedAt: 1 });
+    await store.set(`declub:club-member:10143:${token}:m1`, {
+      userId: "m1",
+      wallets: [wallet(3)],
+      displayWallet: wallet(3),
+      holder: false,
+      holderCheckedAt: 1,
+      joinedAt: 1,
+    });
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "hi" }), { ok: false, reason: "banned" });
   });
 
@@ -109,7 +137,11 @@ describe("createPost", () => {
     assert.deepEqual(await createPost(store, club, "m1", { kind: "shout", text: "x" }), { ok: false, reason: "bad_kind" });
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "   " }), { ok: false, reason: "empty" });
     assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "a".repeat(POST_MAX + 1) }), { ok: false, reason: "too_long" });
-    assert.deepEqual(await createPost(store, club, "m1", { kind: "note", text: "x", link: "5" }), { ok: false, reason: "bad_link" }, "a note can't carry a link");
+    assert.deepEqual(
+      await createPost(store, club, "m1", { kind: "note", text: "x", link: "5" }),
+      { ok: false, reason: "bad_link" },
+      "a note can't carry a link",
+    );
     assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "nope" }), { ok: false, reason: "bad_link" });
   });
 
@@ -118,10 +150,21 @@ describe("createPost", () => {
     const seen: PostLink[] = [];
     const resolve = (tokens: string[] | null) => async (link: PostLink) => (seen.push(link), tokens);
     await reset(store, "m1");
-    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: resolve(null) }), { ok: false, reason: "link_not_found" });
-    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: resolve([OLD.toLowerCase()]) }), { ok: false, reason: "link_mismatch" });
-    const failing = async () => { throw new Error("down"); };
-    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: failing }), { ok: false, reason: "link_unavailable" });
+    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: resolve(null) }), {
+      ok: false,
+      reason: "link_not_found",
+    });
+    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: resolve([OLD.toLowerCase()]) }), {
+      ok: false,
+      reason: "link_mismatch",
+    });
+    const failing = async () => {
+      throw new Error("down");
+    };
+    assert.deepEqual(await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: failing }), {
+      ok: false,
+      reason: "link_unavailable",
+    });
     const ok = await createPost(store, club, "m1", { kind: "looking", text: "x", link: "7" }, { resolveLink: resolve(["0xother", token]) });
     assert.ok(ok.ok);
     assert.deepEqual(ok.post.link, { kind: "deal", id: "7" });
@@ -170,7 +213,14 @@ describe("Board posts in Momentum (ADR 0047)", () => {
     assert.deepEqual(await counted(store), [[wallet(1), NOW / 1000]]);
 
     assert.ok((await say(store, "h", "gm again", "note", at(NOW + 86_400_000))).ok);
-    assert.deepEqual(await counted(store), [[wallet(1), NOW / 1000], [wallet(1), NOW / 1000 + 86_400]], "a new day counts again");
+    assert.deepEqual(
+      await counted(store),
+      [
+        [wallet(1), NOW / 1000],
+        [wallet(1), NOW / 1000 + 86_400],
+      ],
+      "a new day counts again",
+    );
   });
 
   it("drops a hidden or deleted post, and the member's next post that day takes its place", async () => {
@@ -205,9 +255,19 @@ describe("listPosts", () => {
     const first = await listPosts(store, club, { limit: 2, offset: 0 }, deps);
     const second = await listPosts(store, club, { limit: 2, offset: 2 }, deps);
     const last = await listPosts(store, club, { limit: 2, offset: 4 }, deps);
-    assert.deepEqual(first.posts.map((p) => p.text), ["one", "five"], "the pin is on the first page");
-    assert.deepEqual(second.posts.map((p) => p.text), ["four", "three"]);
-    assert.deepEqual(last.posts.map((p) => p.text), ["two"]);
+    assert.deepEqual(
+      first.posts.map((p) => p.text),
+      ["one", "five"],
+      "the pin is on the first page",
+    );
+    assert.deepEqual(
+      second.posts.map((p) => p.text),
+      ["four", "three"],
+    );
+    assert.deepEqual(
+      last.posts.map((p) => p.text),
+      ["two"],
+    );
     assert.equal(first.total, 5);
     assert.equal((await listPosts(store, club, {}, deps)).posts.length, 5, "no limit, the whole board");
   });
@@ -219,11 +279,24 @@ describe("listPosts", () => {
     const b = await posted(store, "m2", "second");
     await new Promise((r) => setTimeout(r, 3));
     const c = await posted(store, "m1", "third");
-    assert.deepEqual((await listPosts(store, club, {}, deps)).posts.map((p) => p.text), ["third", "second", "first"]);
+    assert.deepEqual(
+      (await listPosts(store, club, {}, deps)).posts.map((p) => p.text),
+      ["third", "second", "first"],
+    );
     await pinPost(store, club, own, a, true, deps);
-    assert.deepEqual((await listPosts(store, club, {}, deps)).posts.map((p) => [p.text, p.pinned]), [["first", true], ["third", false], ["second", false]]);
+    assert.deepEqual(
+      (await listPosts(store, club, {}, deps)).posts.map((p) => [p.text, p.pinned]),
+      [
+        ["first", true],
+        ["third", false],
+        ["second", false],
+      ],
+    );
     await deletePost(store, club, { userId: "m2", wallet: wallet(4) }, b, deps);
-    assert.deepEqual((await listPosts(store, club, {}, deps)).posts.map((p) => p.id), [a, c]);
+    assert.deepEqual(
+      (await listPosts(store, club, {}, deps)).posts.map((p) => p.id),
+      [a, c],
+    );
   });
 
   it("tells the viewer their role, and nothing to a visitor", async () => {
@@ -282,7 +355,10 @@ describe("the Club inbox", () => {
 
     await likePost(store, club, "m2", id, true);
     const one = await mine();
-    assert.deepEqual(one.map((i) => i.kind), ["club-like"]);
+    assert.deepEqual(
+      one.map((i) => i.kind),
+      ["club-like"],
+    );
     assert.match(one[0]!.title, /^Someone liked your post/);
     assert.equal(one[0]!.href, `/clubs/${token}?tab=board`);
 
@@ -293,14 +369,21 @@ describe("the Club inbox", () => {
 
     await pinPost(store, club, own, id, true, deps);
     assert.deepEqual((await mine()).map((i) => i.kind).sort(), ["club-like", "club-pinned"]);
-    assert.deepEqual(await clubInbox(store, "m2", [wallet(4)], { registry: reg, standings: async () => null }), [], "another member's likes and pins are theirs");
+    assert.deepEqual(
+      await clubInbox(store, "m2", [wallet(4)], { registry: reg, standings: async () => null }),
+      [],
+      "another member's likes and pins are theirs",
+    );
   });
 
   it("forgets posts older than two weeks and hidden ones", async () => {
     const { store, mod, deps } = await club1();
     const id = await posted(store, "m1", "old news");
     await likePost(store, club, "m2", id, true);
-    assert.equal((await clubInbox(store, "m1", [wallet(3)], { registry: reg, standings: async () => null, now: () => Date.now() + 15 * 86_400_000 })).length, 0);
+    assert.equal(
+      (await clubInbox(store, "m1", [wallet(3)], { registry: reg, standings: async () => null, now: () => Date.now() + 15 * 86_400_000 })).length,
+      0,
+    );
     await hidePost(store, club, mod, id, true, deps);
     assert.equal((await clubInbox(store, "m1", [wallet(3)], { registry: reg, standings: async () => null })).length, 0);
   });
@@ -315,14 +398,39 @@ describe("the Club inbox: replies and standings", () => {
     assert.deepEqual(await mine(), [], "their own reply isn't news");
     await createReply(store, club, "m2", id, { text: "nice" });
     const one = await mine();
-    assert.deepEqual(one.map((i) => i.kind), ["club-reply"]);
+    assert.deepEqual(
+      one.map((i) => i.kind),
+      ["club-reply"],
+    );
     assert.match(one[0]!.title, /^A reply to your post/);
   });
 
-  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({ wallet: wallet(i), rank: i, shares: String(20 - i), joinedAt: i, days: 0, xShares: 0, points: i <= 10 ? 12 : 2, bonusBps: 0, streak: 0, ...(i <= 10 ? { estimate: "1000000000000000000" } : {}), ...over });
+  const row = (i: number, over: Partial<StandingRow> = {}): StandingRow => ({
+    wallet: wallet(i),
+    rank: i,
+    shares: String(20 - i),
+    joinedAt: i,
+    days: 0,
+    xShares: 0,
+    points: i <= 10 ? 12 : 2,
+    bonusBps: 0,
+    streak: 0,
+    ...(i <= 10 ? { estimate: "1000000000000000000" } : {}),
+    ...over,
+  });
   const standings = (over: Partial<ClubStandings> = {}): ClubStandings => ({
-    club: token, n: 3, start: 0, endsAt: 1_000_000, computedAt: 100, fees: "1", holderPool: "10", fundPool: "1", rules: { ...DEFAULT_CLUB_RULES, maxPaid: 10 },
-    rows: Array.from({ length: 12 }, (_, i) => row(i + 1)), activity: {}, ...over,
+    club: token,
+    n: 3,
+    start: 0,
+    endsAt: 1_000_000,
+    computedAt: 100,
+    fees: "1",
+    holderPool: "10",
+    fundPool: "1",
+    rules: { ...DEFAULT_CLUB_RULES, maxPaid: 10 },
+    rows: Array.from({ length: 12 }, (_, i) => row(i + 1)),
+    activity: {},
+    ...over,
   });
 
   it("says where a Holder stands, paid or below the floor, keyed by which", () => {
@@ -333,7 +441,12 @@ describe("the Club inbox: replies and standings", () => {
     assert.equal(outside!.key, `club-rank:${token}:3:out`);
     assert.match(outside!.body, /^About 10\.01 more activity points would put you in the paid places/, "the 10th has 12 points and holds more NFTs");
     assert.match(outside!.title, /outside the paid places/);
-    const [idle] = standingsNews(standings({ rows: standings().rows.map((r) => (r.wallet === wallet(12) ? { ...r, points: 0 } : r)) }), "N", new Set([wallet(12)]), 0);
+    const [idle] = standingsNews(
+      standings({ rows: standings().rows.map((r) => (r.wallet === wallet(12) ? { ...r, points: 0 } : r)) }),
+      "N",
+      new Set([wallet(12)]),
+      0,
+    );
     assert.match(idle!.title, /not earning in N yet/);
     assert.deepEqual(standingsNews(standings({ holderPool: "0" }), "N", new Set([wallet(4)]), 0), [], "no pool, no race");
   });
@@ -343,7 +456,11 @@ describe("the Club inbox: replies and standings", () => {
     const news = standingsNews(standings({ rows: [row(1, { days: 2 })] }), "N", new Set([wallet(1)]), late);
     const closing = news.find((i) => i.kind === "club-closing")!;
     assert.match(closing.body, /active 2 of 7 days/);
-    assert.equal(standingsNews(standings({ rows: [row(1, { days: 2 })] }), "N", new Set([wallet(1)]), 0).filter((i) => i.kind === "club-closing").length, 0, "not before the last day");
+    assert.equal(
+      standingsNews(standings({ rows: [row(1, { days: 2 })] }), "N", new Set([wallet(1)]), 0).filter((i) => i.kind === "club-closing").length,
+      0,
+      "not before the last day",
+    );
     const streak = standingsNews(standings({ rows: [], activity: { [wallet(5)]: { days: 2, streak: 0, carried: 4 } } }), "N", new Set([wallet(5)]), late);
     assert.match(streak[0]!.body, /today to keep your 4-week streak/);
   });
@@ -353,7 +470,13 @@ describe("reports", () => {
   it("flags a post for the moderators however many report it, and never hides it (ADR 0040)", async () => {
     const { store, deps } = await club1();
     const id = await posted(store, "m1", "scam");
-    for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13], ["r4", 14], ["r5", 15]] as const) {
+    for (const [u, n] of [
+      ["r1", 11],
+      ["r2", 12],
+      ["r3", 13],
+      ["r4", 14],
+      ["r5", 15],
+    ] as const) {
       await member(store, u, n, { holder: true });
       assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false });
     }
@@ -364,7 +487,11 @@ describe("reports", () => {
     assert.equal(asOther.reports, undefined, "members don't see counts");
     const asMod = (await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!;
     assert.equal(asMod.reports, 5);
-    assert.deepEqual((await readLog(store, token)).map((l) => l.action), [], "nothing was logged: nobody moderated");
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => l.action),
+      [],
+      "nothing was logged: nobody moderated",
+    );
     assert.equal((await store.get<{ reported?: true }>(postKey(token, id)))?.reported, true);
   });
 
@@ -379,7 +506,14 @@ describe("reports", () => {
     await reportPost(store, club, "r2", b, deps);
     assert.equal(await listReported(store, club, "m2", deps), null, "members can't read it");
     const list = (await listReported(store, club, "mod", deps))!;
-    assert.deepEqual(list.map((i) => [i.post.id, i.reports, i.holderReports]), [[a, 2, 1], [b, 1, 0]], "most Holder reports first; text is shown to staff");
+    assert.deepEqual(
+      list.map((i) => [i.post.id, i.reports, i.holderReports]),
+      [
+        [a, 2, 1],
+        [b, 1, 0],
+      ],
+      "most Holder reports first; text is shown to staff",
+    );
     assert.equal(list[0]!.post.text, "a");
     assert.ok((await hidePost(store, club, mod, a, false, deps)).ok, "dismissing the reports");
     assert.ok((await deletePost(store, club, mod, b, deps)).ok);
@@ -412,7 +546,11 @@ describe("reports", () => {
   it("a Moderator's restore clears the reports", async () => {
     const { store, mod, deps } = await club1();
     const id = await posted(store, "m1");
-    for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) {
+    for (const [u, n] of [
+      ["r1", 11],
+      ["r2", 12],
+      ["r3", 13],
+    ] as const) {
       await member(store, u, n, { holder: true });
       await reportPost(store, club, u, id, deps);
     }
@@ -428,7 +566,12 @@ describe("who reports count", () => {
   it("counts Holders' and staff's reports apart for staff to weigh, and shows staff every report", async () => {
     const { store, deps } = await club1();
     const id = await posted(store, "m1", "contested");
-    for (const [u, n] of [["f1", 31], ["f2", 32], ["f3", 33], ["f4", 34]] as const) {
+    for (const [u, n] of [
+      ["f1", 31],
+      ["f2", 32],
+      ["f3", 33],
+      ["f4", 34],
+    ] as const) {
       await member(store, u, n);
       assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false }, `${u} isn't a Holder`);
     }
@@ -443,20 +586,36 @@ describe("who reports count", () => {
     assert.deepEqual(await reportPost(store, club, "h2", id, deps), { ok: true, hidden: false });
     assert.deepEqual(await reportPost(store, club, "mod", id, deps), { ok: true, hidden: false }, "even a Moderator's own report doesn't hide it");
     assert.equal((await listPosts(store, club, { userId: "mod" }, deps)).posts[0]!.reports, 7);
-    assert.deepEqual((await listReported(store, club, "mod", deps))!.map((i) => [i.reports, i.holderReports]), [[7, 3]], "the three from Holders and staff are told apart");
+    assert.deepEqual(
+      (await listReported(store, club, "mod", deps))!.map((i) => [i.reports, i.holderReports]),
+      [[7, 3]],
+      "the three from Holders and staff are told apart",
+    );
   });
 
   it("keeps staff posts up however many report them, and the reports still reach staff", async () => {
     const { store, deps } = await club1();
     await member(store, "adm", 99);
     const ids = [await posted(store, "own", "owner"), await posted(store, "mod", "moderator"), await posted(store, "adm", "admin")];
-    for (const [u, n] of [["h1", 41], ["h2", 42], ["h3", 43], ["h4", 44]] as const) {
+    for (const [u, n] of [
+      ["h1", 41],
+      ["h2", 42],
+      ["h3", 43],
+      ["h4", 44],
+    ] as const) {
       await member(store, u, n, { holder: true });
       for (const id of ids) assert.deepEqual(await reportPost(store, club, u, id, deps), { ok: true, hidden: false });
     }
     const seen = (await listPosts(store, club, { userId: "own" }, deps)).posts;
-    assert.deepEqual(seen.map((p) => p.hidden), [null, null, null]);
-    assert.deepEqual(seen.map((p) => p.reports), [4, 4, 4], "the reports still reach staff");
+    assert.deepEqual(
+      seen.map((p) => p.hidden),
+      [null, null, null],
+    );
+    assert.deepEqual(
+      seen.map((p) => p.reports),
+      [4, 4, 4],
+      "the reports still reach staff",
+    );
   });
 });
 
@@ -470,12 +629,22 @@ describe("moderating posts", () => {
     await store.set(postKey(token, id), { ...(await store.get<object>(postKey(token, id)))!, reported: true, hidden: "reports" });
     assert.deepEqual((await loadProfile(store, token)).pinned, [id], "the pin is kept");
     const asMember = (await listPosts(store, club, { userId: "m2" }, deps)).posts;
-    assert.deepEqual(asMember.find((p) => p.id === id), { ...asMember.find((p) => p.id === id)!, text: null, pinned: false }, "not shown as pinned while hidden");
+    assert.deepEqual(
+      asMember.find((p) => p.id === id),
+      { ...asMember.find((p) => p.id === id)!, text: null, pinned: false },
+      "not shown as pinned while hidden",
+    );
     assert.equal((await listPosts(store, club, { userId: "own" }, deps)).posts[0]!.pinned, true, "staff see it is still pinned");
 
     assert.ok((await hidePost(store, club, mod, id, false, deps)).ok);
     const restored = (await listPosts(store, club, { userId: "m2" }, deps)).posts;
-    assert.deepEqual(restored.map((p) => [p.text, p.pinned]), [["pinned", true], ["newer", false]]);
+    assert.deepEqual(
+      restored.map((p) => [p.text, p.pinned]),
+      [
+        ["pinned", true],
+        ["newer", false],
+      ],
+    );
   });
 
   it("lets staff hide and restore a member's post, logged", async () => {
@@ -484,7 +653,10 @@ describe("moderating posts", () => {
     assert.ok((await hidePost(store, club, mod, id, true, deps)).ok);
     assert.equal((await listPosts(store, club, { userId: "m2" }, deps)).posts[0]!.hidden, "moderator");
     assert.ok((await hidePost(store, club, mod, id, false, deps)).ok);
-    assert.deepEqual((await readLog(store, token)).map((l) => l.action), ["restore_post", "hide_post"]);
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => l.action),
+      ["restore_post", "hide_post"],
+    );
     assert.equal((await readLog(store, token))[0]!.actor, mod.wallet);
   });
 
@@ -521,7 +693,10 @@ describe("moderating posts", () => {
     await pinPost(store, club, own, theirs, true, deps);
     assert.ok((await deletePost(store, club, mod, theirs, deps)).ok);
     assert.deepEqual((await loadProfile(store, token)).pinned, []);
-    assert.deepEqual((await readLog(store, token)).map((l) => l.action), ["delete_post", "pin_post"]);
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => l.action),
+      ["delete_post", "pin_post"],
+    );
   });
 });
 
@@ -557,7 +732,10 @@ describe("bans", () => {
     assert.deepEqual(await store.members(membersKey(token)).then((m) => m.sort()), ["mod", "m2", "own"].sort());
     assert.deepEqual(await joinClub(store, club, "m1", [wallet(3)]), { ok: false, reason: "banned" });
     const bans = await listBans(store, club, "mod", deps);
-    assert.deepEqual(bans?.club.map((b) => b.wallet), [wallet(3)]);
+    assert.deepEqual(
+      bans?.club.map((b) => b.wallet),
+      [wallet(3)],
+    );
     assert.deepEqual(bans?.everywhere, []);
     assert.equal((await readLog(store, token))[0]!.action, "ban");
   });
@@ -577,7 +755,11 @@ describe("bans", () => {
     assert.deepEqual(await banUser(store, club, adminMember, { wallet: wallet(99) }, false, deps), { ok: false, reason: "forbidden" });
     assert.deepEqual(await banUser(store, club, m1, { wallet: wallet(4) }, false, deps), { ok: false, reason: "forbidden" });
     assert.deepEqual(await banUser(store, club, mod, { wallet: wallet(1) }, false, deps), { ok: false, reason: "forbidden" }, "Moderator can't ban the Owner");
-    assert.deepEqual(await banUser(store, club, own, { wallet: wallet(1) }, false, deps), { ok: false, reason: "forbidden" }, "nor can the Owner ban themselves");
+    assert.deepEqual(
+      await banUser(store, club, own, { wallet: wallet(1) }, false, deps),
+      { ok: false, reason: "forbidden" },
+      "nor can the Owner ban themselves",
+    );
     assert.deepEqual(await banUser(store, club, mod, { wallet: wallet(2) }, false, deps), { ok: false, reason: "forbidden" });
     assert.deepEqual(await banUser(store, club, own, { wallet: wallet(98) }, false, deps), { ok: false, reason: "not_found" });
     const ownerBan = await banUser(store, club, adm, { wallet: wallet(1) }, false, deps);
@@ -595,7 +777,10 @@ describe("bans", () => {
     assert.deepEqual(await store.members(userClubsKey("m1")), []);
     assert.deepEqual(await joinClub(store, club, "m1", [wallet(3)]), { ok: false, reason: "banned" });
     assert.deepEqual((await listBans(store, club, "own", deps))?.everywhere, [], "the Owner doesn't see global bans");
-    assert.deepEqual((await listBans(store, club, "adm", deps))?.everywhere.map((b) => b.wallet), [wallet(3)]);
+    assert.deepEqual(
+      (await listBans(store, club, "adm", deps))?.everywhere.map((b) => b.wallet),
+      [wallet(3)],
+    );
   });
 
   it("lifts a ban without putting the user back; a global ban only by an admin", async () => {
@@ -695,7 +880,10 @@ describe("setRole", () => {
     assert.deepEqual(await setRole(store, club, own, m1.wallet, "moderator", deps), { ok: false, reason: "no_change" });
     assert.deepEqual(await setRole(store, club, own, m1.wallet, null, deps), { ok: true });
     assert.equal(await roleIn(store, token, "m1", deps), "member");
-    assert.deepEqual((await readLog(store, token)).map((l) => l.action), ["remove_moderator", "appoint_moderator"]);
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => l.action),
+      ["remove_moderator", "appoint_moderator"],
+    );
   });
 
   it("refuses a Moderator or a member, and a wallet that isn't a member", async () => {
@@ -753,9 +941,15 @@ describe("updateProfile", () => {
     assert.equal(r.profile.description, "About us");
     const next = await updateProfile(store, club, adm, { holdersOnlyPosts: true }, deps);
     assert.ok(next.ok);
-    assert.deepEqual({ d: next.profile.description, l: next.profile.links, h: next.profile.holdersOnlyPosts }, { d: "About us", l: ["https://x.com/chog"], h: true });
+    assert.deepEqual(
+      { d: next.profile.description, l: next.profile.links, h: next.profile.holdersOnlyPosts },
+      { d: "About us", l: ["https://x.com/chog"], h: true },
+    );
     assert.deepEqual(await updateProfile(store, club, mod, { description: "x" }, deps), { ok: false, reason: "forbidden" });
-    assert.deepEqual((await readLog(store, token)).map((l) => l.action), ["edit_profile", "edit_profile"]);
+    assert.deepEqual(
+      (await readLog(store, token)).map((l) => l.action),
+      ["edit_profile", "edit_profile"],
+    );
   });
 
   it("explains an invalid edit, and refuses an archived Club", async () => {
@@ -770,10 +964,23 @@ describe("updateProfile", () => {
   it("sets whether the Club's memecoin makes Holders, and moves `at` only when the rule changes", async () => {
     const { store, own, deps } = await club1();
     const COIN = "0xd300f095f456D59AAc122B0100833fE195136F6c";
-    const paired = makeRegistry(parseAssets([
-      { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
-      { chainId: 10143, address: COIN, kind: "erc20", category: "memecoin", name: "C", symbol: "C", status: "verified", note: "Why.", club: NFT, minHolding: "100" },
-    ])).clubFor(NFT)!;
+    const paired = makeRegistry(
+      parseAssets([
+        { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
+        {
+          chainId: 10143,
+          address: COIN,
+          kind: "erc20",
+          category: "memecoin",
+          name: "C",
+          symbol: "C",
+          status: "verified",
+          note: "Why.",
+          club: NFT,
+          minHolding: "100",
+        },
+      ]),
+    ).clubFor(NFT)!;
     const at = (t: number) => ({ ...deps, now: () => t });
 
     const off = await updateProfile(store, paired, own, { coinHolders: { on: false } }, at(10));

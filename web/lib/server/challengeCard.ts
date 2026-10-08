@@ -30,7 +30,7 @@ export type ChallengeFacts = {
 };
 
 /** The Club a card is about, and its challenge when the store has it. */
-export type ChallengeCardFacts = { club: string; image?: string; challenge: ChallengeFacts | null };
+type ChallengeCardFacts = { club: string; image?: string; challenge: ChallengeFacts | null };
 
 /** How many winners the card names: the podium's three, or a flat challenge's grid of six. */
 const NAMED = 3;
@@ -71,7 +71,12 @@ export async function readChallengeFacts(address: string, id: string, now = Date
       flat: isFlat(c.judging),
       places: c.winners ?? c.prizes.length,
       prize: c.prize ?? c.prizes[0] ?? 0,
-      winners: shown.map((w, i) => ({ name: profiles[i] ? handleLabel(profiles[i]!) : shortAddress(w.wallet), wallet: w.wallet.toLowerCase(), place: w.place, points: w.points })),
+      winners: shown.map((w, i) => ({
+        name: profiles[i] ? handleLabel(profiles[i]!) : shortAddress(w.wallet),
+        wallet: w.wallet.toLowerCase(),
+        place: w.place,
+        points: w.points,
+      })),
       winnerCount: all.length,
     };
   } catch {

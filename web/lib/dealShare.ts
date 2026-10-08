@@ -57,11 +57,7 @@ export function cardItems(
 }
 
 /** The words for one side: NFTs grouped by collection, then tokens, then MON. */
-export function describeAssets(
-  assets: readonly Asset[],
-  info: ReadonlyMap<string, TokenInfo>,
-  nameOf: (token: string) => string | undefined,
-): string {
+export function describeAssets(assets: readonly Asset[], info: ReadonlyMap<string, TokenInfo>, nameOf: (token: string) => string | undefined): string {
   const parts: string[] = [];
   const nfts = new Map<string, bigint[]>();
   for (const a of assets) {

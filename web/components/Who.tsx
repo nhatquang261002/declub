@@ -41,7 +41,12 @@ export function Who({
   }
 
   if (!profile) {
-    if (plain) return <span className="font-mono"><CopyAddress address={address} full={full} inLink /></span>;
+    if (plain)
+      return (
+        <span className="font-mono">
+          <CopyAddress address={address} full={full} inLink />
+        </span>
+      );
     return (
       <span className="inline-flex items-baseline gap-1 font-mono">
         <Link href={href} className={`${full ? "break-all" : ""} ${open}`} title="Open profile">

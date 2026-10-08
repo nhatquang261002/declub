@@ -17,12 +17,28 @@ async function ofClub(store: Store, entry: ClubEntry, now: number, deps: Deps): 
     if (!kind || e.at <= since) return [];
     // A signed swap is logged as `<tx>:settled` (lib/clubs.ts): its `deal` is the transaction.
     const signed = kind === "swap" && e.id.endsWith(":settled");
-    return [{ id: e.id, clubs: [club], kind, at: e.at, wallets: [...new Set(e.parties.map((p) => p.toLowerCase()))], deal: e.deal, ...(signed ? { signed: true as const } : {}) }];
+    return [
+      {
+        id: e.id,
+        clubs: [club],
+        kind,
+        at: e.at,
+        wallets: [...new Set(e.parties.map((p) => p.toLowerCase()))],
+        deal: e.deal,
+        ...(signed ? { signed: true as const } : {}),
+      },
+    ];
   });
   const joined = rows
     // A row's joinedAt is epoch ms.
     .filter((row) => Math.floor(row.joinedAt / 1000) > since)
-    .map((row): SystemEvent => ({ id: `join:${club}:${row.displayWallet}`, clubs: [club], kind: "join", at: Math.floor(row.joinedAt / 1000), wallets: [row.displayWallet] }));
+    .map((row): SystemEvent => ({
+      id: `join:${club}:${row.displayWallet}`,
+      clubs: [club],
+      kind: "join",
+      at: Math.floor(row.joinedAt / 1000),
+      wallets: [row.displayWallet],
+    }));
   return [...logged, ...joined, ...(await challengeEvents(store, club, since))];
 }
 
@@ -41,10 +57,20 @@ async function challengeEvents(store: Store, club: string, since: number): Promi
   return all.flatMap((c): SystemEvent[] => {
     const out: SystemEvent[] = [];
     const startedAt = Math.floor(c.startsAt / 1000);
-    if (c.state !== "cancelled" && startedAt > since) out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], challenge: c.id, title: c.title });
+    if (c.state !== "cancelled" && startedAt > since)
+      out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], challenge: c.id, title: c.title });
     const winners = c.settled?.winners ?? [];
     const wonAt = c.settled ? Math.floor((c.judging !== "owner" ? Math.min(c.endsAt, c.settled.at) : c.settled.at) / 1000) : 0;
-    if (winners.length > 0 && wonAt > since) out.push({ id: `challenge-won:${c.id}`, clubs: [club], kind: "winner", at: wonAt, wallets: winners.map((w) => w.wallet.toLowerCase()), challenge: c.id, title: c.title });
+    if (winners.length > 0 && wonAt > since)
+      out.push({
+        id: `challenge-won:${c.id}`,
+        clubs: [club],
+        kind: "winner",
+        at: wonAt,
+        wallets: winners.map((w) => w.wallet.toLowerCase()),
+        challenge: c.id,
+        title: c.title,
+      });
     return out;
   });
 }

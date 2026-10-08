@@ -1,16 +1,6 @@
 import { linkedEthereumWallets } from "@/lib/profiles";
 import { fail, gateUser, json } from "@/lib/server/gate";
-import {
-  isAddressString,
-  isSeenKey,
-  MAX_RECENTS,
-  MAX_SEEN_ACCOUNT_KEYS,
-  MAX_SEEN_PER_REQUEST,
-  onlyValid,
-  recentsKey,
-  seenInitKey,
-  seenKey,
-} from "@/lib/state";
+import { isAddressString, isSeenKey, MAX_RECENTS, MAX_SEEN_ACCOUNT_KEYS, MAX_SEEN_PER_REQUEST, onlyValid, recentsKey, seenInitKey, seenKey } from "@/lib/state";
 
 /**
  * The signed-in user's saved state (ADR 0012). Every call needs their Privy access token, and a
@@ -63,7 +53,11 @@ export async function POST(request: Request) {
     }
     if (seen.length > 0) {
       // Sending a key again only refreshes its age; the oldest ones age out past the cap.
-      await store.rank(seenKey(user.id, account), seen.map((member) => ({ member, score: now })), MAX_SEEN_ACCOUNT_KEYS);
+      await store.rank(
+        seenKey(user.id, account),
+        seen.map((member) => ({ member, score: now })),
+        MAX_SEEN_ACCOUNT_KEYS,
+      );
     }
     if (body.initialized === true) await store.set(seenInitKey(user.id, account), 1);
   }

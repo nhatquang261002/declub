@@ -22,15 +22,14 @@ export const FILL_CONTRACTS: Address[] = DECLUB_ESCROW_ADDRESS ? [DECLUB_ESCROW_
 /** A wallet can't have filled more than this many deals; the oldest records age out past it. */
 const MAX_FILLS_PER_ACCOUNT = 2_000;
 
-export const fillsKey = (contract: string, account: string) =>
-  `declub:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
+export const fillsKey = (contract: string, account: string) => `declub:fills:${CHAIN_ID}:${contract.toLowerCase()}:${account.toLowerCase()}`;
 
 export const isFillContract = (address: string) => FILL_CONTRACTS.some((c) => c.toLowerCase() === address.toLowerCase());
 
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-export type IngestResult =
+type IngestResult =
   | { status: "recorded"; fills: number }
   /** The node doesn't have the receipt yet (or there is no such transaction). Worth retrying. */
   | { status: "pending" };

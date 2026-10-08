@@ -18,7 +18,12 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   return {
     title,
     description,
-    openGraph: { title: shareTitle, description, type: "website", images: [{ url: image, width: 1200, height: 630, alt: `${facts.name} Club preview on DeClub` }] },
+    openGraph: {
+      title: shareTitle,
+      description,
+      type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: `${facts.name} Club preview on DeClub` }],
+    },
     twitter: { card: "summary_large_image", title: shareTitle, description, images: [image] },
   };
 }

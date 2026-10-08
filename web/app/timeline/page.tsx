@@ -27,7 +27,8 @@ import { registry } from "@/lib/verifiedAssets";
 /** Every Club the app knows, by lowercase token: a post names its Club by token and the page draws it from here. */
 const CLUBS = new Map<string, ClubInfo>(registry.clubs().map((entry) => [entry.address.toLowerCase(), toClubInfo(entry)]));
 
-const heightOf = (item: FeedItem<TimelinePost>) => (item.type === "post" ? estimateHeight(item.post) : item.type === "challenge" ? CHALLENGE_HEIGHT : systemHeight(item.events.length));
+const heightOf = (item: FeedItem<TimelinePost>) =>
+  item.type === "post" ? estimateHeight(item.post) : item.type === "challenge" ? CHALLENGE_HEIGHT : systemHeight(item.events.length);
 const clubOf = (token: string) => CLUBS.get(token);
 /** About how tall a challenge's card is, for laying the masonry out before it has loaded. */
 const CHALLENGE_HEIGHT = 480;
@@ -59,7 +60,15 @@ function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<st
         <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
           {pinned.map(({ club, challenge: c }) => (
             <li key={`${club}:${c.id}`}>
-              <ChallengeSummary c={c} token={club} now={now} club={clubOf(club)} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={pinned.length > 1} />
+              <ChallengeSummary
+                c={c}
+                token={club}
+                now={now}
+                club={clubOf(club)}
+                heading={c.phase === "open" ? "Challenge" : "Challenge ended"}
+                pinned
+                compact={pinned.length > 1}
+              />
             </li>
           ))}
         </ul>
@@ -67,7 +76,9 @@ function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<st
       {feed.isLoading ? (
         <Loading label="Loading the timeline" rows={3} />
       ) : items.length === 0 ? (
-        pinned.length === 0 ? empty : null
+        pinned.length === 0 ? (
+          empty
+        ) : null
       ) : (
         <>
           <Masonry
@@ -78,10 +89,18 @@ function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<st
               if (item.type === "challenge") return <ChallengeFeedCard key={`challenge:${item.event.id}`} event={item.event} now={now} clubs={clubOf} />;
               if (item.type === "system") return <SystemGroup key={`system:${item.events[0]!.id}`} events={item.events} now={now} clubs={clubOf} />;
               const club = CLUBS.get(item.post.club);
-              return club ? <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined={joined.has(item.post.club)} now={now} /> : null;
+              return club ? (
+                <TimelineCard key={`${item.post.club}:${item.post.id}`} post={item.post} club={club} joined={joined.has(item.post.club)} now={now} />
+              ) : null;
             }}
           />
-          <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
+          <InfiniteSentinel
+            hasMore={!!feed.hasMore}
+            loading={feed.loadingMore}
+            count={feed.posts.length}
+            failed={feed.loadMoreFailed}
+            onLoadMore={feed.loadMore}
+          />
         </>
       )}
     </>
@@ -139,7 +158,13 @@ function Timeline() {
       {hasAccounts && (
         <div className="tabbar mb-4 flex w-full sm:inline-flex sm:w-auto" role="group" aria-label="Which Clubs to show">
           {SHOWS.map((s) => (
-            <button key={s.value} type="button" className="tab inline-flex flex-1 items-center justify-center gap-1.5 sm:flex-none" aria-pressed={show === s.value} onClick={() => setShow(s.value)}>
+            <button
+              key={s.value}
+              type="button"
+              className="tab inline-flex flex-1 items-center justify-center gap-1.5 sm:flex-none"
+              aria-pressed={show === s.value}
+              onClick={() => setShow(s.value)}
+            >
               {s.label}
               {s.value === "joined" && signedIn && <span className="tab-count">{mineClubs.length.toLocaleString()}</span>}
             </button>

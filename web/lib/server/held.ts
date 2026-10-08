@@ -15,7 +15,7 @@ import type { Store } from "./store";
  */
 
 /** The days sampled in a Club's epoch (UTC day numbers) and each member's NFTs on them, added up, by user id. */
-export type Held = { days: number[]; sums: Record<string, string> };
+type Held = { days: number[]; sums: Record<string, string> };
 
 export const heldKey = (club: string, n: number) => `declub:held:${CHAIN_ID}:${club.toLowerCase()}:${n}`;
 const lockKey = (club: string, day: number) => `declub:held-lock:${CHAIN_ID}:${club.toLowerCase()}:${day}`;
@@ -24,7 +24,7 @@ export async function readHeld(store: Store, club: string, n: number): Promise<H
   return (await store.get<Held>(heldKey(club, n))) ?? { days: [], sums: {} };
 }
 
-export type SampleResult = { sampled: string[]; skipped: string[]; failed: string[] };
+type SampleResult = { sampled: string[]; skipped: string[]; failed: string[] };
 
 /**
  * Reads every Club's members' NFTs and adds them to the running epoch's totals, once per Club per

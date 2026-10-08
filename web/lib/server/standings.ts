@@ -1,16 +1,39 @@
 import type { ActivityEvent } from "../clubs";
 import { CHAIN_ID, DECLUB_INTENTS_ADDRESS } from "../config";
-import { PROTOCOL, averageHeld, entryGap, rampGap, rankMembers, epochAt, epochWindow, qualifies, rankHolders, splitClub, type ClubRules, type ReachRecord } from "../rewards";
+import {
+  PROTOCOL,
+  averageHeld,
+  entryGap,
+  rampGap,
+  rankMembers,
+  epochAt,
+  epochWindow,
+  qualifies,
+  rankHolders,
+  splitClub,
+  type ClubRules,
+  type ReachRecord,
+} from "../rewards";
 import { clubAssets, registry, type ClubEntry } from "../verifiedAssets";
 import { liveStreak, readStreaks, standingsKey, streakAt } from "./streaks";
 
-export { standingsKey };
 import { settleDue } from "./challenges";
 import { rulesFor } from "./clubRules";
 import { clubEvents } from "./clubs";
 import { allRows, viemHoldings, type Holdings } from "./members";
 import { readSponsors, sponsorsByClub } from "./sponsors";
-import { cachedSettlementFee, carryKey, holderInputs, isSignedSwap, ownerWallet, reachKey, swapFee, verifiedBy, viemSettlementFee } from "./rewards";
+import {
+  cachedSettlementFee,
+  carryKey,
+  holderInputs,
+  isSignedSwap,
+  ownerWallet,
+  pointsBreakdown,
+  reachKey,
+  swapFee,
+  verifiedBy,
+  viemSettlementFee,
+} from "./rewards";
 import type { Store } from "./store";
 
 /**
@@ -117,7 +140,10 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   const intents = (deps.intents ?? DECLUB_INTENTS_ADDRESS ?? "").toLowerCase();
 
   // Challenges that have ended count in the standings, so settle them first (ADR 0045).
-  await settleDue(store, club, { now: () => now * 1000, ...(deps.genesis !== undefined && deps.length !== undefined ? { epochs: { genesis: deps.genesis, length: deps.length } } : {}) });
+  await settleDue(store, club, {
+    now: () => now * 1000,
+    ...(deps.genesis !== undefined && deps.length !== undefined ? { epochs: { genesis: deps.genesis, length: deps.length } } : {}),
+  });
   const events = (await (deps.events ?? ((c: ClubEntry) => clubEvents(store, c)))(club)).filter((e) => e.at >= window.start && e.at < window.end);
   let fees = 0n;
   let signedFees = 0n;
@@ -132,7 +158,17 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   const reach = await store.get<ReachRecord>(reachKey(n));
   const streaks = await readStreaks(store, key);
   const rules = await (deps.rules ?? ((c: string, k: number) => rulesFor(store, c, k)))(key, n);
-  const { holders, members, excluded, days, samples } = await holderInputs(store, club, n, events, reach, deps.holdings ?? viemHoldings, streaks, verifiedBy(window.end), rules);
+  const { holders, members, excluded, days, samples } = await holderInputs(
+    store,
+    club,
+    n,
+    events,
+    reach,
+    deps.holdings ?? viemHoldings,
+    streaks,
+    verifiedBy(window.end),
+    rules,
+  );
   const carried = (await store.get<{ holders: string; fund: string }>(carryKey(key))) ?? { holders: "0", fund: "0" };
   const sponsored = sponsorsByClub(await readSponsors(store, n)).get(key)?.total ?? 0n;
   const split = splitClub({
@@ -160,13 +196,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       days: h.days,
       xShares: events.filter((e) => e.kind === "xshare" && !e.entry && own.has(e.parties[0] ?? "")).length,
       points: h.points,
-      xPoints: h.xPoints,
-      swapPoints: h.swapPoints,
-      backedPoints: h.backedPoints,
-      ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
-      ...(h.engagedPoints ? { engagedPoints: h.engagedPoints } : {}),
-      backers: h.backers,
-      basePoints: h.basePoints,
+      ...pointsBreakdown(h),
       bonusBps: payout?.bonusBps ?? 0,
       streak: h.streak,
       ...(payout ? { estimate: payout.amount.toString() } : {}),
@@ -228,7 +258,7 @@ export async function clubStandings(store: Store, club: ClubEntry, deps: Standin
 }
 
 /** How many rows the route serves: the leaderboard's top, and as many of the members without NFTs. */
-export const ROWS_SHOWN = 25;
+const ROWS_SHOWN = 25;
 
 /** What one reader is shown: the top rows, and their own place if they gave a wallet. */
 export type StandingsView = Omit<ClubStandings, "rows" | "activity"> & {

@@ -80,10 +80,7 @@ function DealDetailV2({ id }: { id: bigint }) {
   const openOffer = !!deal && isOpenOffer(deal);
   const { proposals, total, hasMore, loadMore } = useProposalsV2(id, openOffer);
 
-  const assets = useMemo(
-    () => [...(deal?.offered ?? []), ...(deal?.requested ?? []), ...proposals.flatMap((p) => p.assets)],
-    [deal, proposals],
-  );
+  const assets = useMemo(() => [...(deal?.offered ?? []), ...(deal?.requested ?? []), ...proposals.flatMap((p) => p.assets)], [deal, proposals]);
   const tokens = useMemo(() => erc20Tokens(assets), [assets]);
   const { info } = useTokenInfo(tokens);
   const trust = useAssetTrust(assets, info);
@@ -117,9 +114,7 @@ function DealDetailV2({ id }: { id: bigint }) {
       ...(fee ? [nativeAsset(0n)] : []),
       ...(deal?.offered ?? []),
       ...(deal?.requested ?? []),
-      ...proposals
-        .filter((p) => p.status === "accepted" || sameAddress(p.proposer, address))
-        .flatMap((p) => p.assets),
+      ...proposals.filter((p) => p.status === "accepted" || sameAddress(p.proposer, address)).flatMap((p) => p.assets),
     ],
     [deal, proposals, address, fee],
   );
@@ -138,7 +133,7 @@ function DealDetailV2({ id }: { id: bigint }) {
 
   if (isLoading) return <EmptyState>Loading deal…</EmptyState>;
   if (!deal && error && describeError(error).kind !== "reverted") {
-    return <LoadError title="Couldn&apos;t load this deal" error={error} />;
+    return <LoadError title="Couldn't load this deal" error={error} />;
   }
   if (!deal) return <EmptyState>This deal does not exist.</EmptyState>;
 
@@ -265,15 +260,7 @@ function DealDetailV2({ id }: { id: bigint }) {
           />
         </DealSheet>
 
-        <Dock
-          deal={deal}
-          status={status}
-          isMaker={isMaker}
-          allowed={allowed}
-          openOffer={openOffer}
-          canPropose={canPropose}
-          connected={!!address}
-        >
+        <Dock deal={deal} status={status} isMaker={isMaker} allowed={allowed} openOffer={openOffer} canPropose={canPropose} connected={!!address}>
           {canFill && (
             <>
               <DealSteps
@@ -326,9 +313,7 @@ function DealDetailV2({ id }: { id: bigint }) {
                   Build your offer <span aria-hidden>↓</span>
                 </a>
               )}
-              {canFill && traitFillBlocked && !steps[0] && (
-                <p className="text-sm text-muted">Pick the NFTs you&apos;ll send, above.</p>
-              )}
+              {canFill && traitFillBlocked && !steps[0] && <p className="text-sm text-muted">Pick the NFTs you&apos;ll send, above.</p>}
             </div>
           ) : null}
           <TxStatus state={action.state} success={status === "filled" ? "Swapped. The assets are in your wallet." : undefined} />
@@ -367,7 +352,9 @@ function DealDetailV2({ id }: { id: bigint }) {
               <h2 className="font-black">Approvals you can turn off</h2>
               <p className="text-sm text-muted">
                 Your wallet still lets the escrow move these. It only needs that while you list or accept a deal.{" "}
-                <Link href="/approvals" className="underline underline-offset-2">All your approvals</Link>
+                <Link href="/approvals" className="underline underline-offset-2">
+                  All your approvals
+                </Link>
               </p>
             </div>
             <ApprovalList approvals={leftover} info={info} />
@@ -429,9 +416,7 @@ function Dock({
   if (status === "expired") {
     return (
       <DealDock tone="warn" title="This deal ran out of time">
-        <p className="text-sm text-muted">
-          Nobody can accept it now. Anyone can send the locked assets back to the maker.
-        </p>
+        <p className="text-sm text-muted">Nobody can accept it now. Anyone can send the locked assets back to the maker.</p>
         {children}
       </DealDock>
     );
@@ -470,9 +455,7 @@ function Dock({
   }
   return (
     <DealDock title={canPropose ? "Send the maker an offer" : "Take the deal"}>
-      {canPropose && (
-        <p className="text-sm text-muted">Your offer is held in escrow while they decide. Take it back any time before they accept.</p>
-      )}
+      {canPropose && <p className="text-sm text-muted">Your offer is held in escrow while they decide. Take it back any time before they accept.</p>}
       {children}
     </DealDock>
   );

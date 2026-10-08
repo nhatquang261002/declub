@@ -18,3 +18,19 @@ export function loadEnv(web: string): void {
   loadEnvConfig(web, false, quiet, true);
   for (const [key, value] of Object.entries(root)) process.env[key] ??= value;
 }
+
+const args = process.argv.slice(2);
+/** Whether `--name` was given. */
+export const flag = (name: string) => args.includes(`--${name}`);
+/** The value after `--name`, if it was given. */
+export const option = (name: string) => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+
+/** Stops a script that has nowhere to read or write the app's data. Call it after `loadEnv`. */
+export function requireStore(): void {
+  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
+    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
+  }
+}

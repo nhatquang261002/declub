@@ -100,8 +100,7 @@ export const feeUnits = (assets: readonly { kind: AssetKind; amount: bigint }[])
 export const sideFee = (perNft: bigint, assets: readonly { kind: AssetKind; amount: bigint }[]): bigint => perNft * feeUnits(assets);
 
 /** Same asset regardless of amount: (kind, token, id). The contract's duplicate rule. */
-export const sameAsset = (a: Asset, b: Asset) =>
-  a.kind === b.kind && a.token.toLowerCase() === b.token.toLowerCase() && a.id === b.id;
+export const sameAsset = (a: Asset, b: Asset) => a.kind === b.kind && a.token.toLowerCase() === b.token.toLowerCase() && a.id === b.id;
 
 /** Distinct ERC-20 token addresses in a list, for one batch of symbol/decimals reads. */
 export function erc20Tokens(assets: readonly Asset[]): Address[] {

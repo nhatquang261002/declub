@@ -6,7 +6,7 @@ import { LoadError } from "@/components/ErrorPanel";
 import { Pills } from "@/components/Pills";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
-import { PostItem } from "@/components/PostItem";
+import { PostItem, postActions } from "@/components/PostItem";
 import { Select } from "@/components/Select";
 import { Spinner } from "@/components/Spinner";
 import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
@@ -106,8 +106,8 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
           <p className="text-xs text-muted">
             Posting needs a linked X or Discord account with “Show my X or Discord handle” turned on in your{" "}
             <Link href="/profile" className="font-bold underline">
-          Profile
-        </Link>
+              Profile
+            </Link>
             .
           </p>
         )}
@@ -118,7 +118,14 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
           {live.map((c) => (
             <li key={c.id}>
               {isLive(c.phase) ? (
-                <ChallengeSummary c={c} token={token} now={now} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={live.length > 1} />
+                <ChallengeSummary
+                  c={c}
+                  token={token}
+                  now={now}
+                  heading={c.phase === "open" ? "Challenge" : "Challenge ended"}
+                  pinned
+                  compact={live.length > 1}
+                />
               ) : (
                 <ChallengeSummary c={c} token={token} now={now} heading="Challenge results" pinned results />
               )}
@@ -158,14 +165,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
                   wallet: me.wallet,
                   canReply: !!me.member && !archived && !holdersOnly,
                 }}
-                actions={{
-                  report: (id) => report.mutate(id),
-                  like: (id, on) => like.mutate({ id, like: on }),
-                  remove: (id) => remove.mutate(id),
-                  hide: (id, hidden) => hide.mutate({ id, hidden }),
-                  pin: (id, pinned) => pin.mutate({ id, pinned }),
-                  ban: (id) => ban.mutate({ post: id }),
-                }}
+                actions={postActions({ report, like, remove, hide, pin, ban })}
               />
             ),
           )}
@@ -179,9 +179,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
           </button>
         </div>
       )}
-      {!isLoading && posts.length > 0 && (
-        <p className="mt-3 text-xs text-muted">Be kind: reports go to the moderators, who can hide and remove posts.</p>
-      )}
+      {!isLoading && posts.length > 0 && <p className="mt-3 text-xs text-muted">Be kind: reports go to the moderators, who can hide and remove posts.</p>}
     </>
   );
 }

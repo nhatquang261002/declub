@@ -25,12 +25,16 @@ const event = (id: string, at: number, kind: SystemEvent["kind"] = "swap"): Syst
 /** A post made at `at` seconds (the posts' own clock is milliseconds). */
 const post = (id: string, at: number, pinned = false) => ({ id, at: at * 1000, pinned });
 /** The feed as ids, a run of system messages between two posts as one bracketed group. */
-const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) => items.map((i) => (i.type === "post" ? i.post.id : i.type === "challenge" ? `<${i.event.id}>` : `[${i.events.map((e) => e.id).join(" ")}]`));
+const order = (items: ReturnType<typeof weave<ReturnType<typeof post>>>) =>
+  items.map((i) => (i.type === "post" ? i.post.id : i.type === "challenge" ? `<${i.event.id}>` : `[${i.events.map((e) => e.id).join(" ")}]`));
 
 describe("newest", () => {
   it("keeps the window, newest first, and says it is complete from the window's start", () => {
     const r = newest([event("old", NOW - SYSTEM_WINDOW_SEC - 1), event("a", NOW - 10), event("b", NOW - 5), event("future", NOW + 9)], NOW);
-    assert.deepEqual(r.events.map((e) => e.id), ["b", "a"]);
+    assert.deepEqual(
+      r.events.map((e) => e.id),
+      ["b", "a"],
+    );
     assert.equal(r.since, NOW - SYSTEM_WINDOW_SEC);
   });
 
@@ -70,7 +74,11 @@ describe("weave", () => {
   });
 
   it("draws a challenge as an item of its own, splitting the run of messages around it", () => {
-    const items = weave([post("p2", 500), post("p1", 100)], [event("a", 200), event("ch", 300, "challenge"), event("b", 400), event("c", 250), event("win", 150, "winner")], { since, complete: true });
+    const items = weave(
+      [post("p2", 500), post("p1", 100)],
+      [event("a", 200), event("ch", 300, "challenge"), event("b", 400), event("c", 250), event("win", 150, "winner")],
+      { since, complete: true },
+    );
     assert.deepEqual(order(items), ["p2", "[b]", "<ch>", "[c a]", "<win>", "p1"]);
   });
 
@@ -93,21 +101,43 @@ describe("withoutPinned", () => {
       { ...event("challenge:b", 200, "challenge"), challenge: "b" },
       event("swap", 100),
     ];
-    assert.deepEqual(withoutPinned(events, new Set(["a"])).map((e) => e.id), ["challenge-won:a", "challenge:b", "swap"]);
+    assert.deepEqual(
+      withoutPinned(events, new Set(["a"])).map((e) => e.id),
+      ["challenge-won:a", "challenge:b", "swap"],
+    );
     assert.equal(withoutPinned(events, new Set()).length, 4);
   });
 });
 
 describe("mergeClubs", () => {
   it("makes an event logged in two Clubs one, naming both", () => {
-    const merged = mergeClubs([{ ...event("x", 1), clubs: ["a"] }, { ...event("x", 1), clubs: ["b"] }, { ...event("y", 2), clubs: ["a"] }]);
-    assert.deepEqual(merged.map((e) => [e.id, e.clubs]), [["x", ["a", "b"]], ["y", ["a"]]]);
+    const merged = mergeClubs([
+      { ...event("x", 1), clubs: ["a"] },
+      { ...event("x", 1), clubs: ["b"] },
+      { ...event("y", 2), clubs: ["a"] },
+    ]);
+    assert.deepEqual(
+      merged.map((e) => [e.id, e.clubs]),
+      [
+        ["x", ["a", "b"]],
+        ["y", ["a"]],
+      ],
+    );
   });
 });
 
 describe("listSystem", () => {
   const deps = { now: () => NOW, settlements: async () => [] };
-  const logged = (id: string, kind: ActivityEvent["kind"], at: number, parties: string[]): ActivityEvent => ({ id, kind, contract: "0xc", deal: id.split(":")[0]!, block: 1, at, parties, tokens: [A.toLowerCase()] });
+  const logged = (id: string, kind: ActivityEvent["kind"], at: number, parties: string[]): ActivityEvent => ({
+    id,
+    kind,
+    contract: "0xc",
+    deal: id.split(":")[0]!,
+    block: 1,
+    at,
+    parties,
+    tokens: [A.toLowerCase()],
+  });
 
   it("lists swaps, listings and joins of the Club, newest first, and not X shares", async () => {
     const store = memoryStore();
@@ -118,19 +148,26 @@ describe("listSystem", () => {
       logged("3:0", "swapped", NOW - SYSTEM_WINDOW_SEC - 50, [wallet(1), wallet(2)]),
       logged("abc:settled", "swapped", NOW - 400, [wallet(5), wallet(6)]),
     ];
-    await store.rank(activityKey(A), rows.map((e) => ({ member: JSON.stringify(e), score: e.at })), 100);
+    await store.rank(
+      activityKey(A),
+      rows.map((e) => ({ member: JSON.stringify(e), score: e.at })),
+      100,
+    );
     const w = wallet(7);
     await store.set(profileKey(w), { provider: "twitter", handle: "h7", userId: "u7", updatedAt: 1 });
     await store.setMembers(userWalletsKey("u7"), [w]);
     assert.ok((await joinClub(store, registry.clubFor(A)!, "u7", [w], { holdings: async () => [0n], now: () => (NOW - 250) * 1000 })).ok);
 
     const r = await listSystem(store, [registry.clubFor(A)!], deps);
-    assert.deepEqual(r.events.map((e) => [e.id, e.kind]), [
-      ["2:0", "listing"],
-      [`join:${A.toLowerCase()}:${w}`, "join"],
-      ["1:0", "swap"],
-      ["abc:settled", "swap"],
-    ]);
+    assert.deepEqual(
+      r.events.map((e) => [e.id, e.kind]),
+      [
+        ["2:0", "listing"],
+        [`join:${A.toLowerCase()}:${w}`, "join"],
+        ["1:0", "swap"],
+        ["abc:settled", "swap"],
+      ],
+    );
     assert.deepEqual(r.events[0]!.wallets, [wallet(3)]);
     assert.equal(r.events.find((e) => e.id === "abc:settled")!.signed, true);
     assert.equal(r.events.find((e) => e.id === "1:0")!.signed, undefined);
@@ -147,14 +184,24 @@ async function joined(store: Store, userId: string, n: number, clubs: string[], 
   const w = wallet(n);
   await store.set(profileKey(w), { provider: "twitter", handle: `h${n}`, userId, updatedAt: 1 });
   await store.setMembers(userWalletsKey(userId), [w]);
-  for (const token of clubs) assert.ok((await joinClub(store, registry.clubFor(token)!, userId, [w], { holdings: async () => [0n], now: () => atSec * 1000 })).ok);
+  for (const token of clubs)
+    assert.ok((await joinClub(store, registry.clubFor(token)!, userId, [w], { holdings: async () => [0n], now: () => atSec * 1000 })).ok);
   return w;
 }
 
 describe("listSystem across Clubs", () => {
   it("lists a deal naming both Clubs once, and a member's joins in each Club apart", async () => {
     const store = memoryStore();
-    const both: ActivityEvent = { id: "9:0", kind: "swapped", contract: "0xc", deal: "9", block: 1, at: NOW - 60, parties: [wallet(1), wallet(2)], tokens: [A.toLowerCase(), B.toLowerCase()] };
+    const both: ActivityEvent = {
+      id: "9:0",
+      kind: "swapped",
+      contract: "0xc",
+      deal: "9",
+      block: 1,
+      at: NOW - 60,
+      parties: [wallet(1), wallet(2)],
+      tokens: [A.toLowerCase(), B.toLowerCase()],
+    };
     for (const token of [A, B]) await store.rank(activityKey(token), [{ member: JSON.stringify(both), score: both.at }], 100);
     await joined(store, "u1", 1, [A, B], NOW - 120);
 

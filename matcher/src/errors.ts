@@ -1,17 +1,8 @@
-import {
-  BaseError,
-  ContractFunctionRevertedError,
-  ContractFunctionZeroDataError,
-} from "viem";
+import { BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError } from "viem";
 
 /** True when the call reached the contract and the contract said no (as opposed to the RPC failing). */
 export function isRevert(err: unknown): boolean {
-  return (
-    err instanceof BaseError &&
-    err.walk(
-      (e) => e instanceof ContractFunctionRevertedError || e instanceof ContractFunctionZeroDataError,
-    ) !== null
-  );
+  return err instanceof BaseError && err.walk((e) => e instanceof ContractFunctionRevertedError || e instanceof ContractFunctionZeroDataError) !== null;
 }
 
 export interface DecodedRevert {

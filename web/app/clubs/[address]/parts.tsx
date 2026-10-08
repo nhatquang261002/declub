@@ -42,4 +42,3 @@ export function Loading({ rows = 3, label }: { rows?: number; label: string }) {
     </div>
   );
 }
-

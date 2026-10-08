@@ -69,12 +69,12 @@ function Approvals() {
     <div className="space-y-6">
       <section className="page-section space-y-2 p-4 text-sm">
         <p>
-          To list or accept a deal, your wallet lets DeClub&apos;s contracts move the assets in it. A deal only needs that while
-          its transaction runs. A signed swap needs it until it settles or expires.
+          To list or accept a deal, your wallet lets DeClub&apos;s contracts move the assets in it. A deal only needs that while its transaction runs. A signed
+          swap needs it until it settles or expires.
         </p>
         <p className="text-muted">
-          Turn off what you no longer use. If a site you don&apos;t trust ever got you to sign something, an approval that&apos;s off
-          can&apos;t be used against you.
+          Turn off what you no longer use. If a site you don&apos;t trust ever got you to sign something, an approval that&apos;s off can&apos;t be used against
+          you.
         </p>
       </section>
 
@@ -92,8 +92,8 @@ function Approvals() {
       <AddContract onAdd={(token) => setAdded((list) => (list.some((t) => t.toLowerCase() === token.toLowerCase()) ? list : [...list, token]))} />
 
       <p className="text-xs text-muted">
-        Checked: verified collections and tokens, collections you&apos;ve used here, the fee token, and what your live signed swaps
-        give. An approval for a single NFT ends by itself when that NFT leaves your wallet.
+        Checked: verified collections and tokens, collections you&apos;ve used here, the fee token, and what your live signed swaps give. An approval for a
+        single NFT ends by itself when that NFT leaves your wallet.
       </p>
     </div>
   );

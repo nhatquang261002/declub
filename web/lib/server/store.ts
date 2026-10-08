@@ -148,7 +148,10 @@ export function memoryStore(): Store {
       ranks.set(key, new Map(kept));
     },
     async ranked(key, limit) {
-      return [...(ranks.get(key) ?? [])].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([member]) => member);
+      return [...(ranks.get(key) ?? [])]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([member]) => member);
     },
     async rankedBefore(key, maxScore, limit) {
       return [...(ranks.get(key) ?? [])]
@@ -174,11 +177,7 @@ const g = globalThis as typeof globalThis & { __declubStore?: Store | null };
 export function getStore(): Store | null {
   if (g.__declubStore !== undefined) return g.__declubStore;
   const creds = credentials();
-  g.__declubStore = creds
-    ? upstash(new Redis(creds))
-    : process.env.NODE_ENV !== "production"
-      ? memoryStore()
-      : null;
+  g.__declubStore = creds ? upstash(new Redis(creds)) : process.env.NODE_ENV !== "production" ? memoryStore() : null;
   return g.__declubStore;
 }
 
@@ -200,7 +199,10 @@ export function clientId(request: Request, env: { VERCEL?: string; TRUST_PROXY?:
   }
   const hops = trustedHops(env.TRUST_PROXY);
   if (hops > 0) {
-    const chain = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const chain = (h.get("x-forwarded-for") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     const ip = chain[chain.length - hops];
     if (ip) return ip;
   }

@@ -57,7 +57,7 @@ export function useChallengeActions(token: string) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const key = token.toLowerCase();
-  const send = <T,>(path: string, body: unknown) => call<T>(getToken!, "POST", `/api/clubs/${token}/challenges${path}`, body);
+  const send = <T>(path: string, body: unknown) => call<T>(getToken!, "POST", `/api/clubs/${token}/challenges${path}`, body);
   const useAct = <V, R = unknown>(run: (v: V) => Promise<R>, done?: string) =>
     useMutation({
       mutationFn: run,
@@ -71,8 +71,14 @@ export function useChallengeActions(token: string) {
     create: useAct((v: ChallengeInput) => send<{ id: string }>("", v), "Challenge started."),
     enter: useAct((v: { id: string; post: string }) => send(`/${v.id}`, { action: "enter", post: v.post }), "You’re in."),
     withdraw: useAct((id: string) => send(`/${id}`, { action: "withdraw" }), "Entry withdrawn."),
-    pick: useAct((v: { id: string; posts: string[] }) => send(`/${v.id}`, { action: "pick", posts: v.posts }), "Winners picked. Their points count this epoch."),
+    pick: useAct(
+      (v: { id: string; posts: string[] }) => send(`/${v.id}`, { action: "pick", posts: v.posts }),
+      "Winners picked. Their points count this epoch.",
+    ),
     cancel: useAct((id: string) => send(`/${id}`, { action: "cancel" }), "Challenge cancelled."),
-    prizeSent: useAct((v: { id: string; post: string; tx: string }) => send(`/${v.id}`, { action: "prize_sent", post: v.post, tx: v.tx }), "Checked on chain: marked as sent."),
+    prizeSent: useAct(
+      (v: { id: string; post: string; tx: string }) => send(`/${v.id}`, { action: "prize_sent", post: v.post, tx: v.tx }),
+      "Checked on chain: marked as sent.",
+    ),
   };
 }

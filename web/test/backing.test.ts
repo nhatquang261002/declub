@@ -103,7 +103,11 @@ describe("backing points (ADR 0038)", () => {
   it("caps what one member gives another in an epoch, both voices together (ADR 0044)", () => {
     const voices = new Map([["whale", v(voiceOf(5n), REWARDS.baseVoice)]]);
     const one: BackingAction[] = [{ giver: "whale", receiver: "friend", kind: "first" }];
-    assert.deepEqual(backingPoints(one, voices).get("friend"), { points: REWARDS.pairCap, backers: 1, base: 1.13 }, "53 points of voice, capped at 20, scaled down together");
+    assert.deepEqual(
+      backingPoints(one, voices).get("friend"),
+      { points: REWARDS.pairCap, backers: 1, base: 1.13 },
+      "53 points of voice, capped at 20, scaled down together",
+    );
     // Spread over several members, nothing is capped.
     const spread = ["a", "b", "c"].map((receiver): BackingAction => ({ giver: "whale", receiver, kind: "like" }));
     assert.equal(backingPoints(spread, voices).get("a")!.points, 53 / 3 > REWARDS.pairCap ? REWARDS.pairCap : Number((53 / 3).toFixed(2)));
@@ -121,7 +125,11 @@ describe("backing points (ADR 0038)", () => {
 describe("base voices (ADR 0039)", () => {
   it("lets a verified account without NFTs back anyone, shared over every Club it gave in", () => {
     const like: BackingAction[] = [{ giver: "fan", receiver: "x", kind: "like" }];
-    assert.deepEqual(backingPoints(like, new Map([["fan", v(0, REWARDS.baseVoice)]])).get("x"), { points: REWARDS.baseVoice, backers: 1, base: REWARDS.baseVoice });
+    assert.deepEqual(backingPoints(like, new Map([["fan", v(0, REWARDS.baseVoice)]])).get("x"), {
+      points: REWARDS.baseVoice,
+      backers: 1,
+      base: REWARDS.baseVoice,
+    });
     // The same like is one of four the fan gave this week across Clubs: a quarter of the voice.
     assert.equal(backingPoints(like, new Map([["fan", v(0, REWARDS.baseVoice, 4)]])).get("x")!.points, REWARDS.baseVoice / 4);
   });
@@ -315,7 +323,11 @@ describe("recording backing", () => {
     assert.equal(await givenEverywhere(store, 0, "fan"), 2 * REWARDS.likeWeight);
     const { holders } = await holderInputs(store, club, 0, [], null, holdings, {}, verifiedBy(GENESIS + WEEK), UNCAPPED);
     const m1 = holders.find((h) => h.userId === "m1")!;
-    assert.deepEqual([m1.backedPoints, m1.backers, m1.basePoints], [REWARDS.baseVoice / 2, 1, REWARDS.baseVoice / 2], "half the fan's voice; late and anon give none");
+    assert.deepEqual(
+      [m1.backedPoints, m1.backers, m1.basePoints],
+      [REWARDS.baseVoice / 2, 1, REWARDS.baseVoice / 2],
+      "half the fan's voice; late and anon give none",
+    );
   });
 });
 

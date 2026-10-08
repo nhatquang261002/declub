@@ -14,7 +14,7 @@ export type ProposalV2 = {
 };
 
 /** The shape `getProposal` / `getProposals` return (IDeClubEscrow.Proposal). */
-export type RawProposal = { proposer: Address; status: number; assets: readonly RawAsset[] };
+type RawProposal = { proposer: Address; status: number; assets: readonly RawAsset[] };
 
 const STATUS: Record<number, ProposalStatus> = { 1: "active", 2: "accepted", 3: "withdrawn", 4: "rejected" };
 

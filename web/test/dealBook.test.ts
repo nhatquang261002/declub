@@ -2,16 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getAddress } from "viem";
 import { erc20Asset, nativeAsset, nftAsset, type TokenInfo } from "../lib/assets";
-import {
-  bookParams,
-  fromWireListings,
-  pageBook,
-  parseBookQuery,
-  toWireListing,
-  type BookQuery,
-  type BookResponse,
-  type BookSource,
-} from "../lib/dealBook";
+import { bookParams, fromWireListings, pageBook, parseBookQuery, toWireListing, type BookQuery, type BookResponse, type BookSource } from "../lib/dealBook";
 import { DEFAULT_FILTERS } from "../lib/dealFilters";
 import { displayStatus } from "../lib/deals";
 import type { DealV2 } from "../lib/dealsV2";
@@ -94,7 +85,11 @@ describe("parseBookQuery", () => {
     for (const bad of ["tab=mine", "mon=lots", "viewer=0x12", "page=0", "size=51", "token=0x1", `q=${"x".repeat(101)}`]) {
       assert.equal(typeof parseBookQuery(new URLSearchParams(bad)), "string", bad);
     }
-    const three = new URLSearchParams([["token", NFT], ["token", USD], ["token", TOADS]]);
+    const three = new URLSearchParams([
+      ["token", NFT],
+      ["token", USD],
+      ["token", TOADS],
+    ]);
     assert.equal(typeof parseBookQuery(three), "string");
   });
 });
@@ -277,7 +272,6 @@ describe("GET /api/deals", () => {
     assert.deepEqual(await (await off(get())).json(), { enabled: false });
   });
 });
-
 
 describe("intentAsListing", () => {
   it("shows a pool-expired intent as expired, like an expired locked deal", () => {

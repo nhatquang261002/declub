@@ -24,11 +24,24 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadEnv } from "./env";
+import { loadEnv, requireStore } from "./env";
 import type { Address, Hex } from "viem";
 import type { StoredChallenge } from "../lib/challenges";
 import type { StoredPost } from "../lib/clubPosts";
-import { CHALLENGES, CLUBS, EXTRA_MEMBERS, FOLLOWS, HOLDINGS, PERSONAS, POSTS, TRADES, type ClubKey, type HolderKey, type PersonaKey, type Side } from "./demo/content";
+import {
+  CHALLENGES,
+  CLUBS,
+  EXTRA_MEMBERS,
+  FOLLOWS,
+  HOLDINGS,
+  PERSONAS,
+  POSTS,
+  TRADES,
+  type ClubKey,
+  type HolderKey,
+  type PersonaKey,
+  type Side,
+} from "./demo/content";
 
 const web = path.resolve(import.meta.dirname, "..");
 loadEnv(web);
@@ -147,7 +160,7 @@ async function main() {
     const estimate = await pub.estimateContractGas({ ...request, account: from } as never);
     const wanted = (estimate * BigInt(process.env.DEMO_GAS_PCT || 300)) / 100n;
     const tip = 2_000_000_000n;
-    const maxFeePerGas = ((await pub.getBlock()).baseFeePerGas ?? 100_000_000_000n) * 13n / 10n + tip;
+    const maxFeePerGas = (((await pub.getBlock()).baseFeePerGas ?? 100_000_000_000n) * 13n) / 10n + tip;
     const balance = await pub.getBalance({ address: from });
     const affordable = (((balance - (request.value ?? 0n)) / maxFeePerGas) * 95n) / 100n;
     if (affordable < estimate) throw new Error(`${from} can't afford ${request.functionName}: ${formatEther(balance)} MON`);
@@ -238,7 +251,13 @@ async function main() {
     const { IPFS_GATEWAY } = await import("../lib/config");
     for (const c of clubKeys) {
       const file = path.join(web, "public", CLUBS[c].image);
-      if (await readFile(file).then(() => true, () => false)) continue;
+      if (
+        await readFile(file).then(
+          () => true,
+          () => false,
+        )
+      )
+        continue;
       const meta = (await readMetadata(CLUBS[c].art)) as { image?: string } | null;
       if (!meta?.image) throw new Error(`${c}: no image in ${CLUBS[c].art}`);
       const url = meta.image.startsWith("ipfs://") ? IPFS_GATEWAY + meta.image.slice("ipfs://".length) : meta.image;
@@ -252,9 +271,7 @@ async function main() {
   }
 
   // The steps below write to the app's store.
-  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
-    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
-  }
+  requireStore();
   const { getStore } = await import("../lib/server/store");
   const { registry } = await import("../lib/verifiedAssets");
   const store = getStore()!;
@@ -344,7 +361,13 @@ async function main() {
       if (!t.taker) continue;
       await approve(t.taker, t.wants);
       const price = "mon" in t.wants ? parseEther(t.wants.mon) : 0n;
-      const receipt = await send(wallets.personas[t.taker], { address: escrow, abi: deClubEscrowAbi, functionName: "fillTrade", args: [tradeId], value: price + fee });
+      const receipt = await send(wallets.personas[t.taker], {
+        address: escrow,
+        abi: deClubEscrowAbi,
+        functionName: "fillTrade",
+        args: [tradeId],
+        value: price + fee,
+      });
       await record(receipt.transactionHash);
       state.trades[i]!.filled = receipt.transactionHash;
       await save();
@@ -369,19 +392,24 @@ async function main() {
 
     // The presenter's Privy user, so they can be a member and the Chog Club's Owner.
     const presenterUser = await findPresenter();
-    const userIdOf = (k: HolderKey) => (k === "you" ? presenterUser?.id ?? null : demoUserId(k));
+    const userIdOf = (k: HolderKey) => (k === "you" ? (presenterUser?.id ?? null) : demoUserId(k));
 
     // 1. Profiles: each persona shares a Discord handle (posting needs a shared profile).
     for (const k of personaKeys) {
-      await syncProfile(store, demoUserId(k), [{ type: "wallet", chain_type: "ethereum", address: persona(k).address }, { type: "discord_oauth", username: PERSONAS[k].handle }] as never, false);
+      await syncProfile(
+        store,
+        demoUserId(k),
+        [
+          { type: "wallet", chain_type: "ethereum", address: persona(k).address },
+          { type: "discord_oauth", username: PERSONAS[k].handle },
+        ] as never,
+        false,
+      );
     }
     console.log(`profiles: ${personaKeys.length}`);
 
     // 2. Members: everyone in each Club they hold in, plus EXTRA_MEMBERS; joined before their first post.
-    const memberships: [HolderKey, ClubKey][] = [
-      ...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])),
-      ...EXTRA_MEMBERS,
-    ];
+    const memberships: [HolderKey, ClubKey][] = [...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])), ...EXTRA_MEMBERS];
     for (const [k, c] of memberships) {
       const userId = userIdOf(k);
       if (!userId) continue;
@@ -507,7 +535,7 @@ async function main() {
     state.challenges ??= {};
     const save = () => writeFile(STATE, JSON.stringify(state, null, 2) + "\n");
     const presenterUser = CHALLENGES.some((c) => CLUBS[c.club].owner === "you") ? await findPresenter() : null;
-    const userIdOf = (k: HolderKey) => (k === "you" ? presenterUser?.id ?? null : demoUserId(k));
+    const userIdOf = (k: HolderKey) => (k === "you" ? (presenterUser?.id ?? null) : demoUserId(k));
 
     // "open" ones start in the running epoch, at most 30 hours ago; "ended" ones ran over the four days before it.
     const now = Date.now();
@@ -536,7 +564,8 @@ async function main() {
     const inputOf = (c: (typeof CHALLENGES)[number]) => {
       const input = { ...c.input };
       const rewards = input.rewards as { asset?: { token: string; amounts: string[] }; pinWinner?: boolean } | undefined;
-      if (rewards?.asset && rewards.asset.token in CLUBS) input.rewards = { ...rewards, asset: { ...rewards.asset, token: clubAddress(rewards.asset.token as ClubKey) } };
+      if (rewards?.asset && rewards.asset.token in CLUBS)
+        input.rewards = { ...rewards, asset: { ...rewards.asset, token: clubAddress(rewards.asset.token as ClubKey) } };
       return input;
     };
 
@@ -557,12 +586,19 @@ async function main() {
         // Nothing is recorded into that epoch's own inputs (active days, backing, Momentum), which may be frozen.
         const checked = checkChallenge({ ...inputOf(c), epochs: 1 }, { registry });
         if (!checked.ok) throw new Error(`${c.key}: ${checked.message}`);
+        // `epochs` only sets when it ends; this one's window is written below.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { epochs: _epochs, ...task } = checked.challenge;
         const id = randomUUID();
         const challenge: StoredChallenge = { id, ...task, startsAt: endedStart, endsAt: endedEnd, by: owner.wallet, state: "live" };
         await store.set(challengeKey(token, id), challenge);
         await store.rank(challengesKey(token), [{ member: id, score: endedStart }], CHALLENGE_RULES.kept);
-        await appendLog(store, token, { actor: owner.wallet, action: "create_challenge", target: id, detail: `${task.title} · judged by ${task.judging}` }, endedStart);
+        await appendLog(
+          store,
+          token,
+          { actor: owner.wallet, action: "create_challenge", target: id, detail: `${task.title} · judged by ${task.judging}` },
+          endedStart,
+        );
         for (const e of c.entries) {
           const userId = demoUserId(e.by);
           const row = await getMember(store, token, userId);
@@ -637,7 +673,9 @@ async function main() {
     for (let tries = 0; tries < 20; tries++) {
       for (const c of clubs) await settleDue(store, entryOf(c));
       const waiting = CHALLENGES.filter((c) => c.when === "ended" && c.input.judging === "raffle" && state.challenges![c.key]);
-      const drawn = await Promise.all(waiting.map(async (c) => (await store.get<StoredChallenge>(challengeKey(entryOf(c.club).address, state.challenges![c.key]!)))?.state !== "live"));
+      const drawn = await Promise.all(
+        waiting.map(async (c) => (await store.get<StoredChallenge>(challengeKey(entryOf(c.club).address, state.challenges![c.key]!)))?.state !== "live"),
+      );
       if (drawn.every(Boolean)) break;
       if (tries === 19) console.warn("A raffle's block isn't final yet: it draws the next time its Club's challenges are read.");
       await new Promise((resolve) => setTimeout(resolve, 3_000));
@@ -646,7 +684,9 @@ async function main() {
     for (const c of clubs) {
       console.log(`\n${CLUBS[c].name} (${entryOf(c).address})`);
       for (const ch of await listChallenges(store, entryOf(c), {})) {
-        const won = ch.settled ? ` · won: ${ch.settled.winners.map((w) => `${w.place}. ${w.wallet.slice(0, 8)} +${w.points}${w.prize ? ` & ${w.prize} ${ch.rewards?.asset?.symbol}` : ""}`).join(", ") || "nobody"}` : "";
+        const won = ch.settled
+          ? ` · won: ${ch.settled.winners.map((w) => `${w.place}. ${w.wallet.slice(0, 8)} +${w.points}${w.prize ? ` & ${w.prize} ${ch.rewards?.asset?.symbol}` : ""}`).join(", ") || "nobody"}`
+          : "";
         console.log(`  ${ch.phase.padEnd(9)} ${ch.judging.padEnd(8)} ${ch.title} · ${ch.entryCount} entries${won}`);
       }
     }

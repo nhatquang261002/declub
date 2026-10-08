@@ -64,9 +64,7 @@ export function ClubCard({
           <BadgeCheckIcon className="size-[1.1rem] shrink-0 text-[#315ea8]" />
           <span className="sr-only">(verified)</span>
         </h2>
-        <p className="text-xs font-semibold text-muted">
-          {clubLabel(club)}
-        </p>
+        <p className="text-xs font-semibold text-muted">{clubLabel(club)}</p>
 
         {stats ? (
           <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-[#111318]/12 pt-3">

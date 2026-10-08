@@ -60,12 +60,18 @@ export function ClubChallenges({ token, symbol, archived, now }: { token: string
           </button>
         )}
       </div>
-      {starting && owner && <StartForm token={token} now={now} owesPrize={challenges.some((c) => prizeOverdue(c, now * 1000))} onDone={() => setStarting(false)} />}
+      {starting && owner && (
+        <StartForm token={token} now={now} owesPrize={challenges.some((c) => prizeOverdue(c, now * 1000))} onDone={() => setStarting(false)} />
+      )}
 
       {isLoading ? (
         <Loading label="Loading the challenges" />
       ) : challenges.length === 0 ? (
-        <Empty title="No challenges yet">{owner ? "Start one: a meme contest, a best pitch, anything the Club can answer with a post." : `When the Owner of ${symbol} sets the Club a challenge, it shows up here.`}</Empty>
+        <Empty title="No challenges yet">
+          {owner
+            ? "Start one: a meme contest, a best pitch, anything the Club can answer with a post."
+            : `When the Owner of ${symbol} sets the Club a challenge, it shows up here.`}
+        </Empty>
       ) : (
         <>
           {active.length > 0 && (
@@ -142,10 +148,25 @@ function StartForm({ token, now, owesPrize, onDone }: { token: string; now: numb
   const paidPlaces = flat ? 1 : Math.max(1, lastPlace + 1);
   const rewards: RewardsInput | undefined =
     giveAsset || pinWinner
-      ? { ...(giveAsset ? { asset: { token: assetToken, amounts: assetAmounts.slice(0, paidPlaces).map((a, i) => (i > 0 && a.trim() === "" ? "0" : a)) } } : {}), ...(pinWinner ? { pinWinner: true } : {}) }
+      ? {
+          ...(giveAsset
+            ? { asset: { token: assetToken, amounts: assetAmounts.slice(0, paidPlaces).map((a, i) => (i > 0 && a.trim() === "" ? "0" : a)) } }
+            : {}),
+          ...(pinWinner ? { pinWinner: true } : {}),
+        }
       : undefined;
   const input: ChallengeInput = flat
-    ? { title, brief, judging, winners: num(winners), prize: num(prize), ...(judging === "everyone" ? { minLikes: num(minLikes) } : {}), epochs, holdersOnly, ...(rewards ? { rewards } : {}) }
+    ? {
+        title,
+        brief,
+        judging,
+        winners: num(winners),
+        prize: num(prize),
+        ...(judging === "everyone" ? { minLikes: num(minLikes) } : {}),
+        epochs,
+        holdersOnly,
+        ...(rewards ? { rewards } : {}),
+      }
     : { title, brief, judging, prizes: places.slice(0, lastPlace + 1).map(num), epochs, holdersOnly, ...(rewards ? { rewards } : {}) };
   const checked = checkChallenge(input, rewardsCtx);
   const rewardsChecked = checkRewards(rewards, paidPlaces, flat, rewardsCtx);
@@ -189,7 +210,13 @@ function StartForm({ token, now, owesPrize, onDone }: { token: string; now: numb
       <FormStep n={1} title="The task">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-bold">Title</span>
-          <input className={field} value={title} maxLength={CHALLENGE_RULES.titleMax * 2} placeholder="Best Chog meme of the week" onChange={(e) => setTitle(e.target.value)} />
+          <input
+            className={field}
+            value={title}
+            maxLength={CHALLENGE_RULES.titleMax * 2}
+            placeholder="Best Chog meme of the week"
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-bold">What members should do</span>
@@ -224,7 +251,9 @@ function StartForm({ token, now, owesPrize, onDone }: { token: string; now: numb
                     {JUDGING[mode].label}
                   </span>
                   <span className="text-xs leading-snug text-muted">
-                    {mode === "owner" ? `After it ends you have ${CHALLENGE_RULES.pickWindowMs / 86_400_000} days to pick the winners, best first.` : JUDGING[mode].line}
+                    {mode === "owner"
+                      ? `After it ends you have ${CHALLENGE_RULES.pickWindowMs / 86_400_000} days to pick the winners, best first.`
+                      : JUDGING[mode].line}
                   </span>
                 </label>
               ))}
@@ -238,7 +267,9 @@ function StartForm({ token, now, owesPrize, onDone }: { token: string; now: numb
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <NumberField label="Number of winners" hint={`1 to ${CHALLENGE_RULES.maxWinners}`} value={winners} onChange={setWinners} />
             <NumberField label="Points each" hint={`0 to ${CHALLENGE_RULES.maxFlatPoints} · 0 is a trophy only`} value={prize} onChange={setPrize} />
-            {judging === "everyone" && <NumberField label="Likes an entry needs" hint={`0 to ${CHALLENGE_RULES.maxMinLikes} · 0 is any entry`} value={minLikes} onChange={setMinLikes} />}
+            {judging === "everyone" && (
+              <NumberField label="Likes an entry needs" hint={`0 to ${CHALLENGE_RULES.maxMinLikes} · 0 is any entry`} value={minLikes} onChange={setMinLikes} />
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
@@ -311,7 +342,11 @@ function StartForm({ token, now, owesPrize, onDone }: { token: string; now: numb
               </div>
             )}
             <ol className="grid gap-2 text-xs sm:grid-cols-3">
-              {["The winners are picked.", "You send each one their prize from your wallet.", "You paste the transaction here; the app checks it on chain."].map((step, i) => (
+              {[
+                "The winners are picked.",
+                "You send each one their prize from your wallet.",
+                "You paste the transaction here; the app checks it on chain.",
+              ].map((step, i) => (
                 <li key={step} className="flex items-start gap-2 rounded-lg bg-[#111318]/5 px-2.5 py-2">
                   <span className="challenge-place challenge-place-sm" aria-hidden>
                     {i + 1}
@@ -381,7 +416,19 @@ function FormStep({ n, title, children }: { n: number; title: string; children: 
 }
 
 /** An amount of the asset prize: whole NFTs, or token units with a decimal point. */
-function AmountField({ label, hint, decimals, value, onChange }: { label: string; hint: string; decimals: boolean; value: string; onChange: (v: string) => void }) {
+function AmountField({
+  label,
+  hint,
+  decimals,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  decimals: boolean;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="flex flex-col gap-1">
       <span className="inline-flex items-center gap-1 text-xs font-bold">

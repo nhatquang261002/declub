@@ -15,12 +15,18 @@ import type { Store } from "./store";
 export const activeKey = (club: string, n: number) => `declub:active:${CHAIN_ID}:${club.toLowerCase()}:${n}`;
 
 /** Posts recorded per member per day: a spare or two, so deleting one post doesn't lose the day. */
-export const POSTS_PER_DAY_RECORDED = 3;
+const POSTS_PER_DAY_RECORDED = 3;
 
 export const dayOf = (unixSeconds: number) => Math.floor(unixSeconds / 86_400);
 
 /** Records a top-level post toward its author's active day. `at` is epoch ms, as posts keep it. */
-export async function recordActive(store: Store, club: string, post: { id: string; userId: string; at: number }, genesis?: number, length?: number): Promise<void> {
+export async function recordActive(
+  store: Store,
+  club: string,
+  post: { id: string; userId: string; at: number },
+  genesis?: number,
+  length?: number,
+): Promise<void> {
   const seconds = Math.floor(post.at / 1000);
   const n = epochAt(seconds, genesis, length);
   if (n < 0) return;
@@ -33,7 +39,12 @@ export async function recordActive(store: Store, club: string, post: { id: strin
  * Each member's active days in a Club's epoch `n`, by user id, counting only posts still shown, and
  * the days in `also` (by user id: the days they liked or replied on).
  */
-export async function activeDays(store: Store, club: string, n: number, also: ReadonlyMap<string, ReadonlySet<string>> = new Map()): Promise<Map<string, number>> {
+export async function activeDays(
+  store: Store,
+  club: string,
+  n: number,
+  also: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+): Promise<Map<string, number>> {
   const entries = (await store.members(activeKey(club, n))).flatMap((m) => {
     // The user id is a Privy DID (`did:privy:…`), so it holds colons: read the day and post id off the right.
     const postAt = m.lastIndexOf(":");

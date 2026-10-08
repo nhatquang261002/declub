@@ -1,8 +1,6 @@
-import { fail, json } from "@/lib/server/gate";
-import { cronAuthorized } from "@/lib/server/fillWatcher";
+import { gateCron, json } from "@/lib/server/gate";
 import { sampleHoldings } from "@/lib/server/held";
 import { viemHoldings } from "@/lib/server/members";
-import { getStore } from "@/lib/server/store";
 import { registry } from "@/lib/verifiedAssets";
 
 /**
@@ -19,9 +17,7 @@ import { registry } from "@/lib/verifiedAssets";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const store = getStore();
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!store || !secret) return fail(503, "disabled", "The holdings sampler is not configured.");
-  if (!cronAuthorized(request, secret)) return fail(401, "unauthorized", "Missing or wrong cron secret.");
+  const store = gateCron(request, "The holdings sampler");
+  if (store instanceof Response) return store;
   return json(await sampleHoldings(store, registry.clubs(), viemHoldings, Math.floor(Date.now() / 1000)));
 }

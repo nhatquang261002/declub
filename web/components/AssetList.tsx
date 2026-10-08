@@ -25,9 +25,7 @@ export function AssetList({ assets, info }: { assets: readonly Asset[]; info: In
   return (
     <ul className="space-y-2">
       {assets.map((a) => (
-        <li key={`${a.kind}:${a.token}:${a.id}`}>
-          {a.kind === "erc721" ? <NftRow asset={a} /> : <AmountRow asset={a} info={info} />}
-        </li>
+        <li key={`${a.kind}:${a.token}:${a.id}`}>{a.kind === "erc721" ? <NftRow asset={a} /> : <AmountRow asset={a} info={info} />}</li>
       ))}
     </ul>
   );

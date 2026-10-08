@@ -43,16 +43,12 @@ async function waitFor(what: string, probe: () => Promise<unknown>, tries = 150)
 
 /** Run a deploy script with `forge script --broadcast` and read the addresses it prints. */
 function forgeScript(script: string, rpcUrl: string, env: Record<string, string>): Record<string, Address> {
-  const r = spawnSync(
-    "forge",
-    ["script", `script/${script}`, "--rpc-url", rpcUrl, "--broadcast", "--private-key", keyOf(0)],
-    {
-      cwd: CONTRACTS,
-      encoding: "utf8",
-      // Only what the script needs: a developer's shell or .env can't change the deployment.
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1", ...env },
-    },
-  );
+  const r = spawnSync("forge", ["script", `script/${script}`, "--rpc-url", rpcUrl, "--broadcast", "--private-key", keyOf(0)], {
+    cwd: CONTRACTS,
+    encoding: "utf8",
+    // Only what the script needs: a developer's shell or .env can't change the deployment.
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1", ...env },
+  });
   if (r.status !== 0) throw new Error(`forge script ${script} failed:\n${r.stdout}\n${r.stderr}`);
   const out: Record<string, Address> = {};
   for (const m of r.stdout.matchAll(/([A-Z0-9_]+)=(0x[0-9a-fA-F]{40})\b/g)) out[m[1]!] = getAddress(m[2]!);
@@ -140,7 +136,11 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       target: "local",
       chainId: 31337,
       rpcUrl,
-      v2, intents, nft, usd, rewards,
+      v2,
+      intents,
+      nft,
+      usd,
+      rewards,
       actors: [1, 2, 3, 4, 5].map(account),
       feeAdmin,
       poolUrl,

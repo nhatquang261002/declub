@@ -2,16 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
-import {
-  type Abi,
-  type Address,
-  type Hex,
-  createWalletClient,
-  getAddress,
-  http,
-  parseAbi,
-  toHex,
-} from "viem";
+import { type Abi, type Address, type Hex, createWalletClient, getAddress, http, parseAbi, toHex } from "viem";
 import { mnemonicToAccount } from "viem/accounts";
 import { type Reader, makeChain, makeReader, makeSender } from "../src/chain.ts";
 import { domain, types } from "../src/intent.ts";
@@ -73,10 +64,7 @@ const chogAbi = parseAbi([
   "function setApprovalForAll(address operator, bool approved)",
   "function ownerOf(uint256 id) view returns (address)",
 ]);
-export const walletAbi = parseAbi([
-  "function exec(address target, bytes data)",
-  "function setReject(bool value)",
-]);
+export const walletAbi = parseAbi(["function exec(address target, bytes data)", "function setReject(bool value)"]);
 const swapAbi = parseAbi([
   "function invalidateNonces(uint256 word, uint256 mask)",
   "function setFee(uint256 newFee)",
@@ -137,11 +125,7 @@ export interface World {
    * clock a week ahead of the wall clock: only do that in a world of its own.
    */
   setFee(newFee: bigint): Promise<void>;
-  fresh(
-    over?: Partial<MatcherConfig>,
-    poolOver?: Partial<PoolConfig>,
-    hooks?: { makerLimit?: RateLimiter },
-  ): { store: Store; pool: Pool; matcher: Matcher };
+  fresh(over?: Partial<MatcherConfig>, poolOver?: Partial<PoolConfig>, hooks?: { makerLimit?: RateLimiter }): { store: Store; pool: Pool; matcher: Matcher };
   chogOf(id: bigint): Asset;
   tokenOf(token: Address, amount: bigint): Asset;
 }
@@ -161,13 +145,9 @@ export async function startWorld(): Promise<World> {
     }
   }
 
-  const [deployer, alice, bob, carol, dave] = [0, 1, 2, 3, 4].map((i) => makeActor(i, rpcUrl)) as [
-    Actor, Actor, Actor, Actor, Actor,
-  ];
+  const [deployer, alice, bob, carol, dave] = [0, 1, 2, 3, 4].map((i) => makeActor(i, rpcUrl)) as [Actor, Actor, Actor, Actor, Actor];
   // The matcher's own funded account: anvil's index 9, so it never holds the traders' assets.
-  const matcherKey = toHex(
-    mnemonicToAccount(MNEMONIC, { addressIndex: 9 }).getHdKey().privateKey!,
-  );
+  const matcherKey = toHex(mnemonicToAccount(MNEMONIC, { addressIndex: 9 }).getHdKey().privateKey!);
   const matcherSender = makeSender({ chainId: CHAIN_ID, rpcUrl }, matcherKey);
 
   const tx = async (p: Promise<Hex>) => {
@@ -182,9 +162,7 @@ export async function startWorld(): Promise<World> {
   const wmon = await deploy("MockERC20.sol", "MockERC20", ["Wrapped MON", "WMON"]);
   const feeRecipient = makeActor(8, rpcUrl).address;
   const feeAdmin = makeActor(7, rpcUrl);
-  const swap = await deploy("DeClubIntents.sol", "DeClubIntents", [
-    wmon, FEE, MAX_FEE, feeRecipient, feeAdmin.address,
-  ]);
+  const swap = await deploy("DeClubIntents.sol", "DeClubIntents", [wmon, FEE, MAX_FEE, feeRecipient, feeAdmin.address]);
   const chog = await deploy("MockChog.sol", "MockChog");
   const usd = await deploy("MockERC20.sol", "MockERC20", ["Mock USD", "mUSD"]);
   const weth = await deploy("MockERC20.sol", "MockERC20", ["Mock WETH", "mWETH"]);
@@ -192,13 +170,29 @@ export async function startWorld(): Promise<World> {
   let nonce = 1n;
 
   const world: World = {
-    rpcUrl, reader, swap, chog, usd, weth, wmon, feeRecipient, feeAdmin, alice, bob, carol, dave,
+    rpcUrl,
+    reader,
+    swap,
+    chog,
+    usd,
+    weth,
+    wmon,
+    feeRecipient,
+    feeAdmin,
+    alice,
+    bob,
+    carol,
+    dave,
     matcherSender,
     stop: () => anvil.kill(),
     tx,
     async mintChogs(to, n) {
       const { result } = await reader.simulateContract({
-        address: chog, abi: chogAbi, functionName: "mint", args: [to, BigInt(n)], account: deployer.account,
+        address: chog,
+        abi: chogAbi,
+        functionName: "mint",
+        args: [to, BigInt(n)],
+        account: deployer.account,
       });
       await tx(deployer.wallet.writeContract({ address: chog, abi: chogAbi, functionName: "mint", args: [to, BigInt(n)] }));
       return Array.from({ length: n }, (_, i) => result + BigInt(i));
@@ -218,15 +212,16 @@ export async function startWorld(): Promise<World> {
     async transferToken(who, token, to, amount) {
       await tx(who.wallet.writeContract({ address: token, abi: erc20Abi, functionName: "transfer", args: [to, amount] }));
     },
-    balanceOf: (token, who) =>
-      reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [who] }),
+    balanceOf: (token, who) => reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [who] }),
     ownerOf: (id) => reader.readContract({ address: chog, abi: chogAbi, functionName: "ownerOf", args: [id] }),
     async deployWallet(owner) {
       return deploy("DeClubIntents.signatures.t.sol", "Mock1271Wallet", [owner]);
     },
     intent(maker, give, want, extra = {}) {
       return {
-        maker, give, want,
+        maker,
+        give,
+        want,
         feeToken: wmon,
         maxFee: FEE,
         deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
@@ -236,23 +231,33 @@ export async function startWorld(): Promise<World> {
     },
     sign: (who, intent) =>
       who.account.signTypedData({
-        domain: domain(CHAIN_ID, swap), types, primaryType: "Intent", message: intent,
+        domain: domain(CHAIN_ID, swap),
+        types,
+        primaryType: "Intent",
+        message: intent,
       }),
     async body(who, intent) {
       return { intent: intentToWire(intent), signature: await world.sign(who, intent) };
     },
     async invalidate(who, n) {
-      await tx(who.wallet.writeContract({
-        address: swap, abi: swapAbi, functionName: "invalidateNonces", args: [n >> 8n, 1n << (n & 0xffn)],
-      }));
+      await tx(
+        who.wallet.writeContract({
+          address: swap,
+          abi: swapAbi,
+          functionName: "invalidateNonces",
+          args: [n >> 8n, 1n << (n & 0xffn)],
+        }),
+      );
     },
     async increaseTime(sec) {
       await fetch(rpcUrl, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "evm_increaseTime", params: [sec] }),
       });
       await fetch(rpcUrl, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "evm_mine", params: [] }),
       });
     },
@@ -268,7 +273,8 @@ export async function startWorld(): Promise<World> {
       const store = new Store();
       const matcherRef: { current?: Matcher } = {};
       const pool = new Pool(
-        store, reader,
+        store,
+        reader,
         { chainId: CHAIN_ID, swap, feeToken: wmon, minTtlSec: 60, maxTtlSec: 7 * 24 * 3600, ...poolOver },
         { onNew: () => matcherRef.current?.kick(), ...hooks },
       );

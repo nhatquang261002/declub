@@ -1,4 +1,6 @@
 import type { User } from "@privy-io/node";
+import { isHash, type Hash } from "viem";
+import { cronAuthorized } from "./fillWatcher";
 import { privyServerConfigured, userById, verifiedUserId } from "./privy";
 import { clientId, getStore, withinLimit, type Store } from "./store";
 
@@ -31,4 +33,33 @@ export async function gateUser(request: Request, name: string, limit = 60): Prom
   const user = await userById(userId);
   if (!user) return fail(401, "unauthorized", "Sign in again to continue.");
   return { store, user };
+}
+
+/**
+ * The common front of every cron route: there is a store and a CRON_SECRET (else 503, `what` is
+ * not configured) and the request carries it as a bearer token (else 401).
+ */
+export function gateCron(request: Request, what: string): Store | Response {
+  const store = getStore();
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!store || !secret) return fail(503, "disabled", `${what} is not configured.`);
+  if (!cronAuthorized(request, secret)) return fail(401, "unauthorized", "Missing or wrong cron secret.");
+  return store;
+}
+
+/**
+ * The common front of a public "I sent this transaction" report (`POST { hash }`): there is a
+ * store (else `{ enabled: false }`), the body names a transaction hash, and the caller is within
+ * 60 reports a minute under `name`, since each report costs RPC calls.
+ */
+export async function gateReport(request: Request, name: string): Promise<{ store: Store; hash: Hash } | Response> {
+  const store = getStore();
+  if (!store) return json({ enabled: false });
+
+  const body = (await request.json().catch(() => ({}))) as { hash?: unknown };
+  if (typeof body.hash !== "string" || !isHash(body.hash)) {
+    return fail(400, "bad_request", "Give a transaction hash.");
+  }
+  if (!(await withinLimit(store, name, clientId(request), 60, 60))) return fail(429, "rate_limited", "Too many requests.");
+  return { store, hash: body.hash };
 }

@@ -1,18 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheckIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrownIcon, HeartIcon, LockIcon, PinIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import {
+  BadgeCheckIcon,
+  ChatIcon,
+  CheckIcon,
+  ClockIcon,
+  CoinIcon,
+  CrownIcon,
+  HeartIcon,
+  LockIcon,
+  PinIcon,
+  TagIcon,
+  TrophyIcon,
+  UsersIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useChallenge } from "@/hooks/useChallenges";
-import { assetShort, assetText, flatPrizeText, isFlat, judgingText, prizeOverdue, type Judging, type Phase, type PublicChallenge, type PublicEntry, type Winner } from "@/lib/challenges";
+import {
+  assetShort,
+  assetText,
+  flatPrizeText,
+  isFlat,
+  judgingText,
+  prizeOverdue,
+  type Judging,
+  type Phase,
+  type PublicChallenge,
+  type PublicEntry,
+  type Winner,
+} from "@/lib/challenges";
 import type { ClubInfo } from "@/lib/clubs";
 import { ago, countdown, untilLabel } from "@/lib/format";
 import type { SystemEvent } from "@/lib/systemFeed";
 
 export const PLACES = ["1st", "2nd", "3rd"];
 
-export const PHASE: Record<Phase, string> = {
+const PHASE: Record<Phase, string> = {
   open: "Open",
   closing: "Counting likes",
   judging: "Owner is picking",
@@ -21,13 +47,13 @@ export const PHASE: Record<Phase, string> = {
 };
 
 /** Where a challenge stands, in a word or two: a raffle that has ended is being drawn, not counting likes. */
-export function phaseLabel(c: Pick<PublicChallenge, "phase" | "judging">): string {
+function phaseLabel(c: Pick<PublicChallenge, "phase" | "judging">): string {
   if (c.phase !== "closing") return PHASE[c.phase];
   return c.judging === "raffle" ? "Drawing" : c.judging === "likes" || c.judging === "holders" ? PHASE.closing : "Settling";
 }
 
 /** Where a challenge stands, in a sentence: the time left, or when it ended and what happens next. */
-export function challengeTiming(c: PublicChallenge, now: number): string {
+function challengeTiming(c: PublicChallenge, now: number): string {
   const endsAt = Math.floor(c.endsAt / 1000);
   if (c.phase === "open") return `Ends in ${countdown(endsAt - now)}`;
   if (c.phase === "judging" && c.pickBy) return `Ended ${ago(endsAt, now)} · the Owner picks ${untilLabel(Math.floor(c.pickBy / 1000), now)} at the latest`;
@@ -251,7 +277,7 @@ export function noWinnerText(c: PublicChallenge): string | null {
 }
 
 /** What counts for an entry: its likes, or in a Holder vote the likes from Holders. */
-export const countOf = (e: PublicEntry, c: Pick<PublicChallenge, "judging">) => (c.judging === "holders" ? (e.votes ?? 0) : e.likes);
+const countOf = (e: PublicEntry, c: Pick<PublicChallenge, "judging">) => (c.judging === "holders" ? (e.votes ?? 0) : e.likes);
 
 /** The badge at the start of an entry's row: its medal once it placed, its rank while likes decide, else nothing. */
 export function EntryRank({ e, c, rank }: { e: PublicEntry; c: PublicChallenge; rank: number }) {
@@ -338,7 +364,17 @@ export function ChallengeSummary({
         <ChallengeClock c={c} now={now} />
         {leading.length > 0 && (
           <div className="flex flex-col gap-1.5">
-            <p className="kicker">{c.settled ? (isFlat(c.judging) ? "Entries" : "Top entries") : c.judging === "likes" || c.judging === "holders" ? "Leading" : c.judging === "first" ? "First in" : "Entries"}</p>
+            <p className="kicker">
+              {c.settled
+                ? isFlat(c.judging)
+                  ? "Entries"
+                  : "Top entries"
+                : c.judging === "likes" || c.judging === "holders"
+                  ? "Leading"
+                  : c.judging === "first"
+                    ? "First in"
+                    : "Entries"}
+            </p>
             <ul className="challenge-entries" aria-label="Entries">
               {leading.map((e, i) => (
                 <li key={e.post}>
@@ -353,7 +389,10 @@ export function ChallengeSummary({
                       <span className="truncate">{e.text === null ? "Hidden" : (e.x?.text ?? e.text)}</span>
                     </span>
                   </span>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-muted" aria-label={c.judging === "holders" ? `${countOf(e, c)} likes from Holders` : `${e.likes} likes`}>
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-muted"
+                    aria-label={c.judging === "holders" ? `${countOf(e, c)} likes from Holders` : `${e.likes} likes`}
+                  >
                     {c.judging === "holders" ? <BadgeCheckIcon className="size-3.5" /> : <HeartIcon className="size-3.5" filled={e.liked} />}
                     {countOf(e, c)}
                   </span>
@@ -414,7 +453,17 @@ function WinningEntries({ c, entries }: { c: PublicChallenge; entries: PublicEnt
  * A challenge in a feed (the Board, the timeline): the start or the result of one, read from the
  * system feed's event and drawn as the challenge's own card, with its entries as they are now.
  */
-export function ChallengeFeedCard({ event, now, clubs, className = "" }: { event: SystemEvent; now: number; clubs?: (token: string) => ClubInfo | undefined; className?: string }) {
+export function ChallengeFeedCard({
+  event,
+  now,
+  clubs,
+  className = "",
+}: {
+  event: SystemEvent;
+  now: number;
+  clubs?: (token: string) => ClubInfo | undefined;
+  className?: string;
+}) {
   const token = event.clubs[0] ?? "";
   const { challenge } = useChallenge(token, event.challenge);
   if (!challenge) return null;

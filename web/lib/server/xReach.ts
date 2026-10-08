@@ -16,7 +16,7 @@ import { privyXAccount, readXShares, signalsOf } from "./xPosts";
  * doesn't change), and the post is still about the Club (with its full links, and who it quotes).
  * The result is saved and published with the epoch, so anyone can recompute the bonus.
  */
-export type ReachDeps = {
+type ReachDeps = {
   /** Unix seconds. */
   now?: () => number;
   clubs?: readonly ClubEntry[];
@@ -37,9 +37,9 @@ export async function collectReach(store: Store, n: number, deps: ReachDeps = {}
 
   if (configured) {
     const clubs = deps.clubs ?? registry.clubs();
-    const shares = (
-      await Promise.all(clubs.map(async (club) => ({ club, shares: await readXShares(store, club.address) })))
-    ).flatMap(({ club, shares }) => shares.filter((s) => s.at >= window.start && s.at < window.end).map((share) => ({ club, share })));
+    const shares = (await Promise.all(clubs.map(async (club) => ({ club, shares: await readXShares(store, club.address) })))).flatMap(({ club, shares }) =>
+      shares.filter((s) => s.at >= window.start && s.at < window.end).map((share) => ({ club, share })),
+    );
 
     const posts = await (deps.posts ?? ((ids) => fetchXPosts(ids)))(shares.map((s) => s.share.tweet));
     const accountOf = deps.xAccountOf ?? privyXAccount;
@@ -49,7 +49,11 @@ export async function collectReach(store: Store, n: number, deps: ReachDeps = {}
     for (const { club, share } of shares) {
       const key = club.address.toLowerCase();
       if (!signals.has(key)) signals.set(key, signalsOf(club, await loadProfile(store, key)));
-      if (!accounts.has(share.userId)) accounts.set(share.userId, accountOf(share.userId).catch(() => null));
+      if (!accounts.has(share.userId))
+        accounts.set(
+          share.userId,
+          accountOf(share.userId).catch(() => null),
+        );
 
       const post = posts.get(share.tweet);
       const account = await accounts.get(share.userId)!;

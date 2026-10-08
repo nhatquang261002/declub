@@ -59,10 +59,10 @@ async function web(): Promise<Web> {
   } as Web;
 }
 
-const localOnly = (w: World) => (w.target !== "local" ? "warps the chain and deploys its own DeClubRewards: local only" : !w.rewards ? "no DeClubRewards deployed" : null);
+const localOnly = (w: World) =>
+  w.target !== "local" ? "warps the chain and deploys its own DeClubRewards: local only" : !w.rewards ? "no DeClubRewards deployed" : null;
 const abi = () => REWARDS_ARTIFACT().abi as Abi;
-const claims = (record: EpochRecord, epoch: bigint) =>
-  record.leaves.map((l) => ({ epoch, account: l.account, amount: BigInt(l.amount), proof: l.proof }));
+const claims = (record: EpochRecord, epoch: bigint) => record.leaves.map((l) => ({ epoch, account: l.account, amount: BigInt(l.amount), proof: l.proof }));
 
 /** Built in RW-01, published and claimed by the later cases. */
 let built: EpochRecord | undefined;
@@ -113,7 +113,11 @@ export const rewardCases: Case<World>[] = [
       // Alice and Bob join holding NFTs; Carol, who holds none, is the Owner.
       const holdings = async (token: Address, wallets: readonly Address[]) =>
         Promise.all(wallets.map((a) => w.read<bigint>(token, w.abi.nft, "balanceOf", [a])));
-      for (const [id, who] of [["ua", w.alice], ["ub", w.bob], ["uc", w.carol]] as const) {
+      for (const [id, who] of [
+        ["ua", w.alice],
+        ["ub", w.bob],
+        ["uc", w.carol],
+      ] as const) {
         assert.ok((await app.joinClub(store, entry, id, [who.address.toLowerCase()], { holdings })).ok, `${who.name} joins`);
       }
       await app.saveRoles(store, w.nft, { owner: "uc", moderators: [] });
@@ -143,7 +147,10 @@ export const rewardCases: Case<World>[] = [
       const weight = (held: bigint, who: Address) => held * (10_000n + bonus(who));
       const [wa, wb, wc] = [weight(a!, w.alice.address), weight(b!, w.bob.address), weight(c!, w.carol.address)];
       const total = wa + wb + wc;
-      assert.ok([w.alice, w.bob, w.carol].every((who) => bonus(who.address) === 0n), "trading earns no bonus");
+      assert.ok(
+        [w.alice, w.bob, w.carol].every((who) => bonus(who.address) === 0n),
+        "trading earns no bonus",
+      );
       const amountOf = (who: Address) => BigInt(built!.leaves.find((l) => l.account === who)?.amount ?? "0");
       assert.equal(amountOf(w.alice.address), (holderPool * wa) / total, "Alice's Holder share");
       assert.equal(amountOf(w.bob.address), (holderPool * wb) / total, "Bob's Holder share");

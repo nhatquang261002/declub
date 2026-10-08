@@ -62,7 +62,13 @@ const topicAddress = (topic: Hex) => `0x${topic.slice(26)}`.toLowerCase();
  * adding up to at least `amount` base units (topics: from, to; data: value), or ERC-721 transfers of
  * at least `amount` distinct token ids (topics: from, to, id). Transfers elsewhere don't count.
  */
-export function prizeProblem(receipt: PrizeReceipt, asset: Pick<AssetPrize, "token" | "kind">, amount: string, to: ReadonlySet<string>, notBefore: number): PrizeProblem | null {
+export function prizeProblem(
+  receipt: PrizeReceipt,
+  asset: Pick<AssetPrize, "token" | "kind">,
+  amount: string,
+  to: ReadonlySet<string>,
+  notBefore: number,
+): PrizeProblem | null {
   if (receipt.status !== "success") return "tx_failed";
   if (receipt.at * 1000 < notBefore) return "tx_too_early";
   const nft = asset.kind === "erc721";

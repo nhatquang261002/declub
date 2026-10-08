@@ -13,13 +13,7 @@ const feeUnits = (assets: Asset[]) => {
 };
 
 /** Create a deal and return its id (from `TradeCreated`). */
-async function create(
-  w: World,
-  who: World["alice"],
-  fn: "createTrade" | "createOpenOffer" | "createTraitTrade",
-  args: unknown[],
-  offered: Asset[],
-) {
+async function create(w: World, who: World["alice"], fn: "createTrade" | "createOpenOffer" | "createTraitTrade", args: unknown[], offered: Asset[]) {
   const fee = await w.v2Fee();
   const value = offered.filter((a) => a.assetType === 0).reduce((s, a) => s + a.amount, 0n) + fee * feeUnits(offered);
   const receipt = await w.send(who, w.v2, w.abi.v2, fn, args, value);
@@ -33,6 +27,13 @@ const owed = (assets: Asset[], fee: bigint) => assets.filter((a) => a.assetType 
 
 async function expiry(w: World, sec = 3600) {
   return (await w.now()) + BigInt(sec);
+}
+
+/** Alice's one NFT, approved for escrow and offered for 0.001 MON: the plain deal most of these cases start from. */
+async function nftForMon(w: World) {
+  const [nftId] = await w.mintNfts(w.alice, 1);
+  await w.approveAll(w.alice, w.v2);
+  return { nftId: nftId!, offered: [w.nftAsset(nftId!)], requested: [w.monAsset(MON("0.001"))] };
 }
 
 type MerkleSet = { root: Hex; proofs: Map<bigint, Hex[]>; count: number };
@@ -110,10 +111,7 @@ export const v2Cases: Case<World>[] = [
     id: "V2-03",
     title: "Expiry: a late fill reverts and anyone returns the escrow to the maker",
     async run(w, note) {
-      const [nftId] = await w.mintNfts(w.alice, 1);
-      await w.approveAll(w.alice, w.v2);
-      const offered = [w.nftAsset(nftId!)];
-      const requested = [w.monAsset(MON("0.001"))];
+      const { nftId, offered, requested } = await nftForMon(w);
       const ttl = 20;
       const { id, fee } = await create(w, w.alice, "createTrade", [offered, requested, zeroAddress, await expiry(w, ttl)], offered);
       await w.expectRevert(w.carol, w.v2, w.abi.v2, "reclaimExpired", [id], "TradeNotExpired");
@@ -123,7 +121,7 @@ export const v2Cases: Case<World>[] = [
       await w.expectRevert(w.bob, w.v2, w.abi.v2, "fillTrade", [id], "TradeIsExpired", owed(requested, fee));
       const receipt = await w.send(w.carol, w.v2, w.abi.v2, "reclaimExpired", [id]);
       note(`trade ${id}, reclaimed by a third party, gas ${receipt.gasUsed}`);
-      assert.equal(await w.ownerOf(nftId!), w.alice.address);
+      assert.equal(await w.ownerOf(nftId), w.alice.address);
       assert.equal((await w.trade(id)).status, Status.Cancelled);
     },
   },
@@ -131,15 +129,12 @@ export const v2Cases: Case<World>[] = [
     id: "V2-04",
     title: "Private deal: only the named taker can fill",
     async run(w, note) {
-      const [nftId] = await w.mintNfts(w.alice, 1);
-      await w.approveAll(w.alice, w.v2);
-      const offered = [w.nftAsset(nftId!)];
-      const requested = [w.monAsset(MON("0.001"))];
+      const { nftId, offered, requested } = await nftForMon(w);
       const { id, fee } = await create(w, w.alice, "createTrade", [offered, requested, w.bob.address, await expiry(w)], offered);
       await w.expectRevert(w.carol, w.v2, w.abi.v2, "fillTrade", [id], "NotAllowedTaker", owed(requested, fee));
       const receipt = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [id], owed(requested, fee));
       note(`trade ${id}, fill gas ${receipt.gasUsed}`);
-      assert.equal(await w.ownerOf(nftId!), w.bob.address);
+      assert.equal(await w.ownerOf(nftId), w.bob.address);
     },
   },
   {
@@ -185,8 +180,9 @@ export const v2Cases: Case<World>[] = [
       note(`trade ${id}, accept gas ${receipt.gasUsed}`);
       assert.equal(await w.ownerOf(offerNft!), w.carol.address);
       assert.equal((await w.balanceOf(w.usd, w.alice.address)) - aliceUsd, USD(25));
-      const statuses = await Promise.all([pBob, pCarol, pDave].map(async (p) =>
-        (await w.read<{ status: number }>(w.v2, w.abi.v2, "getProposal", [id, p])).status));
+      const statuses = await Promise.all(
+        [pBob, pCarol, pDave].map(async (p) => (await w.read<{ status: number }>(w.v2, w.abi.v2, "getProposal", [id, p])).status),
+      );
       assert.deepEqual(statuses, [ProposalStatus.Rejected, ProposalStatus.Accepted, ProposalStatus.Withdrawn]);
       assert.equal((await w.trade(id)).status, Status.Filled);
     },
@@ -252,10 +248,7 @@ export const v2Cases: Case<World>[] = [
     id: "V2-08",
     title: "Guards: self-fill, wrong MON amount, duplicate asset, past expiry, unsolicited MON",
     async run(w) {
-      const [nftId] = await w.mintNfts(w.alice, 1);
-      await w.approveAll(w.alice, w.v2);
-      const offered = [w.nftAsset(nftId!)];
-      const requested = [w.monAsset(MON("0.001"))];
+      const { nftId, offered, requested } = await nftForMon(w);
       const { id, fee } = await create(w, w.alice, "createTrade", [offered, requested, zeroAddress, await expiry(w)], offered);
 
       await w.expectRevert(w.alice, w.v2, w.abi.v2, "fillTrade", [id], "SelfFill", owed(requested, fee));
@@ -273,10 +266,7 @@ export const v2Cases: Case<World>[] = [
       await w.expectRevert(w.alice, w.v2, w.abi.v2, "createTrade", [[w.nftAsset(other!)], [], zeroAddress, 0n], "EmptySide", fee);
 
       // No receive(): MON sent straight to the contract bounces instead of getting stuck.
-      await assert.rejects(
-        w.pub.call({ account: w.bob.account, to: w.v2, value: 1n }),
-        "plain MON transfer to DeClubEscrow should revert",
-      );
+      await assert.rejects(w.pub.call({ account: w.bob.account, to: w.v2, value: 1n }), "plain MON transfer to DeClubEscrow should revert");
       await w.send(w.alice, w.v2, w.abi.v2, "cancelTrade", [id]);
     },
   },

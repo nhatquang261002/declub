@@ -99,7 +99,10 @@ describe("verifyEpochRecord", () => {
   it("passes an epoch as the builder makes it", () => {
     const result = verifyEpochRecord(fixture());
     assert.deepEqual(result.problems, []);
-    assert.equal(result.notes.some((n) => n.includes("4 accounts")), true);
+    assert.equal(
+      result.notes.some((n) => n.includes("4 accounts")),
+      true,
+    );
   });
 
   it("agrees with the builder's tree, and its proofs open", () => {
@@ -203,7 +206,17 @@ describe("carriedInFrom", () => {
   it("takes each Club's carry from the latest earlier epoch that lists it", () => {
     const at = (n: number, clubs: [string, string][]) =>
       ({ n, clubs: clubs.map(([club, holders]) => ({ club, carry: { holders, fund: "0" } })) }) as unknown as EpochRecord;
-    const carried = carriedInFrom([at(1, [[CLUB_A, "5"], [CLUB_B, "7"]]), at(2, [[CLUB_A, "9"]]), at(3, [[CLUB_A, "11"]])], 3);
+    const carried = carriedInFrom(
+      [
+        at(1, [
+          [CLUB_A, "5"],
+          [CLUB_B, "7"],
+        ]),
+        at(2, [[CLUB_A, "9"]]),
+        at(3, [[CLUB_A, "11"]]),
+      ],
+      3,
+    );
     assert.equal(carried.get(CLUB_A)?.holders, 9n);
     assert.equal(carried.get(CLUB_B)?.holders, 7n);
   });

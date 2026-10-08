@@ -63,7 +63,17 @@ function CreateWizard() {
         </section>
       )}
 
-      {signed && <SignedFlow key="signed" step={step} onStep={setStep} onUseEscrow={() => { setSettlement("escrow"); setStep(1); }} />}
+      {signed && (
+        <SignedFlow
+          key="signed"
+          step={step}
+          onStep={setStep}
+          onUseEscrow={() => {
+            setSettlement("escrow");
+            setStep(1);
+          }}
+        />
+      )}
 
       {/* Same key across kinds that share a contract, so switching between them keeps what you typed. */}
       {!signed && swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}

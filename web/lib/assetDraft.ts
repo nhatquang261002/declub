@@ -41,7 +41,7 @@ function parseAmount(input: string, decimals: number): bigint | null {
   }
 }
 
-export type SideResult = { assets: Asset[]; errors: string[] };
+type SideResult = { assets: Asset[]; errors: string[] };
 
 /**
  * Turns typed rows into contract-ready assets, or says what is wrong with which row. The rules

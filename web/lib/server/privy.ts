@@ -90,8 +90,7 @@ export function verifyWebhook(body: string, headers: Headers): unknown | null {
 export async function findUserIdByHandle(provider: ProfileProvider, username: string): Promise<string | null> {
   const users = client().users();
   try {
-    const user =
-      provider === "twitter" ? await users.getByTwitterUsername({ username }) : await users.getByDiscordUsername({ username });
+    const user = provider === "twitter" ? await users.getByTwitterUsername({ username }) : await users.getByDiscordUsername({ username });
     return user.id;
   } catch (error) {
     if (error instanceof NotFoundError) return null;

@@ -55,8 +55,7 @@ function ApprovalRow({
   const revoke = useTxFlow();
   const token = info.get(a.token.toLowerCase());
   const listed = registry.entry(a.token);
-  const name =
-    a.kind === "erc721" ? collectionLabel(collection, listed?.name ?? "NFT collection") : (token?.symbol ?? listed?.symbol ?? "Token");
+  const name = a.kind === "erc721" ? collectionLabel(collection, listed?.name ?? "NFT collection") : (token?.symbol ?? listed?.symbol ?? "Token");
   const trust = trustOf(a.token, a.kind === "erc721" ? { name: collection?.name, symbol: collection?.symbol } : { symbol: token?.symbol });
   const scope =
     a.kind === "erc721"

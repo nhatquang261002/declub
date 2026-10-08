@@ -6,16 +6,7 @@ import { describeError } from "@/lib/errors";
 
 function WarningIcon() {
   return (
-    <svg
-      className="size-6"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
+    <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 4 3 19.5h18L12 4Z" />
       <path d="M12 10v4.2M12 17v.1" />
     </svg>
@@ -77,12 +68,5 @@ export function ErrorPanel({ title, message, details, onRetry, retryLabel = "Try
 export function LoadError({ title, error }: { title: string; error: unknown }) {
   const queryClient = useQueryClient();
   const described = describeError(error);
-  return (
-    <ErrorPanel
-      title={title}
-      message={described.message}
-      details={described.details}
-      onRetry={() => queryClient.invalidateQueries()}
-    />
-  );
+  return <ErrorPanel title={title} message={described.message} details={described.details} onRetry={() => queryClient.invalidateQueries()} />;
 }

@@ -188,7 +188,7 @@ describe("/api/wallets/[address]/profile", () => {
     const get = walletProfileHandler({ store: () => null });
     assert.equal((await get(new Request("http://x"), ctx("nope"))).status, 400);
     const off = await get(new Request("http://x"), ctx(W1));
-    assert.equal((await off.json() as WalletProfile).enabled, false);
+    assert.equal(((await off.json()) as WalletProfile).enabled, false);
   });
 });
 
@@ -255,7 +255,10 @@ describe("a wallet's Clubs", () => {
     const onlyNft = makeRegistry(parseAssets([entry(NFT)]));
     const some = await walletClubsHandler({ store: () => store, registry: onlyNft })(new Request("http://x?fresh=1"), ctx(W1));
     assert.equal(some.headers.get("cache-control"), "no-store");
-    assert.deepEqual(((await some.json()) as { clubs: { token: string }[] }).clubs.map((c) => c.token), [NFT.toLowerCase()]);
+    assert.deepEqual(
+      ((await some.json()) as { clubs: { token: string }[] }).clubs.map((c) => c.token),
+      [NFT.toLowerCase()],
+    );
   });
 
   it("refuses what isn't an address and says it is off without a store", async () => {

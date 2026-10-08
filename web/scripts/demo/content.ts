@@ -8,20 +8,7 @@
  */
 
 export type ClubKey = "chog" | "skrumpeys" | "r3tards";
-export type PersonaKey =
-  | "mika"
-  | "oatmilk"
-  | "nadsworth"
-  | "candle"
-  | "lou"
-  | "warden"
-  | "bulmba"
-  | "hanoi"
-  | "intern"
-  | "cope"
-  | "slow"
-  | "tide"
-  | "fresh";
+export type PersonaKey = "mika" | "oatmilk" | "nadsworth" | "candle" | "lou" | "warden" | "bulmba" | "hanoi" | "intern" | "cope" | "slow" | "tide" | "fresh";
 export type HolderKey = PersonaKey | "you";
 
 /** The Discord username each persona's profile shows (lowercase, 2 to 32 of a-z 0-9 _ .). */
@@ -41,7 +28,10 @@ export const PERSONAS: Record<PersonaKey, { handle: string }> = {
   fresh: { handle: "fresh.wallet" },
 };
 
-export const CLUBS: Record<ClubKey, { env: string; name: string; mainnet: string; image: string; art: string; owner: HolderKey; moderators: PersonaKey[]; description: string; tags: string[] }> = {
+export const CLUBS: Record<
+  ClubKey,
+  { env: string; name: string; mainnet: string; image: string; art: string; owner: HolderKey; moderators: PersonaKey[]; description: string; tags: string[] }
+> = {
   chog: {
     env: "DEMO_CHOG_ADDRESS",
     name: "Chog Genesis",
@@ -74,17 +64,43 @@ export const CLUBS: Record<ClubKey, { env: string; name: string; mainnet: string
     art: "https://www.scatter.art/api/instareveal/mfrvr5upu9925ja07o6ckk6v/1",
     owner: "intern",
     moderators: [],
-    description:
-      "1,033 certified r3tards on the Monad blockchain. Interns welcome. Testnet mirror of the mainnet collection: same ids, same art.",
+    description: "1,033 certified r3tards on the Monad blockchain. Interns welcome. Testnet mirror of the mainnet collection: same ids, same art.",
     tags: ["r3tards", "#r3tards"],
   },
 };
 
 /** Minted in this order, so each holder's token ids are a run that follows the one before. */
 export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
-  chog: [["you", 3], ["mika", 6], ["oatmilk", 4], ["nadsworth", 3], ["candle", 2], ["lou", 2], ["hanoi", 1], ["slow", 1]],
-  skrumpeys: [["warden", 5], ["bulmba", 4], ["hanoi", 3], ["you", 2], ["mika", 2], ["tide", 2], ["lou", 1], ["cope", 1]],
-  r3tards: [["intern", 5], ["cope", 4], ["you", 2], ["tide", 2], ["oatmilk", 2], ["slow", 2], ["candle", 1], ["nadsworth", 1]],
+  chog: [
+    ["you", 3],
+    ["mika", 6],
+    ["oatmilk", 4],
+    ["nadsworth", 3],
+    ["candle", 2],
+    ["lou", 2],
+    ["hanoi", 1],
+    ["slow", 1],
+  ],
+  skrumpeys: [
+    ["warden", 5],
+    ["bulmba", 4],
+    ["hanoi", 3],
+    ["you", 2],
+    ["mika", 2],
+    ["tide", 2],
+    ["lou", 1],
+    ["cope", 1],
+  ],
+  r3tards: [
+    ["intern", 5],
+    ["cope", 4],
+    ["you", 2],
+    ["tide", 2],
+    ["oatmilk", 2],
+    ["slow", 2],
+    ["candle", 1],
+    ["nadsworth", 1],
+  ],
 };
 
 /** Who joins which Club, besides the holders (who join every Club they hold in). */
@@ -182,19 +198,47 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "chog-caption",
     club: "chog",
     when: "open",
-    input: { title: "Caption this Chog", brief: "Post your Chog on X with your best caption. I pick my three favourites when it ends.", judging: "owner", prizes: [10, 5, 2], epochs: 2, holdersOnly: false },
+    input: {
+      title: "Caption this Chog",
+      brief: "Post your Chog on X with your best caption. I pick my three favourites when it ends.",
+      judging: "owner",
+      prizes: [10, 5, 2],
+      epochs: 2,
+      holdersOnly: false,
+    },
     entries: [
-      { by: "mika", at: 0.1, post: "Entry for the caption challenge 👇", x: "when the gas is 0.0001 and you still check twice #chog", likes: ["oatmilk", "lou", "slow"] },
+      {
+        by: "mika",
+        at: 0.1,
+        post: "Entry for the caption challenge 👇",
+        x: "when the gas is 0.0001 and you still check twice #chog",
+        likes: ["oatmilk", "lou", "slow"],
+      },
       { by: "candle", at: 0.3, post: "My caption entry", x: "purple background, purple mood, purple bags. chog szn", likes: ["mika"] },
       { by: "nadsworth", at: 0.55, post: "Caption entry, be kind", x: "held since mint. not a flex, just a lifestyle #chog" },
-      { by: "fresh", at: 0.8, post: "No Chog yet but here's a caption", x: "me refreshing the chog floor every 4 minutes like it owes me money", likes: ["mika", "candle"] },
+      {
+        by: "fresh",
+        at: 0.8,
+        post: "No Chog yet but here's a caption",
+        x: "me refreshing the chog floor every 4 minutes like it owes me money",
+        likes: ["mika", "candle"],
+      },
     ],
   },
   {
     key: "chog-backgrounds",
     club: "chog",
     when: "open",
-    input: { title: "Background raffle", brief: "Share your Chog's background on X. Three Holders win, drawn at random when the epoch ends.", judging: "raffle", winners: 3, prize: 3, epochs: 1, holdersOnly: true, rewards: { pinWinner: true } },
+    input: {
+      title: "Background raffle",
+      brief: "Share your Chog's background on X. Three Holders win, drawn at random when the epoch ends.",
+      judging: "raffle",
+      winners: 3,
+      prize: 3,
+      epochs: 1,
+      holdersOnly: true,
+      rewards: { pinWinner: true },
+    },
     entries: [
       { by: "oatmilk", at: 0.15, post: "Night background, entering the raffle", x: "night background chog. the rarest vibe in the collection #chog" },
       { by: "hanoi", at: 0.35, post: "Raffle entry from Hanoi", x: "gm from hanoi, chog on a teal background, coffee in hand" },
@@ -206,9 +250,21 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "chog-lore",
     club: "chog",
     when: "ended",
-    input: { title: "Chog lore thread", brief: "Write a short Chog origin story on X. I'll pick the best two.", judging: "owner", prizes: [8, 4], holdersOnly: false },
+    input: {
+      title: "Chog lore thread",
+      brief: "Write a short Chog origin story on X. I'll pick the best two.",
+      judging: "owner",
+      prizes: [8, 4],
+      holdersOnly: false,
+    },
     entries: [
-      { by: "mika", at: 0.1, post: "Lore thread is up", x: "chapter 1: the first chog hatched on block 1 and immediately asked for a swap", likes: ["oatmilk", "candle", "slow"] },
+      {
+        by: "mika",
+        at: 0.1,
+        post: "Lore thread is up",
+        x: "chapter 1: the first chog hatched on block 1 and immediately asked for a swap",
+        likes: ["oatmilk", "candle", "slow"],
+      },
       { by: "oatmilk", at: 0.3, post: "My lore entry", x: "the chogs aren't from monad. monad is from the chogs. thread 🧵", likes: ["mika"] },
       { by: "candle", at: 0.5, post: "Lore, purple edition", x: "every chog is born purple. the other colours are what they traded for" },
       { by: "slow", at: 0.75, post: "Short lore from me", x: "a chog never sells. a chog swaps. that's the whole lore", likes: ["mika", "nadsworth"] },
@@ -218,7 +274,14 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "chog-edit",
     club: "chog",
     when: "ended",
-    input: { title: "Best Chog edit", brief: "Edit your Chog into a meme and post it on X. Most liked wins; 1st place also gets a Chog from me.", judging: "likes", prizes: [10, 5, 2], holdersOnly: false, rewards: { asset: { token: "chog", amounts: ["1", "0", "0"] } } },
+    input: {
+      title: "Best Chog edit",
+      brief: "Edit your Chog into a meme and post it on X. Most liked wins; 1st place also gets a Chog from me.",
+      judging: "likes",
+      prizes: [10, 5, 2],
+      holdersOnly: false,
+      rewards: { asset: { token: "chog", amounts: ["1", "0", "0"] } },
+    },
     entries: [
       { by: "mika", at: 0.1, post: "Chog edit entry", x: "chog but it's a 2007 desktop wallpaper", likes: ["oatmilk", "nadsworth", "lou", "hanoi"] },
       { by: "oatmilk", at: 0.25, post: "Edited my Chog", x: "chog as a barista. oat milk only", likes: ["mika", "slow"] },
@@ -232,14 +295,28 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "skrump-poll",
     club: "skrumpeys",
     when: "cancelled",
-    input: { title: "Trait poll", brief: "Post your favourite skrump trait. Called off: we'll run it as a Board poll instead.", judging: "likes", prizes: [5], epochs: 1, holdersOnly: false },
+    input: {
+      title: "Trait poll",
+      brief: "Post your favourite skrump trait. Called off: we'll run it as a Board poll instead.",
+      judging: "likes",
+      prizes: [5],
+      epochs: 1,
+      holdersOnly: false,
+    },
     entries: [],
   },
   {
     key: "skrump-rate",
     club: "skrumpeys",
     when: "open",
-    input: { title: "Rate my skrump", brief: "Post your skrump on X with one line about it. Most liked by the Club wins.", judging: "likes", prizes: [10, 5, 2], epochs: 1, holdersOnly: false },
+    input: {
+      title: "Rate my skrump",
+      brief: "Post your skrump on X with one line about it. Most liked by the Club wins.",
+      judging: "likes",
+      prizes: [10, 5, 2],
+      epochs: 1,
+      holdersOnly: false,
+    },
     entries: [
       { by: "bulmba", at: 0.1, post: "Rate it 👀", x: "bulmba background skrump. 10/10, no notes #skrumpeys", likes: ["hanoi", "tide", "lou", "mika"] },
       { by: "hanoi", at: 0.3, post: "Entry", x: "this skrump reads perfectly at 32px. art. #skrumpeys", likes: ["bulmba", "cope"] },
@@ -251,7 +328,15 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "skrump-first",
     club: "skrumpeys",
     when: "open",
-    input: { title: "First five skrumps", brief: "The first five members to share their skrump on X win. Still spots left.", judging: "first", winners: 5, prize: 2, epochs: 2, holdersOnly: false },
+    input: {
+      title: "First five skrumps",
+      brief: "The first five members to share their skrump on X win. Still spots left.",
+      judging: "first",
+      winners: 5,
+      prize: 2,
+      epochs: 2,
+      holdersOnly: false,
+    },
     entries: [
       { by: "hanoi", at: 0.05, post: "First in?", x: "skrump posted, gm skrumpeys" },
       { by: "mika", at: 0.2, post: "In", x: "my one skrump next to my chogs. it fits #skrumpeys", likes: ["hanoi"] },
@@ -262,7 +347,14 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "skrump-vote",
     club: "skrumpeys",
     when: "ended",
-    input: { title: "Skrump of the week", brief: "Post your skrump on X. Only Holders' likes count. Results get pinned.", judging: "holders", prizes: [10, 5], holdersOnly: false, rewards: { pinWinner: true } },
+    input: {
+      title: "Skrump of the week",
+      brief: "Post your skrump on X. Only Holders' likes count. Results get pinned.",
+      judging: "holders",
+      prizes: [10, 5],
+      holdersOnly: false,
+      rewards: { pinWinner: true },
+    },
     entries: [
       { by: "bulmba", at: 0.1, post: "Skrump of the week entry", x: "this skrump has been through things. #skrumpeys", likes: ["hanoi", "tide", "mika"] },
       { by: "hanoi", at: 0.3, post: "My entry", x: "sunrise skrump from hanoi", likes: ["bulmba", "lou", "cope", "tide"] },
@@ -275,7 +367,14 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "skrump-raffle",
     club: "skrumpeys",
     when: "ended",
-    input: { title: "Meme raffle", brief: "Post a skrump meme on X. Two winners are drawn when it ends, from a block anyone can check.", judging: "raffle", winners: 2, prize: 4, holdersOnly: false },
+    input: {
+      title: "Meme raffle",
+      brief: "Post a skrump meme on X. Two winners are drawn when it ends, from a block anyone can check.",
+      judging: "raffle",
+      winners: 2,
+      prize: 4,
+      holdersOnly: false,
+    },
     entries: [
       { by: "bulmba", at: 0.1, post: "Raffle entry", x: "skrump explaining monad to his parents" },
       { by: "hanoi", at: 0.25, post: "Meme entry", x: "skrump waiting for a block that already happened" },
@@ -290,9 +389,25 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "r3tard-orientation",
     club: "r3tards",
     when: "open",
-    input: { title: "Intern orientation", brief: "Post your r3tard on X and get 2 likes from the Club. Up to three who make it win, plus a r3tard each.", judging: "everyone", winners: 3, prize: 3, minLikes: 2, epochs: 2, holdersOnly: false, rewards: { asset: { token: "r3tards", amounts: ["1"] } } },
+    input: {
+      title: "Intern orientation",
+      brief: "Post your r3tard on X and get 2 likes from the Club. Up to three who make it win, plus a r3tard each.",
+      judging: "everyone",
+      winners: 3,
+      prize: 3,
+      minLikes: 2,
+      epochs: 2,
+      holdersOnly: false,
+      rewards: { asset: { token: "r3tards", amounts: ["1"] } },
+    },
     entries: [
-      { by: "cope", at: 0.1, post: "Reporting for orientation", x: "r3tard orientation day 1: found the coffee machine #r3tards", likes: ["tide", "oatmilk", "slow"] },
+      {
+        by: "cope",
+        at: 0.1,
+        post: "Reporting for orientation",
+        x: "r3tard orientation day 1: found the coffee machine #r3tards",
+        likes: ["tide", "oatmilk", "slow"],
+      },
       { by: "tide", at: 0.35, post: "Orientation entry", x: "my r3tard has more experience than me. #r3tards", likes: ["cope"] },
       { by: "oatmilk", at: 0.6, post: "Entering", x: "my chogs met my r3tards. hr is involved", likes: ["cope", "slow"] },
       { by: "slow", at: 0.85, post: "Orientation", x: "slow blocks, fast r3tards" },
@@ -302,7 +417,14 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "r3tard-desk",
     club: "r3tards",
     when: "open",
-    input: { title: "Best desk setup", brief: "Show your desk with your r3tard on screen. Holders only, Holders' likes decide.", judging: "holders", prizes: [6, 3], epochs: 1, holdersOnly: true },
+    input: {
+      title: "Best desk setup",
+      brief: "Show your desk with your r3tard on screen. Holders only, Holders' likes decide.",
+      judging: "holders",
+      prizes: [6, 3],
+      epochs: 1,
+      holdersOnly: true,
+    },
     entries: [
       { by: "cope", at: 0.2, post: "Desk entry", x: "three monitors, one r3tard, zero productivity #r3tards", likes: ["slow", "candle", "tide"] },
       { by: "slow", at: 0.45, post: "My desk", x: "laptop on a box. r3tard wallpaper. it works", likes: ["fresh", "cope"] },
@@ -313,7 +435,14 @@ export const CHALLENGES: DemoChallenge[] = [
     key: "r3tard-first",
     club: "r3tards",
     when: "ended",
-    input: { title: "First r3tard on X", brief: "The first three to post their r3tard on X win a trophy. Just a trophy.", judging: "first", winners: 3, prize: 0, holdersOnly: false },
+    input: {
+      title: "First r3tard on X",
+      brief: "The first three to post their r3tard on X win a trophy. Just a trophy.",
+      judging: "first",
+      winners: 3,
+      prize: 0,
+      holdersOnly: false,
+    },
     entries: [
       { by: "cope", at: 0.05, post: "First", x: "first r3tard on the timeline #r3tards" },
       { by: "tide", at: 0.15, post: "Second?", x: "r3tard posted. intern energy" },
@@ -326,9 +455,27 @@ export const CHALLENGES: DemoChallenge[] = [
 
 /** Who follows whom (the presenter's wallet is "you"). */
 export const FOLLOWS: [PersonaKey, HolderKey][] = [
-  ["mika", "you"], ["oatmilk", "you"], ["nadsworth", "you"], ["lou", "you"], ["warden", "you"], ["intern", "you"],
-  ["oatmilk", "mika"], ["nadsworth", "mika"], ["candle", "mika"], ["lou", "mika"], ["fresh", "mika"],
-  ["bulmba", "warden"], ["hanoi", "warden"], ["tide", "warden"], ["lou", "warden"],
-  ["cope", "intern"], ["slow", "intern"], ["tide", "intern"], ["fresh", "intern"],
-  ["mika", "warden"], ["warden", "mika"], ["intern", "cope"], ["hanoi", "mika"],
+  ["mika", "you"],
+  ["oatmilk", "you"],
+  ["nadsworth", "you"],
+  ["lou", "you"],
+  ["warden", "you"],
+  ["intern", "you"],
+  ["oatmilk", "mika"],
+  ["nadsworth", "mika"],
+  ["candle", "mika"],
+  ["lou", "mika"],
+  ["fresh", "mika"],
+  ["bulmba", "warden"],
+  ["hanoi", "warden"],
+  ["tide", "warden"],
+  ["lou", "warden"],
+  ["cope", "intern"],
+  ["slow", "intern"],
+  ["tide", "intern"],
+  ["fresh", "intern"],
+  ["mika", "warden"],
+  ["warden", "mika"],
+  ["intern", "cope"],
+  ["hanoi", "mika"],
 ];

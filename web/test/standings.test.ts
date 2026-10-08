@@ -15,7 +15,9 @@ const ETH = 10n ** 18n;
 const GENESIS = 1_800_000_000;
 const WEEK = 604_800;
 const NFT: Address = getAddress("0x220a2c52fd27252e7cd6163a7bf1b6ae159d26e4");
-const clubs = makeRegistry(parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" }])).clubs(10143);
+const clubs = makeRegistry(
+  parseAssets([{ chainId: 10143, address: NFT, kind: "erc721", name: "Mock Chog", symbol: "MCHOG", status: "verified", note: "x" }]),
+).clubs(10143);
 const club = clubs[0]!;
 /** The paid places these tests set (ADR 0044): the Owner limited them to 10. */
 const SEATS = 10;
@@ -53,7 +55,10 @@ describe("live standings", () => {
     // these tests set), so 11 and 12 are below it.
     for (let i = 1; i <= 12; i++) await join(store, `u${i}`, w(i), i);
     for (let i = 1; i <= 10; i++) {
-      for (const [day, suffix] of [[0, "a"], [1, "b"]] as const) {
+      for (const [day, suffix] of [
+        [0, "a"],
+        [1, "b"],
+      ] as const) {
         const p = { id: `q${i}${suffix}`, userId: `u${i}`, wallet: w(i), kind: "note", text: "gm", at: (GENESIS + day * 86_400 + 60) * 1000 };
         await store.set(postKey(NFT, p.id), p);
         await recordActive(store, NFT, p, GENESIS, WEEK);
@@ -63,7 +68,15 @@ describe("live standings", () => {
       reads++;
       return wallets.map((x) => BigInt(20 - Number(BigInt(x))));
     };
-    deps = { now: () => now, clubs, events: async () => [swap(GENESIS + 100), swap(GENESIS - 100)], holdings, genesis: GENESIS, length: WEEK, rules: () => ({ ...DEFAULT_CLUB_RULES, maxPaid: SEATS }) };
+    deps = {
+      now: () => now,
+      clubs,
+      events: async () => [swap(GENESIS + 100), swap(GENESIS - 100)],
+      holdings,
+      genesis: GENESIS,
+      length: WEEK,
+      rules: () => ({ ...DEFAULT_CLUB_RULES, maxPaid: SEATS }),
+    };
   });
 
   it("ranks every Holder, estimates the paid places from the fees so far", async () => {

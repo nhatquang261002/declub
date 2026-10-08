@@ -1,4 +1,3 @@
-import { Tooltip } from "@/components/Tooltip";
 import { heat } from "@/lib/clubs";
 import { MOMENTUM } from "@/lib/momentum";
 
@@ -38,24 +37,5 @@ export function MomentumChange({ change }: { change: number }) {
       {moved > 0 ? "▲" : "▼"} {Math.abs(moved).toLocaleString()}
       <span className="sr-only"> since last week</span>
     </span>
-  );
-}
-
-/**
- * A Club's activity score and how it moved over the week. "Momentum" is explained in place, because
- * what it counts (completed swaps, recent activity) is what stops it being a vanity number.
- */
-export function MomentumBadge({ value, change, explain = false }: { value: number; change: number; explain?: boolean }) {
-  const badge = (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-2xl leading-none font-extrabold tabular-nums">{formatMomentum(value)}</span>
-      <MomentumChange change={change} />
-    </span>
-  );
-  if (!explain) return badge;
-  return (
-    <Tooltip content={MOMENTUM_EXPLAINED} className="cursor-help">
-      {badge}
-    </Tooltip>
   );
 }

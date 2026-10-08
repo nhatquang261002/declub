@@ -2,16 +2,7 @@ import { createPublicClient, erc20Abi, http, parseAbi, type Address, type Public
 import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { featuredCollections } from "../collections";
-import {
-  MAX_QUERY,
-  mergeHits,
-  parseTokenSearch,
-  parseWalletCollections,
-  parseWalletTokens,
-  rankHits,
-  type SearchHit,
-  type SearchKind,
-} from "../search";
+import { MAX_QUERY, mergeHits, parseTokenSearch, parseWalletCollections, parseWalletTokens, rankHits, type SearchHit, type SearchKind } from "../search";
 import { ASSETS, makeRegistry, type AssetEntry } from "../verifiedAssets";
 
 /**
@@ -24,7 +15,7 @@ import { ASSETS, makeRegistry, type AssetEntry } from "../verifiedAssets";
  * picks from the contract again.
  */
 
-export type SearchParams = {
+type SearchParams = {
   query: string;
   /** The wallet whose holdings come first. */
   owner?: Address;
@@ -34,7 +25,7 @@ export type SearchParams = {
   limit?: number;
 };
 
-export type SearchResult = {
+type SearchResult = {
   hits: SearchHit[];
   /** Who answered: the provider, or the chain alone. */
   source: "moralis" | "chain";
@@ -74,8 +65,6 @@ const MORALIS_CHAINS: Record<number, string> = { 143: "0x8f" };
 const MORALIS_URL = "https://deep-index.moralis.io/api/v2.2";
 const TIMEOUT_MS = 6000;
 
-export const providerCovers = (chainId: number) => chainId in MORALIS_CHAINS;
-
 export function moralisProvider(apiKey: string, chainId: number, fetchImpl: typeof fetch = fetch): Provider | null {
   const chainParam = MORALIS_CHAINS[chainId];
   if (!apiKey || !chainParam) return null;
@@ -95,16 +84,20 @@ export function moralisProvider(apiKey: string, chainId: number, fetchImpl: type
 }
 
 /** The provider this server is configured with, if any covers the chain. */
-export const configuredProvider = () => moralisProvider(process.env.MORALIS_API_KEY?.trim() ?? "", CHAIN_ID);
+const configuredProvider = () => moralisProvider(process.env.MORALIS_API_KEY?.trim() ?? "", CHAIN_ID);
 
 // ─────────────────────────────────────────────────────────────── The chain
 
-const nameAbi = parseAbi(["function name() view returns (string)", "function symbol() view returns (string)", "function balanceOf(address) view returns (uint256)"]);
+const nameAbi = parseAbi([
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function balanceOf(address) view returns (uint256)",
+]);
 
 let cachedClient: PublicClient | undefined;
 const client = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL), batch: { multicall: true } }) as PublicClient);
 
-export const viemChainReader: ChainReader = {
+const viemChainReader: ChainReader = {
   async balances(owner, tokens) {
     if (tokens.length === 0) return [];
     const results = await client().multicall({
@@ -116,11 +109,14 @@ export const viemChainReader: ChainReader = {
   async labels(tokens) {
     if (tokens.length === 0) return [];
     const results = await client().multicall({
-      contracts: tokens.flatMap((address) => [
-        { address, abi: nameAbi, functionName: "name" },
-        { address, abi: nameAbi, functionName: "symbol" },
-        { address, abi: erc20Abi, functionName: "decimals" },
-      ] as const),
+      contracts: tokens.flatMap(
+        (address) =>
+          [
+            { address, abi: nameAbi, functionName: "name" },
+            { address, abi: nameAbi, functionName: "symbol" },
+            { address, abi: erc20Abi, functionName: "decimals" },
+          ] as const,
+      ),
       allowFailure: true,
     });
     return tokens.map((_, i) => {
@@ -187,7 +183,10 @@ async function knownAssets(deps: SearchDeps): Promise<SearchHit[]> {
 
 /** Marks which of `known` the wallet holds, by reading `balanceOf` from each contract. */
 async function chainHoldings(owner: Address, known: readonly SearchHit[], reader: ChainReader): Promise<SearchHit[]> {
-  const balances = await reader.balances(owner, known.map((h) => h.address));
+  const balances = await reader.balances(
+    owner,
+    known.map((h) => h.address),
+  );
   return known.flatMap((hit, i) => {
     const balance = balances[i];
     if (balance === null || balance === undefined || balance === 0n) return [];

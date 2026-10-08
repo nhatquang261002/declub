@@ -28,7 +28,7 @@ const SORTS = [
 /** The top three get a podium once three members have Momentum. */
 const PODIUM = 3;
 
-export function RoleChip({ role }: { role?: PublicMember["role"] }) {
+function RoleChip({ role }: { role?: PublicMember["role"] }) {
   if (role === "owner") {
     return (
       <span className="chip chip-dark">
@@ -49,7 +49,7 @@ export function RoleChip({ role }: { role?: PublicMember["role"] }) {
 }
 
 /** Epochs in a row of posting on the Board (ADR 0032); shown from the second. */
-export function StreakChip({ streak }: { streak?: number }) {
+function StreakChip({ streak }: { streak?: number }) {
   if (!streak || streak < 2) return null;
   return (
     <span className="chip chip-peach" title={`Active on the Board ${streak} weeks (epochs) in a row`} aria-label={`${streak}-week streak`}>
@@ -60,7 +60,7 @@ export function StreakChip({ streak }: { streak?: number }) {
 }
 
 /** The challenges a member won in this Club (ADR 0050), as a count; the titles are in the tooltip. */
-export function TrophyCount({ trophies }: { trophies?: PublicMember["trophies"] }) {
+function TrophyCount({ trophies }: { trophies?: PublicMember["trophies"] }) {
   if (!trophies || trophies.length === 0) return null;
   const titles = trophies.map((t) => `${t.place ? (["1st", "2nd", "3rd"][t.place - 1] ?? `${t.place}th`) : "Winner"}: ${t.title}`).join("\n");
   const label = `${trophies.length} challenge ${trophies.length === 1 ? "win" : "wins"}: ${trophies.map((t) => t.title).join(", ")}`;
@@ -227,9 +227,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
         <Empty title="No members yet">Join to be the first on the list.</Empty>
       ) : (
         <>
-          {podium && (
-            <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />
-          )}
+          {podium && <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />}
           {rest.length > 0 && (
             <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={rest[0]?.rank}>
               {rest.map((m) => {
@@ -260,9 +258,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                         </span>
                       )}
                     </div>
-                    {staff && (
-                      <span className="w-8">{!mine && <ActionMenu label="Member actions" groups={staffActions(me.role, m, actions)} />}</span>
-                    )}
+                    {staff && <span className="w-8">{!mine && <ActionMenu label="Member actions" groups={staffActions(me.role, m, actions)} />}</span>}
                   </li>
                 );
               })}

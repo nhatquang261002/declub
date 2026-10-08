@@ -1,10 +1,10 @@
 import { getAddress, isAddress, type Address } from "viem";
-import { toAsset, toRawAsset, type Asset, type TokenInfo } from "./assets";
+import { toAsset, type Asset, type TokenInfo } from "./assets";
 import { DEFAULT_FILTERS, type DealFilters, type DealSort, type MonFilter } from "./dealFilters";
 import { applyDealFiltersV2, involvesToken } from "./dealFiltersV2";
 import { isExpired, sameAddress, type DealStatus } from "./deals";
 import type { DealV2 } from "./dealsV2";
-import { intentAsListing, intentToWire, parsePoolIntent, type PoolIntent, type SignedListing, type WireAsset } from "./intents";
+import { intentAsListing, intentToWire, parsePoolIntent, wireAsset, type PoolIntent, type SignedListing, type WireAsset } from "./intents";
 
 /**
  * The deal book, filtered on the server (`GET /api/deals`) instead of over the newest 200 deals a
@@ -15,7 +15,7 @@ import { intentAsListing, intentToWire, parsePoolIntent, type PoolIntent, type S
 export type DealTab = "open" | "for-you" | "all";
 /** Which settlement to show: both, deals with locked assets, or signed swaps (ADR 0008). */
 export type BookKind = "any" | "locked" | "signed";
-export type Listing = DealV2 | SignedListing;
+type Listing = DealV2 | SignedListing;
 
 export type BookQuery = {
   tab: DealTab;
@@ -32,7 +32,7 @@ export type BookQuery = {
 
 export const MAX_PAGE_SIZE = 50;
 /** A Club has its own asset and at most one paired with it (lib/verifiedAssets.ts). */
-export const MAX_TOKENS = 2;
+const MAX_TOKENS = 2;
 const MAX_QUERY = 100;
 
 const TABS: readonly DealTab[] = ["open", "for-you", "all"];
@@ -101,7 +101,7 @@ export type BookSource = {
   info: ReadonlyMap<string, TokenInfo>;
 };
 
-export type BookResult = {
+type BookResult = {
   items: Listing[];
   /** Listings in the chosen tab that match, over every page. */
   total: number;
@@ -157,12 +157,7 @@ export type BookResponse =
       signedError: string | null;
     };
 
-const wireAsset = (a: Asset): WireAsset => {
-  const raw = toRawAsset(a);
-  return { assetType: raw.assetType, token: raw.token, id: raw.id.toString(), amount: raw.amount.toString() };
-};
-
-export const wirePoolIntent = (row: PoolIntent) => ({ ...row, intent: intentToWire(row.intent) });
+const wirePoolIntent = (row: PoolIntent) => ({ ...row, intent: intentToWire(row.intent) });
 
 export function toWireListing(t: Listing): WireListing {
   if ("signed" in t) return { signed: wirePoolIntent(t.signed) };

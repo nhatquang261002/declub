@@ -45,8 +45,7 @@ export function FeeNote({
       <p className="text-xs text-muted">{children}</p>
       {raise && (
         <p className="text-xs text-muted">
-          Scheduled to rise to <span className="font-semibold">{formatFee(raise.amount * units, unit)}</span> from{" "}
-          {formatDate(raise.at)}. {pendingNote}
+          Scheduled to rise to <span className="font-semibold">{formatFee(raise.amount * units, unit)}</span> from {formatDate(raise.at)}. {pendingNote}
         </p>
       )}
     </div>

@@ -24,7 +24,7 @@ export const STATUS_TEXT: Record<DisplayStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export function StatusBadge({ status }: { status: DisplayStatus }) {
+function StatusBadge({ status }: { status: DisplayStatus }) {
   return (
     <span className={`chip ${BADGE[status]} uppercase tracking-wide ${status === "open" ? "rotate-[-2deg]" : ""}`}>
       {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
@@ -94,7 +94,7 @@ export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: 
 }
 
 /** The gives / wants pair every deal-like card shows. */
-export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
+function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
   return (
     <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
       <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
@@ -116,7 +116,35 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
   );
 }
 
-/** The card chrome shared by deals and signed swaps: header row, gives / wants panels, maker line. */
+/** The chrome every swap card shares: a link, a header row ending in the countdown, the gives / wants panels and a maker line. */
+export function SwapCardShell({
+  href,
+  head,
+  countdown,
+  gives,
+  wants,
+  foot,
+}: {
+  href: string;
+  head: ReactNode;
+  countdown: ReactNode;
+  gives: ReactNode;
+  wants: ReactNode;
+  foot: ReactNode;
+}) {
+  return (
+    <Link href={href} className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {head}
+        <span className="ml-auto">{countdown}</span>
+      </div>
+      <SwapPanels gives={gives} wants={wants} />
+      <div className="mt-4 text-xs text-muted">{foot}</div>
+    </Link>
+  );
+}
+
+/** A deal's card: its id, status and expiry, the gives / wants panels and who made it. */
 export function DealCardFrame({
   href,
   deal,
@@ -140,34 +168,35 @@ export function DealCardFrame({
   const mine = sameAddress(deal.maker, me);
 
   return (
-    <Link
+    <SwapCardShell
       href={href}
-      className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200"
-    >
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-black tracking-tight">
-          <span className="text-accent">#</span>
-          {deal.id.toString()}
-        </span>
-        <StatusBadge status={status} />
-        {tag}
-        {forMe && <span className="chip chip-peach">★ For you</span>}
-        {mine && <span className="chip chip-dark">Yours</span>}
-        {deal.taker && !forMe && <span className="chip">Private</span>}
-        <span className="ml-auto"><ExpiryCountdown expiry={deal.expiry} now={now} status={status} /></span>
-      </div>
-
-      <SwapPanels gives={gives} wants={wants} />
-
-      <div className="mt-4 text-xs text-muted">
-        by <Who address={deal.maker} mine={mine} plain />
-        {deal.taker && !forMe && (
-          <>
-            {" "}
-            · only <Who address={deal.taker} plain /> can accept
-          </>
-        )}
-      </div>
-    </Link>
+      head={
+        <>
+          <span className="font-black tracking-tight">
+            <span className="text-accent">#</span>
+            {deal.id.toString()}
+          </span>
+          <StatusBadge status={status} />
+          {tag}
+          {forMe && <span className="chip chip-peach">★ For you</span>}
+          {mine && <span className="chip chip-dark">Yours</span>}
+          {deal.taker && !forMe && <span className="chip">Private</span>}
+        </>
+      }
+      countdown={<ExpiryCountdown expiry={deal.expiry} now={now} status={status} />}
+      gives={gives}
+      wants={wants}
+      foot={
+        <>
+          by <Who address={deal.maker} mine={mine} plain />
+          {deal.taker && !forMe && (
+            <>
+              {" "}
+              · only <Who address={deal.taker} plain /> can accept
+            </>
+          )}
+        </>
+      }
+    />
   );
 }
