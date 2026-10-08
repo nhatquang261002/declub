@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { StoredPost } from "../lib/clubPosts";
 import { profileKey, userWalletsKey, type StoredProfile } from "../lib/profiles";
-import { DEFAULT_CLUB_RULES, REWARDS, backingPoints, voiceOf, type BackingAction, type Voice } from "../lib/rewards";
+import { DEFAULT_CLUB_RULES, REWARDS, activityPoints, backingPoints, engagementPoints, voiceOf, type BackingAction, type Voice } from "../lib/rewards";
 import { activeDays, dayOf } from "../lib/server/activeDays";
 import { backingKey, givenEverywhere, readBacking, verifiedSince } from "../lib/server/backing";
 import { createPost, createReply, likePost, postKey, type Deps } from "../lib/server/board";
@@ -156,6 +156,39 @@ describe("base voices (ADR 0039)", () => {
   });
 });
 
+describe("points for engaging (ADR 0046)", () => {
+  const like = (giver: string, receiver: string): BackingAction => ({ giver, receiver, kind: "like" });
+  const reply = (giver: string, receiver: string, first = false): BackingAction => ({ giver, receiver, kind: first ? "first" : "reply" });
+
+  it("counts the members engaged with, not the actions: a reply beats a like, and spamming one member earns once", () => {
+    const out = engagementPoints([like("g", "a"), like("g", "a"), like("g", "a"), reply("g", "a"), like("g", "b"), reply("g", "c", true), like("h", "a")]);
+    assert.deepEqual(Object.fromEntries(out), {
+      g: 2 * REWARDS.engageReplyPoints + REWARDS.engageLikePoints,
+      h: REWARDS.engageLikePoints,
+    });
+  });
+
+  it("caps an epoch's engaging, and gives nothing for engaging with oneself", () => {
+    const many = Array.from({ length: 20 }, (_, i) => reply("g", `m${i}`));
+    assert.equal(engagementPoints(many).get("g"), REWARDS.engageCapPerEpoch);
+    assert.equal(engagementPoints([reply("g", "g"), like("g", "g")]).has("g"), false);
+  });
+
+  it("needs no voice: a member without NFTs or a profile earns it as well", () => {
+    const actions = [like("nobody", "a"), reply("nobody", "b")];
+    assert.equal(backingPoints(actions, new Map()).size, 0, "they give no backing");
+    assert.equal(engagementPoints(actions).get("nobody"), REWARDS.engageLikePoints + REWARDS.engageReplyPoints, "but earn for engaging");
+  });
+
+  it("adds to a member's points, capped again however it's called", () => {
+    const a = activityPoints([], null, [wallet(1)], 1, 0, DEFAULT_CLUB_RULES, 0, 3);
+    assert.equal(a.engaged, 3);
+    assert.equal(a.points, REWARDS.dayPoints + 3);
+    assert.equal(activityPoints([], null, [wallet(1)], 0, 0, DEFAULT_CLUB_RULES, 0, 99).engaged, REWARDS.engageCapPerEpoch);
+    assert.equal(activityPoints([], null, [wallet(1)], 1).engaged, undefined, "absent when none");
+  });
+});
+
 describe("recording backing", () => {
   it("records likes and replies against their epoch, and reads only what still stands", async () => {
     const store = memoryStore();
@@ -255,9 +288,10 @@ describe("recording backing", () => {
     const backed = 3 * REWARDS.voicePerNft + REWARDS.baseVoice;
     assert.deepEqual(by, {
       m1: [REWARDS.dayPoints + backed, backed, 1, REWARDS.baseVoice, 1],
-      m2: [REWARDS.dayPoints, 0, 0, 0, 1],
+      m2: [REWARDS.dayPoints + REWARDS.engageLikePoints, 0, 0, 0, 1],
       m3: [0, 0, 0, 0, 0],
     });
+    assert.equal(holders.find((h) => h.userId === "m2")!.engagedPoints, REWARDS.engageLikePoints, "the like earns its giver a little too (ADR 0046)");
   });
 
   it("shares a base voice over every Club, and gives none to a profile shared too late or not at all", async () => {

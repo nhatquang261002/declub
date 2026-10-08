@@ -88,6 +88,14 @@ export type ClubRules = {
   likeWeight: number;
   replyWeight: number;
   firstReplyWeight: number;
+  /**
+   * Engaging (ADR 0046): what a member earns themselves for engaging with others, per other member
+   * (not per action): `engageReplyPoints` for each they replied to, `engageLikePoints` for each they
+   * only liked, at most `engageCapPerEpoch` an epoch.
+   */
+  engageReplyPoints: number;
+  engageLikePoints: number;
+  engageCapPerEpoch: number;
   /** Two members who backed each other in an epoch: each direction counts this much. */
   mutualFactor: number;
   /**
@@ -117,6 +125,9 @@ export const DEFAULT_CLUB_RULES: ClubRules = {
   likeWeight: 1,
   replyWeight: 2,
   firstReplyWeight: 4,
+  engageReplyPoints: 1,
+  engageLikePoints: 0.5,
+  engageCapPerEpoch: 5,
   mutualFactor: 0.5,
   swapPoints: 2,
   swapCapPerEpoch: 14,
@@ -270,7 +281,18 @@ export const SPONSOR_MIN_WEI = 10n ** 17n;
 export const sponsorMessage = (club: string, tx: string, name: string) =>
   `DeClub sponsorship\nClub: ${club.toLowerCase()}\nPayment: ${tx.toLowerCase()}\nName: ${name}`;
 
-export type Activity = { x: number; days: number; swaps: number; backed: number; /** Won in challenges (ADR 0045); absent when none. */ challenge?: number; points: number; bonusBps: number };
+export type Activity = {
+  x: number;
+  days: number;
+  swaps: number;
+  backed: number;
+  /** Won in challenges (ADR 0045); absent when none. */
+  challenge?: number;
+  /** Earned for engaging with other members (ADR 0046), already capped; absent when none. */
+  engaged?: number;
+  points: number;
+  bonusBps: number;
+};
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -280,7 +302,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * and its reach, and their completed swaps (`swapPoints`, ADR 0034). At most 7 active days count.
  * The reach read has the last word on an X share: one that was deleted, or edited so it's no longer
  * about the Club, counts for nothing. `challenge` is what the member won in the Club's challenges
- * this epoch (ADR 0045), already capped.
+ * this epoch (ADR 0045), and `engaged` what they earned for engaging with others (`engagementPoints`,
+ * ADR 0046), both already capped.
  */
 export function activityPoints(
   events: readonly ActivityEvent[],
@@ -290,6 +313,7 @@ export function activityPoints(
   backed = 0,
   rules: ClubRules = DEFAULT_CLUB_RULES,
   challenge = 0,
+  engaged = 0,
 ): Activity {
   const own = new Set(wallets.map((w) => w.toLowerCase()));
   let base = 0;
@@ -306,8 +330,18 @@ export function activityPoints(
   const active = Math.max(0, Math.min(7, Math.floor(days)));
   const support = Math.max(0, backed);
   const won = Math.max(0, challenge);
-  const points = x + swaps + active * rules.dayPoints + support + won;
-  return { x: round2(x), days: active, swaps: round2(swaps), backed: round2(support), ...(won > 0 ? { challenge: round2(won) } : {}), points: round2(points), bonusBps: bonusBps(points, rules) };
+  const engaging = Math.max(0, Math.min(rules.engageCapPerEpoch, engaged));
+  const points = x + swaps + active * rules.dayPoints + support + won + engaging;
+  return {
+    x: round2(x),
+    days: active,
+    swaps: round2(swaps),
+    backed: round2(support),
+    ...(won > 0 ? { challenge: round2(won) } : {}),
+    ...(engaging > 0 ? { engaged: round2(engaging) } : {}),
+    points: round2(points),
+    bonusBps: bonusBps(points, rules),
+  };
 }
 
 /** One like or reply a member gave another in a Club's epoch (ADR 0038), by user id. */
@@ -377,6 +411,25 @@ export function backingPoints(actions: readonly BackingAction[], voices: Readonl
       return [user, { points: round2(club + capped), backers: backers.size, base: round2(capped) }];
     }),
   );
+}
+
+/**
+ * What each member earns for engaging with others in a Club over an epoch (ADR 0046), by user id:
+ * `engageReplyPoints` for each other member they replied to, `engageLikePoints` for each they only
+ * liked, at most `engageCapPerEpoch`. It counts members, not actions, so engaging with many members
+ * pays and fifty likes on one member's posts earn what one does. Unlike backing, it needs no voice:
+ * members without NFTs earn it too. Actions on oneself count for nothing.
+ */
+export function engagementPoints(actions: readonly BackingAction[], rules: ClubRules = DEFAULT_CLUB_RULES): Map<string, number> {
+  const byGiver = new Map<string, Map<string, number>>();
+  for (const a of actions) {
+    if (a.giver === a.receiver) continue;
+    const worth = a.kind === "like" ? rules.engageLikePoints : rules.engageReplyPoints;
+    const mine = byGiver.get(a.giver) ?? new Map<string, number>();
+    mine.set(a.receiver, Math.max(mine.get(a.receiver) ?? 0, worth));
+    byGiver.set(a.giver, mine);
+  }
+  return new Map([...byGiver].map(([giver, mine]) => [giver, round2(Math.min(rules.engageCapPerEpoch, [...mine.values()].reduce((sum, p) => sum + p, 0)))]));
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   activityPoints,
   averageHeld,
   backingPoints,
+  engagementPoints,
   epochAt,
   epochWindow,
   leavesOf,
@@ -84,13 +85,15 @@ export type LedgerRow = {
   shares: string;
   held: number;
   points: number;
-  /** Of `points`: active days, X shares, swaps and others' backing, which came from this many members and this much from base voices. */
+  /** Of `points`: active days, X shares, swaps and others' backing, which came from this many members and this much from base voices; engaging and challenges below. */
   days: number;
   xPoints: number;
   swapPoints: number;
   backedPoints: number;
   /** Of `points`: won in the Club's challenges (ADR 0045). Absent in epochs built before. */
   challengePoints?: number;
+  /** Of `points`: earned for engaging with other members (ADR 0046). Absent when none, and in epochs built before. */
+  engagedPoints?: number;
   backers: number;
   basePoints: number;
   /** The whole bonus: activity plus streak, in basis points, and the streak in epochs. */
@@ -314,6 +317,8 @@ export type HolderInput = Holder & {
   backedPoints: number;
   /** Of `points`: won in challenges (ADR 0045). */
   challengePoints: number;
+  /** Of `points`: earned for engaging with other members (ADR 0046). */
+  engagedPoints: number;
   /** How many members backed them. */
   backers: number;
   /** Of `backedPoints`: from base voices (ADR 0039), at most `baseCapPerReceiver`. */
@@ -348,6 +353,8 @@ export type ClosingHolder = {
   base: number;
   /** Challenge points won in the epoch, capped (ADR 0045). Absent in snapshots taken before. */
   challenge?: number;
+  /** Points for engaging with other members, capped (ADR 0046). Absent when none, and in snapshots taken before. */
+  engaged?: number;
 };
 
 /**
@@ -399,6 +406,8 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
   const removed = [...read0.removed.map((a) => ({ ...a, by: "moderator" as const })), ...read0.actions.filter((a) => banned.has(a.giver)).map((a) => ({ ...a, by: "reward_ban" as const }))];
   const voices = await voicesFor(store, n, actions.map((a) => a.giver), average, linkedBy, rules);
   const backed = backingPoints(actions, voices, rules);
+  // What givers earn themselves for engaging (ADR 0046): a banned member's actions are already out.
+  const engaged = engagementPoints(actions, rules);
   const days = await activeDays(store, club.address, n, read0.days);
   // What members won in the Club's challenges (ADR 0045); a member banned from rewards wins nothing.
   const awards = Object.fromEntries(Object.entries(await readAwards(store, club.address, n)).filter(([userId]) => !banned.has(userId)));
@@ -416,13 +425,14 @@ async function readInputs(store: Store, club: ClubEntry, n: number, holdings: Ho
       backers: support?.backers ?? 0,
       base: support?.base ?? 0,
       ...(awards[userId] ? { challenge: awardedPoints(awards[userId]) } : {}),
+      ...(engaged.get(userId) ? { engaged: engaged.get(userId) } : {}),
     };
   };
   const holders = held.map(({ userId, wallet, wallets, shares, joinedAt }) => row(userId, wallet, wallets, shares, joinedAt));
   const rows = await allRows(store, club.address);
   // Members without NFTs who did something: the Club may pay them a slice (ADR 0044).
   const members = rows
-    .filter((r) => r.displayWallet && r.wallets.length > 0 && !closing.has(r.userId) && !banned.has(r.userId) && ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId) || !!awards[r.userId]))
+    .filter((r) => r.displayWallet && r.wallets.length > 0 && !closing.has(r.userId) && !banned.has(r.userId) && ((days.get(r.userId) ?? 0) > 0 || backed.has(r.userId) || engaged.has(r.userId) || !!awards[r.userId]))
     .map((r) => row(r.userId, r.displayWallet!, r.wallets, 0n, r.joinedAt));
   const wallets = new Map(rows.flatMap((r) => (r.displayWallet ? [[r.userId, r.displayWallet] as const] : [])));
   const read: BackingRead = { actions, removed, voices, wallets };
@@ -443,8 +453,17 @@ export function scoreHolders(
   streaks: Streaks,
   rules: ClubRules = DEFAULT_CLUB_RULES,
 ): HolderInput[] {
-  return inputs.holders.map(({ userId, wallet, wallets, shares, held, joinedAt, days, backed, backers, base, challenge }) => {
-    const { points, bonusBps, x, swaps, backed: backedPoints, challenge: challengePoints = 0 } = activityPoints(events, reach, wallets, days, backed, rules, challenge ?? 0);
+  return inputs.holders.map(({ userId, wallet, wallets, shares, held, joinedAt, days, backed, backers, base, challenge, engaged }) => {
+    const { points, bonusBps, x, swaps, backed: backedPoints, challenge: challengePoints = 0, engaged: engagedPoints = 0 } = activityPoints(
+      events,
+      reach,
+      wallets,
+      days,
+      backed,
+      rules,
+      challenge ?? 0,
+      engaged ?? 0,
+    );
     return {
       userId,
       wallet,
@@ -457,6 +476,7 @@ export function scoreHolders(
       swapPoints: swaps,
       backedPoints,
       challengePoints,
+      engagedPoints,
       backers,
       basePoints: base,
       days,
@@ -664,6 +684,7 @@ async function compute(
       swapPoints: h.swapPoints,
       backedPoints: h.backedPoints,
       ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
+      ...(h.engagedPoints ? { engagedPoints: h.engagedPoints } : {}),
       backers: h.backers,
       basePoints: h.basePoints,
       bonusBps: holder ? totalBonusBps(h, rules) : 0,

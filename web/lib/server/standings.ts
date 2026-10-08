@@ -38,12 +38,14 @@ export type StandingRow = {
   xShares: number;
   /** Activity points: days on the Board, X shares and swaps together (ADR 0037 ranks by it). */
   points: number;
-  /** Of `points`: from X shares, from swaps, and from others' backing (ADR 0038); the rest is from active days. Absent in copies cached before. */
+  /** Of `points`: from X shares, from swaps, and from others' backing (ADR 0038); the rest is from active days, engaging and challenges. Absent in copies cached before. */
   xPoints?: number;
   swapPoints?: number;
   backedPoints?: number;
   /** Of `points`: won in the Club's challenges this epoch (ADR 0045). */
   challengePoints?: number;
+  /** Of `points`: earned for engaging with other members this epoch (ADR 0046). */
+  engagedPoints?: number;
   /** How many members backed them this epoch. */
   backers?: number;
   /** Of `backedPoints`: from verified accounts' base voices (ADR 0039). */
@@ -162,6 +164,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       swapPoints: h.swapPoints,
       backedPoints: h.backedPoints,
       ...(h.challengePoints ? { challengePoints: h.challengePoints } : {}),
+      ...(h.engagedPoints ? { engagedPoints: h.engagedPoints } : {}),
       backers: h.backers,
       basePoints: h.basePoints,
       bonusBps: payout?.bonusBps ?? 0,

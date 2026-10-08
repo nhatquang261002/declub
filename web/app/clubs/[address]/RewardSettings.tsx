@@ -97,7 +97,7 @@ export function RewardSettings({ token, owner, now }: { token: string; owner: bo
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">{OWNER_RULES.map(input)}</div>
-      <p className="text-xs text-muted">How points are counted (backing, active days, swaps, streaks) is the same in every Club.</p>
+      <p className="text-xs text-muted">How points are counted (backing, engaging, active days, swaps, streaks) is the same in every Club.</p>
       {owner ? (
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" className="btn-primary" aria-busy={save.isPending} disabled={save.isPending || !dirty || bad}>

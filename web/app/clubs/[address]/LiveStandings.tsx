@@ -6,7 +6,7 @@ import { FlameIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubStandings } from "@/hooks/useRewards";
-import { REWARDS_EPOCH_SECONDS } from "@/lib/config";
+import { REWARDS_EPOCH_SECONDS, REWARDS_RULES_URL } from "@/lib/config";
 import { countdown, formatMon } from "@/lib/format";
 import { DEFAULT_CLUB_RULES, PROTOCOL, percent, seatsFor, whoIsPaid, type ClubRules } from "@/lib/rewards";
 import type { StandingRow, StandingsView } from "@/lib/server/standings";
@@ -121,14 +121,15 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
       {rules.nonHolderBps > 0 && s.members && <MembersSlice s={s} rules={rules} me={me} />}
 
       <p className="mt-4 text-xs text-muted">
-        Points: each Holder shares out a weekly voice of {rules.voicePerNft} per NFT (up to {rules.voiceCapNfts * rules.voicePerNft}) over the posts and replies they like or
-        answer here, and every verified account {PROTOCOL.baseVoice} more across all Clubs (at most {PROTOCOL.baseCapPerReceiver} of anyone’s points); that backing is most of
-        anyone’s points. Add {rules.dayPoints} for each day you post, reply or like (up to 7), {PROTOCOL.xShareBase} for each of your own X
-        posts about the Club, and {rules.swapPoints} for each swap (up to {rules.swapCapPerEpoch}). Voice and share count the NFTs you held on average over the week, not
-        only at close. An estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
+        Points come from Holders backing your posts and replies, engaging with other members, active days, your X posts about the Club, swaps and
+        challenges. An estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
         <Link href="/guide/clubs#rewards" className="font-semibold underline underline-offset-2">
           How points work
         </Link>
+        {" · "}
+        <a href={REWARDS_RULES_URL} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2">
+          Full rules
+        </a>
       </p>
     </Panel>
   );
@@ -239,6 +240,7 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
           backedPoints={ranked ? me.backedPoints : undefined}
           backers={ranked ? me.backers : undefined}
           challengePoints={ranked ? me.challengePoints : undefined}
+          engagedPoints={ranked ? me.engagedPoints : undefined}
         />
       </div>
       <p className="mt-4 rounded-lg bg-[#f0b735]/25 px-3 py-2 text-sm font-semibold">{hint}</p>
