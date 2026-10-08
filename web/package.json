@@ -14,10 +14,12 @@
     "start:mainnet": "node scripts/flavor.mjs mainnet next start -p 3001",
     "rewards:epoch:mainnet": "node scripts/flavor.mjs mainnet npm run rewards:epoch --",
     "rewards:sponsor:mainnet": "node scripts/flavor.mjs mainnet npm run rewards:sponsor --",
+    "rewards:verify:mainnet": "node scripts/flavor.mjs mainnet npm run rewards:verify --",
     "lint": "eslint",
     "abi": "wagmi generate",
     "rewards:epoch": "node --import ./test/register.mjs scripts/rewards-epoch.ts",
     "rewards:sponsor": "node --import ./test/register.mjs scripts/rewards-sponsor.ts",
+    "rewards:verify": "node --import ./test/register.mjs scripts/rewards-verify.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs --test --test-concurrency=1 \"test/**/*.test.ts\""
   },

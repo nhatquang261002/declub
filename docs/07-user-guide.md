@@ -41,6 +41,10 @@ Open any deal from **Deals**. The page shows **You get** and **You give**, the m
 - **Open offer:** you can't accept it directly. Build an offer from your own assets and press **Send offer**. Your offer is held in the contract until the maker accepts or rejects it, or you press **Withdraw my offer**, which works at any time, even after the deal has closed.
 - **For someone else:** a deal made for one wallet shows "This offer is for someone else" to everyone else.
 
+Every asset shows its contract address and a chip: **Verified** (the contract the project published; not a promise of value), **Unverified** (not on DeClub's list: anyone can make a contract with any name), **Lookalike** (unverified but named like a verified one, almost always a copy) or **Blocked** (on DeClub's blocked list). Before you approve or accept anything unverified you'd receive, the page asks you to tick "I've checked these contract addresses". A deal with a blocked asset can't be accepted here.
+
+Once you've accepted, the page lists any approval your wallet still gives the escrow, under **Approvals you can turn off**. The escrow only uses one while your transaction runs, so you can revoke it. **Your approvals** in the wallet menu lists every approval you've given DeClub's contracts, with a **Revoke** button for each.
+
 If a payout to you was refused, for example by a token or a contract wallet, the deal page shows **Waiting for you to collect**. It's held safely for you; press **Claim** to collect it.
 
 ## Your own deals

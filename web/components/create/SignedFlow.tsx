@@ -22,8 +22,12 @@ import { feeUnits } from "@/lib/assets";
 import { MOCK_ERC20_ADDRESS, POOL_URL } from "@/lib/config";
 import type { Step } from "@/lib/createFlow";
 import { DEADLINES, DEFAULT_DEADLINE, deadlineSeconds, intentProblem, type DeadlineKey } from "@/lib/intents";
+import { blockedProblem } from "@/lib/assetTrust";
 import { ConfirmCard, NextButton, ReviewCard, ReviewStage, StepHeading, StepNav } from "./parts";
 import { DealStageSide } from "@/components/DealSheet";
+
+/** The longest choice gets a warning: a signature out for a week is a standing offer (ADR 0008). */
+const LONG_DEADLINE: DeadlineKey = "7d";
 
 type Props = {
   step: Step;
@@ -63,8 +67,8 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
 
   const give = draftToAssets(giveRows, decimalsOf, { noNative: true });
   const want = draftToAssets(wantRows, decimalsOf, { noNative: true });
-  const wantError = want.errors[0] ?? (want.assets.length === 0 ? "Add something you want in return." : null);
-  const giveError = give.errors[0] ?? intentProblem(give.assets, want.assets);
+  const wantError = want.errors[0] ?? (want.assets.length === 0 ? "Add something you want in return." : null) ?? blockedProblem(want.assets);
+  const giveError = give.errors[0] ?? intentProblem(give.assets, want.assets) ?? blockedProblem(give.assets);
 
   // Reads the chain only once the draft is sound, so typing doesn't fire a read per keystroke.
   // The readiness check multiplies the per-NFT fee by the NFTs given (ADR 0033).
@@ -136,6 +140,12 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
               After this it can no longer settle. Shorter is safer: once a signature has left the pool, only cancelling it on-chain
               (which costs gas) stops it sooner.
             </p>
+            {deadline === LONG_DEADLINE && (
+              <p className="mt-2 text-xs font-semibold text-warn">
+                A week is a long time to leave a signature out. If prices move or you change your mind, removing it from the pool
+                isn&apos;t enough: you&apos;d have to cancel it on-chain.
+              </p>
+            )}
           </div>
           {hasNfts && (
             <div>

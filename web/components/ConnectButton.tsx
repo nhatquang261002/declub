@@ -11,6 +11,7 @@ import {
   ExternalIcon,
   PlusIcon,
   SettingsIcon,
+  ShieldIcon,
   SignOutIcon,
   UserIcon,
   WalletIcon,
@@ -142,6 +143,10 @@ export function ConnectedWallet({
           <Link href={profilePath(address)} className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
             <span className="hdr-pop-icon"><UserIcon /></span>
             <span className="flex-1">Your profile</span>
+          </Link>
+          <Link href="/approvals" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+            <span className="hdr-pop-icon"><ShieldIcon /></span>
+            <span className="flex-1">Your approvals</span>
           </Link>
           {accountLink && (
             <Link href="/settings" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useConnection, useReadContracts } from "wagmi";
 import { Alert } from "@/components/Alert";
@@ -31,6 +32,11 @@ import {
 } from "@/components/DealSheet";
 import { ExternalIcon, LockIcon } from "@/components/Icons";
 import { TxButton, TxStatus } from "@/components/Tx";
+import { TrustCheck } from "@/components/TrustCheck";
+import { ApprovalList } from "@/components/ApprovalList";
+import { useApprovals, type ApprovalTarget } from "@/hooks/useApprovals";
+import { useAssetTrust } from "@/hooks/useAssetTrust";
+import { allVerified, sideTrust } from "@/lib/assetTrust";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
 import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
@@ -50,6 +56,7 @@ import { CopyAddress } from "@/components/CopyAddress";
 import { ShareDeal } from "@/components/ShareDeal";
 
 const NO_ASSETS: readonly Asset[] = [];
+const ESCROW_ONLY = ["escrow"] as const;
 
 export default function DealV2Page() {
   const params = useParams<{ id: string }>();
@@ -79,6 +86,9 @@ function DealDetailV2({ id }: { id: bigint }) {
   );
   const tokens = useMemo(() => erc20Tokens(assets), [assets]);
   const { info } = useTokenInfo(tokens);
+  const trust = useAssetTrust(assets, info);
+  // The taker ticks this after checking unverified contracts they'd receive (ADR 0014).
+  const [checked, setChecked] = useState(false);
 
   const status = deal ? displayStatus(deal, now) : "open";
   const isMaker = sameAddress(deal?.maker, address);
@@ -115,6 +125,17 @@ function DealDetailV2({ id }: { id: bigint }) {
   );
   const credits = useCredits(address, creditAssets);
 
+  // The escrow only uses an approval inside the transaction that pulls the assets, so once this
+  // wallet isn't about to accept or offer, whatever it approved here can be turned off.
+  const approvalTargets = useMemo<ApprovalTarget[]>(
+    () =>
+      assets.flatMap<ApprovalTarget>((a) =>
+        a.kind === "erc721" || a.kind === "trait" ? [{ token: a.token, kind: "erc721" }] : a.kind === "erc20" ? [{ token: a.token, kind: "erc20" }] : [],
+      ),
+    [assets],
+  );
+  const { approvals: leftover } = useApprovals(canFill || canPropose ? undefined : address, approvalTargets, ESCROW_ONLY);
+
   if (isLoading) return <EmptyState>Loading deal…</EmptyState>;
   if (!deal && error && describeError(error).kind !== "reverted") {
     return <LoadError title="Couldn&apos;t load this deal" error={error} />;
@@ -130,6 +151,10 @@ function DealDetailV2({ id }: { id: bigint }) {
   const titles = sideTitles(party);
   const kind = openOffer ? "Open offer" : traitFill.hasTraits ? "Request by trait" : null;
   const settled = status === "filled" || status === "cancelled";
+  // What the taker would receive, and whether anything in the deal is on the blocked list.
+  const received = sideTrust(deal.offered, trust);
+  const blocked = sideTrust([...deal.offered, ...deal.requested], trust).blocked.length > 0;
+  const trustBlocked = blocked || (!allVerified(received) && !checked);
 
   async function accept() {
     if (fee === undefined) return;
@@ -145,6 +170,13 @@ function DealDetailV2({ id }: { id: bigint }) {
     <>
       <BackToDeals />
       <div className="space-y-8">
+        {blocked && (
+          <Alert tone="danger" title="This deal includes a blocked asset">
+            {isMaker
+              ? "One of its assets is on DeClub's blocked list, so nobody can accept it here. You can still cancel it to take your side back."
+              : "One of its assets is on DeClub's blocked list, usually a scam or a copy of a real collection, so it can't be accepted here."}
+          </Alert>
+        )}
         <DealSheet>
           <DealSheetHead
             chips={
@@ -252,6 +284,7 @@ function DealDetailV2({ id }: { id: bigint }) {
                   ["Accept & swap", false],
                 ])}
               />
+              <TrustCheck side={received} info={info} confirmed={checked} onConfirm={setChecked} />
               {fee !== undefined && (
                 <FeeNote amount={fee} units={feeUnits(deal.requested)}>
                   Sent with your payment, once for each NFT you hand over. The maker pays the same for theirs, and neither is charged unless the swap completes.
@@ -278,13 +311,13 @@ function DealDetailV2({ id }: { id: bigint }) {
                 </TxButton>
               )}
               {canFill && steps[0] && (
-                <TxButton state={action.state} onClick={() => action.run(steps[0].call)}>
+                <TxButton state={action.state} disabled={trustBlocked} onClick={() => action.run(steps[0].call)}>
                   {steps[0].label}
                   {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
                 </TxButton>
               )}
               {canFill && !steps[0] && (
-                <TxButton state={action.state} disabled={traitFillBlocked || fee === undefined} onClick={accept}>
+                <TxButton state={action.state} disabled={traitFillBlocked || trustBlocked || fee === undefined} onClick={accept}>
                   Accept &amp; swap
                 </TxButton>
               )}
@@ -325,6 +358,19 @@ function DealDetailV2({ id }: { id: bigint }) {
               </div>
             ))}
             <TxStatus state={claim.state} success="Claimed." />
+          </section>
+        )}
+
+        {leftover.length > 0 && (
+          <section className="deal-panel space-y-3 p-5">
+            <div>
+              <h2 className="font-black">Approvals you can turn off</h2>
+              <p className="text-sm text-muted">
+                Your wallet still lets the escrow move these. It only needs that while you list or accept a deal.{" "}
+                <Link href="/approvals" className="underline underline-offset-2">All your approvals</Link>
+              </p>
+            </div>
+            <ApprovalList approvals={leftover} info={info} />
           </section>
         )}
 

@@ -10,6 +10,8 @@
  * Club memberships and activity live there), NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS, and for --publish
  * REWARDS_OPERATOR_KEY: the private key of the contract's operator. On mainnet the operator is a
  * Safe; there, build without --publish and send `publish(epoch, root)` with `total` from the Safe.
+ * Every signer runs scripts/rewards-verify.ts with the Safe transaction's root and value first, and
+ * signs only on PASS.
  *
  * Before building, it reads the X reach of the epoch's X shares (ADR 0024) with X_BEARER_TOKEN
  * (web/.env.local; pay per use, about $0.005 a post). Without it, X shares count with no reach.

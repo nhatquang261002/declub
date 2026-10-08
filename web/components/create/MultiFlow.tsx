@@ -22,6 +22,7 @@ import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from
 import { noteBytes } from "@/lib/dealsV2";
 import { draftClause, newTraitDraft, resolveDrafts, type TraitDraft } from "@/lib/traitDraft";
 import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
+import { blockedProblem } from "@/lib/assetTrust";
 import { ConfirmCard, NextButton, ReviewStage, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
 import { DealStageSide } from "@/components/DealSheet";
 import { LockIcon } from "@/components/Icons";
@@ -110,10 +111,11 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
   const askError = isOpen
     ? bytes > MAX_NOTE_BYTES ? `The note is ${bytes} bytes; the limit is ${MAX_NOTE_BYTES}.` : null
     : isTrait
-      ? (traitError ?? plain.errors[0] ?? null)
-      : (requested.errors[0] ?? null);
+      ? (traitError ?? plain.errors[0] ?? blockedProblem(requested.assets))
+      : (requested.errors[0] ?? blockedProblem(requested.assets));
   const offerError =
     offered.errors[0] ??
+    blockedProblem(offered.assets) ??
     (isOpen ? null : overlapError(offered.assets, plain.assets)) ??
     takerError(terms.taker, address);
 

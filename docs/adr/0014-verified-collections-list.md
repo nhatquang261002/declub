@@ -1,6 +1,6 @@
 # ADR 0014: A curated list marks which collections and tokens are verified
 
-**Status:** Accepted · 2026-10-02 (the list file; the UI badges and warnings are still to build) · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md). [ADR 0016](0016-clubs-and-momentum.md) opens a Club for each verified collection and memecoin.
+**Status:** Accepted · 2026-10-02 (the list file) · 2026-10-08 (the badges and warnings, and lookalikes, below) · Web only. No contract, matcher or pool change. Builds on [ADR 0005](0005-generic-asset-model.md). [ADR 0016](0016-clubs-and-momentum.md) opens a Club for each verified collection and memecoin.
 
 ## Context
 
@@ -19,6 +19,8 @@ What a user can't see is whether a contract is the real one. A contract can clai
   - **Blocked:** hidden from pickers and lists, refused by the asset editor, and shown with a banner if someone opens a deal that includes it by link.
 - **Never in the way of getting assets back.** Cancel, reclaim, withdraw and `claim` work the same for every tier, and a deal that already holds a blocked token still opens, so its owner can see and unwind it.
 - **Matched by chain id and address, never by name or symbol.** An entry says nothing about any one token in a collection, only about the contract. Testnet and mainnet entries never mix.
+- **Lookalikes are flagged, never trusted.** An unverified contract whose name or symbol reads the same as a verified one's (case, accents, spacing, punctuation, Cyrillic or Greek letters and digits like `0` for `o` folded away) gets a **Lookalike** chip and a warning naming the real contract. The name only ever adds a warning: it can't make anything verified.
+- **Where the extra confirm sits.** It guards what a person *receives*: a taker accepting a deal, and a maker accepting an offer on an open offer. Ticking "I've checked these contract addresses" unlocks **Approve** and **Accept & swap**. A blocked asset on either side of a deal stops both; Create and the offer form refuse it outright. Built in `web/lib/assetTrust.ts`, `web/components/TrustChip.tsx` and `web/components/TrustCheck.tsx`.
 - **What "verified" means** is written down in the docs and applied by the maintainer. A starting bar: the address comes from the project's own official channel; the source is verified on Sourcify or the chain's explorer; an ERC-721 reports the interface, and an ERC-20 passes the escrow's exact-transfer check (no fee-on-transfer, no rebasing). A wrong "verified" is worse than none, so when in doubt an asset stays unverified.
 
 ## What it does not do

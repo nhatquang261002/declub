@@ -384,11 +384,13 @@ This is the live checklist in [10 · Privy](10-privy.md#what-remains-to-validate
 
 | ID | P | Case | Preconditions | Steps | Expected | Automated |
 |---|---|---|---|---|---|---|
-| M-SEC-01 | P0 | Assets are what they claim | Engineer deploys a lookalike ERC-20 named "mUSD" and a lookalike NFT collection named "Chog" | A lists a deal asking for the real mUSD; B creates one offering the fake. Open both as C. | The deal page and list always show the token address beside the symbol, so the two are distinguishable. Record what the app does for an unverified token (the verified-list badges and warnings of ADR 0014 are not built yet; see [6.1](#61-gono-go-checklist)). | — |
+| M-SEC-01 | P0 | Assets are what they claim | Engineer deploys a lookalike ERC-20 named "mUSD" and a lookalike NFT collection named "Chog" | A lists a deal asking for the real mUSD; B creates one offering the fake. Open both as C. | Every asset row shows its address and a chip: **Verified** for the real ones, **Lookalike** for the fakes. As B on A's deal nothing extra is asked. As A or C on B's deal, a "Looks like a copy" warning names the real contract, lists the fake's full address with an explorer link, and **Approve** and **Accept & swap** stay disabled until "I've checked these contract addresses" is ticked. Add the fake to `assets.json` as `blocked` and rebuild: the deal shows "This deal includes a blocked asset", nobody can accept it, B can still cancel, and Create refuses the fake with "… is on DeClub's blocked list". | `web/test/assetTrust.test.ts` |
 | M-SEC-02 | P0 | Approvals are minimal | — | Watch every approval prompt in M-CRE-01/02, M-DEAL-01, M-SIG-01. | ERC-20 approvals are exact amounts; NFT approvals are per-collection only when the copy says so (or per-id for swaps); nothing approves the matcher or any address other than the two deal contracts and the fee token's spender. | — |
 | M-SEC-03 | P0 | What you sign is what's shown | M-SIG-01 | Compare the wallet's typed-data view with the review screen. | Give, want, fee token, `maxFee` and deadline in the prompt match the review; the domain's `verifyingContract` is the configured intents address. | Automated: IN-01 |
 | M-SEC-04 | P1 | Framing and headers | — | Try to load the app in an iframe on another origin; check response headers. | The frame is refused (`X-Frame-Options: DENY`, `frame-ancestors 'none'`). | Automated: WEB-02 |
 | M-SEC-05 | P1 | User text is inert | — | Put `<img src=x onerror=alert(1)>`, a `javascript:` link and a 2,000-character word in an offer note, a trait spec, a Club post and a Club description. | Rendered as plain text, no script runs, layout doesn't break, links aren't clickable. | — |
+| M-SEC-07 | P1 | Revoking approvals | A has done M-DEAL-01 and M-SIG-01 | 1. Open the deal A filled. 2. Open **Your approvals** from the wallet menu. 3. Revoke the collection approval for the escrow, then the one a live signed swap needs. 4. Add the lookalike from M-SEC-01 under **Check another contract**. | 1: "Approvals you can turn off" lists the collection approval left on, with **Revoke**. 2: every approval left on is listed with its contract (Deals or Signed swaps) and what it allows; the one a live swap needs says so. 3: each row goes once its transaction confirms; the signed swap goes **Paused**. 4: it's read and listed only if approved. | — |
+| M-SEC-08 | P2 | A week-long signature is flagged | — | In a signed swap, choose **7 days** under "Good for". | A warning says a week is a long time and that only an on-chain cancel takes it back. Other choices show none. | — |
 | M-SEC-06 | P1 | Unsolicited transfers | — | Send MON, and an NFT with `safeTransferFrom`, straight to `DeClubEscrow` and `DeClubIntents`. | All revert (no `receive()`, no `IERC721Receiver`). A plain `transferFrom` can't be refused by any contract; that NFT is lost, which the Guide should say. | Automated: V2-08 (MON) |
 
 ### 4.16 Rewards and signed social (RWD)
@@ -442,6 +444,7 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 - [ ] Canonical WMON address confirmed (`FEE_TOKEN`); the deploy script's wrap/unwrap check passed against it.
 - [ ] Fee recipient Safe and a separate fee admin Safe exist, with signers and threshold recorded.
 - [ ] `PROTOCOL_FEE_WEI` set from the agreed dollar amount ($5 per NFT a side moves, [ADR 0018](adr/0018-adjustable-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)) at a recorded MON price; `PROTOCOL_FEE_MAX_WEI` about 4× that; both contracts deployed with the same values.
+- [ ] The rewards operator is a Safe of its own (2 of 3 or more, signers on separate hardware wallets), and every signer can run `npm run rewards:verify:mainnet` with read access to the store and has run it once on a testnet epoch.
 - [ ] The fee covers the matcher's worst-case settlement gas at mainnet gas prices.
 - [ ] A runbook for re-pricing the fee (who decides, how both contracts are changed together, the 7-day notice for a raise).
 - [ ] Contracts source-verified on the explorer.
@@ -451,7 +454,7 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 **App and services**
 
 - [ ] Real Chog collection address set (`NEXT_PUBLIC_CHOG_ADDRESS`), its metadata location known and the trait scan tried against it; `ERC721Enumerable` or not is known.
-- [ ] Verified-collections list (`web/data/assets.json`) curated for mainnet, and the badges and warnings of [ADR 0014](adr/0014-verified-collections-list.md) built, or the decision to launch without them is recorded with M-SEC-01's result.
+- [ ] Verified-collections list (`web/data/assets.json`) curated for mainnet, with the official contracts of every collection people are likely to copy, so the lookalike warning has something to compare against ([ADR 0014](adr/0014-verified-collections-list.md)). M-SEC-01 passed.
 - [ ] No `DEMO_*` addresses and no testnet mirrors in the production env or in `web/data/assets.json`; no testnet addresses anywhere in the production env.
 - [ ] Privy production app: allowed origins, login methods, `PRIVY_APP_SECRET`; webhooks need Privy's Enterprise plan, so either that is in place or the fallback (profiles sync when their owner opens their profile page) is accepted.
 - [ ] Upstash production database, separate from testnet.
