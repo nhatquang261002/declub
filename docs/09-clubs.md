@@ -91,7 +91,7 @@ Rules:
 - A cover in one of the brand colours, picked from the address. The avatar is the asset's `image` from the assets list (a path under `web/public`), or its initials until it has one.
 - Name, symbol, kind, a Verified chip (its tooltip is the list's note), when it was last active, an Archived chip, the description and links.
 - Join / Leave. Signed out it offers "Sign in to join"; without sign-in or a store it shows nothing and the Club is read-only. A member sees a Holder badge when they hold the asset, and Leave in the "⋯" menu beside it. Under Join: "Shows your wallet on the Members list."
-- Stats: Momentum and its trend (with an explanation) · members and holders · swaps in 7 days · new deals in 7 days · traders in 30 days · heat.
+- Stats: Momentum and its trend (with an explanation) · members and holders · swaps in 7 days · new deals in 7 days · Holders' counted Board posts and X posts in 7 days · traders in 30 days · heat.
 - A collapsed **Contract details** block under the header (`ClubDetails.tsx`): the contract and kind of each asset, and which holdings earn the badge. Heat (Quiet, Stirring, Active, Busy, Hot) is one of the header stats.
 - The open tab is in the URL, `?tab=market|board|challenges|members|rewards|manage`.
 - The Owner sees "*X* in the Club fund is ready" when the fund can be claimed, with a link to the Rewards tab. It is worded apart from "This Club has no Owner yet · Claim it", which claims the Club, not money.
@@ -149,9 +149,10 @@ Pure functions in `web/lib/momentum.ts`, computed from the Club's activity log o
 | Completed swap containing the asset (V2 fill, accepted proposal, settled intent) | 10 per side | Each side pays the protocol fee for every NFT it gives ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)), so faking it costs real money. A swap counts once however many NFTs it moves; the fee is what scales with them |
 | New deal, open offer or intent naming the asset | 2, at most 3 per wallet per day | Cheap to make, so capped |
 | A Holder's own X post about the Club, shared on its Board ([X posts](#x-posts)) | 3 (1.5 if it only matches a tag), at most one a day per member per Club | Attention is part of a Club's life; capped low and limited to Holders so it can't outweigh trading |
-| Any other Board post | 0 | Giving plain posts no weight means spam doesn't pay |
+| A Holder's top-level Board post ([ADR 0047](adr/0047-board-posts-in-momentum.md)) | 4, the first a day per member per Club | Talk on the Board is part of a Club's life too. Limited to Holders and to one a day so posting can't outweigh trading; a hidden or deleted post counts for nothing, and the member's next post that day takes its place |
+| Replies, and Board posts by members who aren't Holders | 0 | Giving them no weight means spam doesn't pay |
 
-- **Club Momentum** = decayed sum × `(1 + log2(unique wallets in 30 days)) / 4`. Breadth counts, so one wallet trading with itself barely moves it; X shares don't add to the breadth (or to "Traders · 30 days"). The trend compares it with the same score as of 7 days ago.
+- **Club Momentum** = decayed sum × `(1 + log2(unique wallets in 30 days)) / 4`. Breadth counts, so one wallet trading with itself barely moves it; X shares and Board posts don't add to the breadth (or to "Traders · 30 days"). The trend compares it with the same score as of 7 days ago.
 - **Member Momentum** = the decayed weights of events where one of the member's linked wallets is a party. A completed swap with a counterparty already traded with in this Club in the last 7 days counts half (wash damping).
 - All constants live in one exported object, so they can be tuned without touching logic.
 - Results are cached per Club in the store for 60 seconds.
@@ -319,6 +320,7 @@ All keys start with `declub:` and are per chain.
 | `held:{chain}:{club}:{n}` | the daily holdings samples for epoch `n` ([ADR 0040](adr/0040-points-floor-held-average-public-backing.md)): `{ days: number[], sums: { [userId]: decimal string } }` |
 | `rewards:{chain}:backing:{n}` | epoch `n`'s published backing, by Club and public wallet: voices, counted actions, what a moderator's hide removed |
 | `xshares:{chain}:{club}` / `xshare:{chain}:{club}:{tweet}` | zset of counted X shares by time, capped at 5,000 / each share `{tweet, club, userId, wallet, postId, at, strength, hidden?}` |
+| `momentum-posts:{chain}:{club}` | zset of Holders' top-level post ids by time (up to 3 a member a day), capped at 5,000; read against the posts, so hidden and deleted ones drop out ([ADR 0047](adr/0047-board-posts-in-momentum.md)) |
 | `xshare-seen:{chain}:{tweet}` | an X post that has counted, kept a year, so it never counts twice |
 | `xlink:{chain}:{club}:{handle}` | a pending proof code `{code, by, until}` |
 

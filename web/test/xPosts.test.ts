@@ -302,9 +302,9 @@ describe("X shares", () => {
     const id = idAt(NOW - 60_000);
     assert.ok((await share(store, "m1", id, baseDeps(xWorld({ [id]: { author: "alice_x", text: `gm ${NFT}` } })))).ok);
     const events = await clubEvents(store, club, { settlements: async () => [] });
-    assert.deepEqual(events.map((e) => e.kind), ["xshare"]);
+    assert.deepEqual(events.map((e) => e.kind).sort(), ["post", "xshare"], "the Board post that shared it counts too");
     const scores = score(events.map((e) => ({ kind: e.kind, at: e.at, parties: e.parties, weight: e.weight })), Math.floor(NOW / 1000));
-    assert.equal(memberScore(scores, [wallet(1)]), MOMENTUM.xShareWeight);
+    assert.equal(memberScore(scores, [wallet(1)]), MOMENTUM.xShareWeight + MOMENTUM.postWeight);
     assert.equal(scores.uniqueWallets, 0);
   });
 

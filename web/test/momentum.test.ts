@@ -24,6 +24,7 @@ describe("constants", () => {
       washDays: 7,
       breadthDivisor: 4,
       xShareWeight: 3,
+      postWeight: 4,
     });
   });
 });
@@ -108,6 +109,13 @@ describe("score", () => {
     assert.ok(four.club > one.club);
     // 4 wallets: factor (1 + 2) / 4
     assert.equal(four.club, Math.round(4 * MOMENTUM.createdWeight * 0.75 * 100) / 100);
+  });
+
+  it("pays a Board post a little more than an X share, without widening breadth", () => {
+    const scores = score([{ kind: "post", at: NOW, parties: [alice] }, { kind: "xshare", at: NOW, parties: [bob] }], NOW);
+    assert.equal(memberScore(scores, [alice]), MOMENTUM.postWeight);
+    assert.ok(MOMENTUM.postWeight > MOMENTUM.xShareWeight);
+    assert.equal(scores.uniqueWallets, 0);
   });
 
   it("treats wallets case-insensitively", () => {

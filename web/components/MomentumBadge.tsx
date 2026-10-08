@@ -5,7 +5,7 @@ import { MOMENTUM } from "@/lib/momentum";
 /** Momentum is shown whole: a decimal would suggest a precision it doesn't have. */
 export const formatMomentum = (value: number) => Math.round(value).toLocaleString();
 
-export const MOMENTUM_EXPLAINED = `Momentum shows how busy this Club has been. Completed swaps count most; new deals and Holders' own X posts about the Club count a little. Points halve every ${MOMENTUM.halfLifeDays} days and are gone after ${MOMENTUM.windowDays}. It doesn't say the asset is safe or valuable.`;
+export const MOMENTUM_EXPLAINED = `Momentum shows how busy this Club has been. Completed swaps count most; new deals and Holders' Board posts and own X posts about the Club count a little. Points halve every ${MOMENTUM.halfLifeDays} days and are gone after ${MOMENTUM.windowDays}. It doesn't say the asset is safe or valuable.`;
 
 /** Five rising bars, lit up to `level` (0, quiet, lights none). Decoration: say the level in words beside it. */
 export function HeatBars({ level }: { level: number }) {

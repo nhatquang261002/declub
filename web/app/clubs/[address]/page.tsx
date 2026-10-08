@@ -257,13 +257,14 @@ function Club({ entry }: { entry: ClubEntry }) {
           </Stat>
           <Stat
             label={
-              <Tooltip content="Holders’ own X posts about this Club, shared on its Board. They count toward Momentum and the Holder bonus.">
-                <span className="uppercase underline decoration-dotted underline-offset-2">X posts · 7 days</span>
+              <Tooltip content="Holders’ Board posts, one a day each, and their own X posts about this Club shared on the Board. Both count toward Momentum.">
+                <span className="uppercase underline decoration-dotted underline-offset-2">Posts · 7 days</span>
               </Tooltip>
             }
-            quiet={stats ? !stats.xShares7d : false}
+            quiet={stats ? !stats.posts7d && !stats.xShares7d : false}
+            hint={stats ? `${(stats.xShares7d ?? 0).toLocaleString()} from X` : undefined}
           >
-            {stats ? (stats.xShares7d ?? 0).toLocaleString() : "…"}
+            {stats ? (stats.posts7d ?? 0).toLocaleString() : "…"}
           </Stat>
           <Stat label="Traders · 30 days" quiet={stats?.traders30d === 0}>
             {stats ? stats.traders30d.toLocaleString() : "…"}

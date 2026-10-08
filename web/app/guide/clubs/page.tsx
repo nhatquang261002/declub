@@ -42,8 +42,8 @@ const MOMENTUM_RULES = [
   { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. The same two wallets swapping again within ${MOMENTUM.washDays} days counts ${MOMENTUM.washFactor * 100}%.` },
   { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points each, at most ${MOMENTUM.createdPerDay} a day per wallet.` },
   {
-    title: "Your X posts count too",
-    body: `${MOMENTUM.xShareWeight} points when a Holder shares their own X post about the Club on its Board, one a day. A post that only matches a tag counts half. Board notes count for nothing.`,
+    title: "Your posts count too",
+    body: `${MOMENTUM.postWeight} points for a Holder's first Board post of the day, and ${MOMENTUM.xShareWeight} when they share their own X post about the Club on its Board, one a day. An X post that only matches a tag counts half. Replies, and posts that get hidden, count for nothing.`,
   },
   { title: "Everything fades", body: `Points halve every ${MOMENTUM.halfLifeDays} days and are gone after ${MOMENTUM.windowDays}.` },
 ];

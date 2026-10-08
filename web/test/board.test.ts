@@ -8,6 +8,7 @@ import {
 } from "../lib/server/board";
 import { activityKey } from "../lib/server/activity";
 import { activeKey } from "../lib/server/activeDays";
+import { momentumPostEvents, momentumPostsKey } from "../lib/server/postMomentum";
 import { streaksKey } from "../lib/server/streaks";
 import { REWARDS_GENESIS } from "../lib/config";
 import { DEFAULT_CLUB_RULES } from "../lib/rewards";
@@ -152,6 +153,43 @@ describe("createPost", () => {
     assert.ok((await say(store, "own")).ok);
     await member(store, "h1", 7, { holder: true });
     assert.ok((await say(store, "h1")).ok, "a holder may");
+  });
+});
+
+describe("Board posts in Momentum (ADR 0047)", () => {
+  const NOW = 1_800_000_000_000; // epoch ms, a third of the way into a UTC day
+  const at = (ms: number): Deps => ({ admins: new Set(), now: () => ms });
+  const counted = async (store: Store) => (await momentumPostEvents(store, token)).map((e) => [e.parties[0], e.at]);
+
+  it("counts a Holder's first top-level post of the day, and nothing from a member without NFTs", async () => {
+    const store = memoryStore();
+    await member(store, "h", 1, { holder: true });
+    await member(store, "n", 2);
+    for (const ms of [NOW, NOW + 60_000]) assert.ok((await say(store, "h", "gm", "note", at(ms))).ok);
+    assert.ok((await say(store, "n", "gm", "note", at(NOW))).ok);
+    assert.deepEqual(await counted(store), [[wallet(1), NOW / 1000]]);
+
+    assert.ok((await say(store, "h", "gm again", "note", at(NOW + 86_400_000))).ok);
+    assert.deepEqual(await counted(store), [[wallet(1), NOW / 1000], [wallet(1), NOW / 1000 + 86_400]], "a new day counts again");
+  });
+
+  it("drops a hidden or deleted post, and the member's next post that day takes its place", async () => {
+    const store = memoryStore();
+    const own = await member(store, "own", 1);
+    const h = await member(store, "h", 2, { holder: true });
+    await saveRoles(store, token, { owner: "own", moderators: [] });
+    const ids: string[] = [];
+    for (const ms of [NOW, NOW + 60_000, NOW + 120_000]) {
+      const r = await say(store, "h", "gm", "note", at(ms));
+      assert.ok(r.ok);
+      ids.push(r.post.id);
+    }
+    await hidePost(store, club, own, ids[0]!, true, at(NOW));
+    assert.deepEqual(await counted(store), [[wallet(2), NOW / 1000 + 60]]);
+    await deletePost(store, club, h, ids[1]!, at(NOW));
+    assert.deepEqual(await counted(store), [[wallet(2), NOW / 1000 + 120]]);
+    await hidePost(store, club, own, ids[0]!, false, at(NOW));
+    assert.deepEqual(await counted(store), [[wallet(2), NOW / 1000]], "restored, it counts again");
   });
 });
 
@@ -773,10 +811,12 @@ describe("purgeClub", () => {
     await store.addMember(userClubsKey("m1"), OLD.toLowerCase());
     await store.set(streaksKey(token), { m1: { n: 0, count: 1 } });
     await store.addMember(activeKey(token, 0), "m1:1:x");
+    await store.rank(momentumPostsKey(token), [{ member: id, score: 1 }], 10);
 
     assert.deepEqual(await purgeClub(store, token, { now: () => (REWARDS_GENESIS + 86_400) * 1000 }), { members: 3, posts: 1 });
     assert.equal(await store.get(streaksKey(token)), null);
     assert.deepEqual(await store.members(activeKey(token, 0)), []);
+    assert.deepEqual(await store.ranked(momentumPostsKey(token), 10), []);
     assert.deepEqual(await store.members(membersKey(token)), []);
     assert.deepEqual(await store.members(userClubsKey("m1")), [OLD.toLowerCase()], "other Clubs untouched");
     assert.equal(await store.get(postKey(token, id)), null);

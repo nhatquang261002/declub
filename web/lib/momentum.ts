@@ -24,16 +24,21 @@ export const MOMENTUM = {
    * it can't outweigh trading. A post that is only weakly about the Club counts half.
    */
   xShareWeight: 3,
+  /**
+   * A Holder's Board post (ADR 0047): the first a day per member per Club, a little above an X
+   * share. Hidden and deleted posts count for nothing.
+   */
+  postWeight: 4,
 } as const;
 
-export type ActivityKind = "created" | "swapped" | "xshare";
+export type ActivityKind = "created" | "swapped" | "xshare" | "post";
 
 /** What the score needs from a logged event. The log keeps more (see lib/server/activity.ts). */
 export type ScoredEvent = {
   kind: ActivityKind;
   /** Unix seconds. */
   at: number;
-  /** Lowercase wallet addresses. A swap has the two sides; a creation has the maker; an X share the member. */
+  /** Lowercase wallet addresses. A swap has the two sides; a creation has the maker; an X share or a Board post the member. */
   parties: string[];
   /** An X share's strength factor (1 strong, 0.5 weak). Other kinds ignore it. */
   weight?: number;
@@ -76,11 +81,12 @@ export function score(events: ScoredEvent[], now: number, options: { decay?: boo
     const parties = [...new Set(e.parties.map((p) => p.toLowerCase()))];
     const weight = decay(now - e.at);
 
-    // An X share is attention, not trading: it scores its member and leaves breadth (how many
-    // wallets traded) alone. The once-a-day rule is applied when it's recorded.
-    if (e.kind === "xshare") {
+    // An X share or a Board post is attention, not trading: it scores its member and leaves breadth
+    // (how many wallets traded) alone. The once-a-day rules are applied when it's recorded and read.
+    if (e.kind === "xshare" || e.kind === "post") {
       const wallet = parties[0];
-      if (wallet) add(wallet, MOMENTUM.xShareWeight * (e.weight ?? 1) * weight);
+      const base = e.kind === "xshare" ? MOMENTUM.xShareWeight * (e.weight ?? 1) : MOMENTUM.postWeight;
+      if (wallet) add(wallet, base * weight);
       continue;
     }
 

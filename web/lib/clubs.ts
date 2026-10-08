@@ -10,7 +10,7 @@ import { score, trend, type ActivityKind, type ScoredEvent } from "./momentum";
 
 /** One thing that happened to a Club's asset. Field order is fixed: the log stores it as JSON. */
 export type ActivityEvent = {
-  /** `txHash:logIndex` for escrow events (`txHash:settled` for a signed swap, `x:<tweet>` for an X share), so a replayed report is the same event. */
+  /** `txHash:logIndex` for escrow events (`txHash:settled` for a signed swap, `x:<tweet>` for an X share, `post:<id>` for a Board post), so a replayed report is the same event. */
   id: string;
   kind: ActivityKind;
   /** The contract that emitted it, lowercase. */
@@ -49,6 +49,8 @@ export type ClubStats = {
   traders30d: number;
   /** Members' own X posts about the Club shared on its Board in the last 7 days. */
   xShares7d: number;
+  /** Holders' Board posts that counted toward Momentum in the last 7 days: one a day per member. */
+  posts7d: number;
   /** Unix seconds of the latest event, or null. */
   lastActive: number | null;
 };
@@ -65,6 +67,7 @@ export function summarize(events: readonly ActivityEvent[], now: number): ClubSt
     completed7d: week.filter((e) => e.kind === "swapped").length,
     created7d: week.filter((e) => e.kind === "created").length,
     xShares7d: week.filter((e) => e.kind === "xshare").length,
+    posts7d: week.filter((e) => e.kind === "post").length,
     traders30d: score(scored, now).uniqueWallets,
     lastActive: events.reduce<number | null>((latest, e) => (latest === null || e.at > latest ? e.at : latest), null),
   };

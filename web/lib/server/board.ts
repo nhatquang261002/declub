@@ -71,6 +71,7 @@ import {
   type Ban,
 } from "./clubState";
 import { allRows, getMember, leaveClub, memberKey, membersKey, sharedWallets, userClubsKey } from "./members";
+import { momentumPostsKey, recordMomentumPost } from "./postMomentum";
 import { withinLimit, type Store } from "./store";
 import { standingsKey, streaksKey } from "./streaks";
 import { epochAt } from "../rewards";
@@ -252,6 +253,8 @@ export async function createPost(
   await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
   // A post makes its author's day active for Club Rewards (ADR 0032).
   await recordActive(store, token, post, deps.epochs?.genesis, deps.epochs?.length);
+  // A Holder's post adds to Momentum, once a day (ADR 0047).
+  if (row.holder) await recordMomentumPost(store, token, post);
   return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false, undefined, undefined, 0), ...(xShare ? { xShare } : {}) };
 }
 
@@ -951,6 +954,7 @@ export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "n
   await store.del(...keys, postsKey(lower), ...ids.map((id) => likedKey(lower, id)));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
   await purgeXShares(store, lower);
+  await store.del(momentumPostsKey(lower));
   // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days and backing.
   const epochs = Math.max(0, epochAt(Math.floor(nowOf(deps) / 1000)) + 1);
   await store.del(reportedKey(lower), streaksKey(lower), standingsKey(lower), ...Array.from({ length: epochs }, (_, n) => [activeKey(lower, n), backingKey(lower, n), heldKey(lower, n)]).flat());

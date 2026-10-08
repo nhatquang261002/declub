@@ -33,7 +33,7 @@ const created = (over: Partial<ActivityEvent> = {}) => event({ kind: "created", 
 
 describe("summarize", () => {
   it("is all zeros for a Club nobody has traded in", () => {
-    assert.deepEqual(summarize([], NOW), { momentum: 0, change: 0, completed7d: 0, created7d: 0, traders30d: 0, xShares7d: 0, lastActive: null });
+    assert.deepEqual(summarize([], NOW), { momentum: 0, change: 0, completed7d: 0, created7d: 0, traders30d: 0, xShares7d: 0, posts7d: 0, lastActive: null });
   });
 
   it("counts the week, the month and the latest event", () => {
