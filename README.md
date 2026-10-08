@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo/logo-on-dark.svg">
+    <img src="brand/logo/logo-on-light.svg" alt="De(al) Club" height="56">
+  </picture>
+</p>
+
 # De(al) Club
 
 > **Your community's home and market, owned by its members.**
