@@ -63,7 +63,10 @@ cd web
 node --import ./test/register.mjs scripts/demo.ts chain     # mint, fund the personas, hand over the mirrors
 node --import ./test/register.mjs scripts/demo.ts trades    # the ten swaps, into each Club's activity
 node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
+node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
 ```
+
+**Challenges** (`CHALLENGES` in `content.ts`): open ones start in the running epoch through the app's own functions, with signed entries sharing invented X posts (`dcdemo…` handles) and likes. "Ended" ones ran over the four days before it: they are written to the store as the app would have kept them, then the app settles them, so their points count in the epoch they ended in (or the running one, if that epoch is closed). The Chog Club, the presenter's, has one waiting for the Owner's pick and one with a Chog prize to send. A Club allows three open at once, so the step stops if a Club already has more open than it leaves room for.
 
 Every step skips what it already did, so a step that fails halfway can be run again. The presenter must have signed in to the app once with their wallet before `social`: the script finds their Privy user by that wallet to make them a member and the Chog Club's Owner.
 
