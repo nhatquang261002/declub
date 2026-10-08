@@ -1,7 +1,7 @@
 # 08 · Art Direction
 
 DeClub looks like a pinboard of trading stickers: a cream canvas, thick dark outlines, red tape
-and warm Chog-brand colours. The brand's rules and files are in `15-brand-kit.md` and `brand/`. The supplied Chog artwork adds an expressive, collectible
+and warm Chog-brand colours. The brand's rules and files are in `brand-kit.md` and `brand/`. The supplied Chog artwork adds an expressive, collectible
 mood, while trade terms, wallet state and transaction actions stay clear.
 
 ## Visual language

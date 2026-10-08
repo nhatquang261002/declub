@@ -27,8 +27,7 @@ Start here. Each page below owns one topic; if two pages disagree, the one in th
 | Page | What it is |
 |---|---|
 | [Art direction](08-art-direction.md) | How the app implements the look |
-| [Brand kit](15-brand-kit.md) | Look and voice for anything outside the app (files in `../brand/`) |
-| [Go to market](13-go-to-market.md) | Why communities move, where a Club's rewards come from, how we find the first Clubs |
+| [Brand kit](brand-kit.md) | Look and voice for anything outside the app (files in `../brand/`) |
 | [Project description](../README.md) | The pitch: problem, solution, why it is useful (top of the root README) |
 
 ## How these docs are kept

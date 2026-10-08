@@ -1,6 +1,6 @@
 # De(al) Club brand kit
 
-Open `brand-kit.html` for the visual sheet; the rules are in `../docs/15-brand-kit.md`.
+Open `brand-kit.html` for the visual sheet; the rules are in `../docs/brand-kit.md`.
 
 - `logo/` – SVG mark, glyphs, wordmarks and lockups (text outlined, no font needed)
 - `png/` – the same, rasterised
