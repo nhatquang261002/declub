@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pagination } from "@/components/Pagination";
-import { Pills } from "@/components/Pills";
 import { HolderBadge } from "@/components/HolderBadge";
 import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
+import { Select } from "@/components/Select";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions } from "@/hooks/useClubBoard";
@@ -170,14 +170,15 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
   return (
     <>
       <div ref={top} className="mb-5 flex scroll-mt-24 flex-wrap items-center justify-between gap-3">
-        <Pills
+        <Select
+          className="w-auto"
+          aria-label="Sort members"
           value={sort}
           options={SORTS}
           onChange={(next) => {
             setSort(next);
             setPage(1);
           }}
-          label="Sort members"
         />
         <input
           type="search"

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A second-level switch inside a section: For trade / Wanted, a filter, a sort order. Same contract as
+ * A second-level switch inside a section: For trade / Wanted, a filter. Sort orders use `Select`. Same contract as
  * `Tabs`, drawn lighter so it doesn't read as another row of sections.
  */
 export function Pills<T extends string>({

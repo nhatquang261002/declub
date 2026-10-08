@@ -7,6 +7,7 @@ import { Pills } from "@/components/Pills";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { PostComposer } from "@/components/PostComposer";
 import { PostItem } from "@/components/PostItem";
+import { Select } from "@/components/Select";
 import { Spinner } from "@/components/Spinner";
 import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
@@ -89,7 +90,13 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
       )}
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-        <Pills value={active.id} options={lenses.map((l) => ({ value: l.id, label: l.name }))} onChange={setLens} label="Order posts by" />
+        <Select
+          className="w-auto"
+          aria-label="Order posts by"
+          value={active.id}
+          options={lenses.map((l) => ({ value: l.id, label: l.name }))}
+          onChange={setLens}
+        />
         <Pills value={filter} options={FILTERS} onChange={setFilter} label="Show posts" />
       </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
