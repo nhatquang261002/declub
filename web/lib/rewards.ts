@@ -729,6 +729,8 @@ export type EpochRecord = {
   clubs: {
     club: string;
     fees: string;
+    /** Of `fees`, what signed swaps paid in WMON, unwrapped to MON before the epoch is funded; absent when none. */
+    signedFees?: string;
     /** What sponsors added to the Holder pool (ADR 0035); absent in epochs built before. */
     sponsored?: string;
     sponsors?: PublishedSponsor[];

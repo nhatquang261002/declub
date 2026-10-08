@@ -31,6 +31,9 @@ function names(sponsors: readonly PublishedSponsor[] | undefined): string[] {
 const sponsoredBy = (list: string[]) =>
   list.length === 0 ? "" : list.length === 1 ? list[0]! : list.length === 2 ? `${list[0]} and ${list[1]}` : `${list[0]}, ${list[1]} and ${list.length - 2} more`;
 
+/** Signed swaps pay their fee in WMON; it's unwrapped to MON before the epoch is funded. */
+const signedHint = (signedFees: string | undefined) => (wei(signedFees) > 0n ? `${formatMon(wei(signedFees))} from signed swaps, unwrapped from WMON` : undefined);
+
 type View = "overview" | "history";
 const VIEWS = [
   { value: "overview", label: "Overview" },
@@ -149,7 +152,7 @@ function History({ data, token, symbol }: { data: Data; token: string; symbol: s
     <>
       <Panel title={`Epoch ${latest!.n}`}>
         <dl className={`grid grid-cols-2 gap-4 text-sm ${latest!.sponsored ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
-          <Figure label="Fees from swaps" value={formatMon(wei(latest!.fees))} />
+          <Figure label="Fees from swaps" value={formatMon(wei(latest!.fees))} hint={signedHint(latest!.signedFees)} />
           {latest!.sponsored && <Figure label="Sponsored" value={formatMon(wei(latest!.sponsored))} hint={sponsoredBy(names(latest!.sponsors))} />}
           <Figure label="To Holders" value={formatMon(wei(latest!.paidHolders))} hint={`${latest!.holderCount} ${latest!.holderCount === 1 ? "Holder" : "Holders"}`} />
           <Figure label="Club fund" value={formatMon(wei(latest!.paidFund))} />

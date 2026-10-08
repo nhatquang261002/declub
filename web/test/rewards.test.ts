@@ -548,6 +548,17 @@ describe("buildEpoch", () => {
     assert.equal(result.status === "built" && result.record.clubs[0]!.fees, (6n * ETH).toString());
   });
 
+  it("keeps the WMON that signed swaps paid apart from the escrow fees, to show it was unwrapped", async () => {
+    const intents = "0x00000000000000000000000000000000000000ab";
+    events.set(NFT, [swap(), swap({ contract: intents, deal: "0x" + "34".repeat(32), fee: undefined })]);
+    const result = await buildEpoch(store, 0, { ...deps, intents });
+    const record = result.status === "built" ? result.record : undefined!;
+    const line = record.clubs.find((c) => c.club === NFT.toLowerCase())!;
+    assert.equal(line.fees, (10n * ETH).toString());
+    assert.equal(line.signedFees, (6n * ETH).toString());
+    assert.equal(record.clubs.find((c) => c.club === OTHER.toLowerCase())!.signedFees, undefined);
+  });
+
   it("adds recorded sponsors to the Holder pool, publishes who gave what, and funds it in the total", async () => {
     events.set(NFT, [swap()]);
     await recordSponsor(store, 0, { club: NFT, amount: 10n * ETH, sponsor: "Monad Foundation", kind: "partner" });

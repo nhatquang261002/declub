@@ -57,7 +57,7 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
         <Closing endsAt={s.endsAt} now={now} />
       </div>
       <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-t-2 border-[#111318]/10 pt-3">
-        <Stat label="Fees so far" value={formatMon(wei(s.fees))} />
+        <Stat label="Fees so far" value={formatMon(wei(s.fees))} hint={wei(s.signedFees) > 0n ? `${formatMon(wei(s.signedFees))} from signed swaps, paid out as MON` : undefined} />
         {sponsored > 0n && <Stat label="Sponsored" value={`+ ${formatMon(sponsored)}`} hint={sponsoredBy ? `by ${sponsoredBy}` : "Added to the Holder pool"} />}
         <Stat label="Club fund" value={formatMon(wei(s.fundPool))} hint="For the Owner" />
       </dl>

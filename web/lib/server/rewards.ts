@@ -290,10 +290,13 @@ export function cachedSettlementFee(store: Store, read: (txHash: Hex) => Promise
   };
 }
 
+/** Whether a completed swap was a signed one, whose fee was paid in WMON (ADR 0015). */
+export const isSignedSwap = (event: ActivityEvent, intents: string) => !event.fee && !!intents && event.contract === intents;
+
 /** A completed swap's fee: carried by the event, or read from its settlement for a signed swap. */
 export async function swapFee(event: ActivityEvent, intents: string, settlementFee: (txHash: Hex) => Promise<bigint>): Promise<bigint> {
   if (event.fee) return BigInt(event.fee);
-  return intents && event.contract === intents ? settlementFee(event.deal as Hex) : 0n;
+  return isSignedSwap(event, intents) ? settlementFee(event.deal as Hex) : 0n;
 }
 
 /** A Holder as the builder and the standings see them: who they are, and their streak record. */
@@ -572,11 +575,16 @@ async function compute(
   }
 
   // A swap's fee is split evenly between the Clubs it names; the dust stays with the protocol.
+  // Signed swaps paid theirs in WMON, which the operator unwraps before publishing: kept apart to show it.
   const fees = new Map<string, bigint>();
+  const signedFees = new Map<string, bigint>();
   for (const { event, clubs: named } of swaps.values()) {
     const fee = await swapFee(event, intents, settlementFee);
     const each = fee / BigInt(named.size);
-    for (const club of named) fees.set(club, (fees.get(club) ?? 0n) + each);
+    for (const club of named) {
+      fees.set(club, (fees.get(club) ?? 0n) + each);
+      if (isSignedSwap(event, intents)) signedFees.set(club, (signedFees.get(club) ?? 0n) + each);
+    }
   }
 
   const reach = await (deps.reach ?? ((k: number) => store.get<ReachRecord>(reachKey(k))))(n);
@@ -687,6 +695,7 @@ async function compute(
     clubs: splits.map((s) => ({
       club: s.club,
       fees: str(s.fees),
+      ...(signedFees.get(s.club) ? { signedFees: str(signedFees.get(s.club)!) } : {}),
       ...(s.sponsored > 0n ? { sponsored: str(s.sponsored), sponsors: sponsors.get(s.club)?.sponsors ?? [] } : {}),
       holderPool: str(s.holderPool),
       fundPool: str(s.fundPool),
@@ -780,6 +789,7 @@ export type ClubRewardsView = {
     start: number;
     end: number;
     fees: string;
+    signedFees?: string;
     sponsored?: string;
     sponsors?: PublishedSponsor[];
     holderPool: string;
@@ -802,8 +812,8 @@ export async function clubRewards(store: Store, club: string, now = Math.floor(D
   const epochs = records.flatMap((r) => {
     const line = r.clubs.find((c) => c.club === key);
     if (!line) return [];
-    const { fees, sponsored, sponsors, holderPool, fundPool, paidHolders, paidFund, holderCount } = line;
-    return [{ n: r.n, start: r.start, end: r.end, fees, ...(sponsored ? { sponsored, sponsors: sponsors ?? [] } : {}), holderPool, fundPool, paidHolders, paidFund, holderCount }];
+    const { fees, signedFees, sponsored, sponsors, holderPool, fundPool, paidHolders, paidFund, holderCount } = line;
+    return [{ n: r.n, start: r.start, end: r.end, fees, ...(signedFees ? { signedFees } : {}), ...(sponsored ? { sponsored, sponsors: sponsors ?? [] } : {}), holderPool, fundPool, paidHolders, paidFund, holderCount }];
   });
   const running = epochAt(now);
   const openLine = running >= 0 ? sponsorsByClub(await readSponsors(store, running)).get(key) : undefined;

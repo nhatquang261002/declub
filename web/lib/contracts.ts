@@ -36,10 +36,12 @@ export const clubRewards = DECLUB_REWARDS_ADDRESS
 
 /**
  * Wrapped MON, the fee token of DeClubIntents (ADR 0015). `deposit` wraps native MON one to
- * one (the WETH9 interface), which is how a wallet holding only MON can pay the fee.
+ * one (the WETH9 interface), which is how a wallet holding only MON can pay the fee; `withdraw`
+ * unwraps it, which is how the rewards operator turns those fees back into MON (ADR 0022).
  */
 export const wmonAbi = parseAbi([
   "function deposit() payable",
+  "function withdraw(uint256 amount)",
   "function balanceOf(address owner) view returns (uint256)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function approve(address spender, uint256 amount) returns (bool)",

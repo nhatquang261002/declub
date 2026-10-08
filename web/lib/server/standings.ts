@@ -10,7 +10,7 @@ import { rulesFor } from "./clubRules";
 import { clubEvents } from "./clubs";
 import { allRows, viemHoldings, type Holdings } from "./members";
 import { readSponsors, sponsorsByClub } from "./sponsors";
-import { cachedSettlementFee, carryKey, holderInputs, ownerWallet, reachKey, swapFee, verifiedBy, viemSettlementFee } from "./rewards";
+import { cachedSettlementFee, carryKey, holderInputs, isSignedSwap, ownerWallet, reachKey, swapFee, verifiedBy, viemSettlementFee } from "./rewards";
 import type { Store } from "./store";
 
 /**
@@ -67,6 +67,8 @@ export type ClubStandings = {
   /** Unix seconds. */
   computedAt: number;
   fees: string;
+  /** Of `fees`, what signed swaps paid in WMON; absent when none. */
+  signedFees?: string;
   /** What sponsors have added to the Holder pool so far (ADR 0035); absent in copies cached before. */
   sponsored?: string;
   holderPool: string;
@@ -116,10 +118,13 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
   await settleDue(store, club, { now: () => now * 1000, ...(deps.genesis !== undefined && deps.length !== undefined ? { epochs: { genesis: deps.genesis, length: deps.length } } : {}) });
   const events = (await (deps.events ?? ((c: ClubEntry) => clubEvents(store, c)))(club)).filter((e) => e.at >= window.start && e.at < window.end);
   let fees = 0n;
+  let signedFees = 0n;
   for (const event of events) {
     if (event.kind !== "swapped") continue;
     const named = clubs.filter((c) => clubAssets(c).some((a) => event.tokens.includes(a.address.toLowerCase()))).length;
-    fees += (await swapFee(event, intents, settlementFee)) / BigInt(Math.max(1, named));
+    const each = (await swapFee(event, intents, settlementFee)) / BigInt(Math.max(1, named));
+    fees += each;
+    if (isSignedSwap(event, intents)) signedFees += each;
   }
 
   const reach = await store.get<ReachRecord>(reachKey(n));
@@ -183,6 +188,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
     endsAt: window.end,
     computedAt: now,
     fees: fees.toString(),
+    ...(signedFees > 0n ? { signedFees: signedFees.toString() } : {}),
     sponsored: sponsored.toString(),
     holderPool: split.holderPool.toString(),
     fundPool: split.fundPool.toString(),
