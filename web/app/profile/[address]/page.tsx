@@ -11,6 +11,7 @@ import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { EditProfile } from "@/components/profile/EditProfile";
 import { ProfileClubs, ProfileFollowing, ProfilePosts } from "@/components/profile/ProfileLists";
+import { ProfileTrophies } from "@/components/profile/ProfileTrophies";
 import { useNow } from "@/hooks/useNow";
 import { useFollows } from "@/hooks/useSocial";
 import { useFollowGraph, useMyWallets, useWalletProfile } from "@/hooks/useWalletProfile";
@@ -116,6 +117,7 @@ function Profile({ address }: { address: string }) {
             <dd className="text-lg font-black tabular-nums">{graph.following.length}</dd>
           </div>
         </dl>
+        <ProfileTrophies trophies={card.data?.trophies ?? []} />
         {mine && !editing && !about && !card.isLoading && (
           <p className="text-sm text-muted">
             Nothing about you yet.{" "}

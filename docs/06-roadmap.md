@@ -23,6 +23,15 @@ lives in the git log and the relevant ADRs.
 
 - [x] Club Pulse: swaps, new deals and new members as system messages between posts on the Board and the timeline, built from the activity log and member list, with no signing (ADR 0043)
 - [x] Club challenges: the Owner starts a challenge any time, members answer with a Board post, winners are picked by likes or by the Owner and earn the points the Owner set, as epoch points (ADR 0045)
+- [x] A challenge entry earns only its prize: it counts toward Momentum, not toward the author's epoch points (ADR 0048)
+- [x] More ways to pick challenge winners: Holder vote, a verifiable raffle, first N, everyone who completes, with a create form that only builds valid challenges (ADR 0049)
+- [x] Challenge rewards beyond points: a trophy on the winner's profile, an NFT or token prize the Owner sends and the app checks on-chain, and pinning the winning entry (ADR 0050)
+- [x] Challenge notifications and a share card for the results
+- [ ] More kinds of challenge entry, beyond the member's own X post:
+  - [ ] Streak quest: active on N days during the challenge, no entry form
+  - [ ] Trade quest: a deal or swap in the Club's asset during the challenge, checked on-chain
+  - [ ] Board post: any Board post, no X needed (art, pitches, members without X)
+  - [ ] Raid: quote or reply to an X post the Owner names (needs a check that the X API reads quotes)
 - [ ] Member roles and titles: the Owner gives custom titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
 
 ## Deferred

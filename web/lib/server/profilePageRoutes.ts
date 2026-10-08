@@ -7,6 +7,8 @@ import { registry as defaultRegistry, type Registry } from "../verifiedAssets";
 import { readAvatars } from "./avatars";
 import { fail, gateUser, json, type UserGate } from "./gate";
 import { membershipsOfWallet } from "./members";
+import { readTrophies } from "./challengeState";
+import type { PublicTrophy } from "../challenges";
 import { softViewer, type RouteDeps } from "./boardRoutes";
 import { listWalletPosts } from "./timeline";
 import { parseCursor, TIMELINE_MAX_PAGE, TIMELINE_PAGE } from "../timeline";
@@ -65,7 +67,8 @@ export function aboutHandlers(deps: ProfilePageDeps = {}) {
 const PUBLIC = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" };
 
 /** GET /api/wallets/[address]/profile: what a wallet's owner shows about themselves. Public. */
-export function walletProfileHandler(deps: ProfilePageDeps = {}) {
+export function walletProfileHandler(deps: ProfilePageDeps & { registry?: Pick<Registry, "clubFor"> } = {}) {
+  const clubs = deps.registry ?? defaultRegistry;
   return async function GET(request: Request, ctx: { params: Promise<{ address: string }> }) {
     const { address } = await ctx.params;
     if (!isAddress(address, { strict: false })) return fail(400, "bad_request", "Give a wallet address.");
@@ -80,16 +83,31 @@ export function walletProfileHandler(deps: ProfilePageDeps = {}) {
       readAvatars(store, [wallet]).catch(() => ({}) as Record<string, AvatarView>),
       readAbout(store, wallet).catch(() => null),
     ]);
+    const trophies = await walletTrophies(store, wallet, row, clubs).catch(() => []);
     const body: WalletProfile = {
       enabled: true,
       profile: row ? { provider: row.provider, handle: row.handle } : null,
       avatar: avatars[wallet] ?? null,
       about,
+      ...(trophies.length > 0 ? { trophies } : {}),
     };
     // The owner's own page asks for `fresh`, so what they just saved isn't hidden behind the CDN's copy.
     const fresh = new URL(request.url).searchParams.get("fresh") === "1";
     return Response.json(body, { headers: fresh ? { "Cache-Control": "no-store" } : PUBLIC });
   };
+}
+
+/**
+ * The challenges `wallet` won (ADR 0050), newest first. Trophies are kept per user; only the ones
+ * won under this wallet are shown, so a profile never ties together wallets its owner kept apart.
+ */
+async function walletTrophies(store: Store, wallet: string, row: StoredProfile | null, clubs: Pick<Registry, "clubFor">): Promise<PublicTrophy[]> {
+  const userId = row?.userId ?? (await membershipsOfWallet(store, wallet))[0]?.row.userId;
+  if (!userId) return [];
+  return (await readTrophies(store, userId)).flatMap(({ wallet: won, ...t }) => {
+    const club = clubs.clubFor(t.club);
+    return won === wallet && club ? [{ ...t, clubName: club.name }] : [];
+  });
 }
 
 /**

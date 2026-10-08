@@ -157,6 +157,8 @@ export type XShare = {
   strength: SignalStrength;
   /** The Board post was hidden: it counts for nothing until restored. */
   hidden?: true;
+  /** The Board post is a challenge entry (ADR 0048): Momentum counts it, epoch points don't. */
+  entry?: string;
 };
 
 const base = `declub:xshare:${CHAIN_ID}`;
@@ -167,6 +169,8 @@ const xLinkKey = (club: string, handle: string) => `declub:xlink:${CHAIN_ID}:${c
 
 /** How old an X post may be when it's shared and still count. */
 export const X_SHARE_MAX_AGE_MS = 48 * 3_600_000;
+/** The rate limit that keeps a member to X_SHARES_PER_DAY in a Club on UTC day `day`. */
+const xShareDayLimit = (club: string, day: number) => `xshare-day:${club.toLowerCase()}:${day}`;
 /** How many of a member's X posts count per Club per UTC day. */
 export const X_SHARES_PER_DAY = 1;
 /** X shares kept per Club. A busy Club fills this in months, and Momentum reads 30 days. */
@@ -201,7 +205,7 @@ export async function recordXShare(
   if (!strength) return { own, counted: null, reason: "no_signal" };
 
   const day = Math.floor(now / 86_400_000);
-  if (!(await withinLimit(store, `xshare-day:${token}:${day}`, input.userId, X_SHARES_PER_DAY, 2 * 86_400))) {
+  if (!(await withinLimit(store, xShareDayLimit(token, day), input.userId, X_SHARES_PER_DAY, 2 * 86_400))) {
     return { own, counted: null, reason: "daily_limit" };
   }
   if ((await store.hit(seenKey(input.card.id), SEEN_SEC)) > 1) return { own, counted: null, reason: "already_counted" };
@@ -254,7 +258,24 @@ export function xShareEvents(shares: readonly XShare[]): ActivityEvent[] {
     parties: [s.wallet.toLowerCase()],
     tokens: [s.club],
     weight: strengthFactor(s.strength),
+    ...(s.entry ? { entry: true as const } : {}),
   }));
+}
+
+/**
+ * Marks the X share of Board post `postId` as a challenge entry (ADR 0048), or clears the mark with
+ * `challenge: null`. Marking gives the member back today's X-share slot: an entry earns through its
+ * challenge, so it shouldn't stop their next X post from counting.
+ */
+export async function setXShareEntry(store: Store, club: string, tweet: string, postId: string, challenge: string | null): Promise<void> {
+  const share = await store.get<XShare>(xShareKey(club, tweet));
+  if (!share || share.postId !== postId || (share.entry ?? null) === challenge) return;
+  const next: XShare = { ...share };
+  if (challenge) next.entry = challenge;
+  else delete next.entry;
+  await store.set(xShareKey(club, tweet), next);
+  // One X share counts a day (X_SHARES_PER_DAY), and this was it: clearing the day's count frees the slot.
+  if (challenge && !share.entry) await store.del(`declub:rl:${xShareDayLimit(club, Math.floor(share.at / 86_400))}:${share.userId}`);
 }
 
 // ─────────────────────────────────────────────────────────────── linking the project's account

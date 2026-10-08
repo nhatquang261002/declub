@@ -39,10 +39,11 @@ export const isChallengeEvent = (e: Pick<SystemEvent, "kind">) => e.kind === "ch
 /**
  * The events without the starts of challenges pinned on top of the Board while they run: the card is
  * already there, so it isn't drawn twice. A result still shows; a challenge that is done falls back
- * into the feed at the time it started.
+ * into the feed at the time it started. `results` are settled challenges whose results the Owner
+ * pinned (ADR 0050): neither their start nor their result is drawn again while they're pinned.
  */
-export const withoutPinned = (events: readonly SystemEvent[], pinned: ReadonlySet<string>) =>
-  events.filter((e) => !(e.kind === "challenge" && e.challenge && pinned.has(e.challenge)));
+export const withoutPinned = (events: readonly SystemEvent[], pinned: ReadonlySet<string>, results: ReadonlySet<string> = new Set()) =>
+  events.filter((e) => !(e.challenge && ((e.kind === "challenge" && pinned.has(e.challenge)) || (isChallengeEvent(e) && results.has(e.challenge)))));
 
 /** What `kind` of system message an activity event makes, or null for the kinds that make none (X shares are posts' business). */
 export const systemKindOf = (e: Pick<ActivityEvent, "kind">): SystemKind | null => (e.kind === "swapped" ? "swap" : e.kind === "created" ? "listing" : null);

@@ -5,7 +5,7 @@ import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
 import { Pagination } from "@/components/Pagination";
 import { HolderBadge } from "@/components/HolderBadge";
-import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
+import { BanIcon, CrownIcon, FlameIcon, ShieldIcon, TrophyIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
 import { Select } from "@/components/Select";
 import { WalletAvatar } from "@/components/WalletAvatar";
@@ -55,6 +55,19 @@ export function StreakChip({ streak }: { streak?: number }) {
     <span className="chip chip-peach" title={`Active on the Board ${streak} weeks (epochs) in a row`} aria-label={`${streak}-week streak`}>
       <FlameIcon />
       {streak} {streak === 1 ? "week" : "weeks"}
+    </span>
+  );
+}
+
+/** The challenges a member won in this Club (ADR 0050), as a count; the titles are in the tooltip. */
+export function TrophyCount({ trophies }: { trophies?: PublicMember["trophies"] }) {
+  if (!trophies || trophies.length === 0) return null;
+  const titles = trophies.map((t) => `${t.place ? (["1st", "2nd", "3rd"][t.place - 1] ?? `${t.place}th`) : "Winner"}: ${t.title}`).join("\n");
+  const label = `${trophies.length} challenge ${trophies.length === 1 ? "win" : "wins"}: ${trophies.map((t) => t.title).join(", ")}`;
+  return (
+    <span className="trophy-count" title={titles} aria-label={label}>
+      <TrophyIcon />
+      {trophies.length}
     </span>
   );
 }
@@ -126,6 +139,7 @@ function Podium({
               <RoleChip role={m.role} />
               {m.holder && <HolderBadge symbol={symbol} />}
               <StreakChip streak={m.streak} />
+              <TrophyCount trophies={m.trophies} />
             </span>
             <span className="text-xs text-muted">
               {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}
@@ -232,6 +246,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                         <RoleChip role={m.role} />
                         {m.holder && <HolderBadge symbol={symbol} />}
                         <StreakChip streak={m.streak} />
+                        <TrophyCount trophies={m.trophies} />
                       </div>
                       <p className="text-xs text-muted">
                         Joined {ago(Math.floor(m.joinedAt / 1000), now)} · {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}

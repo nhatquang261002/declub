@@ -1,0 +1,37 @@
+# ADR 0049: More ways to pick a challenge's winners: Holder vote, raffle, first in, everyone who completes
+
+**Status:** Accepted · 2026-10-08 · Web only: no contract change. Amends [ADR 0045](0045-club-challenges.md) (challenges); [ADR 0048](0048-entries-earn-through-their-challenge.md) (what an entry earns) and [ADR 0044](0044-owner-reward-settings.md) (what Owners may set) hold for every mode. The spec is [09 · Clubs](../09-clubs.md#challenges).
+
+## Context
+
+A challenge had two ways to pick winners: likes from members, or the Owner's pick, each paying one to three ranked places. Owners want other kinds of challenge: a giveaway where any entrant can win, a race where the first in win, a task everyone who does it should be paid for, and a vote where only the Club's Holders have a say (so a like ring of outsiders can't carry it).
+
+Some of these pay many winners the same, so letting them pay what a ranked place pays would let one challenge pour points into a Club's ramp. A random draw run by the app is only fair if nobody, the app included, can choose its result, and anyone can check it.
+
+## Decision
+
+- **Six ways (`judging`), in two families.**
+  - **Ranked** (1 to 3 places, `prizes`, each 0 to 20 points, a lower place never more than a higher one, as before): `"likes"`, `"owner"`, and **`"holders"` (Holder vote)**: ranked like `"likes"`, but only likes from members with the Holder badge count (`PublicEntry.votes`). The badge is the member row's as it stands when the challenge settles. Anyone can still like.
+  - **Flat** (one prize for every winner: `winners` 1 to 25, `prize` 0 to 10 points each, `CHALLENGE_RULES.maxWinners`, `maxFlatPoints`):
+    - **`"raffle"`**: the winners are drawn at random from the entries that can win.
+    - **`"first"` (first in)**: the first `winners` entries by Board post time win. Entries stay open to the end; at the settle the first that can still win, win, so a later entry is a reserve that moves up if one ahead drops out (hidden, deleted, a ban).
+    - **`"everyone"` (everyone who completes)**: every entry with at least `minLikes` likes from other members (0 to 10; 0 means any entry) wins, up to `winners`, earliest first (`winnersByTime`).
+  A flat prize stays below a ranked place's (10 against 20) so a challenge with many winners can't inflate the ramp; the per-member cap (`CHALLENGE_CAP_PER_EPOCH`, 20 an epoch) is unchanged. These bounds are the protocol's: the Owner chooses within them and can't raise them (ADR 0044).
+- **A prize may be 0 points** (trophy only): the winners are named and published with the challenge, but nothing is added to the epoch, and the settlement has no `epoch`. Prizes that aren't points (trophies, assets) are a `rewards` beside `prizes` ([ADR 0050](0050-challenge-rewards-beyond-points.md)), so the points stay what an epoch counts.
+- **Kept the same way for every mode.** `prizes` is always the points of each place, best first: a flat challenge's are `winners` equal values, so the settling, the epoch ledger (`publishAwards`, `readAwards`) and every reader of `prizes` work unchanged. A flat winner still has a `place` (1..N, in draw or time order), shown as "Winner", not gold, silver and bronze. `StoredChallenge` and `PublicChallenge` gain `winners`, `prize` and `minLikes`; challenges kept before have none of them and read and settle as before. `checkChallenge` refuses a mixed-up prize (`prizes` with a flat mode, `winners` or `prize` with a ranked one, `minLikes` anywhere but `"everyone"`), and the Owner's form runs the same check as they type, so it can only send a challenge the server takes.
+- **Likes lock where they decide** (`likesDecide`): `"likes"`, `"holders"`, and `"everyone"` with `minLikes` above 0 refuse likes from the end (`voting_closed`). A raffle and first in don't use likes, so nothing locks.
+- **A raffle is drawn with a block nobody knew.** Settling stays lazy and idempotent (`settleDue`), in two steps under the settle lock:
+  1. **Commit.** On the first settle after the end, the challenge keeps `drawBlock`, the newest Monad block plus `CHALLENGE_RULES.drawMargin` (10), and `drawPool`, the entries that could win then, sorted by post id. Nothing about the result is known yet. With no entries it settles with no winners and reads no block.
+  2. **Draw**, once that block is final: `seed = keccak256(blockHash ‖ challengeId as UTF-8)` (`drawSeed`); the pool is shuffled with it (`drawOrder`: Fisher–Yates from the last position down, position `i` swapping with `keccak256(seed ‖ uint256(i)) mod (i + 1)`), and the first `winners` that can still win, a member once, win (`drawWinners`). One that dropped out since the commit is skipped, not redrawn. The settlement keeps `draw: { block, hash, seed, pool }`, so anyone can draw it again.
+  The block reader is a dependency (`BlockReader`: viem in production, a fake in tests). A chain that can't be read leaves the raffle for the next settle. **Once the block is committed the Owner can't cancel** (`drawing`): the result is fixed, and calling it off would be choosing it.
+- **Which epoch the points count in.** Every mode but the Owner's pick counts in the epoch it ended with, if that epoch isn't closed yet, else in the running one (as `"likes"` did). The feed tells a win at the challenge's end for all of them, and an Owner's pick when it is made.
+- **The Owner's form** is four steps: the task (title, brief, Holders only), how winners are picked (six cards, each with a line on what it does), the prize (three places, or the number of winners, points each and for `"everyone"` the likes needed), and the epoch it ends with, with the card members will see drawn live beside it. The cards and the challenge's page show a flat prize as one tile ("5 winners · +3 pts each", or a trophy), the spots taken while a first-in challenge runs, and a settled raffle's block, seed and a one-line way to check it. The Owner's place picker stays for `"owner"` only.
+
+## Consequences
+
+- An Owner can still favour friends, within the same bounds as before: they can't enter, every win is published, and the cap per member per epoch is unchanged. A flat challenge can pay up to 25 members, at most 10 points each, so it spreads points without letting any one member count more than they could already.
+- A raffle's draw can't be chosen by the app or the Owner: the block is fixed before its hash exists, and the pool before the draw. What staff can still do is what they could in any challenge: hide an entry or ban its member, which skips it (the next in the draw moves up) rather than redrawing, and is visible in the published pool and the Club's log. A block proposer could in principle withhold a block to change its hash; for points this small that isn't worth it.
+- A raffle needs a second settle after its block is final. The epoch close settles first, but if the close is the first to touch a raffle it only commits the block, and the draw's points count in the next epoch, as they would for a likes-judged challenge nobody settled before the close.
+- First in rewards speed, so it favours members online when a challenge starts; Owners pick it knowingly, and a later entry still waits as a reserve. Replacing an entry moves the member to the new post's time.
+- A Holder vote leans on the Holder badge as last read (about daily, and on demand for a member's own badge): a like from a member who just bought in counts once their badge is read again.
+- Old challenges and their published wins are unchanged. Nothing is migrated.

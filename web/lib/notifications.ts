@@ -17,10 +17,18 @@ export type NotificationKind =
   | "club-reply"
   | "club-xshare"
   | "club-rank"
-  | "club-closing";
+  | "club-closing"
+  | "challenge-new"
+  | "challenge-ending"
+  | "challenge-won"
+  | "challenge-results"
+  | "challenge-pick"
+  | "challenge-pick-soon"
+  | "challenge-prize-sent"
+  | "challenge-prize-owed";
 
 /** Kinds that report something that already happened and need nothing from the user. */
-export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped", "club-like", "club-pinned", "club-reply", "club-xshare"];
+export const NEWS_KINDS: readonly NotificationKind[] = ["filled", "intent-settled", "intent-dropped", "club-like", "club-pinned", "club-reply", "club-xshare", "challenge-results"];
 
 export type AppNotification = {
   /** Stable per (kind, deal or intent), so read state survives reloads. */
@@ -31,7 +39,7 @@ export type AppNotification = {
   title: string;
   body: string;
   href: string;
-  /** Needs a transaction from the user (accept, reclaim), as opposed to informational. */
+  /** Needs the user to act (accept, reclaim, pick a challenge's winners), as opposed to informational. */
   actionable: boolean;
 };
 
@@ -127,16 +135,18 @@ export function deriveNotifications(
 /** What the server says a signed-in member should hear about their Clubs (lib/server/inbox.ts). */
 export type ClubInboxItem = {
   key: string;
-  kind: "club-like" | "club-pinned" | "club-reward" | "club-reply" | "club-xshare" | "club-rank" | "club-closing";
+  kind: Extract<NotificationKind, `club-${string}` | `challenge-${string}`>;
   at: number;
   title: string;
   body: string;
   href: string;
+  /** An Owner's pick of a challenge's winners (ADR 0045), or a prize they owe (ADR 0050), waits on them. */
+  actionable?: true;
 };
 
-/** The Club inbox as notifications: all news, none needing a transaction from the bell. */
+/** The Club inbox as notifications: news, except what the server marks as waiting on the member. */
 export const clubNotifications = (items: readonly ClubInboxItem[]): AppNotification[] =>
-  items.map((i) => ({ key: i.key, kind: i.kind, recency: BigInt(Math.floor(i.at)), title: i.title, body: i.body, href: i.href, actionable: false }));
+  items.map((i) => ({ key: i.key, kind: i.kind, recency: BigInt(Math.floor(i.at)), title: i.title, body: i.body, href: i.href, actionable: i.actionable === true }));
 
 /** Actionable first, then newest first. */
 export function sortNotifications(list: AppNotification[]): AppNotification[] {

@@ -319,7 +319,8 @@ export function activityPoints(
   let base = 0;
   let reached = 0;
   for (const e of events) {
-    if (e.kind !== "xshare" || !own.has(e.parties[0] ?? "")) continue;
+    // An X share that is a challenge entry counts toward Momentum only (ADR 0048).
+    if (e.kind !== "xshare" || e.entry || !own.has(e.parties[0] ?? "")) continue;
     const read = reach?.available ? reach.posts[e.deal] : undefined;
     const factor = read ? (read.ok ? strengthFactor(read.strength) : 0) : (e.weight ?? 1);
     base += PROTOCOL.xShareBase * factor;
@@ -345,7 +346,11 @@ export function activityPoints(
 }
 
 /** One like or reply a member gave another in a Club's epoch (ADR 0038), by user id. */
-export type BackingAction = { giver: string; receiver: string; kind: "like" | "reply" | "first" };
+/**
+ * One like or reply. `entry` marks one given to a challenge entry (ADR 0048): the challenge's prize
+ * covers the entry, so it backs nobody, but the giver still earns for engaging (`engagementPoints`).
+ */
+export type BackingAction = { giver: string; receiver: string; kind: "like" | "reply" | "first"; entry?: true };
 
 /** A Holder's weekly voice in their own Club: `voicePerNft` per NFT, counting at most `voiceCapNfts`. */
 export const voiceOf = (shares: bigint | number, rules: ClubRules = DEFAULT_CLUB_RULES) =>
@@ -372,7 +377,8 @@ export type Voice = { club: number; base: number; given?: number };
  * how many gave them any, and how much of it came from base voices.
  */
 export function backingPoints(actions: readonly BackingAction[], voices: ReadonlyMap<string, Voice>, rules: ClubRules = DEFAULT_CLUB_RULES): Map<string, { points: number; backers: number; base: number }> {
-  const given = actions.filter((a) => a.giver !== a.receiver);
+  // A challenge entry earns through its challenge (ADR 0048): backing given to one doesn't count, nor use the giver's voice.
+  const given = actions.filter((a) => a.giver !== a.receiver && !a.entry);
   const has = (user: string) => {
     const v = voices.get(user);
     return !!v && (v.club > 0 || v.base > 0);

@@ -6,6 +6,7 @@
  * This file is shared by the browser and the server.
  */
 import type { AvatarView } from "./avatars";
+import type { PublicTrophy } from "./challenges";
 import type { Profile } from "./profiles";
 
 export type About = { name?: string; bio?: string };
@@ -62,6 +63,8 @@ export type WalletProfile = {
   profile: Profile | null;
   avatar: AvatarView | null;
   about: About | null;
+  /** Challenges this wallet won (ADR 0050), newest first; absent when none. */
+  trophies?: PublicTrophy[];
 };
 
 /** A Club a wallet is listed in, as its Members list shows it. */

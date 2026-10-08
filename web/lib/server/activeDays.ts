@@ -44,7 +44,8 @@ export async function activeDays(store: Store, club: string, n: number, also: Re
   const days = new Map<string, Set<string>>();
   entries.forEach(({ userId, day }, i) => {
     const post = posts[i];
-    if (!post || post.hidden || post.parent || post.userId !== userId) return;
+    // A challenge entry earns through its challenge (ADR 0048): it doesn't make the day active.
+    if (!post || post.hidden || post.parent || post.entry || post.userId !== userId) return;
     days.set(userId, (days.get(userId) ?? new Set()).add(day));
   });
   for (const [userId, more] of also) for (const day of more) days.set(userId, (days.get(userId) ?? new Set()).add(day));

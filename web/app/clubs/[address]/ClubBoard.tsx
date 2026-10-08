@@ -16,7 +16,7 @@ import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard"
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
 import { useSystemMessages } from "@/hooks/useSystemMessages";
-import { isLive } from "@/lib/challenges";
+import { isLive, isPinned } from "@/lib/challenges";
 import { isStaff } from "@/lib/clubRoles";
 import { LENSES, type LensId } from "@/lib/lenses";
 import { weave, withoutPinned } from "@/lib/systemFeed";
@@ -57,16 +57,17 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   const { report, like, remove, hide, pin, ban } = useClubActions(token);
   const [filter, setFilter] = useState<"all" | "looking">("all");
   const system = useSystemMessages({ club: token });
-  // Challenges still running (ADR 0045) are pinned on top, whatever the order or filter, so the feed leaves out their start.
+  // Challenges still running (ADR 0045) are pinned on top, whatever the order or filter, so the feed leaves out their start;
+  // so are results the Owner chose to pin, for a few days after they settle (ADR 0050).
   const { challenges } = useChallenges(token);
-  const live = useMemo(() => challenges.filter((c) => isLive(c.phase)), [challenges]);
+  const live = useMemo(() => challenges.filter((c) => isPinned(c, now * 1000)), [challenges, now]);
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
   // and holds everything: another lens or "Looking for" is a question about posts.
   const byTime = active.id === "newest";
   const items = useMemo(() => {
     const list = filter === "all" ? posts : posts.filter((p) => p.kind === "looking");
     const withSystem = byTime && filter === "all";
-    const events = withoutPinned(system.events, new Set(live.map((c) => c.id)));
+    const events = withoutPinned(system.events, new Set(live.map((c) => c.id)), new Set(live.filter((c) => !isLive(c.phase)).map((c) => c.id)));
     return weave(list, withSystem ? events : [], { since: system.since, complete: !hasMore });
   }, [posts, filter, byTime, system.events, system.since, hasMore, live]);
 
@@ -116,7 +117,11 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
           {live.map((c) => (
             <li key={c.id}>
-              <ChallengeSummary c={c} token={token} now={now} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={live.length > 1} />
+              {isLive(c.phase) ? (
+                <ChallengeSummary c={c} token={token} now={now} heading={c.phase === "open" ? "Challenge" : "Challenge ended"} pinned compact={live.length > 1} />
+              ) : (
+                <ChallengeSummary c={c} token={token} now={now} heading="Challenge results" pinned results />
+              )}
             </li>
           ))}
         </ul>

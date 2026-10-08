@@ -93,6 +93,8 @@ async function standing(store: Store, club: string, entries: Entry[]): Promise<E
       if (!parent || post.userId !== e.userId) continue;
       action = { giver: e.userId, receiver: parent.userId, kind: firsts.get(parent.id) === post.id ? "first" : "reply" };
     }
+    // Backing a challenge entry: its challenge pays the author, the giver still engaged (ADR 0048).
+    if ((e.kind === "like" ? post : parent)?.entry) action.entry = true;
     const key = `${e.kind}|${e.id}|${e.userId}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -132,7 +134,7 @@ export async function givenEverywhere(store: Store, n: number, userId: string, r
   }
   let total = 0;
   for (const [club, entries] of byClub) {
-    for (const a of (await standing(store, club, entries)).actions) if (a.giver !== a.receiver) total += backingWeight(a.kind, rules);
+    for (const a of (await standing(store, club, entries)).actions) if (a.giver !== a.receiver && !a.entry) total += backingWeight(a.kind, rules);
   }
   return total;
 }
@@ -175,7 +177,8 @@ export async function voicesFor(
 /** One Club's backing in an epoch, by public wallet, so anyone can recompute its points with `backingPoints` (ADR 0040). */
 export type PublishedBacking = {
   voices: Record<string, Voice>;
-  actions: { from: string; to: string; kind: BackingAction["kind"] }[];
+  /** `entry`: given to a challenge entry, so it backs nobody but still counts as engaging (ADR 0048). */
+  actions: { from: string; to: string; kind: BackingAction["kind"]; entry?: true }[];
   /** Taken out by a moderator's hide, or because the giver was banned from rewards (ADR 0044). */
   removed: { from: string; to: string; kind: BackingAction["kind"]; by: "moderator" | "reward_ban" }[];
 };
@@ -208,7 +211,7 @@ export async function publishBacking(
   };
   const out: PublishedBacking = { voices: {}, actions: [], removed: [] };
   for (const [userId, voice] of voices) out.voices[await nameOf(userId)] = voice;
-  for (const a of backing.actions) out.actions.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind });
+  for (const a of backing.actions) out.actions.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, ...(a.entry ? { entry: true as const } : {}) });
   for (const a of backing.removed) out.removed.push({ from: await nameOf(a.giver), to: await nameOf(a.receiver), kind: a.kind, by: a.by ?? "moderator" });
   return out;
 }

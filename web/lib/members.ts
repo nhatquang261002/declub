@@ -38,6 +38,8 @@ export type PublicMember = {
   role?: "owner" | "moderator";
   /** Epochs in a row with enough active days on the Board (ADR 0032), when still alive. */
   streak?: number;
+  /** The challenges they won in this Club under this wallet (ADR 0050), newest first; absent when none. */
+  trophies?: { challenge: string; title: string; place: number | null }[];
 };
 
 export type MemberSort = "momentum" | "new";

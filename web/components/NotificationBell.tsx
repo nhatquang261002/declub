@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrossIcon, FlameIcon, HeartIcon, InboxIcon, PauseIcon, PinIcon, SwapIcon, TrendUpIcon, XLogoIcon } from "@/components/Icons";
+import { BellIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrossIcon, CrownIcon, FlameIcon, HeartIcon, InboxIcon, PauseIcon, PinIcon, SwapIcon, TrendUpIcon, TrophyIcon, XLogoIcon } from "@/components/Icons";
 import { usePopover } from "@/components/Popover";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification, NotificationKind } from "@/lib/notifications";
@@ -22,6 +22,14 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   "club-xshare": "X post counted",
   "club-rank": "Your rank",
   "club-closing": "Epoch ending",
+  "challenge-new": "Challenge",
+  "challenge-ending": "Challenge ending",
+  "challenge-won": "You won",
+  "challenge-results": "Results",
+  "challenge-pick": "Pick winners",
+  "challenge-pick-soon": "Pick soon",
+  "challenge-prize-sent": "Prize sent",
+  "challenge-prize-owed": "Send the prize",
 };
 
 // One icon and tint per kind: the colour says good news, needs you, or gone.
@@ -40,6 +48,14 @@ const KIND_LOOK: Record<NotificationKind, { icon: ReactNode; tone: string }> = {
   "club-xshare": { icon: <XLogoIcon />, tone: "bg-mint/15 text-mint" },
   "club-rank": { icon: <TrendUpIcon />, tone: "bg-mint/15 text-mint" },
   "club-closing": { icon: <FlameIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-new": { icon: <TrophyIcon />, tone: "bg-peach/20 text-peach" },
+  "challenge-ending": { icon: <ClockIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-won": { icon: <TrophyIcon />, tone: "bg-mint/15 text-mint" },
+  "challenge-results": { icon: <TrophyIcon />, tone: "bg-white/10 text-white/80" },
+  "challenge-pick": { icon: <CrownIcon />, tone: "bg-peach/20 text-peach" },
+  "challenge-pick-soon": { icon: <CrownIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-prize-sent": { icon: <TrophyIcon />, tone: "bg-mint/15 text-mint" },
+  "challenge-prize-owed": { icon: <TrophyIcon />, tone: "bg-warn/15 text-warn" },
 };
 
 const MAX_SHOWN = 20;
@@ -147,7 +163,7 @@ export function NotificationBellView({
               <span className="hdr-pop-icon !size-11 !rounded-full text-white/70"><BellIcon className="size-5" /></span>
               <p className="text-sm font-bold text-white">You&apos;re all caught up</p>
               <p className="text-xs leading-5 text-white/55">
-                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards and your rank) show up here.
+                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards, your rank and challenges) show up here.
               </p>
             </div>
           ) : (

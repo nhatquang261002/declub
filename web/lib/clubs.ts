@@ -32,6 +32,8 @@ export type ActivityEvent = {
   fee?: string;
   /** An X share's strength factor (lib/xPosts.ts `strengthFactor`). */
   weight?: number;
+  /** An X share that is a challenge entry (ADR 0048): it counts toward Momentum, not toward epoch points. */
+  entry?: true;
 };
 
 export const toScored = (e: ActivityEvent): ScoredEvent => ({ kind: e.kind, at: e.at, parties: e.parties, ...(e.weight !== undefined ? { weight: e.weight } : {}) });

@@ -17,6 +17,7 @@ import {
   type CoinRule,
   type MembersPaging,
   type MembersView,
+  type PublicMember,
 } from "../members";
 import { score } from "../momentum";
 import { profileKey, userWalletsKey, type StoredProfile } from "../profiles";
@@ -25,6 +26,8 @@ import { withoutUser } from "../clubRoles";
 import { epochAt } from "../rewards";
 import { isBanned, loadProfile, loadRoles, saveRoles } from "./clubState";
 import { liveStreak, readStreaks } from "./streaks";
+import { trophiesKey } from "./challengeState";
+import type { Trophy } from "../challenges";
 import type { Store } from "./store";
 
 /**
@@ -267,7 +270,21 @@ export async function listMembers(
       if (profile && profile.userId === row.userId) handles!.set(row.displayWallet, profile.handle);
     });
   }
-  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks, paging && { ...paging, handles });
+  const view = rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks, paging && { ...paging, handles });
+  return { ...view, members: await withTrophies(store, entry.address.toLowerCase(), rows, view.members) };
+}
+
+/**
+ * The page's members with the challenges each won in this Club (ADR 0050), read for that page only.
+ * Only wins published under the wallet the row shows count, so the list never ties two wallets.
+ */
+async function withTrophies(store: Store, club: string, rows: readonly MemberRow[], members: PublicMember[]): Promise<PublicMember[]> {
+  const userOf = new Map(rows.map((row) => [row.displayWallet, row.userId]));
+  const lists = await store.getMany<Trophy[]>(members.map((m) => trophiesKey(userOf.get(m.wallet) ?? "")));
+  return members.map((m, i) => {
+    const won = (lists[i] ?? []).filter((t) => t.club === club && t.wallet === m.wallet);
+    return won.length > 0 ? { ...m, trophies: won.map((t) => ({ challenge: t.challenge, title: t.title, place: t.place })) } : m;
+  });
 }
 
 /** How many members hold the asset, as of their last check. Reads every row. */

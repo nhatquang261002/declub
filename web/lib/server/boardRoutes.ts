@@ -41,14 +41,14 @@ import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
 import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
-import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, withdrawEntry } from "./challenges";
+import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, pickWinners, sendPrize, withdrawEntry, type ChallengeDeps } from "./challenges";
 
 /**
  * The board and staff routes, built over a registry like the other Club routes so tests can use a
  * list of their own. Writes need the caller's Privy access token; reads are public, and a reader
  * who sends a token also sees their own hidden posts (and, as staff, every hidden one).
  */
-export type RouteDeps = BoardDeps & {
+export type RouteDeps = BoardDeps & Pick<ChallengeDeps, "blocks" | "prizeChain"> & {
   gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
   /** Who is reading, if they said: Privy in production, a stand-in in tests. */
   viewer?: (request: Request) => Promise<{ id: string } | null>;
@@ -103,10 +103,22 @@ const REFUSALS: Record<string, [number, string]> = {
   closed: [409, "This challenge has ended."],
   not_judging: [409, "This challenge isn’t waiting for the Owner’s pick."],
   no_entry: [404, "You haven’t entered this challenge."],
+  drawing: [409, "This raffle’s draw is already committed to a block, so it can’t be called off."],
   reward_banned: [403, "You’re banned from this Club’s rewards, so you can’t enter its challenges."],
   busy: [409, "That is being settled right now. Try again in a moment."],
   challenge_conflict: [409, "You and this member are in the same challenge, so the Owner or another Moderator has to do that."],
   voting_closed: [409, "This post is an entry in a challenge that has ended, so its likes are locked."],
+  prize_overdue: [409, "A winner of an earlier challenge here is still waiting on their prize. Send it and mark it sent before offering another."],
+  no_prize: [409, "That winner isn’t owed a prize from this challenge."],
+  prize_sent: [409, "That prize is already marked as sent."],
+  tx_used: [409, "That transaction has already paid a prize."],
+  tx_not_found: [404, "That transaction wasn’t found on chain yet. Wait for it to be mined, then try again."],
+  tx_failed: [422, "That transaction failed on chain, so it sent nothing."],
+  tx_too_early: [422, "That transaction was made before the challenge ended. Send the prize after it settles."],
+  wrong_asset: [422, "That transaction doesn’t move the prize’s NFT or token."],
+  wrong_recipient: [422, "That transaction doesn’t send the prize to any wallet the winner has linked."],
+  too_little: [422, "That transaction sends less than the winner is owed."],
+  chain_unavailable: [503, "Couldn’t read the chain right now. Try again."],
   thread_full: [409, "This post has as many replies as it can take."],
   too_many_moderators: [409, "A Club has at most 10 Moderators."],
   already_owner: [409, "They are already the Owner."],
@@ -423,8 +435,11 @@ export function rulesHandlers(registry: Registry, deps: RouteDeps = {}) {
 }
 
 /**
- * Club challenges (ADR 0045). GET (public) lists them, settling the ones that ended; POST (the Owner
- * or an app admin) starts one: `{ title, brief, judging: "likes" | "owner", prizes: [points…], epochs, holdersOnly? }`.
+ * Club challenges (ADR 0045, ADR 0049). GET (public) lists them, settling the ones that ended; POST
+ * (the Owner or an app admin) starts one: `{ title, brief, judging, epochs, holdersOnly? }` with, for
+ * `judging` "likes" | "holders" | "owner", `prizes: [points…]` (best first), and for "raffle" |
+ * "first" | "everyone", `winners` and `prize` (points each), plus `minLikes` for "everyone"; and
+ * optionally `rewards: { asset?: { token, amounts }, pinWinner? }` (ADR 0050).
  */
 export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
@@ -442,7 +457,7 @@ export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
     async POST(request: Request, ctx: Ctx) {
       const f = await front(registry, ctx, request, deps, "club-mod");
       if (f instanceof Response) return f;
-      const result = await createChallenge(f.store, f.entry, f.actor, await bodyOf(request), deps);
+      const result = await createChallenge(f.store, f.entry, f.actor, await bodyOf(request), { ...deps, registry });
       return result.ok ? json({ enabled: true, id: result.id }, 201) : refuse(result.reason, result.message);
     },
   };
@@ -454,7 +469,8 @@ export function challengesHandlers(registry: Registry, deps: RouteDeps = {}) {
  *   "enter" { post }  a member enters one of their Board posts,
  *   "withdraw"        a member takes their entry back,
  *   "pick" { posts }  the Owner names the winners of a challenge they judge, best first,
- *   "cancel"          the Owner calls it off.
+ *   "cancel"          the Owner calls it off,
+ *   "prize_sent" { post, tx }  the Owner reports a winner's asset prize sent; checked on chain (ADR 0050).
  */
 export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
@@ -485,8 +501,10 @@ export function challengeHandlers(registry: Registry, deps: RouteDeps = {}) {
               ? await pickWinners(f.store, f.entry, f.actor, id, body.posts, deps)
               : body.action === "cancel"
                 ? await cancelChallenge(f.store, f.entry, f.actor, id, deps)
-                : null;
-      if (!result) return refuse("invalid", "Send { action: \"enter\" | \"withdraw\" | \"pick\" | \"cancel\" }.");
+                : body.action === "prize_sent"
+                  ? await sendPrize(f.store, f.entry, f.actor, id, { post: body.post, tx: body.tx }, deps)
+                  : null;
+      if (!result) return refuse("invalid", "Send { action: \"enter\" | \"withdraw\" | \"pick\" | \"cancel\" | \"prize_sent\" }.");
       if (!result.ok && result.reason === "holders_only") return refuse("holders_only", "This challenge is for Holders: you need to hold the Club’s asset to enter.");
       return result.ok ? json({ enabled: true }) : refuse(result.reason, "message" in result && typeof result.message === "string" ? result.message : undefined);
     },

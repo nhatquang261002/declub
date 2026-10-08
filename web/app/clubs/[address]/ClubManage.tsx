@@ -44,6 +44,7 @@ const ACTIONS: Record<string, string> = {
   create_challenge: "started a challenge:",
   cancel_challenge: "cancelled a challenge:",
   settle_challenge: "settled a challenge:",
+  prize_sent: "sent a challenge prize:",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";

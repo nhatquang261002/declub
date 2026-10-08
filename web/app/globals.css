@@ -1706,6 +1706,40 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 .challenge-pick-on[data-place="2"] { --medal: #c3ccd8; }
 .challenge-pick-on[data-place="3"] { --medal: #dd9a66; }
 
+/* A flat prize (ADR 0049) is one wider tile: how many win and what each gets. */
+.challenge-prizes:has(> .challenge-prize-flat) { grid-template-columns: minmax(0, 16rem); }
+
+/* The Owner's choice of how winners are picked: a card per way, the chosen one raised. */
+.challenge-mode { display: flex; cursor: pointer; flex-direction: column; gap: 0.3rem; border: 2px solid rgb(17 19 24 / 0.2); border-radius: 0.75rem; background: white; padding: 0.6rem 0.7rem; transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease; }
+.challenge-mode:hover { border-color: #111318; }
+.challenge-mode:has(input:checked) { border-color: #111318; background: color-mix(in srgb, #6d4fb3 9%, white); box-shadow: 3px 3px 0 #111318; }
+.challenge-mode:has(input:focus-visible) { outline: 2px solid #6d4fb3; outline-offset: 2px; }
+
+/* An asset prize under a tile's points (ADR 0050): what the Owner sends, a check once it was. */
+.challenge-asset { display: flex; min-width: 0; align-items: center; gap: 0.3rem; border-top: 1.5px dashed rgb(17 19 24 / 0.25); padding-top: 0.35rem; font-size: 0.78rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.challenge-asset svg:last-child:not(:first-child) { color: #1f7a55; }
+/* "Prize not sent", said plainly. */
+.challenge-unsent { border: 2px solid #a9282f; border-radius: 0.75rem; background: #fbeaea; padding: 0.45rem 0.7rem; color: #7c1d22; font-size: 0.8rem; font-weight: 700; }
+/* Pinned results: the winning entry, on a gold ground. */
+.challenge-winning { display: flex; align-items: flex-start; gap: 0.6rem; border: 2px solid #111318; border-radius: 0.75rem; background: color-mix(in srgb, #f0b735 16%, white); padding: 0.55rem 0.7rem; box-shadow: 2px 2px 0 #111318; }
+/* The prizes of a settled challenge, one row per winner, with the Owner's "mark as sent". */
+.challenge-prize-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.7rem 1.25rem; }
+.challenge-prize-row + .challenge-prize-row { border-top: 1px solid rgb(17 19 24 / 0.1); }
+.prize-state { display: inline-flex; align-items: center; gap: 0.25rem; border: 1.5px solid currentColor; border-radius: 9999px; padding: 0.05rem 0.5rem; font-size: 0.68rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.prize-state[data-state="sent"] { color: #1f7a55; background: #e3f5ec; }
+.prize-state[data-state="owed"] { color: #8a5a00; background: #fdf3dc; }
+.prize-state[data-state="overdue"] { color: #a9282f; background: #fbeaea; }
+
+/* Trophies (ADR 0050): a medal per win, gold, silver, bronze, or gold for a flat win. */
+.trophy-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 0.5rem; }
+.trophy { display: flex; min-width: 0; align-items: center; gap: 0.6rem; border: 2px solid #111318; border-radius: 0.75rem; background: color-mix(in srgb, var(--medal, #f0b735) 16%, white); padding: 0.5rem 0.65rem; }
+.trophy[data-place="2"] { --medal: #c3ccd8; }
+.trophy[data-place="3"] { --medal: #dd9a66; }
+:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip) { color: #111318; transition: box-shadow 140ms ease; }
+:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover { color: #111318; box-shadow: 2px 2px 0 #111318; }
+.trophy-count { display: inline-flex; align-items: center; gap: 0.2rem; border: 1.5px solid #111318; border-radius: 9999px; background: color-mix(in srgb, #f0b735 45%, white); padding: 0 0.4rem; font-size: 0.68rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.trophy-count svg { width: 0.75rem; height: 0.75rem; }
+
 .challenge-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; border-top: 1.5px solid rgb(17 19 24 / 0.12); background: rgb(255 255 255 / 0.4); padding: 0.65rem 1rem; }
 
 @media (prefers-reduced-motion: reduce) {

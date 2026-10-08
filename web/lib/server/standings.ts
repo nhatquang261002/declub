@@ -158,7 +158,7 @@ export async function computeStandings(store: Store, club: ClubEntry, deps: Stan
       ...(h.held !== undefined ? { held: averageHeld(h.held, samples) } : {}),
       joinedAt: h.joinedAt,
       days: h.days,
-      xShares: events.filter((e) => e.kind === "xshare" && own.has(e.parties[0] ?? "")).length,
+      xShares: events.filter((e) => e.kind === "xshare" && !e.entry && own.has(e.parties[0] ?? "")).length,
       points: h.points,
       xPoints: h.xPoints,
       swapPoints: h.swapPoints,

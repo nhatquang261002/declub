@@ -1,6 +1,6 @@
 # ADR 0045: Club challenges: the Owner sets a task, winners earn activity points
 
-**Status:** Accepted · 2026-10-07 (amended: challenges run in epochs, and can be Holders-only) · Web only: no contract change. Builds on [ADR 0038](0038-points-from-backing.md) (points) and [ADR 0044](0044-owner-reward-settings.md) (what Owners may set). The spec is [09 · Clubs](../09-clubs.md#challenges). Replaces the roadmap's "weekly prompt".
+**Status:** Accepted · 2026-10-07 (amended: challenges run in epochs, and can be Holders-only; an entry earns only its prize: [ADR 0048](0048-entries-earn-through-their-challenge.md); a Holder vote, a raffle, first in and everyone who completes: [ADR 0049](0049-more-ways-to-pick-challenge-winners.md); trophies, an NFT or token prize and pinned results: [ADR 0050](0050-challenge-rewards-beyond-points.md)) · Web only: no contract change. Builds on [ADR 0038](0038-points-from-backing.md) (points) and [ADR 0044](0044-owner-reward-settings.md) (what Owners may set). The spec is [09 · Clubs](../09-clubs.md#challenges). Replaces the roadmap's "weekly prompt".
 
 ## Context
 

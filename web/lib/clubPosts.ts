@@ -50,6 +50,12 @@ export type StoredPost = {
   x?: StoredXCard;
   /** On a reply: the top-level post it answers. Replies have no link and aren't on the Board list. */
   parent?: string;
+  /**
+   * The challenge this post was entered in (ADR 0048). The challenge's prize covers it: it still
+   * counts toward Momentum, but earns its author no epoch points of its own (no active day, X share
+   * or backing). Kept after a withdrawal; cleared if the challenge is cancelled.
+   */
+  entry?: string;
 };
 
 /**

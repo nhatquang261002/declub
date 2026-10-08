@@ -1,13 +1,27 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getAddress } from "viem";
-import { CHALLENGE_CAP_PER_EPOCH, CHALLENGE_RULES, checkChallenge, phaseOf, prizeText, winnersByLikes, winnersByPick } from "../lib/challenges";
+import { getAddress, keccak256, stringToHex, concat, type Hex } from "viem";
+import {
+  CHALLENGE_CAP_PER_EPOCH,
+  CHALLENGE_RULES,
+  checkChallenge,
+  drawOrder,
+  drawSeed,
+  drawWinners,
+  likesDecide,
+  phaseOf,
+  prizeText,
+  winnersByLikes,
+  winnersByPick,
+  winnersByTime,
+  type StoredChallenge,
+} from "../lib/challenges";
 import type { ActivityEvent } from "../lib/clubs";
 import { profileKey, userWalletsKey } from "../lib/profiles";
-import { banUser, createPost, deletePost, hidePost, likePost, type Deps } from "../lib/server/board";
+import { banUser, createPost, deletePost, getPost, hidePost, likePost, type Deps } from "../lib/server/board";
 import { challengesHandlers, challengeHandlers } from "../lib/server/boardRoutes";
-import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, liveChallenges, pickWinners, settleDue, withdrawEntry } from "../lib/server/challenges";
-import { readAwards } from "../lib/server/challengeState";
+import { cancelChallenge, createChallenge, enterChallenge, getChallenge, listChallenges, liveChallenges, pickWinners, settleDue, withdrawEntry, type BlockReader } from "../lib/server/challenges";
+import { challengeKey, challengesKey, entriesKey, entryOfKey, readAwards, votingClosed } from "../lib/server/challengeState";
 import { readLog, saveRoles } from "../lib/server/clubState";
 import type { UserGate } from "../lib/server/gate";
 import { getMember, joinClub, type Holdings } from "../lib/server/members";
@@ -16,6 +30,8 @@ import { listSystem } from "../lib/server/system";
 import { setRewardBan } from "../lib/server/rewardSettings";
 import { computeStandings } from "../lib/server/standings";
 import { memoryStore, type Store } from "../lib/server/store";
+import { momentumPostEvents } from "../lib/server/postMomentum";
+import { readXShares, xShareEvents } from "../lib/server/xPosts";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 import type { XCard } from "../lib/xPosts";
 
@@ -52,10 +68,10 @@ let tweetId = 1_000;
  * A Board post by `userId` at `s` seconds, sharing an X post: by default their own, posted on X just
  * before. `x: "none"` makes a plain note; "theirs" another account's post; a number, the X post's time.
  */
-async function post(store: Store, userId: string, s: number, x: "own" | "none" | "theirs" | number = "own") {
+async function post(store: Store, userId: string, s: number, x: "own" | "none" | "theirs" | number = "own", text = `my entry ${s}`) {
   await store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
   const id = String(tweetId++);
-  tweets.set(id, { id, author: x === "theirs" ? "someone" : userId, text: `my entry ${s}`, postedAt: (GENESIS + (typeof x === "number" ? x : s)) * 1000 });
+  tweets.set(id, { id, author: x === "theirs" ? "someone" : userId, text, postedAt: (GENESIS + (typeof x === "number" ? x : s)) * 1000 });
   const link = x === "none" ? {} : { link: `https://x.com/${userId}/status/${id}` };
   const r = await createPost(store, club, userId, { kind: "note", text: `gm ${userId} ${s}`, ...link }, at(s));
   assert.ok(r.ok);
@@ -95,7 +111,8 @@ describe("a challenge's rules", () => {
     bad({ prizes: [5, 10] });
     bad({ prizes: [CHALLENGE_RULES.maxPoints + 1] });
     bad({ prizes: [2.5] });
-    bad({ prizes: [0] });
+    bad({ prizes: [-1] });
+    assert.ok(checkChallenge(input({ prizes: [0] })).ok, "a place may pay no points: a trophy only");
     bad({ epochs: 0 });
     bad({ epochs: CHALLENGE_RULES.maxEpochs + 1 });
     bad({ epochs: 1.5 });
@@ -449,6 +466,90 @@ describe("a challenge judged by likes", () => {
   });
 });
 
+describe("an entry earns through its challenge (ADR 0048)", () => {
+  /** h: a Holder (1 NFT) whose X posts name the collection, so they count as X shares; a: a Holder (2 NFTs) who likes. */
+  async function holders() {
+    const store = await world();
+    const w = wallet(7);
+    await store.set(profileKey(w), { provider: "twitter", handle: "h7", userId: "h", updatedAt: 1 });
+    await store.setMembers(userWalletsKey("h"), [w]);
+    assert.ok((await joinClub(store, club, "h", [w], { holdings: async () => [1n] })).ok);
+    return store;
+  }
+  const xPost = (store: Store, userId: string, s: number) => post(store, userId, s, "own", `gm ${NFT} ${s}`);
+  const holdings: Holdings = async (_t, ws) => ws.map((w) => ({ [wallet(7)]: 1n, [wallet(4)]: 2n })[w.toLowerCase()] ?? 0n);
+  const deps = (s: number): RewardsDeps => ({
+    now: () => GENESIS + s,
+    clubs: [club],
+    // Momentum's events: the X shares and the Holders' Board posts.
+    events: async () => [...xShareEvents(await readXShares(store_!, token)), ...(await momentumPostEvents(store_!, token))],
+    holdings,
+    chainId: 10143,
+    contract: getAddress(wallet(0xee)),
+    genesis: GENESIS,
+    length: WEEK,
+  });
+  let store_: Store | undefined;
+  const rowOf = async (s: number, w: string) => (await computeStandings(store_!, club, deps(s)))!.rows.find((r) => r.wallet === w);
+
+  it("keeps the post in Momentum, but gives its author no active day, X share or backing; the liker still engages", async () => {
+    const store = (store_ = await holders());
+    const id = await start(store);
+    const entry = await xPost(store, "h", 60);
+    assert.ok((await getPost(store, token, entry))!.x!.counted, "an X share when posted");
+    assert.ok((await enterChallenge(store, club, "h", id, entry, at(61))).ok);
+    assert.ok((await likePost(store, club, "a", entry, true, at(62))).ok);
+
+    assert.equal((await getPost(store, token, entry))!.entry, id);
+    // Momentum still has the post and its X share.
+    assert.ok((await momentumPostEvents(store, token)).some((e) => e.deal === entry));
+    assert.deepEqual(xShareEvents(await readXShares(store, token)).map((e) => e.entry), [true]);
+
+    const h = (await rowOf(100, wallet(7)))!;
+    assert.deepEqual([h.days, h.xShares, h.xPoints, h.backedPoints], [0, 0, 0, 0]);
+    const a = (await rowOf(100, wallet(4)))!;
+    assert.ok((a.engagedPoints ?? 0) > 0, "liking an entry is still engaging");
+    assert.equal(a.days, 1, "and makes the liker's day active");
+  });
+
+  it("frees the day's X-share slot, so the member's next X post still counts", async () => {
+    const store = (store_ = await holders());
+    const id = await start(store);
+    const entry = await xPost(store, "h", 60);
+    assert.ok((await enterChallenge(store, club, "h", id, entry, at(61))).ok);
+    const next = await xPost(store, "h", 120);
+    assert.ok((await getPost(store, token, next))!.x!.counted, "not refused by the daily limit");
+    const h = (await rowOf(200, wallet(7)))!;
+    assert.deepEqual([h.days, h.xShares], [1, 1]);
+  });
+
+  it("stays covered after a withdrawal, and earns again when the challenge is cancelled", async () => {
+    const store = (store_ = await holders());
+    const id = await start(store);
+    const entry = await xPost(store, "h", 60);
+    assert.ok((await enterChallenge(store, club, "h", id, entry, at(61))).ok);
+    assert.ok((await likePost(store, club, "a", entry, true, at(62))).ok);
+    assert.ok((await withdrawEntry(store, club, "h", id, at(63))).ok);
+    assert.equal((await getPost(store, token, entry))!.entry, id, "taking it back doesn't let it earn the backing it collected");
+    assert.equal((await rowOf(100, wallet(7)))!.backedPoints, 0);
+
+    assert.ok((await cancelChallenge(store, club, actor("own", 1), id, at(110))).ok);
+    assert.equal((await getPost(store, token, entry))!.entry, undefined);
+    const h = (await rowOf(200, wallet(7)))!;
+    assert.deepEqual([h.days, h.xShares], [1, 1]);
+    assert.ok((h.backedPoints ?? 0) > 0);
+  });
+
+  it("refuses a post from an epoch already frozen: it has earned there", async () => {
+    const store = (store_ = await holders());
+    const id = await start(store, { epochs: 2 });
+    const old = await xPost(store, "h", 60);
+    await closeEpoch(store, 0, deps(WEEK + 60));
+    assert.deepEqual(await enterChallenge(store, club, "h", id, old, at(WEEK + 100)), { ok: false, reason: "bad_post" });
+    assert.ok((await enterChallenge(store, club, "h", id, await xPost(store, "h", WEEK + 120), at(WEEK + 121))).ok);
+  });
+});
+
 describe("a challenge the Owner judges", () => {
   async function played() {
     const store = await world();
@@ -585,5 +686,314 @@ describe("the challenge routes", () => {
 
     // The read route takes its store from the environment, as the other public reads do: the list itself is checked here.
     assert.deepEqual((await listChallenges(store, club, {}, at(200))).map((c) => [c.id, c.entryCount]), [[id, 1]]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// More ways to pick winners (ADR 0049)
+
+/** Two more members with the Holder badge: h1 (wallet 7) and h2 (wallet 8). */
+async function withHolders(store: Store) {
+  for (const [u, n] of [["h1", 7], ["h2", 8]] as const) {
+    const w = wallet(n);
+    await store.set(profileKey(w), { provider: "twitter", handle: `h${n}`, userId: u, updatedAt: 1 });
+    await store.setMembers(userWalletsKey(u), [w]);
+    assert.ok((await joinClub(store, club, u, [w], { holdings: async () => [1n] })).ok);
+  }
+  return store;
+}
+
+/** A chain to draw from: the newest block, and the hashes of the blocks that are final. */
+function fakeChain(head = 5_000n) {
+  const hashes = new Map<bigint, Hex>();
+  const state = { head, down: false, reads: 0 };
+  const blocks: BlockReader = {
+    async latest() {
+      state.reads++;
+      if (state.down) throw new Error("rpc down");
+      return state.head;
+    },
+    async hashOf(n) {
+      state.reads++;
+      if (state.down) throw new Error("rpc down");
+      return hashes.get(n) ?? null;
+    },
+  };
+  return { blocks, hashes, state };
+}
+const hashOf = (label: string) => keccak256(stringToHex(label));
+
+const flatInput = (judging: string, over: Record<string, unknown> = {}) => ({ title: "Flat", brief: "Do the thing.", judging, winners: 2, prize: 3, epochs: 1, ...over });
+async function startFlat(store: Store, judging: string, over: Record<string, unknown> = {}) {
+  const r = await createChallenge(store, club, actor("own", 1), flatInput(judging, over), at(START));
+  assert.ok(r.ok, JSON.stringify(r));
+  return r.id;
+}
+
+/** Entries from g (60 s), a (61 s), x (62 s) and mod (63 s) in challenge `id`, in that order. */
+async function enterAll(store: Store, id: string) {
+  const posts: Record<string, string> = {};
+  for (const [u, s] of [["g", 60], ["a", 61], ["x", 62], ["mod", 63]] as const) {
+    posts[u] = await post(store, u, s);
+    assert.ok((await enterChallenge(store, club, u, id, posts[u], at(s + 1))).ok, u);
+  }
+  return posts as { g: string; a: string; x: string; mod: string };
+}
+
+describe("checking the new ways to pick winners", () => {
+  it("takes a flat prize for raffle, first in and everyone, within the protocol's bounds", () => {
+    for (const judging of ["raffle", "first", "everyone"]) {
+      const r = checkChallenge(flatInput(judging));
+      assert.ok(r.ok, judging);
+      assert.deepEqual(r.ok && [r.challenge.prizes, r.challenge.winners, r.challenge.prize], [[3, 3], 2, 3], "kept as one prize per winner");
+    }
+    assert.equal((checkChallenge(flatInput("everyone")) as { challenge: { minLikes?: number } }).challenge.minLikes, 0, "any entry by default");
+    assert.ok(checkChallenge(flatInput("raffle", { prize: 0 })).ok, "a trophy only");
+    assert.ok(checkChallenge(flatInput("raffle", { winners: CHALLENGE_RULES.maxWinners, prize: CHALLENGE_RULES.maxFlatPoints })).ok);
+    assert.ok(checkChallenge(flatInput("everyone", { minLikes: CHALLENGE_RULES.maxMinLikes })).ok);
+    assert.ok(checkChallenge(input({ judging: "holders" })).ok, "a Holder vote pays places");
+    const bad = (over: Record<string, unknown>) => assert.equal(checkChallenge(over).ok, false, JSON.stringify(over));
+    bad(flatInput("raffle", { winners: 0 }));
+    bad(flatInput("raffle", { winners: CHALLENGE_RULES.maxWinners + 1 }));
+    bad(flatInput("first", { prize: CHALLENGE_RULES.maxFlatPoints + 1 }));
+    bad(flatInput("first", { prize: -1 }));
+    bad(flatInput("first", { prize: 1.5 }));
+    bad(flatInput("first", { prize: undefined }));
+    bad(flatInput("everyone", { minLikes: CHALLENGE_RULES.maxMinLikes + 1 }));
+    bad(flatInput("raffle", { minLikes: 2 }));
+    bad(flatInput("raffle", { prizes: [3] }));
+    bad(input({ judging: "holders", winners: 2 }));
+    bad(input({ judging: "owner", prize: 2 }));
+    bad(flatInput("raffle", { winners: Number.NaN }));
+    // Flat points stay below a ranked place's, and the per-epoch cap is the protocol's.
+    assert.ok(CHALLENGE_RULES.maxFlatPoints < CHALLENGE_RULES.maxPoints);
+    assert.equal(CHALLENGE_CAP_PER_EPOCH, 20);
+  });
+
+  it("locks likes only where they decide", () => {
+    assert.deepEqual(
+      (["likes", "holders", "owner", "raffle", "first"] as const).map((judging) => likesDecide({ judging })),
+      [true, true, false, false, false],
+    );
+    assert.equal(likesDecide({ judging: "everyone", minLikes: 0 }), false);
+    assert.equal(likesDecide({ judging: "everyone", minLikes: 2 }), true);
+  });
+});
+
+describe("the pure picks", () => {
+  const c = (post: string, userId: string, at: number, likes: number) => ({ post, userId, wallet: `w${userId}`, at, likes });
+
+  it("takes the earliest entries, with enough likes, a member once", () => {
+    const cands = [c("p3", "u3", 30, 0), c("p1", "u1", 10, 2), c("p2", "u2", 20, 1), c("p4", "u1", 5, 0)];
+    assert.deepEqual(winnersByTime(cands, 2, 4).map((w) => [w.post, w.place, w.points]), [["p4", 1, 4], ["p2", 2, 4]], "u1's later entry doesn't win twice");
+    assert.deepEqual(winnersByTime(cands, 5, 4, 1).map((w) => w.post), ["p1", "p2"]);
+    assert.deepEqual(winnersByTime(cands, 5, 0, 3), []);
+  });
+
+  it("draws the same order from the same seed, and anyone can redo it", () => {
+    const seed = drawSeed(hashOf("block"), "00000000-0000-0000-0000-000000000001");
+    assert.equal(seed, keccak256(concat([hashOf("block"), stringToHex("00000000-0000-0000-0000-000000000001")])));
+    const posts = Array.from({ length: 12 }, (_, i) => `post-${String(i).padStart(2, "0")}`);
+    const order = drawOrder(seed, posts);
+    assert.deepEqual([...order].sort(), [...posts].sort(), "a permutation");
+    assert.deepEqual(drawOrder(seed, [...posts].reverse()), order, "the order the pool comes in doesn't matter");
+    assert.notDeepEqual(drawOrder(drawSeed(hashOf("other"), "00000000-0000-0000-0000-000000000001"), posts), order, "another block, another order");
+    const cands = posts.map((p, i) => c(p, `u${i}`, i, 0));
+    assert.deepEqual(drawWinners(seed, cands, 3).map((x) => x.post), order.slice(0, 3));
+    // One that dropped out is skipped, not redrawn: the next in the same order moves up.
+    const without = cands.filter((x) => x.post !== order[1]);
+    assert.deepEqual(drawWinners(seed, without, 3, posts).map((x) => x.post), [order[0], order[2], order[3]]);
+  });
+});
+
+describe("a Holder vote", () => {
+  it("counts only likes from Holders, and locks them at the end", async () => {
+    const store = await withHolders(await world());
+    const id = await start(store, { judging: "holders", prizes: [10, 5] });
+    const g = await post(store, "g", 60);
+    const a = await post(store, "a", 61);
+    for (const [u, p] of [["g", g], ["a", a]] as const) assert.ok((await enterChallenge(store, club, u, id, p, at(62))).ok);
+    // g: two likes, neither from a Holder; a: one, from a Holder.
+    for (const [who, p] of [["x", g], ["mod", g], ["h1", a]] as const) assert.ok((await likePost(store, club, who, p, true, at(70))).ok);
+    const open = (await getChallenge(store, club, id, {}, at(100)))!;
+    assert.deepEqual(open.entries.map((e) => [e.post, e.likes, e.votes]), [[a, 1, 1], [g, 2, 0]], "ranked by the Holders' likes");
+    assert.deepEqual(await likePost(store, club, "h2", g, true, at(END)), { ok: false, reason: "voting_closed" });
+    const done = (await getChallenge(store, club, id, {}, at(END + 1)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => [w.post, w.place, w.points, w.likes]), [[a, 1, 10, 1]], "g had no Holder's like");
+  });
+});
+
+describe("a raffle", () => {
+  it("commits a future block after the end, then draws with its hash, verifiably", async () => {
+    const store = await world();
+    const chain = fakeChain();
+    const id = await startFlat(store, "raffle", { winners: 2, prize: 3, title: "Raffle" });
+    const posts = await enterAll(store, id);
+    // Likes don't decide a raffle: nothing locks.
+    assert.equal(await votingClosed(store, token, posts.g, (GENESIS + END + 1) * 1000), false);
+    assert.equal(chain.state.reads, 0);
+
+    // The first read after the end commits a block that doesn't exist yet.
+    const drawing = (await getChallenge(store, club, id, {}, { ...at(END + 1), blocks: chain.blocks }))!;
+    assert.deepEqual([drawing.phase, drawing.drawBlock, drawing.settled], ["closing", 5_000 + CHALLENGE_RULES.drawMargin, undefined]);
+    const stored = (await store.get<StoredChallenge>(challengeKey(token, id)))!;
+    assert.deepEqual(stored.drawPool, Object.values(posts).sort());
+    // Once committed, the Owner can't call it off to choose the result.
+    assert.deepEqual(await cancelChallenge(store, club, actor("own", 1), id, at(END + 2)), { ok: false, reason: "drawing" });
+    // A newer head doesn't move the committed block.
+    chain.state.head = 9_000n;
+    assert.equal(await settleDue(store, club, { ...at(END + 3), blocks: chain.blocks }), 0, "the block isn't final yet");
+    assert.equal((await store.get<StoredChallenge>(challengeKey(token, id)))!.drawBlock, 5_010);
+
+    const hash = hashOf("block 5010");
+    chain.hashes.set(5_010n, hash);
+    assert.equal(await settleDue(store, club, { ...at(END + 4), blocks: chain.blocks }), 1);
+    const done = (await getChallenge(store, club, id, {}, at(END + 5)))!;
+    const draw = done.settled!.draw!;
+    assert.deepEqual([draw.block, draw.hash, draw.seed], [5_010, hash, drawSeed(hash, id)]);
+    // Anyone can redo it from what is published.
+    const expected = drawOrder(draw.seed as Hex, draw.pool).slice(0, 2);
+    assert.deepEqual(done.settled!.winners.map((w) => [w.post, w.place, w.points]), [[expected[0], 1, 3], [expected[1], 2, 3]]);
+    assert.equal(done.settled!.epoch, 0, "in the epoch it ended in");
+    const awards = await readAwards(store, token, 0);
+    assert.deepEqual(Object.values(awards).map((x) => x.points), [3, 3]);
+    assert.equal(await settleDue(store, club, { ...at(END + 6), blocks: chain.blocks }), 0, "drawn once");
+  });
+
+  it("skips an entry that dropped out after the commit, rather than redrawing", async () => {
+    const store = await world();
+    const chain = fakeChain();
+    const id = await startFlat(store, "raffle", { winners: 2, prize: 3 });
+    await enterAll(store, id);
+    await settleDue(store, club, { ...at(END + 1), blocks: chain.blocks });
+    const hash = hashOf("skip");
+    chain.hashes.set(5_010n, hash);
+    const pool = (await store.get<StoredChallenge>(challengeKey(token, id)))!.drawPool!;
+    const order = drawOrder(drawSeed(hash, id), pool);
+    // The Owner sees who the block would pick and hides them: the next in line wins, nobody is redrawn.
+    assert.ok((await hidePost(store, club, actor("own", 1), order[0]!, true, at(END + 2))).ok);
+    await settleDue(store, club, { ...at(END + 3), blocks: chain.blocks });
+    const done = (await getChallenge(store, club, id, {}, at(END + 4)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => w.post), [order[1], order[2]]);
+    assert.deepEqual(done.settled!.draw!.pool, pool, "the pool published is the one committed");
+  });
+
+  it("waits out a chain that can't be read, and settles an empty one without it", async () => {
+    const store = await world();
+    const chain = fakeChain();
+    chain.state.down = true;
+    const id = await startFlat(store, "raffle");
+    await enterAll(store, id);
+    assert.equal(await settleDue(store, club, { ...at(END + 1), blocks: chain.blocks }), 0);
+    assert.equal((await store.get<StoredChallenge>(challengeKey(token, id)))!.drawBlock, undefined, "nothing committed");
+    chain.state.down = false;
+    await settleDue(store, club, { ...at(END + 2), blocks: chain.blocks });
+    assert.equal((await store.get<StoredChallenge>(challengeKey(token, id)))!.drawBlock, 5_010);
+
+    const empty = await createChallenge(store, club, actor("own", 1), flatInput("raffle", { title: "Empty" }), at(WEEK + 10));
+    assert.ok(empty.ok);
+    chain.state.down = true;
+    const reads = chain.state.reads;
+    assert.equal(await settleDue(store, club, { ...at(2 * WEEK + 1), blocks: chain.blocks }), 1, "no entries: settled with nobody, no block needed");
+    assert.equal(chain.state.reads, reads + 1, "only the first raffle's pending read");
+    assert.deepEqual((await getChallenge(store, club, empty.id, {}, at(2 * WEEK + 2)))!.settled!.winners, []);
+  });
+});
+
+describe("first in", () => {
+  it("pays the first entries posted, and moves the next one up when one drops out", async () => {
+    const store = await world();
+    const id = await startFlat(store, "first", { winners: 2, prize: 4 });
+    const posts = await enterAll(store, id);
+    const open = (await getChallenge(store, club, id, {}, at(100)))!;
+    assert.deepEqual(open.entries.map((e) => e.post), [posts.g, posts.a, posts.x, posts.mod], "in the order posted");
+    assert.deepEqual([open.winners, open.prize], [2, 4]);
+    // Likes don't decide: they aren't locked at the end.
+    assert.ok((await likePost(store, club, "a", posts.g, true, at(END))).ok);
+    // g's entry is hidden before the end: a and x are the first two left.
+    assert.ok((await hidePost(store, club, actor("own", 1), posts.g, true, at(200))).ok);
+    const done = (await getChallenge(store, club, id, {}, at(END + 1)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => [w.post, w.place, w.points]), [[posts.a, 1, 4], [posts.x, 2, 4]]);
+  });
+});
+
+describe("everyone who completes", () => {
+  it("pays every entry with enough likes, earliest first up to the cap, and locks the likes", async () => {
+    const store = await world();
+    const id = await startFlat(store, "everyone", { winners: 2, prize: 5, minLikes: 1 });
+    const posts = await enterAll(store, id);
+    for (const [who, p] of [["a", posts.g], ["g", posts.x], ["g", posts.mod]] as const) assert.ok((await likePost(store, club, who, p, true, at(100))).ok);
+    assert.deepEqual(await likePost(store, club, "x", posts.a, true, at(END)), { ok: false, reason: "voting_closed" });
+    const done = (await getChallenge(store, club, id, {}, at(END + 1)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => [w.post, w.place, w.points]), [[posts.g, 1, 5], [posts.x, 2, 5]], "a had no like; mod is past the cap");
+    assert.equal(done.minLikes, 1);
+  });
+
+  it("with no likes asked, takes any entry and locks nothing", async () => {
+    const store = await world();
+    const id = await startFlat(store, "everyone", { winners: 10, prize: 2 });
+    const posts = await enterAll(store, id);
+    assert.equal(await votingClosed(store, token, posts.g, (GENESIS + END) * 1000), false);
+    const done = (await getChallenge(store, club, id, {}, at(END + 1)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => w.place), [1, 2, 3, 4]);
+  });
+
+  it("names the winners of a trophy-only prize, but adds nothing to the epoch", async () => {
+    const store = await world();
+    const id = await startFlat(store, "everyone", { winners: 3, prize: 0 });
+    await enterAll(store, id);
+    const done = (await getChallenge(store, club, id, {}, at(END + 1)))!;
+    assert.equal(done.settled!.winners.length, 3);
+    assert.equal(done.settled!.epoch, undefined);
+    assert.deepEqual(await readAwards(store, token, 0), {});
+  });
+
+  it("puts flat points into the epoch's ledger, numbered in order", async () => {
+    const store = await world();
+    const id = await startFlat(store, "everyone", { winners: 3, prize: 5 });
+    await enterAll(store, id);
+    assert.equal(await settleDue(store, club, at(WEEK + 1)), 1);
+    const holdings: Holdings = async (_t, ws) => ws.map((w) => ({ [wallet(3)]: 4n, [wallet(4)]: 2n })[w.toLowerCase()] ?? 0n);
+    const deps: RewardsDeps = { now: () => GENESIS + WEEK + 60, clubs: [club], events: async () => [], holdings, chainId: 10143, contract: getAddress(wallet(0xee)), genesis: GENESIS, length: WEEK };
+    await closeEpoch(store, 0, deps);
+    await buildEpoch(store, 0, deps);
+    const ledger = (await store.get<Record<string, PublishedLedger>>(pointsKey(0)))![token]!;
+    assert.equal(ledger.rows.find((r) => r.wallet === wallet(3))!.challengePoints, 5);
+    assert.deepEqual(ledger.challenges!.wins.map((w) => [w.wallet, w.place, w.points]), [[wallet(3), 1, 5], [wallet(4), 2, 5], [wallet(5), 3, 5]]);
+  });
+});
+
+describe("challenges kept before ADR 0049", () => {
+  it("still read and settle as they did", async () => {
+    const store = await world();
+    // As kept before: no holdersOnly, no winners, prize or draw.
+    const old = { id: "11111111-1111-4111-8111-111111111111", title: "Old one", brief: "From before.", judging: "likes", prizes: [7], startsAt: (GENESIS + START) * 1000, endsAt: (GENESIS + END) * 1000, by: wallet(1), state: "live" };
+    await store.set(challengeKey(token, old.id), old);
+    await store.rank(challengesKey(token), [{ member: old.id, score: old.startsAt }], CHALLENGE_RULES.kept);
+    const g = await post(store, "g", 60);
+    await store.addMember(entriesKey(token, old.id), `${g}|g`);
+    await store.set(entryOfKey(token, g), old.id);
+    assert.ok((await likePost(store, club, "a", g, true, at(70))).ok);
+    const view = (await getChallenge(store, club, old.id, {}, at(100)))!;
+    assert.deepEqual([view.judging, view.prizes, view.holdersOnly, view.winners, view.prize], ["likes", [7], false, undefined, undefined]);
+    assert.deepEqual(await likePost(store, club, "x", g, true, at(END)), { ok: false, reason: "voting_closed" });
+    const done = (await getChallenge(store, club, old.id, {}, at(END + 1)))!;
+    assert.deepEqual(done.settled!.winners.map((w) => [w.post, w.points]), [[g, 7]]);
+    assert.equal(done.settled!.draw, undefined);
+  });
+});
+
+describe("the challenge routes, for the new ways", () => {
+  it("start a raffle, and refuse a mixed-up prize", async () => {
+    const store = await world();
+    const gate = async (): Promise<UserGate> => ({ store, user: { id: "own", linked_accounts: [] } }) as unknown as UserGate;
+    const list = challengesHandlers(reg, { ...at(START), gate });
+    const ctx = { params: Promise.resolve({ token: NFT }) };
+    const req = (body: unknown) => new Request("http://x/api", { method: "POST", body: JSON.stringify(body), headers: { "x-forwarded-for": "203.0.113.9" } });
+    assert.equal((await list.POST(req(flatInput("raffle", { winners: 5, prize: 2 })), ctx)).status, 201);
+    const mixed = await list.POST(req(flatInput("raffle", { prizes: [3] })), ctx);
+    assert.equal(mixed.status, 400);
+    const log = await readLog(store, token);
+    assert.match(log.find((l) => l.action === "create_challenge")!.detail ?? "", /5 × 2 points · judged by raffle/);
   });
 });

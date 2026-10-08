@@ -51,7 +51,7 @@ export function useChallenge(token: string, id: string | undefined) {
   return { challenge: query.data?.challenge, isLoading: query.isLoading, error: query.error };
 }
 
-/** Starting, entering, picking and cancelling. Each refreshes the list, the log and the standings. */
+/** Starting, entering, picking, cancelling and marking a prize sent. Each refreshes the list, the log and the standings. */
 export function useChallengeActions(token: string) {
   const getToken = useAccessToken();
   const queryClient = useQueryClient();
@@ -73,5 +73,6 @@ export function useChallengeActions(token: string) {
     withdraw: useAct((id: string) => send(`/${id}`, { action: "withdraw" }), "Entry withdrawn."),
     pick: useAct((v: { id: string; posts: string[] }) => send(`/${v.id}`, { action: "pick", posts: v.posts }), "Winners picked. Their points count this epoch."),
     cancel: useAct((id: string) => send(`/${id}`, { action: "cancel" }), "Challenge cancelled."),
+    prizeSent: useAct((v: { id: string; post: string; tx: string }) => send(`/${v.id}`, { action: "prize_sent", post: v.post, tx: v.tx }), "Checked on chain: marked as sent."),
   };
 }

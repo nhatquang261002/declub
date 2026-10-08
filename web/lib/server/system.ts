@@ -28,7 +28,7 @@ async function ofClub(store: Store, entry: ClubEntry, now: number, deps: Deps): 
 
 /**
  * A Club's challenges as messages (ADR 0045): one when the Owner started it (not if it was cancelled),
- * one when it was won. A likes-judged win is told at the challenge's end, an Owner's pick when it was made.
+ * one when it was won. A win is told at the challenge's end, an Owner's pick when it was made.
  */
 async function challengeEvents(store: Store, club: string, since: number): Promise<SystemEvent[]> {
   let all: StoredChallenge[] = [];
@@ -43,7 +43,7 @@ async function challengeEvents(store: Store, club: string, since: number): Promi
     const startedAt = Math.floor(c.startsAt / 1000);
     if (c.state !== "cancelled" && startedAt > since) out.push({ id: `challenge:${c.id}`, clubs: [club], kind: "challenge", at: startedAt, wallets: [c.by.toLowerCase()], challenge: c.id, title: c.title });
     const winners = c.settled?.winners ?? [];
-    const wonAt = c.settled ? Math.floor((c.judging === "likes" ? Math.min(c.endsAt, c.settled.at) : c.settled.at) / 1000) : 0;
+    const wonAt = c.settled ? Math.floor((c.judging !== "owner" ? Math.min(c.endsAt, c.settled.at) : c.settled.at) / 1000) : 0;
     if (winners.length > 0 && wonAt > since) out.push({ id: `challenge-won:${c.id}`, clubs: [club], kind: "winner", at: wonAt, wallets: winners.map((w) => w.wallet.toLowerCase()), challenge: c.id, title: c.title });
     return out;
   });
