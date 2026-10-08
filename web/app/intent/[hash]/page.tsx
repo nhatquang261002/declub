@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import type { Hex } from "viem";
-import { useConnection } from "wagmi";
+import { useConnection, useReadContract } from "wagmi";
 import { AssetList } from "@/components/AssetList";
 import { SettlementTag } from "@/components/DealParts";
 import { BackToDeals, DealByline, DealDock, DealFacts, DealSheet, DealSheetHead, DealStage, DealStageSide, DealStamp, DealTitle } from "@/components/DealSheet";
@@ -175,6 +175,16 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
       )}
 
       {mine && live && <MakerPanel row={row} info={info} stale={status === "stale"} />}
+      {/* Removed from the pool but not yet expired: a copy that left the pool could still settle, so offer the real cancel. */}
+      {mine && status === "cancelled" && intent.deadline >= BigInt(now) && swapIntents && (
+        <DealDock tone="warn" eyebrow="Your signed swap" title="Removed from the pool">
+          <p className="text-sm text-muted">
+            This pool won&apos;t match it any more, but a copy of your signature that already left could still settle until{" "}
+            {formatDate(intent.deadline)}.
+          </p>
+          <OnChainCancel maker={intent.maker} nonce={intent.nonce} />
+        </DealDock>
+      )}
       {!mine && live && (
         <DealDock tone="blocked" eyebrow="How this settles" title="A matcher settles this, not a button">
           <p className="text-sm text-muted">
@@ -191,7 +201,6 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
 /** What the maker can do with a live intent: put it back in play, take it out of the pool, or kill it on-chain. */
 function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<typeof useIntentsTokenInfo>["info"]; stale: boolean }) {
   const approval = useTxFlow();
-  const invalidate = useTxFlow();
   const sign = useSignFlow();
   const { intent } = row;
   const { fee: currentFee } = useIntentFee();
@@ -210,7 +219,6 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
     ),
   );
   const fix = readiness.steps[0];
-  const contract = swapIntents;
 
   return (
     <DealDock tone={stale ? "warn" : "maker"} eyebrow="Your signed swap" title={stale ? "Your swap is on hold" : "Your swap is in the pool"}>
@@ -243,25 +251,47 @@ function MakerPanel({ row, info, stale }: { row: PoolIntent; info: ReturnType<ty
         <TxStatus state={sign.state} />
       </div>
 
-      {contract && (
-        <div className="space-y-2 border-t-2 border-dashed border-[#111318]/15 pt-4">
-          <p className="text-sm text-muted">
-            To be certain it can never settle, cancel it permanently on-chain. That costs gas. Revoking the approval in your
-            wallet also stops the assets from moving.
-          </p>
-          <TxButton
-            variant="danger"
-            state={invalidate.state}
-            onClick={() => {
-              const { word, mask } = nonceBit(intent.nonce);
-              return invalidate.run({ ...contract, functionName: "invalidateNonces", args: [word, mask] });
-            }}
-          >
-            Cancel on-chain
-          </TxButton>
-          <TxStatus state={invalidate.state} success="Cancelled on-chain. It can never settle now." />
+      {swapIntents && (
+        <div className="border-t-2 border-dashed border-[#111318]/15 pt-4">
+          <OnChainCancel maker={intent.maker} nonce={intent.nonce} />
         </div>
       )}
     </DealDock>
+  );
+}
+
+/**
+ * `invalidateNonces` for one intent: the only cancel that holds against a copy of the signature that left the
+ * pool. Reads the nonce first so a swap already cancelled on-chain says so instead of offering a second tx.
+ */
+function OnChainCancel({ maker, nonce }: { maker: `0x${string}`; nonce: bigint }) {
+  const invalidate = useTxFlow();
+  const used = useReadContract({
+    ...swapIntents!,
+    functionName: "isNonceUsed",
+    args: [maker, nonce],
+  });
+
+  if (used.data) {
+    return <p className="text-sm text-muted">Cancelled on-chain. This signature can never settle now.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted">
+        To be certain it can never settle, cancel it permanently on-chain. That costs gas. Revoking the approval in your
+        wallet also stops the assets from moving.
+      </p>
+      <TxButton
+        variant="danger"
+        state={invalidate.state}
+        onClick={() => {
+          const { word, mask } = nonceBit(nonce);
+          return invalidate.run({ ...swapIntents!, functionName: "invalidateNonces", args: [word, mask] });
+        }}
+      >
+        Cancel on-chain
+      </TxButton>
+      <TxStatus state={invalidate.state} success="Cancelled on-chain. It can never settle now." />
+    </div>
   );
 }

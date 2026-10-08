@@ -133,7 +133,8 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
               onChange={setDeadline}
             />
             <p className="mt-1 text-xs text-muted">
-              After this it can no longer settle. Shorter is safer: a signature can&apos;t be recalled once it has left the pool.
+              After this it can no longer settle. Shorter is safer: once a signature has left the pool, only cancelling it on-chain
+              (which costs gas) stops it sooner.
             </p>
           </div>
           {hasNfts && (

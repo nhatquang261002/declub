@@ -218,7 +218,8 @@ export const STATUS_LABEL: Record<IntentStatus, string> = {
   open: "Open",
   stale: "Paused",
   settled: "Settled",
-  cancelled: "Cancelled",
+  // Only this pool dropped it; a copy can still settle until the deadline, so not "Cancelled".
+  cancelled: "Removed",
   expired: "Expired",
   consumed: "Used elsewhere",
   rejected: "Dropped",
@@ -229,7 +230,7 @@ export const STATUS_HELP: Record<IntentStatus, string> = {
   open: "Waiting for a match. It settles on its own when swaps that fit are found.",
   stale: "The matcher skips it for now because your wallet can't honour it. It comes back by itself once it can.",
   settled: "Matched and swapped on-chain.",
-  cancelled: "Removed from the pool. A copy of the signature elsewhere could still settle until it expires.",
+  cancelled: "Removed from the pool. A copy of the signature elsewhere could still settle until it expires, unless it's cancelled on-chain.",
   expired: "Its deadline passed, so it can no longer settle.",
   consumed: "Its nonce was used, so this signature can't settle any more.",
   rejected: "The matcher gave up on it after it failed on-chain checks.",

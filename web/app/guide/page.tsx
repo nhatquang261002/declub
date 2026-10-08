@@ -145,7 +145,8 @@ const AFTER: ReadonlyArray<{ title: string; body: ReactNode; signed?: boolean }>
     signed: true,
     body: (
       <>
-        <b>Remove from pool</b> is free. <b>Cancel on-chain</b> costs gas but makes your signature useless for good.
+        <b>Remove from pool</b> is free. <b>Cancel on-chain</b> costs gas but makes your signature useless for good. It stays
+        on the swap&apos;s page after you remove it, until the deadline.
       </>
     ),
   },
@@ -180,7 +181,7 @@ const COMPARE: ReadonlyArray<[string, string, string]> = [
   ["Your assets", "Held by the contract until it's accepted, cancelled or expires.", "Stay in your wallet the whole time."],
   ["What you can use", "MON, NFTs, tokens, trait requests and open offers.", "NFTs and tokens. MON must be wrapped as WMON. No trait requests."],
   ["Who can take it", "Anyone, one named wallet, or you pick from the offers you receive.", "Anyone that meets your terms. A matcher finds pairs and rings of up to 4 wallets."],
-  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, removed from the pool, or its deadline passes (10 minutes to 7 days)."],
+  ["How it ends", "Accepted, cancelled by you, or expired and reclaimed. Expiry is optional.", "Settled by a match, cancelled on-chain, or its deadline passes (10 minutes to 7 days). Removing it from the pool only stops this pool using it."],
 ];
 
 const MODES = [
@@ -194,7 +195,7 @@ const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
   ["Should I lock my assets or just sign?", "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post."],
   ["Why can a signed swap fail?", "Nothing is held, so the swap only works if your asset and approval are still in place when a match is found. If they aren't, the settlement is rejected as a whole and nobody loses anything, but your swap doesn't happen. It shows as Paused and comes back once you fix it."],
   ["Can I sign several swaps with the same NFT?", "No. Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool also takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives."],
-  ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. A short deadline is the best protection."],
+  ["Can I take back a signed swap?", "Removing it from the pool is free, but a copy of your signature that already left the pool could still be used until it expires. For certainty, cancel it on-chain, which costs gas. You can still do that from the swap's page after removing it, until its deadline. A short deadline is the best protection."],
 ];
 
 /** Only shown with Privy sign-in, which the handle lookup needs. */

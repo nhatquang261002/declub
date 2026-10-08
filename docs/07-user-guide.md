@@ -67,7 +67,7 @@ When signed swaps are on, step 1 of Create asks how the deal settles. Both kinds
 **Signed swaps.** You choose what you give and the least you'll accept, and a deadline (10 minutes, 1 hour, 6 hours, 24 hours or 7 days). The steps approve your assets, wrap the MON you need for the fee into WMON, then **Sign and post**. On the swap's page:
 
 - **Remove from pool** is free, but a copy of your signature that already left the pool could still be used until the deadline.
-- **Cancel on-chain** costs gas and makes the signature useless for good.
+- **Cancel on-chain** costs gas and makes the signature useless for good. It stays on the page after you remove the swap from the pool, until the deadline.
 - **Paused** means your wallet can't honour the swap right now (the asset moved, or an approval was revoked). Fix it and the swap comes back.
 
 Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives.
