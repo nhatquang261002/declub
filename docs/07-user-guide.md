@@ -2,7 +2,7 @@
 
 DeClub gives every verified Monad NFT collection a Club, with its memecoin if it has one: a place to trade it, talk about it and share in the fees its market pays. Trading is peer-to-peer and non-custodial: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
 
-The in-app version of this guide has two bases, side by side: **Clubs** at `/guide` ([page](../web/app/guide/page.tsx)), which leads with what DeClub is, how to start and how to earn, and **Deals** at `/guide/deals` ([page](../web/app/guide/deals/page.tsx)). The old `/guide/clubs` redirects to `/guide`.
+The in-app version of this guide has two bases, side by side: **Clubs** at `/guide` ([page](../web/app/guide/page.tsx)), which leads with what DeClub is, how to start, how to earn and how an Owner or sponsor grows a Club, and **Deals** at `/guide/deals` ([page](../web/app/guide/deals/page.tsx)). The old `/guide/clubs` redirects to `/guide`.
 
 ## Sign in
 
@@ -119,7 +119,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
 - **Challenges:** tasks the Owner sets the Club. Answer one with your own X post; winners get points toward the week's rewards, a trophy, and sometimes an NFT or token (see below).
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
-- **Rewards:** what the Club's swaps paid in fees, what went to its Holders and its Owner, and your share to claim.
+- **Rewards:** what the Club's swaps paid in fees, what sponsors added, what went to its Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
 
 **Joining.** Sign in, link a wallet, and press **Join Club**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. To leave, open the **⋯** menu next to it and choose **Leave this Club**.
@@ -186,6 +186,8 @@ Every completed swap pays a small protocol fee. Each week (an *epoch*), for ever
 - **Win challenges.** Winners of the Owner's challenges earn the points the Owner set, as ordinary points for that week, up to a weekly limit. An entry earns only through its prize: it doesn't count as an active day, an X share or backing for you.
 
 **What earns little or nothing:** liking or replying to yourself or between your own wallets; members who keep liking each other, or one person over and over; swapping with your own wallets or the same wallet again and again; NFTs bought just before the week closes; likes taken back and posts a moderator hid. The Owner can also ban a member from rewards. Points are checked again when the week closes. The full rules, with every weight, limit and formula, are in [Clubs → Rewards](09-clubs.md#rewards).
+
+**Growing a Club.** Swap fees are one source of rewards, not the only one, so a Club with few swaps can still pay. An Owner can run [challenges](#clubs-and-momentum) with points, a trophy or an NFT or token, choose who is paid, and post the weekly recap to X. Anyone, the Owner included, can sponsor a week. The in-app Guide has this under **Grow a Club**.
 
 Anyone can also sponsor an epoch from the Club's Rewards tab: enter an amount (at least 0.1 MON) and a name, send the MON, then sign to put your name on it. The MON is paid to the rewards operator, who funds the epoch with it, so it can't be refunded. It goes to the Club's Holders only, none to the protocol, and the Rewards tab says who gave what (with the wallet that paid). The weekly recap names only sponsors the operator recorded or the Owner paid as.
 

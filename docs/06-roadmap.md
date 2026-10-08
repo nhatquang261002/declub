@@ -12,27 +12,25 @@ lives in the git log and the relevant ADRs.
 - [x] Swaps count in the Holder bonus, capped ([ADR 0034](adr/0034-swaps-count-in-the-holder-bonus.md))
 - [x] Sponsored epochs ([ADR 0035](adr/0035-sponsored-epochs.md)), from the app with the payment checked on chain ([ADR 0036](adr/0036-sponsor-from-the-app.md)) or by the operator with `npm run rewards:sponsor`; either way before the epoch is built
 - [ ] Try a real sponsorship in a browser on testnet: send, sign, see it on the Rewards tab, build and publish the epoch
-- [ ] Deploy `DeClubIntents` to testnet: the retired `OnDealIntents` has a different EIP-712 domain, so `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS` stays blank, which hides signed swaps, until it is deployed
+- [x] Deploy `DeClubIntents` to testnet with the per-NFT fee (2026-10-07)
 - [ ] Verify the deployments on Sourcify
 - [ ] Run the manual testnet pass with two real wallets
 - [ ] Run the rewards epoch and claim flow on testnet
 - [ ] Turn on X reach: set `X_BEARER_TOKEN` (the code is built; off by default)
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
 
-## Next: Club social
+## Next
 
-- [x] Club Pulse: swaps, new deals and new members as system messages between posts on the Board and the timeline, built from the activity log and member list, with no signing (ADR 0043)
-- [x] Club challenges: the Owner starts a challenge any time, members answer with a Board post, winners are picked by likes or by the Owner and earn the points the Owner set, as epoch points (ADR 0045)
-- [x] A challenge entry earns only its prize: it counts toward Momentum, not toward the author's epoch points (ADR 0048)
-- [x] More ways to pick challenge winners: Holder vote, a verifiable raffle, first N, everyone who completes, with a create form that only builds valid challenges (ADR 0049)
-- [x] Challenge rewards beyond points: a trophy on the winner's profile, an NFT or token prize the Owner sends and the app checks on-chain, and pinning the winning entry (ADR 0050)
-- [x] Challenge notifications and a share card for the results
-- [ ] More kinds of challenge entry, beyond the member's own X post:
+- [ ] Build proper infrastructure for the project: hosting, monitoring, backups and a real cron/queue in place of the free GitHub-scheduled fill watcher and the single Redis store
+- [ ] Improve in-app posting: images, GIFs, emoji, formatting and more
+- [ ] Improve the timeline algorithm
+- [ ] Integrate X engagement into the account (reach and activity from a linked X account; related: turn on X reach, above)
+- [ ] Add new challenge types, beyond the member's own X post:
   - [ ] Streak quest: active on N days during the challenge, no entry form
   - [ ] Trade quest: a deal or swap in the Club's asset during the challenge, checked on-chain
   - [ ] Board post: any Board post, no X needed (art, pitches, members without X)
   - [ ] Raid: quote or reply to an X post the Owner names (needs a check that the X API reads quotes)
-- [ ] Member roles and titles: the Owner gives custom titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
+- [ ] Custom roles for members: the Owner gives titles ("Artist", "OG") that show next to a name on posts, on top of the existing Moderator role
 
 ## Deferred
 
@@ -43,13 +41,4 @@ lives in the git log and the relevant ADRs.
 
 ## References
 
-- [01 · Product spec](01-product-spec.md)
-- [02 · Architecture](02-architecture.md)
-- [03 · Contract design](03-contract-design.md)
-- [04 · Security](04-security.md)
-- [05 · Frontend](05-frontend.md)
-- [07 · User guide](07-user-guide.md)
-- [09 · Clubs](09-clubs.md)
-- [11 · Test plan](11-test-plan.md)
-- [12 · Demo](12-demo.md)
-- [13 · Why communities move, and how we grow](13-go-to-market.md)
+The full map of docs and decisions is in the [docs index](README.md).

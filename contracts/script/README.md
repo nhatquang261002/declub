@@ -10,7 +10,7 @@
 
 `DeployEscrow`, `DeployIntents` and `DeployRewards` run on Monad testnet (`10143`), local Anvil (`31337`, for tests) and Monad mainnet (`143`); any other chain reverts with "unsupported chain". On mainnet they also refuse mocks and demo wallets, a zero fee or ceiling, a missing `FEE_RECIPIENT`, `FEE_FIXED`, a `FEE_ADMIN` that is unset or equal to the recipient, and (intents) any `FEE_TOKEN` but the canonical WMON `0x3bd3…433A`. See [mainnet](#mainnet). `DeployChog.s.sol` deploys mocks, so it stays testnet-only: "testnet deployment only". Each `run()` only parses the env into a `Config` and calls `deploy(Config)`, so tests call `deploy` directly. All of them print ready-to-paste lines for the root `.env`.
 
-On testnet, `DeClubEscrow` and `DeClubRewards` are deployed (the demo deployment). `DeClubIntents` is not: the intents deployments there predate the rename and sign with an older EIP-712 domain, so deploy it fresh. Details in [03 · Contract Design](../../docs/03-contract-design.md#deployed-vs-source).
+On testnet, `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` are deployed (the demo deployment). Earlier intents deployments predate the rename and sign with an older EIP-712 domain; don't point anything at them. Details in [03 · Contract Design](../../docs/03-contract-design.md#deployed-vs-source).
 
 ## `DeployEscrow.s.sol`
 

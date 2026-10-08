@@ -10,7 +10,7 @@ A **Club** is the community for one verified NFT collection, and the heart of De
 - **Pulse:** the Club speaking between posts. Swaps, new deals and new members of the last week show on the Board, and on the timeline (every live Club, or the reader's own under "Joined Clubs"), as one-line **system messages** with a coloured icon per kind, grouped between posts ([ADR 0043](adr/0043-system-messages.md)). Nobody wrote them, so they have no author, likes or moderation.
 - **Momentum:** how alive the asset's trading is, for the Club, and how much each member has contributed.
 - **Challenges:** tasks the Owner sets the Club at any time; members answer with a post and the winners earn activity points ([ADR 0045](adr/0045-club-challenges.md); [below](#challenges)).
-- **Rewards:** a share of the fees the Club's swaps paid, to its active Holders and its Owner, each week, by rules the Owner sets ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)).
+- **Rewards:** a share of the fees the Club's swaps paid, to its active Holders and its Owner, each week, by rules the Owner sets ([ADR 0022](adr/0022-club-rewards.md); [below](#rewards)). Fees are one source: sponsors add to the Holder pool for an epoch ([ADR 0035](adr/0035-sponsored-epochs.md)) and the Owner's challenges add points, trophies and prizes, so a Club with little trading can still pay.
 
 No deal contract, matcher rule or pool rule depends on a Club: a deal settles the same either way. Rewards are paid after the fact, from a separate contract (`DeClubRewards`).
 

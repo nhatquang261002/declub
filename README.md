@@ -1,62 +1,102 @@
 # De(al) Club
 
-> **Your community's market, owned by its members.**
+> **Your community's home and market, owned by its members.**
 
-DeClub gives each verified Monad NFT collection a Club: a market, a signed
-conversation, member rankings and rewards funded by completed swaps.
+Docs: [index](docs/README.md) · [product spec](docs/01-product-spec.md) · [user guide](docs/07-user-guide.md) · [Clubs](docs/09-clubs.md) · [roadmap](docs/06-roadmap.md)
 
-## Key points
+## The problem
 
-DeClub is an NFT marketplace that each community owns, built around one question:
-when a community creates the value, who captures it?
+NFT communities create a lot of value, but very little of it comes back to them. The people who generate it are rarely the ones who capture it.
 
-- **A more fun way to trade.** Swap NFT for NFT, with MON on either side, or ask
-  for any NFT with the traits you want. Every swap settles atomically, so
-  nobody has to trust the other side or send first.
-- **Your own market for your community.** Every verified Monad NFT collection
-  gets a Club with its own market, board and ranked members, run by an Owner
-  and Moderators.
-- **Participation turns into a stake.** Each week, 50% of the fees a Club's swaps
-  pay goes to its active Holders, 25% to the Club fund the Owner collects and 25% to the
-  protocol. Points come mostly from others backing your posts and replies: each
-  Holder shares out a weekly voice, weighted by the NFTs they hold, over what they
-  like and answer in their Club, and any verified account adds a small voice that
-  works across Clubs. Outside voices are capped, holdings are averaged over the
-  week, and payouts follow the NFTs held, so fake accounts and like rings earn
-  about what their NFTs would. Each Club's Owner sets who is paid (all active
-  Holders, the most active, members without NFTs) within protocol bounds, and every payout is a Merkle claim anyone
-  can check on chain.
-- **The social graph is yours.** Posts and follows are signed by the member's
-  wallet and exported in full, so a Club's conversation can't be locked in or
-  deleted by a platform.
-- **The feed is a choice.** The Board is ordered by a lens the reader picks
-  (Newest, Most active, Holders, Following). A lens is a pure function over
-  public data, so another app can rank the same posts its own way. There is no
-  registry of third-party lenses yet.
-- **Governance is next.** Holder votes for Moderators and Club-fund grants are
-  planned but not built ([roadmap](docs/06-roadmap.md)). Today the Owner decides.
+- **Activity goes unpaid.** The Holders who post, welcome newcomers, answer questions and keep a project alive earn nothing for it. Their only reward is a Discord role.
+- **The conversation belongs to a platform.** A community's posts, followers and history live on Discord and X, which can rank, bury or delete them, and none of the value goes back to the people who wrote them.
+- **The fees leave the community.** Holders trade with each other every day, and the marketplace keeps the whole trading fee. Nothing goes back to the collection whose community made the market.
+- **Owners have no way to fund the community** besides launching a token or running another sale.
+- **Rewarding activity usually backfires.** When a project pays for posts or volume, it attracts bots, like rings and wash trading, so the real members are drowned out.
+- **Swapping NFTs is slow and risky.** Marketplaces sell NFTs for a price, they don't swap them. Swapping in DMs means agreeing who sends first, which is where scams happen.
+- **The OTC market takes a lot to be trusted.** OTC deals take at least 5-10% of the deal from the trader just to have a middleman for your deal to happen.
 
-The application supports:
+The question behind DeClub: when a community creates the value, who captures it?
 
-- locked swaps through `DeClubEscrow`;
-- signed swaps through `DeClubIntents`;
-- Club posts, follows, moderation and Momentum;
-- weekly Holder and Club-fund rewards through `DeClubRewards`.
+## The solution
 
-See the [product spec](docs/01-product-spec.md), [user guide](docs/07-user-guide.md)
-and [Club specification](docs/09-clubs.md) for details.
+DeClub gives every verified Monad NFT collection a Club: an open Board signed by its members, a ranking of who the community backs, weekly rewards in MON, and its own swap market whose fees pay for those rewards.
 
-## The problem and who it is for
+DeClub is a home for an NFT community first. The market is what pays for it.
 
-NFT communities do their work in Discord and on X, but the value that work creates
-leaves: a marketplace keeps the trading fee, a Discord server can be banned or deleted,
-and Holders who post, welcome newcomers and trade with each other earn nothing for it.
-Swapping with a stranger still means someone has to send first.
+### 1. An open social graph the members own
 
-DeClub is for three people around a Monad NFT collection: the **Owner** who wants Holders
-who stay and a way to fund the community, the **Holder** who wants something back for
-holding and talking, and the **Trader** who wants an NFT-for-NFT swap with no one to
-trust. See [docs/13-go-to-market.md](docs/13-go-to-market.md).
+Each Club has a Board for posts, replies, likes and pins. Posts and follows are signed by the member's wallet and can be exported in full, so the social graph belongs to the community, not a platform, and nobody can lock it in or delete it. The community runs its own Club: the Owner and Moderators moderate the Board, the Owner sets the reward rules, and Holders vote on challenge winners. A cross-Club Timeline lets anyone discover other communities.
+
+### 2. Competitive feeds
+
+Readers choose how the feed is ordered (Newest, Most active, Holders, Following). Every order is a simple public function over public data, so any other app can compete to rank the same posts better.
+
+### 3. Attention that pays the people who give it
+
+Points come mostly from other members backing you, not from how much you post. Each Holder gets a weekly voice, weighted by the NFTs they hold, and spends it by liking and replying to posts in their Club. Curation is paid too: members earn a little for backing others. Verified outside accounts get a small voice, so newcomers can join in. The system is built to be hard to game:
+
+- holdings are averaged over the week, so buying just before the snapshot doesn't work,
+- mutual backing between the same two members counts for less,
+- outside voices and swap points are capped, and repeat swaps with the same person count less,
+- payouts follow the NFTs a member actually holds, so a farm of fake accounts earns roughly what its NFTs would anyway,
+- who backed whom is published every week, so anyone can audit it.
+
+Each Club's Owner programs its incentives within protocol limits: pay every active Holder, only the most active, or a share for members without NFTs, and ban abusers from rewards.
+
+Swap fees are one source of rewards. An Owner or a sponsor can put more in any week, run challenges with incentives, and grow the community.
+
+### 4. A real stake, funded by the community's own trades
+
+Each completed swap in the Club pays a small fee per NFT moved. Every week:
+
+- 50% goes to the Club's active Holders,
+- 25% goes to the Club fund, which the Owner collects,
+- 25% goes to the protocol.
+
+Payouts are published as a Merkle root on DeClubRewards, so anyone can check their share on chain and claim it in one transaction.
+
+A project, a partner or the Owner can sponsor a week: the MON joins the Holders' pool, with the sponsor's name on the Club's page and its weekly recap, so a Club with little trading can still reward its community.
+
+### 5. The engine: a trustless swap market
+
+Members swap NFT for NFT, add MON on either side, or ask for any NFT with the traits they want. Every swap settles atomically on chain, so nobody sends first and nobody has to trust the other side. Two modes:
+
+- **Locked swaps (DeClubEscrow):** the maker locks their side and the taker completes it in one transaction.
+- **Signed swaps (DeClubIntents):** wallets sign what they want to give and get, and a matcher settles pairs, or rings of up to four people, in one transaction.
+
+### 6. Challenges
+
+The Owner can set the Club a task, like "post your best fan art on X", and a sponsor can back the week it runs in. Members enter with their own X post, and winners are picked by likes, a Holder vote, the Owner, a verifiable on-chain raffle, first in, or everyone who qualifies. Prizes can be points, trophies, NFT or token prizes, or a pinned post.
+
+### 7. A new kind of creator fee
+
+An Owner claims their Club by proving on chain that they own the collection's contract, then collects the Club fund each week: a cut of every swap their community makes. A royalty pays the creator when an NFT is resold; the loyalty fee pays them while the community keeps trading together. No token, no sale, no extra mint.
+
+### 8. Safety built in
+
+Trust badges and lookalike checks flag fake or copycat collections. Users confirm the contract addresses before accepting a swap, can see and revoke their token approvals on one page, and get a warning on long-lived signatures. Before a payout is signed, a verification script checks it.
+
+### Why Monad
+
+DeClub turns a swap into a social action that happens many times a week: approve, fill, claim. Each step has to confirm fast and cost little. Monad is EVM-compatible, so the contracts are plain Solidity and any wallet works. With 800ms finality and 10,000 TPS, a multi-step swap feels like one click, which closes the gap that has made onchain social feel clunky. Rewards are paid in the same MON the fees were paid in.
+
+## What makes it useful
+
+**For Holders:** holding and taking part finally earns something. When you post, reply, back other members and trade inside your Club, you get a real share of the fees your community generates, paid in MON and checkable on chain. Your posts and followers belong to your wallet, not to a platform.
+
+**For Owners:** a ready-made home for the community, with its own Board, moderation tools, challenges, member rankings and market, plus the Club fund, and sponsors and challenges to fund and grow the community, all without launching a token. Rewards favour Holders who stay and engage over people who flip, which is what a project needs to survive after mint.
+
+**For traders:** NFT-for-NFT swaps, bundles, trait requests and multi-party rings, all without trusting a stranger or sending first. This is a market that floor-price marketplaces don't offer.
+
+**For the ecosystem:** DeClub doesn't ask anyone to leave Discord, X or their usual marketplace. It adds a layer those platforms can't offer, because their business model is keeping the value. There's a built-in growth loop: Holders share their Club on X → visitors see an active Club with real conversation and trades → they join, hold, post and swap → swap fees grow the reward pool → Holders earn more and share more. Every rewarded Holder is also marketing their Club.
+
+What sets it apart:
+
+- Members own what they create: their posts, their social graph and a share of the value.
+- Rewards are tied to real engagement between members and to real NFT ownership, so they are hard to farm.
+- Everything that matters can be verified: swaps settle on chain, payouts are Merkle claims, posts are wallet-signed, and the backing data is public.
+- No new token and no speculation. Rewards come from real fees on real swaps.
 
 ## Architecture
 
@@ -198,8 +238,7 @@ get test MON from a Monad testnet faucet. Swaps and claims are on-chain transact
 Posts, follows, profiles and Club membership are stored in Upstash Redis and sign-in
 uses Privy, so a local run without `UPSTASH_REDIS_REST_URL`/`_TOKEN` and
 `NEXT_PUBLIC_PRIVY_APP_ID`/`PRIVY_APP_SECRET` (see `.env.example`) shows the market but
-not the demo world's conversation. Signed swaps (`DeClubIntents`) are not deployed on
-testnet. **fill:** the hosted demo URL, which has all of it.
+not the demo world's conversation. **fill:** the hosted demo URL, which has all of it.
 
 ### Run the web app
 

@@ -44,6 +44,7 @@ const SECTIONS: GuideSection[] = [
   { id: "post", label: "Post and report" },
   { id: "club", label: "Inside a Club" },
   { id: "roles", label: "Who runs a Club" },
+  { id: "grow", label: "Grow a Club" },
   { id: "safety", label: "Stay safe" },
   { id: "faq", label: "FAQ" },
 ];
@@ -68,7 +69,7 @@ const PILLARS = [
   {
     icon: <CoinIcon className="size-4" />,
     title: "Get rewarded",
-    body: `Each week ${percent(PROTOCOL.holderBps)} of a Club's swap fees goes to its active Holders, in MON. Its Owner also rewards the best members through challenges.`,
+    body: `Each week ${percent(PROTOCOL.holderBps)} of a Club's swap fees goes to its active Holders, in MON. Its Owner and sponsors can add more, through challenges and sponsored weeks.`,
   },
 ];
 
@@ -159,8 +160,8 @@ const TABS = [
     title: "Rewards",
     body: (
       <>
-        What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim. <b>Share the week</b> posts the
-        recap to X.
+        What the Club&apos;s swaps paid in fees this epoch, what sponsors added, how much went to its Holders and its Owner, and your share to claim.{" "}
+        <b>Share the week</b> posts the recap to X.
       </>
     ),
   },
@@ -222,6 +223,46 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
     role: "Visitor",
     who: "Not signed in, or not joined.",
     can: "Reads everything, but can't post.",
+  },
+];
+
+/** For an Owner or a sponsor: the ways to put more into a Club than its swap fees do. */
+const GROW = [
+  {
+    icon: <TrophyIcon className="size-4" />,
+    title: "Run a challenge",
+    body: "Set the Club a task: a meme, a pitch, a name. Winners get points, a trophy, and an NFT or token if you offer one.",
+  },
+  {
+    icon: <CoinIcon className="size-4" />,
+    title: "Back a week",
+    body: "Anyone can sponsor a week. The MON goes to the Club's Holders, and your name shows on its Rewards tab and in the weekly recap.",
+  },
+  {
+    icon: <ShieldIcon className="size-4" />,
+    title: "Choose who is paid",
+    body: "Pay every active Holder, only the most active, or set aside a slice for members without NFTs. Changes start next week.",
+  },
+  {
+    icon: <XLogoIcon className="size-4" />,
+    title: "Share the week",
+    body: "Post the weekly recap to X: the fees, the sponsors and what the most active Holders were paid.",
+  },
+];
+
+const SPONSOR_STEPS = [
+  {
+    title: "Open the Club's Rewards tab",
+    body: (
+      <>
+        Press <b>Sponsor this epoch</b>.
+      </>
+    ),
+  },
+  { title: "Enter an amount and a name", body: "The name is what the Club sees next to your gift." },
+  {
+    title: "Send the MON, then sign",
+    body: "The app checks the payment on chain before it puts your name on it. The MON is paid to the rewards operator, who adds it to that week's Holder pool, so it can't be refunded.",
   },
 ];
 
@@ -407,6 +448,14 @@ const FAQ: ReadonlyArray<[string, string]> = [
     `Each week, the fees from the Club's completed swaps are added up. ${percent(PROTOCOL.holderBps)} goes to its active Holders, split by the NFTs they held through the week, with a bonus for the most active; ${percent(PROTOCOL.fundBps)} goes to the Owner's Club fund. Whatever can't be paid rolls into the next week.`,
   ],
   [
+    "What if my Club has few swaps?",
+    "Fees are one source, not the only one. The Owner can run challenges with points, a trophy or an NFT or token, and anyone can sponsor a week to add MON to the Holders' share. Both show on the Club's page.",
+  ],
+  [
+    "Can anyone sponsor a Club?",
+    "Yes. Open its Rewards tab, press Sponsor this epoch, enter an amount and a name, send the MON and sign. The app checks the payment on chain. The MON goes to the Club's Holders only and can't be refunded.",
+  ],
+  [
     "Why haven't I been paid yet?",
     `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also need some activity that week, and an NFT of the collection (unless the Owner turned on a slice for members without NFTs), and to be among the paid places if the Owner limited them. Holding alone doesn't earn a share. Your share waits under Rewards until you claim it.`,
   ],
@@ -467,6 +516,7 @@ export default function GuidePage() {
         summary={[
           "Joining a Club is free.",
           `Active Holders share ${percent(PROTOCOL.holderBps)} of its fees, every week.`,
+          "Owners and sponsors can add more with challenges and sponsored weeks.",
           "Swaps move both sides together, or nothing.",
           "Your posts are signed and yours.",
           NETWORK.mainnet ? "Real assets: check every deal." : "Testnet only: use test assets.",
@@ -578,6 +628,13 @@ export default function GuidePage() {
                 </li>
               </ul>
               <p className={`mt-3 text-sm leading-6 ${MUTED}`}>A swap that names two Clubs&apos; assets splits its fee between them.</p>
+              <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
+                Fees aren&apos;t the only source: sponsors can add MON to the Holders&apos; share for a week.{" "}
+                <a href="#grow" className="underline">
+                  Grow a Club
+                </a>
+                .
+              </p>
             </div>
             <div className={`${CARD} p-5 sm:p-6`}>
               <span className="grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">
@@ -775,6 +832,30 @@ export default function GuidePage() {
             ))}
           </dl>
           <p className="mt-4 text-sm leading-6 text-muted">The app&apos;s admins can do all of this in every Club, and ban someone from all of them.</p>
+        </Section>
+
+        <Section
+          sections={SECTIONS}
+          id="grow"
+          title="Grow a Club: challenges and sponsors"
+          intro={<>Swap fees are one source of rewards. An Owner or a sponsor can put more in any week, and the Club shows who did.</>}
+        >
+          <CardGrid cols={2} items={GROW} />
+
+          <h3 className="mt-8 text-lg font-black">Sponsor a week</h3>
+          <div className="mt-3">
+            <Steps items={SPONSOR_STEPS} />
+          </div>
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
+            <CoinIcon className="mt-0.5 size-5 shrink-0 text-[#1f7a55]" />
+            <span>
+              <b>Sponsored MON goes to Holders only.</b> None of it goes to the Club fund or the protocol, and a week with no Holders carries it to the next.
+              Pick a Club with real members: the pool pays whoever is active in it.
+            </span>
+          </p>
+          <Link href="#challenges" className="btn-secondary mt-4">
+            How challenges work <span aria-hidden>→</span>
+          </Link>
         </Section>
 
         <GuideEnd

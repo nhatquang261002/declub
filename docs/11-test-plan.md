@@ -25,7 +25,7 @@ Out of scope: proving contract properties. Foundry (unit, fuzz, invariant), Halm
 | **Monad testnet** | A redeploy of the current source, the matcher, a deployed web build (production mode), `e2e` verify (DEP) and web smoke (WEB), then every manual case below | Engineer for setup, testers for manual cases | Before the go/no-go meeting, on the release candidate commit |
 | **Mainnet canary** | `e2e` verify (DEP) and web smoke (WEB) only, then the canary cases in [6.3](#63-post-deploy-canary) with tiny real amounts | Release owner plus one tester | Right after the mainnet deploy, before any announcement |
 
-The README's `DeClubEscrow` and `DeClubRewards` are current. `DeClubIntents` is not deployed on testnet, so the signed-swap cases can't pass until you deploy it ([2.2](#22-contracts-and-tokens)).
+The README's three testnet contracts are current. Redeploy them from the release candidate before the pass ([2.2](#22-contracts-and-tokens)).
 
 ### Roles
 
