@@ -2,7 +2,7 @@
 
 DeClub gives every verified Monad NFT collection a Club, with its memecoin if it has one: a place to trade it, talk about it and share in the fees its market pays. Trading is peer-to-peer and non-custodial: NFTs (ERC-721), tokens (ERC-20) and MON. Nobody holds anything for you. Either the contract settles both sides in one transaction, or nothing moves.
 
-The in-app version of this guide has two bases, side by side: **Deals** at `/guide` ([page](../web/app/guide/page.tsx)) and **Clubs** at `/guide/clubs` ([page](../web/app/guide/clubs/page.tsx)).
+The in-app version of this guide has two bases, side by side: **Clubs** at `/guide` ([page](../web/app/guide/page.tsx)), which leads with what DeClub is, how to start and how to earn, and **Deals** at `/guide/deals` ([page](../web/app/guide/deals/page.tsx)). The old `/guide/clubs` redirects to `/guide`.
 
 ## Sign in
 
@@ -220,5 +220,5 @@ A deal settles the same whether or not you're in a Club: nothing in a deal or it
 
 ## For maintainers
 
-- The Guide page's comparison and the create screen's six settlement chips (*Can't fail*, *Costs gas*, *Assets locked*, *Free*, *Nothing locked*, *Can fail*) read the same words from `web/lib/settlementTerms.ts`. Each chip's tooltip links to its entry on the Guide (`/guide#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), so change a reason there and both follow.
+- The Guide page's comparison and the create screen's six settlement chips (*Can't fail*, *Costs gas*, *Assets locked*, *Free*, *Nothing locked*, *Can fail*) read the same words from `web/lib/settlementTerms.ts`. Each chip's tooltip links to its entry on the Deals guide (`/guide/deals#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), so change a reason there and both follow.
 - The settlement section only appears when signed swaps are configured (`NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`). The reasoning behind the two paths is in [ADR 0008](adr/0008-trade-intents.md) and [ADR 0009](adr/0009-ring-swaps.md).

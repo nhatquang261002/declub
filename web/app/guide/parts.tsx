@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CheckIcon, SwapIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
 import { SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 
-// The Guide has two bases side by side, Deals (/guide) and Clubs (/guide/clubs), and both share this
+// The Guide has two bases side by side, Clubs (/guide, the app's purpose, so it comes first) and Deals (/guide/deals), and both share this
 // frame: a hero with the switch between them, a numbered contents list, and sections that read like a short manual. Button names
 // are in bold so they match the screens. docs/07-user-guide.md is the longer version of both.
 
@@ -14,8 +14,8 @@ export type GuideSection = { id: string; label: string };
 type GuideBase = "deals" | "clubs";
 
 const BASES: ReadonlyArray<{ key: GuideBase; href: string; label: string; icon: ReactNode }> = [
-  { key: "deals", href: "/guide", label: "Deals", icon: <SwapIcon className="size-4" /> },
-  { key: "clubs", href: "/guide/clubs", label: "Clubs", icon: <UsersIcon className="size-4" /> },
+  { key: "clubs", href: "/guide", label: "Clubs", icon: <UsersIcon className="size-4" /> },
+  { key: "deals", href: "/guide/deals", label: "Deals", icon: <SwapIcon className="size-4" /> },
 ];
 
 function BaseSwitch({ base }: { base: GuideBase }) {
@@ -164,6 +164,25 @@ export function CardGrid({ items, cols = 3 }: { items: ReadonlyArray<{ title: st
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Numbered steps in one card, read top to bottom. */
+export function Steps({ items }: { items: ReadonlyArray<{ title: string; body: ReactNode }> }) {
+  return (
+    <ol className={`${CARD} divide-y divide-[#111318]/10`}>
+      {items.map((step, i) => (
+        <li key={step.title} className="flex gap-4 p-5 sm:p-6">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">
+            {i + 1}
+          </span>
+          <div>
+            <h3 className="font-black">{step.title}</h3>
+            <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 

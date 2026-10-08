@@ -40,7 +40,7 @@ function off(c: Ctx, what: string) {
   throw new Warning(`${what} is off here, so only its "off" answer was checked`);
 }
 
-const PAGES = ["/", "/deals", "/create", "/history", "/clubs", "/guide", "/guide/clubs", "/account"];
+const PAGES = ["/", "/deals", "/create", "/history", "/clubs", "/guide", "/guide/deals", "/account"];
 /** Old routes that now redirect (the app's three redirect pages). */
 const REDIRECTS: Record<string, string> = { "/v2/create": "/create", "/intents/new": "/create", "/intents": "/deals" };
 /** Next.js's error boundary text, which a 200 can still carry. */

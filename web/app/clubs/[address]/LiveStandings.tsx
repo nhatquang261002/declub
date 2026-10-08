@@ -123,7 +123,7 @@ export function LiveStandings({ token, symbol, wallet, now, sponsoredBy }: { tok
       <p className="mt-4 text-xs text-muted">
         Points come from Holders backing your posts and replies, engaging with other members, active days, your X posts about the Club, swaps and
         challenges. An estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
-        <Link href="/guide/clubs#rewards" className="font-semibold underline underline-offset-2">
+        <Link href="/guide#rewards" className="font-semibold underline underline-offset-2">
           How points work
         </Link>
         {" · "}

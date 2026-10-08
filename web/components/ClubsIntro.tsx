@@ -1,26 +1,28 @@
 import Link from "next/link";
-import { ChatIcon, CoinIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { ChatIcon, CoinIcon, TagIcon, TrophyIcon, UsersIcon } from "@/components/Icons";
 import { HeatBars } from "@/components/MomentumBadge";
 import { HEAT } from "@/lib/clubs";
-import { MOMENTUM } from "@/lib/momentum";
 import { PROTOCOL, percent } from "@/lib/rewards";
 import { ClubsTeaser } from "./ClubsTeaser";
 
 const WHAT = [
-  { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open offer and request for the asset, in one place." },
-  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post what you're after, reply, or share your X posts, signed by your wallet, and pick how the feed is ordered." },
+  { icon: <ChatIcon className="size-5" />, title: "Board", body: "Post, reply and like, and share your X posts. Signed by your wallet." },
+  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(PROTOCOL.holderBps)} of the Club's swap fees goes to its active Holders each week, and ${percent(PROTOCOL.fundBps)} to the Club fund.` },
+  { icon: <TagIcon className="size-5" />, title: "Market", body: "Every open deal and request for the asset, in one place." },
   { icon: <UsersIcon className="size-5" />, title: "Members", body: "A leaderboard ranked by Momentum, with Holder badges. Follow who you trust." },
-  { icon: <CoinIcon className="size-5" />, title: "Rewards", body: `${percent(PROTOCOL.holderBps)} of the Club's swap fees goes to its active Holders each week, more to the ones who post and swap, and ${percent(PROTOCOL.fundBps)} to the Club fund.` },
 ];
+
+/** Under the four tabs, one row across: how an Owner rewards the members who show up. */
+const CHALLENGES = { icon: <TrophyIcon className="size-5" />, title: "Challenges", body: "The Owner sets a task, members answer with a post, and the winners get points, a trophy or a prize." };
 
 const HOW = [
-  { title: "Completed swaps count most", body: `${MOMENTUM.swapWeight} points for each side of a finished trade. Each side pays the fee for every NFT it gives, so faking it costs real money.` },
-  { title: "New deals count a little", body: `${MOMENTUM.createdWeight} points for each new deal or signed swap, at most ${MOMENTUM.createdPerDay} a day per wallet, so spam doesn't pay.` },
-  { title: "Attention counts a little", body: `${MOMENTUM.postWeight} points for a Holder's first Board post of the day, and ${MOMENTUM.xShareWeight} when they share their own X post about the Club, one a day.` },
-  { title: "Everything fades", body: `An event's weight halves every ${MOMENTUM.halfLifeDays} days and is gone after ${MOMENTUM.windowDays}. A Club stays hot only by staying busy.` },
+  { title: "Completed swaps count most", body: "Each side pays the fee for every NFT it gives, so faking a busy market costs real money." },
+  { title: "New deals count a little", body: "Up to a daily limit per wallet, so spam doesn't pay." },
+  { title: "Holders' posts count a little", body: "A Holder's first Board post of the day, and their own X posts about the Club." },
+  { title: "Everything fades", body: "Old activity counts less each day, so a Club stays hot only by staying busy." },
 ];
 
-/** The home page's introduction to Clubs and Momentum. The Clubs themselves live at /clubs. */
+/** The home page's introduction to Clubs. The Clubs themselves live at /clubs. */
 export function ClubsIntro() {
   return (
     <section id="clubs" aria-labelledby="clubs-title" className="mb-12 scroll-mt-24">
@@ -31,8 +33,8 @@ export function ClubsIntro() {
             Every collection gets a Club, and the Club shares in its market.
           </h2>
           <p className="mt-3 max-w-xl leading-7 text-muted">
-            Each verified NFT collection has a Club: one place to find what’s up for trade, post what you’re after,
-            and see who really trades it. A memecoin made for a collection joins that collection’s Club; a memecoin has none of its own.
+            Each verified NFT collection has a Club: one place to talk, find what’s up for trade, and see who really
+            takes part. A memecoin made for a collection joins that collection’s Club.
           </p>
           <ul className="mt-6 grid gap-4 sm:grid-cols-2">
             {WHAT.map((item) => (
@@ -44,6 +46,15 @@ export function ClubsIntro() {
                 <p className="mt-1 text-sm leading-6 text-muted">{item.body}</p>
               </li>
             ))}
+            <li className="flex items-start gap-3 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 sm:col-span-2">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735]">
+                {CHALLENGES.icon}
+              </span>
+              <span>
+                <span className="block font-extrabold">{CHALLENGES.title}</span>
+                <span className="mt-1 block text-sm leading-6 text-muted">{CHALLENGES.body}</span>
+              </span>
+            </li>
           </ul>
           <Link href="/clubs" className="btn-primary mt-7">
             Explore Clubs <span aria-hidden>→</span>

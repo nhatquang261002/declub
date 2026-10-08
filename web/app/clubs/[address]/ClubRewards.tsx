@@ -114,7 +114,7 @@ function Overview({ data, token, symbol, wallet, isOwner, now }: { data: Data; t
       <Panel
         title="How this Club earns"
         action={
-          <Link href="/guide/clubs#rewards" className="text-xs font-semibold underline underline-offset-2">
+          <Link href="/guide#rewards" className="text-xs font-semibold underline underline-offset-2">
             How rewards work
           </Link>
         }

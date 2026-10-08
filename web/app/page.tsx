@@ -2,29 +2,39 @@ import Link from "next/link";
 import { DeClubArt } from "@/components/ChogArt";
 import { ClubsIntro } from "@/components/ClubsIntro";
 import { CreateDealButton } from "@/components/CreateDealButton";
-import { XLogoIcon } from "@/components/Icons";
+import { InboxIcon, ShieldIcon, SwapIcon, TagIcon, XLogoIcon } from "@/components/Icons";
 import { LogoMark, Wordmark } from "@/components/Logo";
 import { explorerAddress, DECLUB_ESCROW_ADDRESS } from "@/lib/config";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
+import { swapIntents } from "@/lib/contracts";
 import { NETWORK } from "@/lib/network";
 import { PROTOCOL, percent } from "@/lib/rewards";
 
+// The same ideas the Guide opens with (/guide#what), in the order a newcomer needs them.
 const STEPS = [
   {
     number: "01",
     title: "Join your Club",
-    body: "Every verified Monad NFT collection has one, with its memecoin if it has one. Join with your wallet; holding the NFT makes you a Holder, and the Owner can let the coin count too.",
+    body: "Every verified Monad NFT collection has one. Anyone signed in can join, for free: it sends no transaction.",
   },
   {
     number: "02",
     title: "Trade and talk inside it",
-    body: "Swap with other members, lock a deal or sign one, and post what you’re after. Your wallet signs your posts, so they’re yours.",
+    body: "Swap with other members on its Market, NFT for NFT or any mix. Post, reply and enter challenges on its Board, signed by your wallet.",
   },
   {
     number: "03",
-    title: "Own a share of the market",
-    body: `Each completed swap pays a small fee. Every week ${percent(PROTOCOL.holderBps)} of it goes back to the Club’s active Holders and ${percent(PROTOCOL.fundBps)} to its Owner’s Club fund, paid in MON.`,
+    title: "Get rewarded",
+    body: `Every week ${percent(PROTOCOL.holderBps)} of the Club’s swap fees goes to its active Holders, in MON. And its Owner rewards the best members through challenges.`,
   },
+];
+
+/** What the market does that a marketplace doesn't: the reason to trade here. */
+const MARKET = [
+  { icon: <SwapIcon className="size-5" />, title: "NFT for NFT", body: "Swap NFTs, tokens and MON in any mix, bundles included. Not just NFTs for tokens." },
+  { icon: <TagIcon className="size-5" />, title: "Ask by trait", body: "Request any NFT with a trait, like any Chog with a Crown hat. Whoever holds a match can accept." },
+  { icon: <InboxIcon className="size-5" />, title: "Open offers", body: "Show what you're giving and let people offer their own assets. You pick the one you like." },
+  { icon: <ShieldIcon className="size-5" />, title: "Can't half-happen", body: "Both sides move in one transaction, or nothing moves. No middleman, no trust needed." },
 ];
 
 export default function HomePage() {
@@ -42,8 +52,8 @@ export default function HomePage() {
               <span className="block text-accent">owned by its members.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Every verified Monad NFT collection gets a Club, and its memecoin joins it. Members trade inside it, talk in posts they sign and own,
-              and Holders earn a share of the fees their Club’s swaps pay.
+              Every verified Monad NFT collection gets a Club. Members talk in posts they sign and own, trade inside it, and its active Holders
+              share the fees its swaps pay, every week.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/clubs" className="btn-primary">
@@ -58,16 +68,21 @@ export default function HomePage() {
           <DeClubArt />
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-3">
-          <div className="hero-stat"><strong>{percent(PROTOCOL.holderBps)} to top Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
+          <div className="hero-stat"><strong>{percent(PROTOCOL.holderBps)} to active Holders</strong><span>Of the fees your Club’s swaps pay, every week</span></div>
           <div className="hero-stat"><strong>Posts you own</strong><span>Signed by your wallet, exportable anywhere</span></div>
           <div className="hero-stat"><strong>Escrowed by a contract</strong><span>Assets move only in transactions or signatures you approve</span></div>
         </div>
       </section>
 
       <section aria-labelledby="how-it-works" className="mb-12">
-        <h2 id="how-it-works" className="text-2xl font-bold tracking-tight sm:text-3xl">
-          How it works
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="how-it-works" className="text-2xl font-bold tracking-tight sm:text-3xl">
+            How it works
+          </h2>
+          <Link href="/guide" className="text-sm font-bold text-[#a9282f] hover:underline">
+            Read the guide →
+          </Link>
+        </div>
         <ol className="mt-6 grid gap-3 md:grid-cols-3">
           {STEPS.map((step) => (
             <li key={step.number} className="page-section p-6">
@@ -79,17 +94,38 @@ export default function HomePage() {
         </ol>
       </section>
 
+      <section aria-labelledby="market-title" className="mb-12">
+        <p className="kicker text-[#a9282f]!">The market</p>
+        <h2 id="market-title" className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+          Made for swaps, not just sales.
+        </h2>
+        <p className="mt-3 max-w-2xl leading-7 text-muted">
+          Marketplaces sell NFTs for tokens. DeClub swaps them, wallet to wallet, settled by a contract
+          {swapIntents ? ": lock your assets in a deal, or just sign and keep them until a match" : ""}. And every swap&apos;s fee feeds the Club
+          whose asset was traded.
+        </p>
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {MARKET.map((item) => (
+            <li key={item.title} className="page-section p-6">
+              <span className="grid size-10 place-items-center rounded-xl border-2 border-[#111318] bg-[#f0b735]">{item.icon}</span>
+              <h3 className="mt-3 text-lg font-semibold">{item.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">{item.body}</p>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <CreateDealButton />
+          <Link href="/deals" className="btn-secondary">
+            Browse deals <span aria-hidden>→</span>
+          </Link>
+          <Link href="/guide/deals" className="text-sm font-bold text-[#a9282f] hover:underline">
+            How deals work →
+          </Link>
+        </div>
+      </section>
+
       <ClubsIntro />
 
-      <section className="page-section flex flex-col items-start justify-between gap-4 p-6 sm:flex-row sm:items-center">
-        <div>
-          <p className="font-semibold">New to DeClub?</p>
-          <p className="mt-1 text-sm text-muted">
-            Learn how Clubs, rewards and signed posts work.
-          </p>
-        </div>
-        <Link href="/guide/clubs" className="btn-secondary shrink-0">Read the field guide</Link>
-      </section>
 
       <footer className="relative mt-12 overflow-hidden rounded-2xl border-2 border-[#111318] bg-[#171a22] p-6 text-sm text-white sm:p-9">
         <div className="absolute -right-12 -top-16 size-44 rounded-full border-[18px] border-[#315ea8]/40" aria-hidden />
