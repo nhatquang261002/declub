@@ -117,7 +117,7 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 
 - **Market:** the open deals and signed swaps that offer or ask for the asset (**For trade**, **Wanted**), and **Recent swaps**.
 - **Board:** short posts from members, signed by their wallets, in the order you pick.
-- **Challenges:** tasks the Owner sets the Club. Answer one with a post and, if you win, you earn points toward your share of the week's rewards (see below).
+- **Challenges:** tasks the Owner sets the Club. Answer one with your own X post; winners get points toward the week's rewards, a trophy, and sometimes an NFT or token (see below).
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
 - **Rewards:** what the Club's swaps paid in fees, what went to its Holders and its Owner, and your share to claim.
 - **Manage:** only for the Club's staff (see *Roles*).
@@ -153,6 +153,8 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 **Rewards beyond points.** Every winner gets a **trophy**: a medal on their profile (gold, silver or bronze for a place, gold for a winner) and a trophy count beside their name in Members. The Owner can also offer **an NFT or token** from DeClub's verified list. They send it from their own wallet after the challenge ends and paste the transaction; the app checks on chain that it reached the winner. DeClub never holds the prize and can't send it for them. On the challenge's page you see your prize as owed, or sent with a link to the transaction. If the Owner hasn't sent it two weeks after the end, the card and the page say **Prize not sent**, and the Owner can't offer another one in that Club until they do. The Owner can also **pin the winners** on top of the Board for three days.
 
+**Sharing a challenge.** On a challenge's page, **Share your win** (or **Share your entry**, or **Share on X**) shows a preview of the challenge's card first: the podium or the winners once it's over, the prizes and the time left while it runs. The button there opens X with the text and the link. A link to a challenge shows the same card wherever it's posted.
+
 Winners earn the points as ordinary activity points for that week, so they raise your bonus and your place on the ramp; at most 20 challenge points count for you in a week, however many you win. The Owner can't enter their own challenge; Moderators can, but can't hide or ban someone in the same challenge while it runs. Every win is published with the week's points. **An entry earns through its prize only:** it still counts toward the Club's Momentum, but it doesn't give you an active day, an X share or backing from its likes, even after you withdraw it (unless the Owner cancels the challenge, which gives your post back). Entering doesn't use up your X share for the day. Liking and replying to entries still counts as engaging.
 
 **Replies and likes.** Reply to a post once, one level deep (you can't reply to a reply), and like posts you value (not your own). Replies are signed with your Club wallet; likes aren't. Both count toward Club Rewards, for you and, if you hold an NFT, for the author (see *Rewards*). The author sees them in the bell.
@@ -181,7 +183,7 @@ Every completed swap pays a small protocol fee. Each week (an *epoch*), for ever
 - **Show up.** Each day (UTC) you post, reply or like on the Board is an active day, up to 7 a week. 3 or more active days a week keep a streak going, and each week in a row adds to your bonus, up to a limit.
 - **Post about it on X.** Share your own X post about the Club in a Board note: from the X account linked to your profile, posted in the last 48 hours, one a day per Club. About the Club means a link to the Club or its token, a mention of or reply to the project's X account, or one of the Club's tags (a tag counts less). Once X engagement is switched on, posts that do well on X count for more, up to a limit.
 - **Trade.** Each completed swap with someone else's wallet adds points; the same wallet again within a week counts less. Capped each week.
-- **Win challenges.** Winners of the Owner's challenges earn the points the Owner set, as ordinary points for that week, up to a weekly limit.
+- **Win challenges.** Winners of the Owner's challenges earn the points the Owner set, as ordinary points for that week, up to a weekly limit. An entry earns only through its prize: it doesn't count as an active day, an X share or backing for you.
 
 **What earns little or nothing:** liking or replying to yourself or between your own wallets; members who keep liking each other, or one person over and over; swapping with your own wallets or the same wallet again and again; NFTs bought just before the week closes; likes taken back and posts a moderator hid. The Owner can also ban a member from rewards. Points are checked again when the week closes. The full rules, with every weight, limit and formula, are in [Clubs → Rewards](09-clubs.md#rewards).
 

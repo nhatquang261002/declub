@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BadgeCheckIcon, ChatIcon, CoinIcon, CrossIcon, CrownIcon, ExternalIcon, FlagIcon, FlameIcon, HeartIcon, ListIcon, ShieldIcon, SwapIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ChatIcon, CoinIcon, CrossIcon, CrownIcon, ExternalIcon, FlagIcon, FlameIcon, HeartIcon, ListIcon, PinIcon, ShieldIcon, SwapIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { JudgingIcon } from "@/components/ChallengeCard";
+import { CHALLENGE_RULES, JUDGING, type Judging } from "@/lib/challenges";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR } from "@/lib/clubPosts";
 import { PRIVY_APP_ID, REWARDS_RULES_URL } from "@/lib/config";
@@ -18,6 +20,7 @@ const SECTIONS: GuideSection[] = [
   { id: "join", label: "Join a Club" },
   { id: "badges", label: "Badges and Momentum" },
   { id: "rewards", label: "Rewards" },
+  { id: "challenges", label: "Challenges" },
   { id: "post", label: "Post and report" },
   { id: "roles", label: "Who runs a Club" },
   { id: "safety", label: "Stay safe" },
@@ -27,7 +30,7 @@ const SECTIONS: GuideSection[] = [
 const TABS = [
   { icon: <TagIcon className="size-4" />, title: "Market", body: <>Open deals{swapIntents ? " and signed swaps" : ""} for the asset, split into <b>For trade</b> and <b>Wanted</b>, plus <b>Recent swaps</b>.</> },
   { icon: <ChatIcon className="size-4" />, title: "Board", body: <>Short posts from members, with replies and likes under them. Order them by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post can link one of the Club&apos;s own deals.</> },
-  { icon: <TrophyIcon className="size-4" />, title: "Challenges", body: <>Tasks the Owner sets the Club, any time. Answer one with a post; the winners, picked by likes or by the Owner, earn activity points for the week, which raise your share of the rewards.</> },
+  { icon: <TrophyIcon className="size-4" />, title: "Challenges", body: <>Tasks the Owner sets the Club, any time. Answer one with your own X post; the winners get points toward the week&apos;s rewards, a trophy, and sometimes an NFT or token. See <a href="#challenges" className="underline">Challenges</a>.</> },
   { icon: <UsersIcon className="size-4" />, title: "Members", body: <>A leaderboard of the people in the Club, ranked by Momentum. <b>Follow</b> the ones you trust.</> },
   { icon: <CoinIcon className="size-4" />, title: "Rewards", body: <>What the Club&apos;s swaps paid in fees this epoch, how much went to its Holders and its Owner, and your share to claim. <b>Share the week</b> posts the recap to X.</> },
   { icon: <ShieldIcon className="size-4" />, title: "Manage", body: <>For staff. Owners edit the Club page, the coin rule and the X links; everyone on staff sees the bans and the moderation log. Pins and moderators are set from the post menus and the Members list.</> },
@@ -148,9 +151,46 @@ const EARN: ReadonlyArray<{ icon: React.ReactNode; title: string; lead: string; 
   {
     icon: <TrophyIcon className="size-4" />,
     title: "Win challenges",
-    lead: "The Owner sets challenges with points for up to three places.",
-    more: ["Winners are picked by members' likes or by the Owner.", "Wins count as ordinary points for that week, up to a weekly limit."],
+    lead: "Winners of the Owner's challenges get the points the Owner set.",
+    more: [
+      "Wins count as ordinary points for that week, up to a weekly limit.",
+      "An entry earns only through its prize: it doesn't count as an active day, an X share or backing for you.",
+    ],
   },
+];
+
+const days = (ms: number) => Math.round(ms / 86_400_000);
+
+const ENTER_STEPS = [
+  { title: "Post it on X", body: "From the X account linked to your profile, after the challenge started. Older posts don't count." },
+  { title: "Paste the link", body: <>Open the challenge, paste your post&apos;s link, add a line for the Board and press <b>Sign &amp; enter</b>. It&apos;s shared on the Board too.</> },
+  { title: "Wait for the end", body: "One entry each: a new one replaces the old. Some challenges are for Holders only, but anyone in the Club can like the entries." },
+];
+
+/** How winners are picked, as a member reads it (`JUDGING`'s lines speak to the Owner). */
+const PICK_LINES: Record<Judging, string> = {
+  likes: "Ranked by likes from other members. Likes lock when it ends.",
+  holders: "The same, but only likes from Holders count.",
+  owner: `The Owner picks the winners within ${days(CHALLENGE_RULES.pickWindowMs)} days of the end, or nobody wins.`,
+  raffle: "Drawn at random from the entries, using a block nobody could know in advance. The challenge's page shows how to check it.",
+  first: "The first entries posted win. If one drops out, the next in line moves up.",
+  everyone: "Every entry wins, up to a limit, or only those with the few likes the Owner asked for.",
+};
+const PICKS = (Object.keys(JUDGING) as Judging[]).map((j) => ({
+  icon: <JudgingIcon judging={j} className="size-4" />,
+  title: j === "owner" ? "The Owner picks" : JUDGING[j].label,
+  body: PICK_LINES[j],
+}));
+
+const PRIZES = [
+  { icon: <CoinIcon className="size-4" />, title: "Points", body: "Ordinary points for that week, as the Owner set them: more for 1st than 2nd and 3rd, or the same for every winner." },
+  { icon: <TrophyIcon className="size-4" />, title: "A trophy", body: "Every winner gets one, on their profile and beside their name in Members." },
+  {
+    icon: <TagIcon className="size-4" />,
+    title: "An NFT or token",
+    body: `Sometimes. The Owner sends it from their own wallet and the app checks on chain that it arrived; DeClub never holds it. If it isn't sent within ${days(CHALLENGE_RULES.prizeDueMs)} days, the challenge says Prize not sent.`,
+  },
+  { icon: <PinIcon className="size-4" />, title: "A place on top of the Board", body: `Sometimes. The Owner can pin the results above the Board's posts for ${days(CHALLENGE_RULES.pinResultsMs)} days.` },
 ];
 
 const FAIR_PLAY = [
@@ -176,6 +216,14 @@ const FAQ: ReadonlyArray<[string, string]> = [
     `Each week, the fees from the Club's completed swaps are added up. ${percent(PROTOCOL.holderBps)} goes to its active Holders, split by the NFTs they held through the week, with a bonus for the most active; ${percent(PROTOCOL.fundBps)} goes to the Owner's Club fund. Whatever can't be paid rolls into the next week.`,
   ],
   ["Why haven't I been paid yet?", `An epoch is paid after it ends, once it's published on chain, and claims open a day after that (the default), so a mistake can be caught. You also need some activity that week, and an NFT of the collection (unless the Owner turned on a slice for members without NFTs), and to be among the paid places if the Owner limited them. Holding alone doesn't earn a share. Your share waits under Rewards until you claim it.`],
+  [
+    "Do challenge entries earn points on their own?",
+    "No. An entry still adds to the Club's Momentum, but what it earns you is the challenge's prize. It doesn't count as an active day, an X share or backing from its likes, even after you withdraw it, unless the Owner cancels the challenge. Liking and replying to entries still counts as engaging.",
+  ],
+  [
+    "Who sends an NFT or token prize?",
+    `The Owner, from their own wallet, after the challenge ends. They paste the transaction and the app checks on chain that it reached the winner. DeClub never holds the prize and can't send it for them. If it isn't sent within ${days(CHALLENGE_RULES.prizeDueMs)} days, the challenge says so, and the Owner can't offer another in that Club until they send it.`,
+  ],
   ["Can I take my posts with me?", "Yes. Every post is signed by your wallet, and each Club's feed is public at /api/clubs/<address>/feed, with the signature. Your posts across Clubs are at /api/wallets/<your wallet>/posts, and who you follow at /api/wallets/<your wallet>/follows."],
   ["Which assets get a Club?", "Only NFT collections on DeClub's verified list, so a copycat can't get one. A memecoin made for a collection shares that collection's Club. The Owner decides whether holding it makes you a Holder, and from how much; rewards follow the NFTs either way. A memecoin has no Club of its own."],
   ["Why can't I post?", "You need to be a member, with an X or Discord account linked and “Show my X or Discord handle” turned on (Profile page). Linking alone isn’t enough. Some Owners also limit posting to Holders. If you posted a moment ago, wait for the cooldown."],
@@ -232,7 +280,7 @@ export default function ClubsGuidePage() {
               <b>Joining shows your wallet</b> on the Members list, so join with an account whose wallet you&apos;re happy
               to show.{!PRIVY_APP_ID && " Sign-in is off on this deployment, so joining and posting aren't available here."} Your <b>Club wallet</b> is
               the linked wallet shown next to your name on the Members list. The bell in the header tells you about replies, likes, pins, counted X posts,
-              rewards and your rank, and on your Profile page you can set an avatar from an NFT you hold.
+              rewards, your rank and challenges, and on your Profile page you can set an avatar from an NFT you hold.
             </span>
           </p>
         </Section>
@@ -371,6 +419,44 @@ export default function ClubsGuidePage() {
               <a href={REWARDS_RULES_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2">
                 Club Rewards, fully explained <ExternalIcon className="size-3.5" />
               </a>
+            </span>
+          </p>
+        </Section>
+
+        <Section
+          sections={SECTIONS}
+          id="challenges"
+          title="Challenges: post, win, get a trophy"
+          intro={<>The Owner sets the Club a task, any time: a meme, a pitch, a name. It shows as a card on the Board and the <b>Challenges</b> tab, and ends when a week does.</>}
+        >
+          <h3 className="text-lg font-black">Enter in three steps</h3>
+          <ol className={`${CARD} mt-3 divide-y divide-[#111318]/10`}>
+            {ENTER_STEPS.map((step, i) => (
+              <li key={step.title} className="flex gap-4 p-5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">{i + 1}</span>
+                <div>
+                  <p className="font-black">{step.title}</p>
+                  <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <h3 className="mt-8 text-lg font-black">How winners are picked</h3>
+          <p className={`mt-1 mb-3 text-sm leading-6 ${MUTED}`}>The Owner chooses one when they start it; the card says which.</p>
+          <CardGrid cols={3} items={PICKS} />
+
+          <h3 className="mt-8 text-lg font-black">What winners get</h3>
+          <div className="mt-3">
+            <CardGrid cols={2} items={PRIZES} />
+          </div>
+
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
+            <TrophyIcon className="mt-0.5 size-5 shrink-0 text-[#a9282f]" />
+            <span>
+              <b>Your entry earns through its prize.</b> It still adds to the Club&apos;s Momentum, but it doesn&apos;t count as an active day, an X share
+              or backing for you, even after you withdraw it. Liking and replying to entries still counts as engaging. Won? <b>Share your win</b> on
+              the challenge&apos;s page; the bell tells you about new challenges, their last day and results.
             </span>
           </p>
         </Section>
