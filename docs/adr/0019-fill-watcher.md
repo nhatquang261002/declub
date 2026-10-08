@@ -1,6 +1,6 @@
 # ADR 0019: Fill watcher: follow the chain for fills and Club activity
 
-**Status:** Accepted · 2026-10-03 · Web only. No contract, matcher or pool change. Completes the server-side fill history of [ADR 0012](0012-server-side-saves.md) and the Club activity log of [ADR 0016](0016-clubs-and-momentum.md).
+**Status:** Accepted · 2026-10-03 · Web only. No contract, matcher or pool change. Completes the server-side fill history of [ADR 0012](0012-server-side-saves.md) and the Club activity log of [ADR 0016](0016-clubs-and-momentum.md). Amended by [ADR 0051](0051-hypersync-for-the-fill-watcher.md): with an Envio token, transactions are found with HyperSync instead of 100-block log queries.
 
 ## Context
 

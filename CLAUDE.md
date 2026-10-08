@@ -37,7 +37,7 @@ Rewards epochs: `npm run rewards:epoch | rewards:sponsor | rewards:verify` in `w
 - **Don't edit deployed `.sol` files for cosmetic reasons** (comments, doc links). The testnet contracts are not yet Sourcify-verified and any source change breaks that.
 - **Testnet and mainnet are build flavors of one codebase** (`web/scripts/flavor.mjs`, `web/lib/network.ts`). Chain-specific copy goes through `NETWORK`; never fork per chain, and no testnet value may leak into the mainnet flavor (it reads only `.env.mainnet`). Mainnet has nothing deployed.
 - **Monad quirk:** a wallet under 10 MON whose second tx lands within ~1.2 s of its first executes with status 0 and still pays gas, even though simulation passes. Space txs ~3 s apart when scripting. Public RPC `testnet-rpc.monad.xyz` has timed out; `https://rpc.ankr.com/monad_testnet` serves chain 10143.
-- **No indexer.** Deals are read from storage (ADR 0004), not logs (the public RPC caps `eth_getLogs` at 100 blocks); the server holds the deal book (ADR 0020) and the fill watcher fills the activity log (ADR 0019).
+- **No indexer.** Deals are read from storage (ADR 0004), not logs (the public RPC caps `eth_getLogs` at 100 blocks); the server holds the deal book (ADR 0020) and the fill watcher fills the activity log (ADR 0019), finding transactions with Envio HyperSync when `ENVIO_API_TOKEN` is set (ADR 0051), and `rewards:verify` checks fees against `FeeCharged` logs the same way (ADR 0052).
 - Posts and follows are EIP-712 signed by the member's wallet; keep them exportable. Hiding a post is a moderator action, never a report count.
 
 ## Security rules

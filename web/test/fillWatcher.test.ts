@@ -106,6 +106,17 @@ describe("watchFills", () => {
     assert.equal((await readActivity(store, NFT))[0].deal, "2");
   });
 
+  it("scans in the ranges its source allows, unless told otherwise", async () => {
+    const chain = fakeChain(450n);
+    const wide: ChainScan = { ...chain.scan, range: 200 };
+    await run(chain, { scan: wide, range: undefined, startBlock: 1n });
+    assert.deepEqual(chain.queries, [
+      [1n, 200n],
+      [201n, 400n],
+      [401n, 450n],
+    ]);
+  });
+
   it("picks up from its cursor, and only scans new blocks", async () => {
     const chain = fakeChain(100n);
     await run(chain, { startBlock: 1n });

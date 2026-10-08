@@ -26,6 +26,7 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,mjs}\" \"../matcher/**/*.ts\" \"../e2e/**/*.ts\""
   },
   "dependencies": {
+    "@envio-dev/hypersync-client": "^1.4.1",
     "@next/env": "^16.3.6",
     "@privy-io/node": "^0.35.0",
     "@privy-io/react-auth": "^3.46.0",

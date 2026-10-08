@@ -16,6 +16,7 @@ lives in the git log and the relevant ADRs.
 - [ ] Verify the deployments on Sourcify
 - [ ] Run the manual testnet pass with two real wallets
 - [ ] Run the rewards epoch and claim flow on testnet
+- [ ] Run the fill watcher on testnet with `ENVIO_API_TOKEN` and backfill from the deploy block ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md); built and unit-tested, not yet run against HyperSync)
 - [ ] Turn on X reach: set `X_BEARER_TOKEN` (the code is built; off by default)
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
 

@@ -1,10 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { createPublicClient, getAbiItem, http, type Address, type Hex, type PublicClient } from "viem";
+import { createPublicClient, getAbiItem, http, toEventSelector, type Address, type Hex, type PublicClient } from "viem";
 import { deClubEscrowAbi } from "../abi";
 import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { ACTIVITY_CONTRACTS, recordActivity, viemReader, type IngestOptions, type Reader } from "./activity";
 import { FILL_CONTRACTS, recordFills } from "./fills";
+import { hypersyncScan, withFallback } from "./hypersyncScan";
 import type { Store } from "./store";
 
 /**
@@ -30,6 +31,8 @@ export type ChainScan = {
   head(): Promise<bigint>;
   /** Transactions in blocks `from`..`to` (inclusive) that emitted a watched event, in chain order, each once. */
   txs(from: bigint, to: bigint): Promise<Hex[]>;
+  /** Blocks per `txs` call this source answers. Without one, the public RPC's 100. */
+  range?: number;
 };
 
 /** Every contract whose events count: fills, and creations for the Clubs. */
@@ -43,17 +46,40 @@ const DEFAULT_RANGE = 100;
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
+const HYPERSYNC_TIMEOUT_MS = 5_000;
+
+const finalizedHead = async () => (await client().getBlock({ blockTag: "finalized" })).number;
+
 function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
   return {
-    async head() {
-      return (await client().getBlock({ blockTag: "finalized" })).number;
-    },
+    head: finalizedHead,
     async txs(from, to) {
       if (contracts.length === 0) return [];
       const logs = await client().getLogs({ address: [...contracts], events: EVENTS, fromBlock: from, toBlock: to });
       return [...new Set(logs.map((log) => log.transactionHash))];
     },
   };
+}
+
+/**
+ * Envio HyperSync when `ENVIO_API_TOKEN` is set (ADR 0051), the node's own logs when not. The token
+ * is server-side only. HyperSync serves a chain at `<chain id>.hypersync.xyz`, so both flavors
+ * use the same code.
+ */
+async function defaultScan(): Promise<ChainScan> {
+  const apiToken = process.env.ENVIO_API_TOKEN?.trim();
+  if (!apiToken || WATCHED.length === 0) return viemScan();
+  // Loaded on demand: it is a native module the other routes have no use for.
+  const { HypersyncClient } = await import("@envio-dev/hypersync-client");
+  const hypersync = new HypersyncClient({
+    url: `https://${CHAIN_ID}.hypersync.xyz`,
+    apiToken,
+    // The client's defaults (30 s, 12 retries) could outlast the route's 60 s. A connection to Envio can stall
+    // for as long as its timeout; if it still can't answer, the run falls back to the node.
+    httpReqTimeoutMillis: HYPERSYNC_TIMEOUT_MS,
+    maxNumRetries: 3,
+  });
+  return withFallback(hypersyncScan(hypersync, finalizedHead, WATCHED, EVENTS.map(toEventSelector)), viemScan());
 }
 
 /** The last block the watcher has fully processed. */
@@ -93,9 +119,8 @@ type WatchResult =
 
 /** Scans from the cursor toward the finalized head, recording fills and Club activity on the way. */
 export async function watchFills(store: Store, options: WatchOptions = {}): Promise<WatchResult> {
-  const scan = options.scan ?? viemScan();
+  const scan = options.scan ?? (await defaultScan());
   const reader = options.reader ?? viemReader();
-  const range = BigInt(Math.max(1, options.range ?? DEFAULT_RANGE));
   const parallel = Math.max(1, options.parallel ?? 4);
   const budgetMs = options.budgetMs ?? 40_000;
   const now = options.now ?? Date.now;
@@ -106,6 +131,8 @@ export async function watchFills(store: Store, options: WatchOptions = {}): Prom
   if ((await store.hit(lockKey(), Math.ceil(budgetMs / 1000) + 60)) > 1) return { status: "busy" };
   try {
     const head = await scan.head();
+    // After `head()`: a scan that fell back to the node has a smaller range.
+    const range = BigInt(Math.max(1, options.range ?? scan.range ?? DEFAULT_RANGE));
     const saved = await store.get<number | string>(cursorKey());
     let cursor: bigint;
     if (saved !== null) {

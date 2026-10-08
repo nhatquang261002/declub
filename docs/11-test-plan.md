@@ -450,7 +450,7 @@ Every line needs an owner and a link to evidence. Any unchecked P0 line is a no-
 - [ ] A mainnet deploy path exists and was reviewed. Built: `DeployEscrow` and `DeployIntents` accept chain 143 and, there only, refuse mocks, demo wallets, a zero fee or ceiling, `FEE_FIXED`, a missing or shared recipient/admin, and any `FEE_TOKEN` but the canonical WMON (`script/FeeConfig.sol`, tested). Dry-run against the real mainnet RPC passes; the reviewer still has to sign it off.
 - [ ] Canonical WMON address confirmed (`FEE_TOKEN`); the deploy script's wrap/unwrap check passed against it.
 - [ ] Fee recipient Safe and a separate fee admin Safe exist, with signers and threshold recorded.
-- [ ] The rewards operator is a Safe of its own (2 of 3 or more, signers on separate hardware wallets), and every signer can run `npm run rewards:verify:mainnet` with read access to the store and has run it once on a testnet epoch.
+- [ ] The rewards operator is a Safe of its own (2 of 3 or more, signers on separate hardware wallets), and every signer can run `npm run rewards:verify:mainnet` with read access to the store and an `ENVIO_API_TOKEN` (for the fee check, [ADR 0052](adr/0052-check-epoch-fees-against-fee-logs.md)), and has run it once on a testnet epoch.
 - [ ] `PROTOCOL_FEE_WEI` set from the agreed dollar amount ($5 per NFT a side moves, [ADR 0018](adr/0018-adjustable-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)) at a recorded MON price; `PROTOCOL_FEE_MAX_WEI` about 4× that; both contracts deployed with the same values.
 - [ ] The fee covers the matcher's worst-case settlement gas at mainnet gas prices.
 - [ ] A runbook for re-pricing the fee (who decides, how both contracts are changed together, the 7-day notice for a raise).

@@ -14,9 +14,11 @@
  * It reads the stored epoch, the earlier ones (for what rolled into each Club) and the sponsors
  * ledger, with the Upstash credentials the app uses, and the chain at NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS:
  * the contract's own `leaf()` for every leaf, `epochs(n)`, `operator()`, and each sponsor's
- * payment. It writes nothing. Exits 1 on any problem. What it can't catch is in docs/04-security.md.
+ * payment, and with ENVIO_API_TOKEN every `FeeCharged` of the epoch's window (ADR 0052). It writes
+ * nothing. Exits 1 on any problem. What it can't catch is in docs/04-security.md.
  */
 import path from "node:path";
+import type { PublicClient } from "viem";
 import type { EpochRecord } from "../lib/rewards";
 import { loadEnv, option, requireStore } from "./env";
 
@@ -146,6 +148,9 @@ async function main() {
     }
   }
 
+  // The fees the Clubs were credited, against what the contracts charged (ADR 0052).
+  const feeNotes = await checkFeesOnChain(record, client, problems);
+
   const total = BigInt(record.total);
   console.log(`epoch    ${n}`);
   console.log(`contract ${contract} (chain ${CHAIN_ID})`);
@@ -154,6 +159,7 @@ async function main() {
   console.log(`value    ${total} wei = ${formatEther(total)} MON`);
   console.log(`on chain ${published ? `published, opens ${new Date(Number(onChain.openAt) * 1000).toISOString()}` : "not published yet"}`);
   for (const note of result.notes) console.log(`note     ${note}`);
+  for (const note of feeNotes) console.log(`note     ${note}`);
   if (sponsorEntries.length > 0) {
     console.log(
       `note     ${sponsorEntries.length - unchecked} sponsor payments checked on chain${unchecked ? `; ${unchecked} without a transaction, check those by hand` : ""}.`,
@@ -167,6 +173,34 @@ async function main() {
     process.exit(1);
   }
   console.log("\nPASS");
+}
+
+/**
+ * Compares the epoch's fees with the `FeeCharged` logs of its window, found with Envio HyperSync.
+ * Without `ENVIO_API_TOKEN` it can't (the public RPC reads 100 blocks of logs at a time) and says so.
+ * Adds to `problems`; returns the notes to print.
+ */
+async function checkFeesOnChain(record: EpochRecord, client: PublicClient, problems: string[]): Promise<string[]> {
+  const apiToken = process.env.ENVIO_API_TOKEN?.trim();
+  if (!apiToken) return ["Fees weren't checked against the chain's logs: set ENVIO_API_TOKEN to check them."];
+  const { HypersyncClient } = await import("@envio-dev/hypersync-client");
+  const { CHAIN_ID, DECLUB_ESCROW_ADDRESS, DECLUB_INTENTS_ADDRESS } = await import("../lib/config");
+  const { FEE_WINDOW_SLACK, checkFees, feesOnChain, firstBlockAt } = await import("../lib/server/feeCheck");
+  if (!DECLUB_ESCROW_ADDRESS) return ["Fees weren't checked: NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS isn't set."];
+
+  const hypersync = new HypersyncClient({ url: `https://${CHAIN_ID}.hypersync.xyz`, apiToken });
+  const [height, finalized] = await Promise.all([hypersync.getHeight(), client.getBlock({ blockTag: "finalized" })]);
+  const last = finalized.number < BigInt(height) ? finalized.number : BigInt(height);
+  const timestampOf = async (block: bigint) => Number((await client.getBlock({ blockNumber: block })).timestamp);
+  // [start - slack, end + slack): the first block at or after each end.
+  const from = await firstBlockAt(record.start - FEE_WINDOW_SLACK, 0n, last, timestampOf);
+  const to = await firstBlockAt(record.end + FEE_WINDOW_SLACK, from, last, timestampOf);
+  if (to > last) return [`Fees weren't checked: the epoch's window runs past the newest block both the node and Envio have final (${last}).`];
+
+  const onChain = await feesOnChain(hypersync, { escrow: DECLUB_ESCROW_ADDRESS, intents: DECLUB_INTENTS_ADDRESS }, from, to - 1n);
+  const checked = checkFees(record, onChain);
+  problems.push(...checked.problems);
+  return checked.notes;
 }
 
 main().catch((error: unknown) => {

@@ -330,7 +330,7 @@ The public Monad testnet RPC caps `eth_getLogs` at **100 blocks** per request, s
 2. **History, notifications and the picker's *In open deals*** still read the newest deals from the chain (`useDeals`: `tradeCount` polled every 5s, then one `getTrade` multicall every 8s, the previous list kept while a new batch loads). `toDeal` drops unknown ids. Every confirmed transaction invalidates all queries.
 3. "Expired" is computed from the local clock (`displayStatus` in `lib/deals.ts`, which mirrors the contract's `isExpired`), on lists and on the detail page alike. The contract judges it against the block, so a reclaim or fill right at the boundary can still be refused; the simulation says so before the wallet opens.
 
-**Who filled a public deal** is only recorded in `TradeFilled`. With the server store on, History uses the server's receipt-verified fills (`useFills`): the app reports each fill's transaction, and the fill watcher ([ADR 0019](adr/0019-fill-watcher.md), `GET /api/cron/fills`, needs `CRON_SECRET`) follows the chain for the ones made elsewhere. Without the store, History falls back to fills made from this browser (`useLocalFills`).
+**Who filled a public deal** is only recorded in `TradeFilled`. With the server store on, History uses the server's receipt-verified fills (`useFills`): the app reports each fill's transaction, and the fill watcher ([ADR 0019](adr/0019-fill-watcher.md), `GET /api/cron/fills`, needs `CRON_SECRET`; finds transactions with Envio HyperSync when `ENVIO_API_TOKEN` is set, [ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)) follows the chain for the ones made elsewhere. Without the store, History falls back to fills made from this browser (`useLocalFills`).
 
 ## Transaction flow (`useTxFlow`)
 

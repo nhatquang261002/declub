@@ -206,11 +206,12 @@ Mutation checks: removing the over-claim check, letting a revoke through after c
 | **The operator takes the MON** | Only before claims open (`revoke`) or the unclaimed rest after `CLAIM_WINDOW` (`sweep`); the window is fixed at deploy and at least a day | `DeClubRewards.close.t.sol`, `testFuzz_delayBoundary` |
 | **The web builder and the contract disagree** on the leaf | A root built by `web/lib/rewards.ts` is verified and paid by the contract in a fixture test | `DeClubRewards.leafFixture.t.sol`, `web/test/rewards.test.ts` |
 | **A Safe signer signs a root or value that isn't the built epoch**, or one whose books don't add up | Each signer runs `npm run rewards:verify:mainnet -- --epoch N --root 0x… --value 12.5MON` with what the Safe transaction shows, and signs only on PASS (see below) | `web/test/rewardsVerify.test.ts` |
+| **The epoch credits the Clubs with more fees than the protocol charged** (inflated store, forged activity) | `rewards:verify` sums `FeeCharged` from both contracts over the epoch's window with HyperSync and fails if the credited fees are more | `web/test/feeCheck.test.ts`: fails when the deal fees credited exceed what DeClubEscrow charged, and the signed-swap case |
 
 ### Accepted limitations
 
 - **The operator is trusted for correctness.** It decides who is paid; the contract only bounds the damage. On mainnet it is a Safe (`DeployRewards.s.sol` refuses an EOA there).
-- **The pre-signing check only proves the epoch holds together.** `web/scripts/rewards-verify.ts` (pure checks in `web/lib/server/rewardsVerify.ts`) rebuilds the root from the contract's own `leaf()` hashes with its own tree code, opens every proof, checks each leaf against its breakdown and the total against the leaves, checks every Club's pools against its fees, sponsors and what the earlier epoch carried over, checks what each Club pays and carries over against its pools, checks that every sponsor payment reached the operator on chain, and compares the root and value with the Safe transaction and with what's already on chain. It does not re-derive who earned what. A store whose activity, memberships, holdings or swap fees were tampered with still builds a self-consistent record that passes. It also doesn't reconcile the Clubs' fees against the contracts' `FeeCharged` logs, because the public RPC answers `eth_getLogs` for at most 100 blocks. The claim delay and the public epoch data are what's left against those.
+- **The pre-signing check only proves the epoch holds together.** `web/scripts/rewards-verify.ts` (pure checks in `web/lib/server/rewardsVerify.ts`) rebuilds the root from the contract's own `leaf()` hashes with its own tree code, opens every proof, checks each leaf against its breakdown and the total against the leaves, checks every Club's pools against its fees, sponsors and what the earlier epoch carried over, checks what each Club pays and carries over against its pools, checks that every sponsor payment reached the operator on chain, and compares the root and value with the Safe transaction and with what's already on chain. It does not re-derive who earned what. A store whose activity, memberships, holdings or swap fees were tampered with still builds a self-consistent record that passes. With `ENVIO_API_TOKEN` set it does check that the Clubs weren't credited with more fees than the two contracts' `FeeCharged` logs show for the epoch's window ([ADR 0052](adr/0052-check-epoch-fees-against-fee-logs.md), `web/lib/server/feeCheck.ts`), but only as a ceiling padded by 15 minutes, and it is skipped without the token. The claim delay and the public epoch data are what's left against fees the Clubs were credited too little of, and against who earned what.
 - **Holdings are read when the epoch is built**, not at a fixed block. Borrowing NFTs around that moment is possible; the reward at stake is a fraction of fees.
 - **An account that refuses MON** can't be paid until it accepts it; its leaf stays claimable until the epoch is swept.
 - No external review yet.
@@ -231,3 +232,17 @@ contracts/test/rewards/
 
 `forge coverage`: 100% of lines, statements, branches and functions on `DeClubRewards.sol`. Slither is triaged [above](#static-analysis).
 
+
+## Fill watcher
+
+The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club activity that feed History and Momentum. It holds no keys and moves no assets. It may find transactions with Envio HyperSync ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)).
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **A wrong or hostile HyperSync answer** makes the watcher record a fill or event that didn't happen | HyperSync only names transactions. Each one is passed to `recordFills` and `recordActivity`, which read the receipt from the node and record only what its logs say | `fillWatcher.test.ts`: records nothing twice, keeps the cursor before a chunk it couldn't finish |
+| **HyperSync is behind or ahead of the node,** so the cursor passes blocks that weren't scanned or aren't final | `head()` is the lower of the node's finalized block and HyperSync's height | `hypersyncScan.test.ts`: only treats blocks as scanned when both the node and Envio have them |
+| **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height can't be read the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
+| **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
+| **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |

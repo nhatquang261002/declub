@@ -23,7 +23,7 @@
       │   │                                   │             │
       │   └───────────────┬───────────────────┘             │ settle(cycle, sigs)
       │                   │ storage reads, receipts,        │
-      │                   │ 100-block log scans             │
+      │                   │ log scans (HyperSync)           │
       ▼                   ▼                                 ▼
  ┌──────────────────────── Monad testnet (10143) ─────────────────────────┐
  │  ┌─────────────────────────┐         ┌─────────────────────────────┐   │
@@ -82,7 +82,7 @@ The full specs are in [03 · Contract Design](03-contract-design.md); the interf
 
 ### Frontend (`web/`)
 
-Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([ADR 0010](adr/0010-privy-sign-in.md)). It sends every transaction from the browser and reads most things straight from the chain. Its server routes (`web/app/api`) keep profiles, saves and Clubs in Upstash Redis ([ADR 0011](adr/0011-verified-profiles.md), [0012](adr/0012-server-side-saves.md), [0016](adr/0016-clubs-and-momentum.md)), hold the deal book so it can be searched and filtered whole (`/api/deals`, [ADR 0020](adr/0020-server-side-deal-book.md)), follow the chain for fills from a cron (`/api/cron/fills`, [ADR 0019](adr/0019-fill-watcher.md)), and take Privy's webhook (`/api/webhooks/privy`, [ADR 0013](adr/0013-privy-webhooks.md)). See [05 · Frontend](05-frontend.md).
+Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([ADR 0010](adr/0010-privy-sign-in.md)). It sends every transaction from the browser and reads most things straight from the chain. Its server routes (`web/app/api`) keep profiles, saves and Clubs in Upstash Redis ([ADR 0011](adr/0011-verified-profiles.md), [0012](adr/0012-server-side-saves.md), [0016](adr/0016-clubs-and-momentum.md)), hold the deal book so it can be searched and filtered whole (`/api/deals`, [ADR 0020](adr/0020-server-side-deal-book.md)), follow the chain for fills from a cron (`/api/cron/fills`, [ADR 0019](adr/0019-fill-watcher.md), finding transactions with Envio HyperSync when a token is set, [ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)), and take Privy's webhook (`/api/webhooks/privy`, [ADR 0013](adr/0013-privy-webhooks.md)). See [05 · Frontend](05-frontend.md).
 
 ### Intent pool and matcher (`matcher/`)
 
@@ -90,7 +90,7 @@ A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), 
 
 ### Indexer (deferred)
 
-Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
+Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md), [0051](adr/0051-hypersync-for-the-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
 
 ## Key flows
 
@@ -176,4 +176,4 @@ A few Monad specifics that affect the design:
 
 - **Fast blocks:** the UI can wait for the transaction receipt instead of showing long "pending" states.
 - **Gas is charged on the gas limit, not gas used:** give fills sensible explicit limits rather than inflated defaults. Confirm this against Monad's docs.
-- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)).
+- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)). The server's fill watcher gets past the cap with Envio HyperSync when it has a token ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)).

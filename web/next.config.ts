@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
   // Each flavor builds into its own folder (scripts/flavorEnv.mjs), so testnet and mainnet can run at once.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: { root: __dirname },
+  // A native module (ADR 0051): loaded from node_modules at run time, not bundled.
+  serverExternalPackages: ["@envio-dev/hypersync-client"],
   // The account page is now the account settings, and the profile has a page of its own (ADR 0042).
   // Deal pages lost their /v2 prefix; shared links to the old paths keep working.
   async redirects() {
