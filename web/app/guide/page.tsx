@@ -77,7 +77,7 @@ const MAKE_STEPS = [
     body: (
       <>
         Check the summary, <b>Approve</b> each asset you offer, then <b>Create deal</b> (<b>Post open offer</b> for an open offer). Your side and your share of
-        the fee are now held by the contract.
+        the <a href="#fees" className="font-bold underline">fee</a> are now held by the contract.
       </>
     ),
   },
@@ -94,8 +94,8 @@ const TAKE = [
     kind: "Exact assets",
     body: (
       <>
-        Approve what you send if asked, then press <b>Accept &amp; swap</b>. Any MON asked for, plus your share of the
-        fee, goes in the same transaction.
+        Approve what you send if asked, then press <b>Accept &amp; swap</b>. Any MON asked for, plus your share of the{" "}
+        <a href="#fees" className="font-bold underline">fee</a>, goes in the same transaction.
       </>
     ),
   },
