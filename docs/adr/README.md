@@ -69,19 +69,22 @@ Read in this order: the money (0022), then how points work (0038, 0040, 0044), t
 
 | # | Decision | Status |
 |---|---|---|
-| [0022](0022-club-rewards.md) | Fees go back to the Club: Merkle claims on `DeClubRewards` | Accepted |
+| [0022](0022-club-rewards.md) | Fees go back to the Club: Merkle claims on `DeClubRewards` | Amended by 0054 |
 | [0024](0024-x-posts-and-the-holder-bonus.md) | X posts and the Holder bonus | Amended by 0029, 0032, 0044 |
 | [0029](0029-top-holders-and-posts-only-bonus.md) | Top Holders are paid; the bonus counts posts only | Amended by 0034, 0037 |
 | [0032](0032-live-standings-active-days-and-replies.md) | Live standings, active days, streaks, replies | Accepted |
 | [0034](0034-swaps-count-in-the-holder-bonus.md) | Swaps count in the bonus, capped | Accepted |
 | [0035](0035-sponsored-epochs.md) | Sponsors add to a Club's Holder pool | Accepted |
-| [0036](0036-sponsor-from-the-app.md) | Sponsor from the app, payment checked on chain | Accepted |
+| [0036](0036-sponsor-from-the-app.md) | Sponsor from the app, payment checked on chain | Amended by 0053 |
 | [0037](0037-most-active-holders-are-paid.md) | The most active Holders are paid, not the biggest | Amended by 0040 |
 | [0038](0038-points-from-backing.md) | Points come from what other Holders back | Amended by 0039, 0040 |
 | [0039](0039-base-voice-for-verified-accounts.md) | Verified accounts get a small base voice | Accepted |
 | [0040](0040-points-floor-held-average-public-backing.md) | Holdings averaged over the week, public backing, moderator-only hides | Floor replaced by 0044 |
 | [0044](0044-owner-reward-settings.md) | Owners set how their Club pays; a ramp replaces the floor | Accepted |
 | [0046](0046-points-for-engaging.md) | Points for engaging with other members | Accepted |
+| [0053](0053-back-up-sponsors-and-members.md) | Back up sponsors and members: kept signatures, export and a checked restore | Accepted |
+| [0054](0054-resumable-epoch-build-and-epoch-backup.md) | A resumable epoch build, and a backup of built epochs | Accepted |
+| [0055](0055-full-store-dump.md) | A full dump of the server store | Accepted |
 
 ## Challenges
 

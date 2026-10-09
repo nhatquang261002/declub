@@ -6,8 +6,8 @@ import { SPONSOR_MIN_WEI, sponsorMessage } from "../lib/rewards";
 import { rolesKey } from "../lib/server/clubState";
 import { memberKey, membersKey } from "../lib/server/members";
 import { lastKey, recordSponsor, removeSponsor } from "../lib/server/rewards";
-import { sponsorHandler, sponsorInfoHandler, sponsorTxKey, type Payment, type SponsorDeps } from "../lib/server/sponsorRoutes";
-import { readSponsors } from "../lib/server/sponsors";
+import { restoreSponsors, sponsorHandler, sponsorInfoHandler, sponsorTxKey, type Payment, type SponsorDeps } from "../lib/server/sponsorRoutes";
+import { exportSponsors, readSponsors, sponsorsByClub } from "../lib/server/sponsors";
 import { memoryStore, type Store } from "../lib/server/store";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
@@ -158,5 +158,76 @@ describe("sponsoring from the app (ADR 0036)", () => {
     assert.equal(((await again.json()) as { already: boolean }).already, true, "the payment stays taken: it isn't added again");
     await store.set("declub:rewards:10143:epoch:0", { n: 0 });
     assert.equal((await removeSponsor(store, 0, TX)).status, "built");
+  });
+
+  describe("backup and restore (ADR 0053)", () => {
+    it("keeps the sponsor's signature with the payment, and never publishes it", async () => {
+      await send({ tx: TX, name: "A", signature: SIG });
+      const [entry] = await readSponsors(store, 0);
+      assert.equal(entry!.signature, SIG);
+      const published = sponsorsByClub([entry!]).get(NFT.toLowerCase())!.sponsors;
+      assert.ok(!JSON.stringify(published).includes(SIG), "the epoch record and the Rewards tab carry no signature");
+    });
+
+    it("rebuilds the ledger from an export after the store is lost", async () => {
+      await send({ tx: TX, name: "Monad Foundation", signature: SIG });
+      const { records, unsigned } = await exportSponsors(store, 0, 3);
+      assert.deepEqual(records, [{ epoch: 0, club: NFT.toLowerCase(), tx: TX, name: "Monad Foundation", signature: SIG }]);
+      assert.deepEqual(unsigned, []);
+
+      const before = (await readSponsors(store, 0))[0]!;
+      store = memoryStore();
+      const out = await restoreSponsors(store, registry, records, deps);
+      assert.deepEqual(out, { restored: 1, skipped: [] });
+      const after = (await readSponsors(store, 0))[0]!;
+      assert.deepEqual({ ...after, at: 0 }, { ...before, at: 0 });
+      assert.equal(((await store.get(sponsorTxKey(TX))) as { epoch: number }).epoch, 0, "the payment is marked taken again");
+    });
+
+    it("puts a payment back in the epoch it was in, even when later epochs are built", async () => {
+      await send({ tx: TX, name: "A", signature: SIG });
+      const { records } = await exportSponsors(store, 0, 3);
+      store = memoryStore();
+      await store.set(lastKey(), 0);
+      // `last` says epoch 0 is built, so a new payment would go to 1; a restore keeps it where it was.
+      const out = await restoreSponsors(store, registry, records, deps);
+      assert.equal(out.restored, 1);
+      assert.equal((await readSponsors(store, 0)).length, 1);
+    });
+
+    it("counts a payment once however often it is restored", async () => {
+      await send({ tx: TX, name: "A", signature: SIG });
+      const { records } = await exportSponsors(store, 0, 0);
+      const again = await restoreSponsors(store, registry, records, deps);
+      assert.deepEqual(again.skipped, [{ tx: TX, reason: "already recorded" }]);
+      store = memoryStore();
+      await restoreSponsors(store, registry, records, deps);
+      await store.del(sponsorTxKey(TX));
+      await restoreSponsors(store, registry, records, deps);
+      assert.equal((await readSponsors(store, 0)).length, 1, "even if the taken-marker is gone, the ledger doesn't double");
+    });
+
+    it("adds nothing the chain and the signature don't back", async () => {
+      const forged = [
+        { epoch: 0, club: NFT, tx: TX, name: "A", signature: SIG },
+        { epoch: 0, club: NFT, tx: TX2, name: "Not paid", signature: SIG },
+        { epoch: 0, club: "0x00000000000000000000000000000000000000ff", tx: TX, name: "No Club", signature: SIG },
+        { epoch: -1, club: NFT, tx: TX, name: "A", signature: SIG },
+        { epoch: 0, club: NFT, tx: "0x12", name: "A", signature: SIG },
+        { epoch: 0, club: NFT, tx: TX, name: "   ", signature: SIG },
+      ];
+      signed = false;
+      const out = await restoreSponsors(store, registry, forged, deps);
+      assert.equal(out.restored, 0);
+      assert.equal(out.skipped.length, forged.length);
+      assert.deepEqual(await readSponsors(store, 0), []);
+    });
+
+    it("lists entries it can't restore from the chain instead of dropping them", async () => {
+      await recordSponsor(store, 0, { club: NFT, amount: ETH, sponsor: "By hand", kind: "partner" });
+      const { records, unsigned } = await exportSponsors(store, 0, 0);
+      assert.deepEqual(records, []);
+      assert.equal(unsigned[0]!.sponsor, "By hand");
+    });
   });
 });

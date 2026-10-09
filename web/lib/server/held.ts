@@ -15,7 +15,7 @@ import type { Store } from "./store";
  */
 
 /** The days sampled in a Club's epoch (UTC day numbers) and each member's NFTs on them, added up, by user id. */
-type Held = { days: number[]; sums: Record<string, string> };
+export type Held = { days: number[]; sums: Record<string, string> };
 
 export const heldKey = (club: string, n: number) => `declub:held:${CHAIN_ID}:${club.toLowerCase()}:${n}`;
 const lockKey = (club: string, day: number) => `declub:held-lock:${CHAIN_ID}:${club.toLowerCase()}:${day}`;

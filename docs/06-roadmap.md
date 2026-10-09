@@ -22,7 +22,7 @@ lives in the git log and the relevant ADRs.
 
 ## Next
 
-- [ ] Build proper infrastructure for the project: hosting, monitoring, backups and a real cron/queue in place of the free GitHub-scheduled fill watcher and the single Redis store
+- [ ] Build proper infrastructure for the project: hosting, monitoring, backups and a real cron/queue in place of the free GitHub-scheduled fill watcher and the single Redis store (the sponsor ledger, member lists, built epochs and, unchecked, the whole store now export and restore: `rewards:sponsor --export`, `members:backup`, `rewards:backup`, `store:backup`; `store:backup` runs nightly from `store-backup.yml` once the repo is private; still to do: an off-site copy)
 - [ ] Improve in-app posting: images, GIFs, emoji, formatting and more
 - [ ] Improve the timeline algorithm
 - [ ] Integrate X engagement into the account (reach and activity from a linked X account; related: turn on X reach, above)

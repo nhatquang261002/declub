@@ -6,6 +6,7 @@ import type { Registry } from "../verifiedAssets";
 import { roleIn, type Deps as BoardDeps } from "./board";
 import { clubEvents, type Deps } from "./clubs";
 import { fail, gateUser, json, type UserGate } from "./gate";
+import { hasSigned, recordJoin, type JoinDeps } from "./joinRecords";
 import { clubsOf, freshHolder, getMember, joinClub, leaveClub, listMembers, syncMemberships, type MemberDeps } from "./members";
 import { clientId, getStore, withinLimit } from "./store";
 
@@ -15,7 +16,8 @@ import { clientId, getStore, withinLimit } from "./store";
  */
 type RouteDeps = Deps &
   MemberDeps &
-  BoardDeps & {
+  BoardDeps &
+  Pick<JoinDeps, "verifyJoin"> & {
     /** Who is calling. Privy in production; a stand-in in tests. */
     gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
   };
@@ -52,13 +54,18 @@ export async function gatedClub(registry: Registry, ctx: Ctx, request: Request, 
   return { entry, store: g.store, user: g.user };
 }
 
-/** What the signed-in user's own membership looks like to them. */
-const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number }, role: string) => ({
+/**
+ * What the signed-in user's own membership looks like to them. `club` is the address a membership
+ * is signed for, and `signed` says whether it already is, for the wallet shown (ADR 0053).
+ */
+const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number }, role: string, club: string, signed: boolean) => ({
   member: true,
   wallet: row.displayWallet,
   holder: row.holder,
   joinedAt: row.joinedAt,
   role,
+  club,
+  signed,
 });
 
 /**
@@ -80,7 +87,12 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
       const row = known && !known.holder ? await freshHolder(store, entry, user.id, deps) : known;
       const role = await roleIn(store, entry.address, user.id, deps);
       // An admin has staff powers in a Club they never joined, so the page needs to know.
-      return json({ enabled: true, ...(row ? mine(row, role) : { member: false, ...(role === "admin" ? { role } : {}) }) });
+      return json({
+        enabled: true,
+        ...(row
+          ? mine(row, role, entry.address, await hasSigned(store, entry.address, user.id, row.displayWallet))
+          : { member: false, ...(role === "admin" ? { role } : {}) }),
+      });
     },
 
     async POST(request: Request, ctx: Ctx) {
@@ -89,11 +101,34 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
       const { entry, store, user } = f;
 
       const result = await joinClub(store, entry, user.id, linkedEthereumWallets(user.linked_accounts), deps);
-      if (result.ok) return json({ enabled: true, ...mine(result.row, await roleIn(store, entry.address, user.id, deps)) });
+      if (result.ok) {
+        const role = await roleIn(store, entry.address, user.id, deps);
+        return json({ enabled: true, ...mine(result.row, role, entry.address, await hasSigned(store, entry.address, user.id, result.row.displayWallet)) });
+      }
       if (result.reason === "archived") return fail(409, "archived", "This Club is archived and isn’t taking new members.");
       if (result.reason === "banned") return fail(403, "banned", "You can’t join this Club.");
       if (result.reason === "full") return fail(409, "full", "This Club is full.");
       return fail(422, "no_wallet", "Link a wallet to your account first, so the Club has one to show.");
+    },
+
+    /** PUT { message, signature }: keeps the member's signed consent, the proof a backup is restored from (ADR 0053). */
+    async PUT(request: Request, ctx: Ctx) {
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
+      const body = (await request.json().catch(() => null)) as { message?: unknown; signature?: unknown } | null;
+      const result = await recordJoin(store, entry, user.id, { message: body?.message, signature: body?.signature }, deps);
+      if (result.ok) return json({ enabled: true, signed: true });
+      const refusals = {
+        unsigned: [400, "Sign the membership message with your Club wallet."],
+        not_member: [409, "Join the Club first."],
+        wrong_club: [422, "That message is for another Club."],
+        wrong_wallet: [422, "Sign with the wallet your membership is shown under."],
+        stale: [422, "That signature is too old. Sign again."],
+        bad_signature: [422, "The signature isn’t from that wallet."],
+      } as const;
+      const [status, message] = refusals[result.reason];
+      return fail(status, result.reason, message);
     },
 
     async DELETE(request: Request, ctx: Ctx) {

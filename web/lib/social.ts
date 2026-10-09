@@ -32,6 +32,12 @@ export const SOCIAL_TYPES = {
     { name: "following", type: "bool" },
     { name: "at", type: "uint64" },
   ],
+  /** A member's consent to be on a Club's list (ADR 0053): the proof a backup is restored from. */
+  Join: [
+    { name: "club", type: "address" },
+    { name: "wallet", type: "address" },
+    { name: "at", type: "uint64" },
+  ],
 } as const;
 
 /** The `at` to sign now: unix seconds. */
@@ -43,6 +49,8 @@ export const SIGNED_SKEW_SEC = 300;
 /** A post as signed. `at` is unix seconds; `link` is "", a deal id, an intent hash or an X post link. */
 export type PostMessage = { club: Address; kind: "note" | "looking"; text: string; link: string; at: number };
 export type FollowMessage = { follower: Address; target: Address; following: boolean; at: number };
+/** A membership as signed: `wallet` is the one the Members list shows for the member. */
+export type JoinMessage = { club: Address; wallet: Address; at: number };
 /** A reply as signed: `parent` is the replied-to post's id. */
 export type ReplyMessage = { club: Address; parent: string; text: string; at: number };
 
@@ -52,7 +60,11 @@ export const linkString = (link: PostLink | undefined) =>
 
 const wirePost = (m: PostMessage) => ({ ...m, at: BigInt(m.at) });
 const wireFollow = (m: FollowMessage) => ({ ...m, at: BigInt(m.at) });
+const wireJoin = (m: JoinMessage) => ({ ...m, at: BigInt(m.at) });
 const wireReply = (m: ReplyMessage) => ({ ...m, at: BigInt(m.at) });
+
+export const joinTypedData = (m: JoinMessage, chainId = CHAIN_ID) =>
+  ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Join", message: wireJoin(m) }) as const;
 
 export const postTypedData = (m: PostMessage, chainId = CHAIN_ID) =>
   ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Post", message: wirePost(m) }) as const;
@@ -129,6 +141,16 @@ export function parsePostMessage(input: unknown): PostMessage | null {
   if (typeof m.text !== "string" || typeof m.link !== "string") return null;
   if (typeof m.at !== "number" || !Number.isSafeInteger(m.at) || m.at < 0) return null;
   return { club: getAddress(m.club), kind: m.kind, text: m.text, link: m.link, at: m.at };
+}
+
+/** A join message from a request body or a backup file, or null when it isn't one. */
+export function parseJoinMessage(input: unknown): JoinMessage | null {
+  if (!input || typeof input !== "object") return null;
+  const m = input as Record<string, unknown>;
+  if (typeof m.club !== "string" || !isAddress(m.club, { strict: false })) return null;
+  if (typeof m.wallet !== "string" || !isAddress(m.wallet, { strict: false })) return null;
+  if (typeof m.at !== "number" || !Number.isSafeInteger(m.at) || m.at < 0) return null;
+  return { club: getAddress(m.club), wallet: getAddress(m.wallet), at: m.at };
 }
 
 export function parseFollowMessage(input: unknown): FollowMessage | null {

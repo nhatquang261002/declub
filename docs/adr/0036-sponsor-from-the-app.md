@@ -1,6 +1,6 @@
 # ADR 0036: Sponsor an epoch from the app, with the payment checked on chain
 
-**Status:** Accepted · 2026-10-07 · Web only: no contract change. Amends [ADR 0035](0035-sponsored-epochs.md) (who records a sponsorship). The spec is [09 · Clubs](../09-clubs.md#rewards).
+**Status:** Accepted · 2026-10-07 · Web only: no contract change. Amends [ADR 0035](0035-sponsored-epochs.md) (who records a sponsorship). Amended by [ADR 0053](0053-back-up-sponsors-and-members.md) (the signature is kept). The spec is [09 · Clubs](../09-clubs.md#rewards).
 
 ## Context
 

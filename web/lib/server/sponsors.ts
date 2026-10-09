@@ -1,5 +1,6 @@
 import { CHAIN_ID } from "../config";
 import { SPONSOR_NAME_MAX, type PublishedSponsor, type Sponsorship } from "../rewards";
+import type { SponsorBackup } from "./sponsorRoutes";
 import type { Store } from "./store";
 
 /**
@@ -12,6 +13,24 @@ export const sponsorKey = (n: number) => `declub:rewards:${CHAIN_ID}:sponsors:${
 
 export async function readSponsors(store: Store, n: number): Promise<Sponsorship[]> {
   return (await store.get<Sponsorship[]>(sponsorKey(n))) ?? [];
+}
+
+/**
+ * The sponsorships of epochs `from` to `to` in the form `restoreSponsors` takes. The ledger is the
+ * only place a payment is tied to its Club and name, so this is the backup of it (ADR 0053). An
+ * entry from before signatures were kept, or one the operator wrote by hand, can't be restored from
+ * the chain: it comes back in `unsigned` to be noted somewhere else.
+ */
+export async function exportSponsors(store: Store, from: number, to: number): Promise<{ records: SponsorBackup[]; unsigned: Sponsorship[] }> {
+  const records: SponsorBackup[] = [];
+  const unsigned: Sponsorship[] = [];
+  for (let epoch = from; epoch <= to; epoch++) {
+    for (const e of await readSponsors(store, epoch)) {
+      if (e.tx && e.signature) records.push({ epoch, club: e.club, tx: e.tx, name: e.sponsor, signature: e.signature });
+      else unsigned.push(e);
+    }
+  }
+  return { records, unsigned };
 }
 
 /** A name safe to show: one line, no control characters, at most `SPONSOR_NAME_MAX` characters. */

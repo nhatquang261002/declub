@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createPublicClient, getAddress, http, parseAbi, verifyTypedData, type Address, type Hex, type PublicClient } from "viem";
+import { createPublicClient, getAddress, http, parseAbi, type Address, type Hex, type PublicClient } from "viem";
 import { chain } from "../chain";
 import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import {
@@ -27,6 +27,7 @@ import {
 } from "../clubPosts";
 import { applyRole, atLeast, isOwnerOrAdmin, isStaff, mayActOn, roleOf, type ClubRole, type RoleChange } from "../clubRoles";
 import { toAsset } from "../assets";
+import { verifySocialSignature } from "./socialSignature";
 import { getIntent } from "../pool";
 import { lensOf, type LensContext, type LensId } from "../lenses";
 import { coinRule } from "../members";
@@ -298,21 +299,8 @@ export async function createPost(
 
 type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
 
-let verifier: PublicClient | undefined;
-/** viem's check: an EOA's signature, or a smart wallet's through ERC-1271. */
-async function viemVerifyTyped(signer: Address, typed: ReturnType<typeof postTypedData> | ReturnType<typeof replyTypedData>, signature: Hex): Promise<boolean> {
-  // A plain wallet's signature is checked here; only a smart wallet costs a call (ERC-1271).
-  if (await verifyTypedData({ address: signer, signature, ...typed }).catch(() => false)) return true;
-  verifier ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
-  try {
-    if (!(await verifier.getCode({ address: signer }))) return false;
-    return await verifier.verifyTypedData({ address: signer, signature, ...typed });
-  } catch {
-    return false;
-  }
-}
-const viemVerifyPost = (signer: Address, message: PostMessage, signature: Hex) => viemVerifyTyped(signer, postTypedData(message), signature);
-const viemVerifyReply = (signer: Address, message: ReplyMessage, signature: Hex) => viemVerifyTyped(signer, replyTypedData(message), signature);
+const viemVerifyPost = (signer: Address, message: PostMessage, signature: Hex) => verifySocialSignature(signer, postTypedData(message), signature);
+const viemVerifyReply = (signer: Address, message: ReplyMessage, signature: Hex) => verifySocialSignature(signer, replyTypedData(message), signature);
 
 /**
  * A post the author signed (ADR 0023). The message must be exactly what `createPost` would store,

@@ -7,6 +7,13 @@
  *   node --import ./test/register.mjs scripts/rewards-sponsor.ts --epoch 3 --club 0x… --amount 2 --name "Chog team" --owner
  *   node --import ./test/register.mjs scripts/rewards-sponsor.ts --epoch 3 --remove-tx 0x…   # drop a name that shouldn't show
  *
+ *   node --import ./test/register.mjs scripts/rewards-sponsor.ts --export sponsors.json [--from 0] [--to 7]
+ *   node --import ./test/register.mjs scripts/rewards-sponsor.ts --restore sponsors.json
+ *
+ * --export is the backup of the ledger: the one place a payment is tied to a Club and a name. Keep it
+ * somewhere other than the store. --restore checks each entry against the chain and the sponsor's
+ * signature again (ADR 0053), so it adds nothing the chain doesn't back, and it can run twice.
+ *
  * Sponsors can also pay from the app (ADR 0036): the server records those itself, so use --list to
  * see them, and --remove-tx for a name that shouldn't show (the MON stays with the operator).
  *
@@ -44,6 +51,32 @@ async function main() {
       console.log(
         `  ${e.club}  ${formatEther(BigInt(e.amount))} MON  ${e.sponsor}${e.kind === "owner" ? " (Owner)" : ""}${e.by ? `  from ${e.by}  ${e.tx ?? ""}` : ""}`,
       );
+    return;
+  }
+
+  const exportTo = option("export");
+  if (exportTo) {
+    const { writeFileSync } = await import("node:fs");
+    const { exportSponsors } = await import("../lib/server/sponsors");
+    const { records, unsigned } = await exportSponsors(store, Number(option("from") ?? 0), Number(option("to") ?? n));
+    writeFileSync(exportTo, JSON.stringify(records, null, 2));
+    console.log(`wrote ${records.length} sponsorships to ${exportTo}`);
+    if (unsigned.length > 0)
+      console.log(
+        `${unsigned.length} have no signature (recorded by hand or before signatures were kept) and can't be restored from the chain; note them elsewhere.`,
+      );
+    return;
+  }
+
+  const restoreFrom = option("restore");
+  if (restoreFrom) {
+    const { readFileSync } = await import("node:fs");
+    const { restoreSponsors } = await import("../lib/server/sponsorRoutes");
+    const records: unknown = JSON.parse(readFileSync(restoreFrom, "utf8"));
+    if (!Array.isArray(records)) throw new Error("The file should hold a list of sponsorships, as --export writes it.");
+    const { restored, skipped } = await restoreSponsors(store, registry, records);
+    console.log(`restored ${restored} of ${records.length}`);
+    for (const s of skipped) console.log(`  skipped ${s.tx}: ${s.reason}`);
     return;
   }
 

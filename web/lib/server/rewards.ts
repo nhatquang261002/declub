@@ -161,7 +161,7 @@ type SponsorResult =
 export async function recordSponsor(
   store: Store,
   n: number,
-  input: { club: string; amount: bigint; sponsor: string; kind: Sponsorship["kind"]; by?: string; tx?: string },
+  input: { club: string; amount: bigint; sponsor: string; kind: Sponsorship["kind"]; by?: string; tx?: string; signature?: string },
   now = Math.floor(Date.now() / 1000),
 ): Promise<SponsorResult> {
   const sponsor = cleanSponsorName(input.sponsor);
@@ -208,13 +208,15 @@ export async function removeSponsor(
 async function append(
   store: Store,
   n: number,
-  input: { club: string; amount: bigint; kind: Sponsorship["kind"]; by?: string; tx?: string },
+  input: { club: string; amount: bigint; kind: Sponsorship["kind"]; by?: string; tx?: string; signature?: string },
   sponsor: string,
   now: number,
 ): Promise<SponsorResult> {
   // Built while this call waited for its turn: the pools are fixed.
   if (await store.get<EpochRecord>(epochKey(n))) return { status: "built" };
   const entries = await readSponsors(store, n);
+  // A payment counts once, however often it is recorded: a retry after a crash, or a restore run twice.
+  if (input.tx && entries.some((e) => e.tx === input.tx!.toLowerCase())) return { status: "recorded", entries };
   entries.push({
     club: input.club.toLowerCase(),
     amount: input.amount.toString(),
@@ -223,6 +225,7 @@ async function append(
     at: now,
     ...(input.by ? { by: input.by.toLowerCase() } : {}),
     ...(input.tx ? { tx: input.tx.toLowerCase() } : {}),
+    ...(input.signature ? { signature: input.signature } : {}),
   });
   await store.set(sponsorKey(n), entries);
   // The live standings are cached for minutes: drop this Club's copy so the pool shows the money now.
@@ -250,7 +253,15 @@ export async function viemSettlementFee(txHash: Hex): Promise<bigint> {
   return total;
 }
 
-/** Builds epoch `n` if it has ended and is next in line. Safe to call again: it never builds twice. */
+/**
+ * Builds epoch `n` if it has ended and is next in line. Safe to call again: it never builds twice,
+ * and a build that stopped part way is finished (ADR 0054).
+ *
+ * The epoch record is the commit point. Before it, a build writes nothing a rebuild reads, so a
+ * crash just means building again, from the same frozen inputs. After it, everything else (the
+ * indexes, the carry, the streaks and `last`) is derived from the record and the frozen closings
+ * by `finishEpoch`, which can be repeated, so a crash there is mended by the next call.
+ */
 export async function buildEpoch(store: Store, n: number, deps: RewardsDeps = {}): Promise<BuildResult> {
   const contract = deps.contract ?? DECLUB_REWARDS_ADDRESS;
   if (!contract) return { status: "unconfigured" };
@@ -259,31 +270,52 @@ export async function buildEpoch(store: Store, n: number, deps: RewardsDeps = {}
   if (now < window.end) return { status: "open", endsAt: window.end };
 
   const existing = await store.get<EpochRecord>(epochKey(n));
-  if (existing) return { status: "exists", record: existing };
   const last = await store.get<number>(lastKey());
-  if (last !== null && n !== last + 1) return { status: "out_of_order", expected: last + 1 };
+  if (existing && last !== null && n !== last + 1) return { status: "exists", record: existing };
+  if (!existing && last !== null && n !== last + 1) return { status: "out_of_order", expected: last + 1 };
 
   if ((await store.hit(lockKey(), 600)) > 1) return { status: "busy" };
   try {
-    const { record, streaks, backing, ledger } = await compute(store, n, window, contract, deps, now);
+    if (existing) {
+      // The record is there but `last` isn't `n`: a build stopped after writing it.
+      await finishEpoch(store, existing);
+      return { status: "built", record: existing };
+    }
+    const { record, backing, ledger } = await compute(store, n, window, contract, deps, now);
     await store.set(backingRecordKey(n), backing);
     await store.set(pointsKey(n), ledger);
     await store.set(epochKey(n), record);
-    await store.rank(epochsKey(), [{ member: String(n), score: n }], EPOCHS_KEPT);
-    for (const leaf of record.leaves) {
-      await store.rank(accountKey(leaf.account), [{ member: String(n), score: n }], ACCOUNT_EPOCHS_KEPT);
-    }
-    for (const club of record.clubs) {
-      await store.set(carryKey(club.club), club.carry);
-    }
-    for (const [club, next] of streaks) {
-      await store.set(streaksKey(club), next);
-    }
-    await store.set(lastKey(), n);
+    await finishEpoch(store, record);
     return { status: "built", record };
   } finally {
     await store.del(lockKey());
   }
+}
+
+/** The members of a Club's frozen epoch whose active days keep a streak going. */
+const qualifiedUsers = (closing: Closing) =>
+  Object.entries(closing.days)
+    .filter(([, days]) => qualifies(days, closing.rules))
+    .map(([userId]) => userId);
+
+/**
+ * What a built epoch leaves behind besides its record, all taken from the record and the Clubs'
+ * frozen closings: the epoch and per-account indexes, what each Club carries into the next epoch,
+ * the streaks, and last of all `last`, which says the epoch is done. Repeating it changes nothing.
+ * A Club whose closing is gone keeps its streaks as they are.
+ */
+export async function finishEpoch(store: Store, record: EpochRecord): Promise<void> {
+  const { n } = record;
+  await store.rank(epochsKey(), [{ member: String(n), score: n }], EPOCHS_KEPT);
+  for (const leaf of record.leaves) {
+    await store.rank(accountKey(leaf.account), [{ member: String(n), score: n }], ACCOUNT_EPOCHS_KEPT);
+  }
+  for (const club of record.clubs) {
+    await store.set(carryKey(club.club), club.carry);
+    const closing = await store.get<Closing>(closingKey(club.club, n));
+    if (closing) await store.set(streaksKey(club.club), nextStreaks(await readStreaks(store, club.club), n, qualifiedUsers(closing)));
+  }
+  await store.set(lastKey(), n);
 }
 
 /** `settlementFee`, remembered per transaction: a settled swap's fee never changes. */
@@ -378,7 +410,7 @@ type ClosingHolder = {
  * taken back, a post deleted or a moderator's hide after the close can't move the result. What the
  * chain and X say (swaps, X shares and their reach) is read when the epoch is built.
  */
-type Closing = {
+export type Closing = {
   n: number;
   /** Unix seconds the snapshot was taken. */
   closedAt: number;
@@ -623,7 +655,7 @@ async function compute(
   contract: Address,
   deps: RewardsDeps,
   now: number,
-): Promise<{ record: EpochRecord; streaks: Map<string, Streaks>; backing: Record<string, PublishedBacking>; ledger: Record<string, PublishedLedger> }> {
+): Promise<{ record: EpochRecord; backing: Record<string, PublishedBacking>; ledger: Record<string, PublishedLedger> }> {
   const clubs = deps.clubs ?? registry.clubs();
   const eventsOf = deps.events ?? ((club: ClubEntry) => clubEvents(store, club));
   const holdings = deps.holdings ?? viemHoldings;
@@ -661,7 +693,6 @@ async function compute(
   const reach = await (deps.reach ?? ((k: number) => store.get<ReachRecord>(reachKey(k))))(n);
   const sponsors = sponsorsByClub(await readSponsors(store, n));
   const inputs: ClubInput[] = [];
-  const streaks = new Map<string, Streaks>();
   const backing: Record<string, PublishedBacking> = {};
   const closings = new Map<string, Closing>();
   const holdersOf = new Map<string, HolderInput[]>();
@@ -678,19 +709,9 @@ async function compute(
     const holders = scoreHolders(closing, n, activity.get(key) ?? [], reach, prev, rules);
     // Members without NFTs only count where the Club pays them a slice (ADR 0044).
     const members = rules.nonHolderBps > 0 ? scoreHolders({ holders: closing.members ?? [] }, n, activity.get(key) ?? [], reach, prev, rules) : [];
-    const days = new Map(Object.entries(closing.days));
     holdersOf.set(key, holders);
     membersOf.set(key, members);
     backing[key] = closing.backing;
-    // Every member's streak moves along, Holder or not: the badge is for posting, the bonus for Holders.
-    streaks.set(
-      key,
-      nextStreaks(
-        prev,
-        n,
-        [...days].filter(([, d]) => qualifies(d, rules)).map(([userId]) => userId),
-      ),
-    );
     inputs.push({
       club: key,
       fees: fees.get(key) ?? 0n,
@@ -794,7 +815,7 @@ async function compute(
     })),
     reach,
   };
-  return { record, streaks, backing, ledger };
+  return { record, backing, ledger };
 }
 
 /**

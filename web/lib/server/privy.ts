@@ -98,6 +98,16 @@ export async function findUserIdByHandle(provider: ProfileProvider, username: st
   }
 }
 
+/** The user who has linked this wallet, or `null` if nobody has. For restoring a membership from its signature (ADR 0053). */
+export async function findUserByWallet(address: string): Promise<User | null> {
+  try {
+    return await client().users().getByWalletAddress({ address });
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
+  }
+}
+
 /** A user's current linked accounts, read from Privy by id. `null` if the user no longer exists. */
 export async function loadLinkedAccounts(userId: string): Promise<User["linked_accounts"] | null> {
   try {

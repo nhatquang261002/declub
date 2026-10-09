@@ -38,6 +38,8 @@ import type { Store } from "./store";
 
 export const membersKey = (token: string) => `declub:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
 export const memberKey = (token: string, userId: string) => `declub:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
+/** The member's signed consent to be listed (ADR 0053), by user id like the row it backs. */
+export const joinRecordKey = (token: string, userId: string) => `declub:club-join:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
 export const userClubsKey = (userId: string) => `declub:user-clubs:${userId}`;
 /**
  * The memberships shown under a wallet (ADR 0042), as `token:userId`. Only a member's display wallet
@@ -174,7 +176,7 @@ export async function leaveClub(store: Store, token: string, userId: string): Pr
   const roles = await loadRoles(store, token);
   if (roles.owner === userId || roles.moderators.includes(userId)) await saveRoles(store, token, withoutUser(roles, userId));
   const row = await getMember(store, token, userId);
-  await store.del(memberKey(token, userId));
+  await store.del(memberKey(token, userId), joinRecordKey(token, userId));
   await store.removeMember(membersKey(token), userId);
   await reindex(store, token, userId, row?.displayWallet, undefined);
   await store.removeMember(userClubsKey(userId), token.toLowerCase());

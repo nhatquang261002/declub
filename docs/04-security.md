@@ -246,3 +246,37 @@ The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club a
 | **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height can't be read the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
 | **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
 | **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |
+
+## Server store backups
+
+The server store holds the sponsor ledger and the Club member lists ([ADR 0053](adr/0053-back-up-sponsors-and-members.md)), which nothing else can recreate, and the built epochs with the Holders' proofs ([ADR 0054](adr/0054-resumable-epoch-build-and-epoch-backup.md)). The first two keep a signature and the third a root the chain holds; a restore re-checks them. A full dump of the rest ([ADR 0055](adr/0055-full-store-dump.md), `npm run store:backup`) restores unchecked; a nightly workflow runs it, in a private repository only.
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **A restore adds a sponsor who didn't pay**, or under a name the payer didn't sign | Each entry goes through the checks of a new payment: sent to the operator, large enough, succeeded, and the payer's signature of the Club, transaction and name | `sponsor.test.ts`: adds nothing the chain and the signature don't back |
+| **A restore counts a payment twice** | A payment already in an epoch's ledger, or marked taken, is skipped | `sponsor.test.ts`: counts a payment once however often it is restored |
+| **A restore adds a member who didn't join** | Only a `Join` signed by the wallet, for this Club, whose wallet an account has linked | `joinRecords.test.ts`: adds nobody who didn't sign, whatever the file says |
+| **A signature is passed off as another member's** | `PUT` accepts only the wallet the caller's membership is shown under, so another user's signature names a wallet the caller doesn't have | `joinRecords.test.ts`: refuses what it can't stand behind |
+| **A backup brings back someone who left** | Leaving, a ban and an unlinked wallet delete the signature; a restore re-runs the Club's ban check | `joinRecords.test.ts`: drops the signature when a member leaves, still honours a ban that survived |
+| **The backup shows a second wallet of a member** | The signed wallet is the one the Members list already shows; the export drops a record that no longer matches it | `joinRecords.test.ts`: exports only signatures that still match |
+| **A build that stops part way wedges the rewards** (the record is saved, `last` and the carry are not) | The record is the commit point; `finishEpoch` derives the indexes, carry, streaks and `last` from it and the frozen closings, and the next `buildEpoch` runs it | `rewards.test.ts`: finishes a build that stopped before the epoch index, the carry, the streaks, the marker |
+| **The finish moves the streaks twice**, or rolls back an epoch that was built after | `nextStreaks` skips a member already counted for `n`; a record at or below `last` is never finished again | `rewards.test.ts`: finishes a stopped build once, never moves the streaks twice, and lets the next epoch follow |
+| **A crash before the record leaves a rebuild reading changed carry or streaks** | Nothing a rebuild reads is written before the record | `rewards.test.ts`: writes nothing a rebuild reads until the record is committed |
+| **A restored epoch pays the wrong people, or is for another chain or contract** | The root is recomputed from the leaves, every proof must open, the money must add up, and a published epoch's root and total must be the chain's | `rewards.test.ts`: refuses a record that doesn't hold together; checks a published epoch against the chain |
+| **A restore replaces a built epoch**, or is slotted out of order | A different epoch at the same `n` is refused; epochs go back in order from 0 unless a gap is asked for | `rewards.test.ts`: never replaces a different epoch; restores in order |
+| **A restore rolls back a store that has moved on** | A key already there is kept unless `--overwrite` is given; without `--confirm` it only counts | `storeBackup.test.ts`: keeps a key that is already there; replaces a key only when asked; writes nothing on a dry run |
+| **A restored lock or counter blocks the app** (a lock restored without its expiry never frees) | The dump leaves out every key with an expiry, the named locks and the cached standings, and the restore refuses them if a file has them | `storeBackup.test.ts`: leaves out what the app makes again; refuses what a dump never holds |
+| **A hand-edited dump writes outside the app's keys** or with the wrong shape | Only `declub:` keys of the three shapes the store uses are accepted; the rest are counted as refused | `storeBackup.test.ts`: refuses what a dump never holds |
+| **A dump is published**: a nightly job's artifact in a public repository is downloadable by anyone signed in to GitHub | The workflow runs only when `github.event.repository.private` is true; a read-only Upstash token is enough for it | none (a configuration rule; run it once by hand after the repo goes private) |
+| **A dump holds a key twice, or an empty one that expired mid-run** | A key repeated by `SCAN` is taken once; a string that vanished between the scan and the read is skipped, not saved empty | `storeBackup.test.ts`: reads past the first page and takes a repeated key once; skips a key that expired between the scan and the read |
+| **A sponsor signature or name leaks into public data** | The signature stays in the ledger; the epoch record and the Rewards tab are built from `PublishedSponsor`, which has none | `sponsor.test.ts`: keeps the sponsor's signature, and never publishes it |
+
+### Accepted limitations
+
+- **The backup file is only as safe as where it is kept,** and a stale one restores whoever was in then. It holds wallets and sponsor names.
+- **Members and sponsors who never signed are not in it.**
+- **A dump is unchecked and not a snapshot.** It is as fresh as its last run, can hold one key newer than another, and restores a tampered store as it was. The Upstash adapter in `scripts/store-backup.ts` has no automated test: try a restore into a scratch database. The file holds Privy ids, wallets and avatars and is written for its owner alone.
+- **The running epoch isn't in an epoch backup.** Its holdings samples, activity and likes are in the store until it closes.
+- **A restored epoch is as good as the checks above:** it holds together and matches the chain, but a record built from tampered inputs is still self-consistent (see the Rewards limitations).

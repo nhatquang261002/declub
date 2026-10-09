@@ -10,15 +10,15 @@ import { useAccessToken } from "@/hooks/useAccessToken";
 import { call } from "@/hooks/useClubMembership";
 import { CHAIN_ID } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
-import { followTypedData, signingTime, type FollowMessage, type postTypedData, type replyTypedData } from "@/lib/social";
+import { followTypedData, signingTime, type FollowMessage, type joinTypedData, type postTypedData, type replyTypedData } from "@/lib/social";
 
-// Signed social records (ADR 0023): posts and follows are signed by the wallet, so they can be
+// Signed social records (ADR 0023, 0053): posts, follows and memberships are signed by the wallet, so they can be
 // carried elsewhere and checked by anyone. Signing costs no gas and moves nothing.
 
 /** Where a signed write is: waiting on the wallet, or on the server once it is signed. */
 export type SocialStage = "signing" | "sending";
 
-type Typed = ReturnType<typeof postTypedData> | ReturnType<typeof followTypedData> | ReturnType<typeof replyTypedData>;
+type Typed = ReturnType<typeof postTypedData> | ReturnType<typeof followTypedData> | ReturnType<typeof replyTypedData> | ReturnType<typeof joinTypedData>;
 
 /**
  * Signs a social record with the connected wallet. When `expected` is given (a post must come from

@@ -356,7 +356,10 @@ describe("the routes", () => {
     const joined = await m.POST(req("POST"), ctx(NFT.toLowerCase()));
     assert.equal(joined.status, 200);
     const body = await joined.json();
-    assert.deepEqual({ ...body, joinedAt: 0 }, { enabled: true, member: true, wallet: W1, holder: true, joinedAt: 0, role: "member" });
+    assert.deepEqual(
+      { ...body, joinedAt: 0 },
+      { enabled: true, member: true, wallet: W1, holder: true, joinedAt: 0, role: "member", club: club.address, signed: false },
+    );
     assert.ok(!JSON.stringify(body).includes("route-u1"), "no user id in the answer");
     assert.equal((await (await m.GET(req(), ctx(NFT))).json()).member, true);
 

@@ -32,6 +32,8 @@ import { postKey } from "../lib/server/board";
 import { rolesKey } from "../lib/server/clubState";
 import { memberKey, membersKey, type Holdings } from "../lib/server/members";
 import { buildEpoch, carryKey, claimableFor, clubRewards, epochKey, lastKey, recordSponsor, removeSponsor, type RewardsDeps } from "../lib/server/rewards";
+import { exportEpoch, restoreEpoch, type EpochBackup, type RestoreDeps } from "../lib/server/epochBackup";
+import type { EpochRecord } from "../lib/rewards";
 import { sponsorsByClub } from "../lib/server/sponsors";
 import { memoryStore, type Store } from "../lib/server/store";
 import { makeRegistry, parseAssets, type ClubEntry } from "../lib/verifiedAssets";
@@ -814,6 +816,247 @@ describe("buildEpoch", () => {
     assert.equal(view.epochs[0]!.fees, (4n * ETH).toString());
     assert.equal(view.earners[0]!.amount, (2n * ETH).toString());
     assert.deepEqual(view.carry, { holders: "0", fund: "0" });
+  });
+});
+
+describe("a build that stops part way (ADR 0054)", () => {
+  let store: Store;
+  let crashAt: string | null;
+  let deps: RewardsDeps;
+  const club = NFT.toLowerCase();
+  const streaks = () => `declub:rewards:10143:streaks:${club}`;
+
+  /** A store that throws once when `crashAt` is written, as a lost connection would. */
+  const crashing = (inner: Store): Store =>
+    new Proxy(inner, {
+      get(target, prop, receiver) {
+        if (prop !== "set" && prop !== "rank") return Reflect.get(target, prop, receiver);
+        return async (key: string, ...rest: unknown[]) => {
+          if (key === crashAt) {
+            crashAt = null;
+            throw new Error("connection lost");
+          }
+          return (target[prop] as (...args: unknown[]) => Promise<void>)(key, ...rest);
+        };
+      },
+    });
+
+  async function seed(into: Store) {
+    await join(into, NFT, "ua", [alice]);
+    await into.set(rolesKey(NFT), { owner: "ua", moderators: [] });
+    await into.set(streaks(), { ua: { n: -1, count: 2 } });
+    for (let d = 0; d < 4; d++) await postOnBoard(into, "ua", alice, GENESIS + d * 86_400 + 60);
+  }
+
+  /** The state a build leaves, for comparing a repaired one with a clean one. */
+  const stateOf = async (s: Store) => ({
+    record: await s.get(epochKey(0)),
+    last: await s.get(lastKey()),
+    carry: await s.get(carryKey(club)),
+    streaks: await s.get(streaks()),
+    epochs: await s.ranked("declub:rewards:10143:epochs", 10),
+    account: await s.ranked(`declub:rewards:10143:account:${alice}`, 10),
+  });
+
+  beforeEach(async () => {
+    crashAt = null;
+    store = crashing(memoryStore());
+    deps = {
+      now: () => GENESIS + WEEK,
+      clubs,
+      events: async (c: ClubEntry) => (c.address === NFT ? [swap()] : []),
+      holdings: holdingsOf({ [NFT.toLowerCase()]: { [alice]: 2n } }),
+      chainId: 10143,
+      contract: REWARDS_AT,
+      genesis: GENESIS,
+      length: WEEK,
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
+    };
+    await seed(store);
+  });
+
+  const clean = async () => {
+    const fresh = memoryStore();
+    await seed(fresh);
+    await buildEpoch(fresh, 0, deps);
+    return stateOf(fresh);
+  };
+
+  for (const [what, key] of [
+    ["the epoch index", "declub:rewards:10143:epochs"],
+    ["the carry", carryKey(club)],
+    ["the streaks", `declub:rewards:10143:streaks:${NFT.toLowerCase()}`],
+    ["the marker that says it is done", lastKey()],
+  ] as const) {
+    it(`finishes a build that stopped before ${what}, to the state a clean build leaves`, async () => {
+      crashAt = key;
+      await assert.rejects(buildEpoch(store, 0, deps), /connection lost/);
+      assert.ok(await store.get(epochKey(0)), "the record was committed before it stopped");
+      assert.equal(await store.get(lastKey()), null, "and the epoch isn't marked done");
+      const again = await buildEpoch(store, 0, deps);
+      assert.equal(again.status, "built");
+      assert.deepEqual(await stateOf(store), await clean());
+    });
+  }
+
+  it("writes nothing a rebuild reads until the record is committed, so a crash before it just builds again", async () => {
+    crashAt = epochKey(0);
+    await assert.rejects(buildEpoch(store, 0, deps), /connection lost/);
+    assert.equal(await store.get(carryKey(club)), null);
+    assert.deepEqual(await store.get(streaks()), { ua: { n: -1, count: 2 } }, "the streaks weren't moved");
+    assert.equal(await store.get(lastKey()), null);
+    assert.equal((await buildEpoch(store, 0, deps)).status, "built");
+    assert.deepEqual(await stateOf(store), await clean());
+  });
+
+  it("finishes a stopped build once, never moves the streaks twice, and lets the next epoch follow", async () => {
+    crashAt = lastKey();
+    await assert.rejects(buildEpoch(store, 0, deps), /connection lost/);
+    // Epoch 0 is committed but not done: calling for it again finishes it once, and again changes nothing.
+    assert.equal((await buildEpoch(store, 0, deps)).status, "built");
+    const done = await stateOf(store);
+    assert.equal((await buildEpoch(store, 0, deps)).status, "exists");
+    assert.deepEqual(await stateOf(store), done);
+    assert.deepEqual((done.streaks as Record<string, { n: number; count: number }>).ua, { n: 0, count: 3 });
+    assert.equal((await buildEpoch(store, 1, { ...deps, now: () => GENESIS + 2 * WEEK })).status, "built", "and the next epoch can follow");
+  });
+});
+
+describe("backing up and restoring an epoch (ADR 0054)", () => {
+  const club = NFT.toLowerCase();
+  const DAY = 86_400;
+  let source: Store;
+  let deps: RewardsDeps;
+  let backups: EpochBackup[];
+
+  async function seed(into: Store) {
+    await join(into, NFT, "ua", [alice]);
+    await into.set(rolesKey(NFT), { owner: "ua", moderators: [] });
+    for (let epoch = 0; epoch < 2; epoch++) for (let d = 0; d < 4; d++) await postOnBoard(into, "ua", alice, GENESIS + epoch * WEEK + d * DAY + 60);
+  }
+
+  /** What the app reads about a store's epochs, to compare one with its restored copy. */
+  const stateOf = async (s: Store, n: number) => ({
+    record: await s.get(epochKey(n)),
+    last: await s.get(lastKey()),
+    carry: await s.get(carryKey(club)),
+    streaks: await s.get(`declub:rewards:10143:streaks:${club}`),
+    points: await s.get(`declub:rewards:10143:points:${n}`),
+    backing: await s.get(`declub:rewards:10143:backing:${n}`),
+    epochs: await s.ranked("declub:rewards:10143:epochs", 10),
+    account: await s.ranked(`declub:rewards:10143:account:${alice}`, 10),
+  });
+
+  beforeEach(async () => {
+    source = memoryStore();
+    deps = {
+      now: () => GENESIS + WEEK,
+      clubs,
+      events: async (c: ClubEntry) => (c.address === NFT ? [swap(), swap({ at: GENESIS + WEEK + 100 })] : []),
+      holdings: holdingsOf({ [NFT.toLowerCase()]: { [alice]: 2n } }),
+      chainId: 10143,
+      contract: REWARDS_AT,
+      genesis: GENESIS,
+      length: WEEK,
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
+    };
+    await seed(source);
+    await buildEpoch(source, 0, deps);
+    await buildEpoch(source, 1, { ...deps, now: () => GENESIS + 2 * WEEK });
+    backups = [(await exportEpoch(source, 0))!, (await exportEpoch(source, 1))!];
+  });
+
+  const restore: RestoreDeps = { chainId: 10143, contract: REWARDS_AT };
+
+  it("exports nothing for an epoch that isn't built, and a backup that survives being written as a file", async () => {
+    assert.equal(await exportEpoch(source, 7), null);
+    assert.deepEqual(JSON.parse(JSON.stringify(backups[0])), backups[0]);
+  });
+
+  it("rebuilds the claim data after the store is lost, and the next epoch builds the same on top of it", async () => {
+    const fresh = memoryStore();
+    for (const backup of backups) assert.equal((await restoreEpoch(fresh, backup, restore)).status, "restored");
+    assert.deepEqual(await stateOf(fresh, 1), await stateOf(source, 1));
+    assert.deepEqual(await stateOf(fresh, 0).then((x) => x.record), await stateOf(source, 0).then((x) => x.record), "with every proof");
+
+    // The carry and the streaks came back too, so epoch 2 is the epoch 2 the lost store would have built.
+    const later = { ...deps, now: () => GENESIS + 3 * WEEK };
+    const a = await buildEpoch(source, 2, later);
+    const b = await buildEpoch(fresh, 2, later);
+    assert.equal(a.status, "built");
+    assert.equal(b.status, "built");
+    assert.equal((b as { record: EpochRecord }).record.root, (a as { record: EpochRecord }).record.root);
+  });
+
+  it("is safe to run twice, and finishes an epoch a restore left half done", async () => {
+    const fresh = memoryStore();
+    await restoreEpoch(fresh, backups[0]!, restore);
+    assert.equal((await restoreEpoch(fresh, backups[0]!, restore)).status, "exists");
+    await fresh.del(lastKey());
+    assert.equal((await restoreEpoch(fresh, backups[0]!, restore)).status, "exists");
+    assert.equal(await fresh.get(lastKey()), 0);
+  });
+
+  it("refuses a record that doesn't hold together or isn't for this deployment", async () => {
+    const tamper = (change: (b: EpochBackup) => void) => {
+      const copy = structuredClone(backups[0]!);
+      change(copy);
+      return copy;
+    };
+    const refused = async (backup: EpochBackup, deps: RestoreDeps = restore) => {
+      const out = await restoreEpoch(memoryStore(), backup, deps);
+      assert.equal(out.status, "refused", JSON.stringify(out));
+      return out.status === "refused" ? out.reason : "";
+    };
+    await refused(tamper((b) => (b.record.leaves[0]!.amount = (BigInt(b.record.leaves[0]!.amount) + 1n).toString())));
+    await refused(tamper((b) => (b.record.leaves[0]!.proof = [`0x${"ab".repeat(32)}`])));
+    await refused(tamper((b) => (b.record.root = `0x${"cd".repeat(32)}`)));
+    await refused(tamper((b) => (b.record.chainId = 1)));
+    assert.match(await refused(backups[0]!, { ...restore, contract: "0x00000000000000000000000000000000000000ef" }), /bound to/);
+    await refused({ ...backups[0]!, version: 2 } as unknown as EpochBackup);
+    await refused({ version: 1, n: 0 } as unknown as EpochBackup);
+  });
+
+  it("checks a published epoch against the chain", async () => {
+    const record = backups[0]!.record;
+    const onChain = (root: `0x${string}`, total: bigint) => async () => ({ root, total });
+    const wrongRoot = await restoreEpoch(memoryStore(), backups[0]!, { ...restore, onChain: onChain(`0x${"11".repeat(32)}`, BigInt(record.total)) });
+    assert.equal(wrongRoot.status, "refused");
+    const wrongTotal = await restoreEpoch(memoryStore(), backups[0]!, { ...restore, onChain: onChain(record.root, 1n) });
+    assert.equal(wrongTotal.status, "refused");
+    assert.equal((await restoreEpoch(memoryStore(), backups[0]!, { ...restore, onChain: onChain(record.root, BigInt(record.total)) })).status, "restored");
+    assert.equal(
+      (await restoreEpoch(memoryStore(), backups[0]!, { ...restore, onChain: onChain(`0x${"0".repeat(64)}`, 0n) })).status,
+      "restored",
+      "an unpublished epoch has nothing to match",
+    );
+  });
+
+  it("never replaces a different epoch", async () => {
+    // A valid epoch 0 built from other inputs: one swap fewer, so other pools and another root.
+    const alt = memoryStore();
+    await seed(alt);
+    await buildEpoch(alt, 0, { ...deps, events: async (c: ClubEntry) => (c.address === NFT ? [swap({ fee: (8n * ETH).toString() })] : []) });
+    const different = (await exportEpoch(alt, 0))!;
+    assert.notEqual(different.record.root, backups[0]!.record.root);
+
+    const out = await restoreEpoch(source, different, restore);
+    assert.deepEqual(out, { status: "refused", reason: "a different epoch 0 is already stored" });
+    assert.deepEqual((await stateOf(source, 0)).record, backups[0]!.record, "the stored epoch is untouched");
+  });
+
+  it("restores in order: an epoch whose predecessor is missing waits", async () => {
+    const fresh = memoryStore();
+    // Epoch 1 on its own: its Club carried money in from epoch 0, which isn't back yet.
+    assert.equal((await restoreEpoch(fresh, backups[1]!, restore)).status, "refused");
+    // A gap is allowed only when asked for: the earlier epochs are paid out and aren't wanted back.
+    assert.equal((await restoreEpoch(fresh, backups[1]!, { ...restore, allowGap: true })).status, "restored");
+    assert.equal(await fresh.get(lastKey()), 1);
+    await fresh.del(lastKey());
+    await fresh.del(epochKey(1));
+    // And once epochs are being restored, one that isn't next is not slotted in.
+    await fresh.set(lastKey(), 0);
+    assert.deepEqual(await restoreEpoch(fresh, backups[0]!, restore), { status: "out_of_order", expected: 1 });
   });
 });
 

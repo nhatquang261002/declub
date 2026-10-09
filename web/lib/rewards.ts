@@ -266,6 +266,8 @@ export type Sponsorship = {
   /** The wallet that paid, and its transaction, when the app checked the payment on chain (ADR 0036). */
   by?: string;
   tx?: string;
+  /** The sponsor's signature of `sponsorMessage`, kept with the payment so the ledger can be rebuilt from the chain (ADR 0053). */
+  signature?: string;
 };
 
 /** The longest sponsor name kept. */
