@@ -107,17 +107,39 @@ What sets it apart:
 
 ## Architecture
 
-A Next.js app reads the chain directly (no indexer) and keeps Club data, posts and
-profiles in Upstash Redis. A small matcher service pools signed swaps and settles pairs
-and rings of up to four. Three contracts hold the money, and none depends on a Club.
+A Next.js app reads deals from contract storage and keeps Club data, posts and profiles
+in Upstash Redis. It finds settled swaps in the chain's logs with Envio HyperSync (below).
+A small matcher service pools signed swaps and settles pairs and rings of up to four.
+Three contracts hold the money, and none depends on a Club.
 
 ```text
 Browser (Next.js, wagmi + viem, Privy) ──► Monad: DeClubEscrow  (locked swaps)
         │                                         DeClubIntents (signed swaps)
         ├──► Next.js API ──► Upstash Redis        DeClubRewards (Merkle claims)
         │    (Clubs, posts, profiles, epoch builder, fill watcher)
+        │         └──► Envio HyperSync (which txs to read) ──► Monad node (receipts)
         └──► Matcher (HTTP + SQLite) ──► settle(cycle, signatures)
 ```
+
+### Envio HyperSync
+
+The public Monad RPC answers `eth_getLogs` for only 100 blocks at a time, so following a
+week of swaps from logs isn't practical. HyperSync answers any block range in a few queries.
+We use its Node client in two places:
+
+- **Activity feed and Club stats.** A cron (`/api/cron/fills`) asks HyperSync for every
+  transaction that created or filled a deal on our contracts, then reads
+  each receipt from a Monad node and records the swap. HyperSync only says where to look;
+  nothing is recorded on its word. If it doesn't answer, the run falls back to the node's
+  own log scan. Code: [`hypersyncScan.ts`](web/lib/server/hypersyncScan.ts),
+  [`fillWatcher.ts`](web/lib/server/fillWatcher.ts). Why: [ADR 0051](docs/adr/0051-hypersync-for-the-fill-watcher.md).
+- **Rewards check.** Before a Safe signs a weekly rewards root, `npm run rewards:verify`
+  totals every `FeeCharged` log in the epoch's window and fails if the Clubs were credited
+  more fees than the contracts charged. Code: [`feeCheck.ts`](web/lib/server/feeCheck.ts).
+  Why: [ADR 0052](docs/adr/0052-check-epoch-fees-against-fee-logs.md).
+
+Set `ENVIO_API_TOKEN` (server-side) to turn both on. Without it the watcher scans the node
+100 blocks at a time and the fee check is skipped.
 
 The full diagram, components and trade-offs are in [docs/02-architecture.md](docs/02-architecture.md),
 the contracts in [docs/03-contract-design.md](docs/03-contract-design.md) and the threat
@@ -129,7 +151,7 @@ model in [docs/04-security.md](docs/04-security.md).
 | --- | --- |
 | Contracts | Solidity 0.8.28 (EVM `prague`), Foundry, OpenZeppelin; fuzz tests, Slither and Halmos checks |
 | Web | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
-| Chain access | wagmi 3, viem 2, TanStack Query |
+| Chain access | wagmi 3, viem 2, TanStack Query; Envio HyperSync for log scans on the server |
 | Identity | Privy (sign-in, linked X and Discord handles, webhooks via svix), EIP-712 signatures |
 | Data | Upstash Redis for Clubs, posts, follows and profiles; the chain for deals and holdings |
 | Matcher | Node.js 24 with built-in SQLite, viem |
