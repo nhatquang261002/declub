@@ -49,20 +49,29 @@ describe("rankHits", () => {
     const verified = hit({ address: B, name: "Chog Verified", symbol: "CHOGV", tier: "verified" });
     const held = hit({ address: C, name: "Some Chog Fan", symbol: "FAN", held: true });
     const out = rankHits([rest, verified, held], "chog");
-    assert.deepEqual(out.map((h) => h.address), [C, B, A]);
+    assert.deepEqual(
+      out.map((h) => h.address),
+      [C, B, A],
+    );
   });
 
   it("orders holdings by value, then count, and spam last", () => {
     const small = hit({ address: A, held: true, usd: 5 });
     const big = hit({ address: B, held: true, usd: 500 });
     const spam = hit({ address: C, held: true, spam: true, usd: 9999 });
-    assert.deepEqual(rankHits([spam, small, big], "").map((h) => h.address), [B, A, C]);
+    assert.deepEqual(
+      rankHits([spam, small, big], "").map((h) => h.address),
+      [B, A, C],
+    );
   });
 
   it("orders by closeness within a group", () => {
     const exact = hit({ address: A, name: "Alpha", symbol: "ABC" });
     const partial = hit({ address: B, name: "Zabc coin", symbol: "ZZZ" });
-    assert.deepEqual(rankHits([partial, exact], "abc").map((h) => h.address), [A, B]);
+    assert.deepEqual(
+      rankHits([partial, exact], "abc").map((h) => h.address),
+      [A, B],
+    );
   });
 
   it("drops what doesn't match", () => {
@@ -72,7 +81,11 @@ describe("rankHits", () => {
 
 describe("mergeHits", () => {
   it("keeps one hit per asset and lets holdings and verification stick", () => {
-    const [one] = mergeHits([hit({ address: A, name: "" })], [hit({ address: A, name: "Named", held: true, balance: "5" })], [hit({ address: A, tier: "verified" })]);
+    const [one] = mergeHits(
+      [hit({ address: A, name: "" })],
+      [hit({ address: A, name: "Named", held: true, balance: "5" })],
+      [hit({ address: A, tier: "verified" })],
+    );
     assert.equal(one.name, "Named");
     assert.equal(one.held, true);
     assert.equal(one.tier, "verified");
@@ -88,7 +101,15 @@ describe("provider responses", () => {
   it("reads a wallet's tokens, leaving out native MON, empty balances and bad rows", () => {
     const out = parseWalletTokens({
       result: [
-        { token_address: A.toLowerCase(), symbol: "MUSD", name: "Mock USD", decimals: "18", balance: "1500000000000000000", usd_value: 1.5, logo: "https://x.test/a.png" },
+        {
+          token_address: A.toLowerCase(),
+          symbol: "MUSD",
+          name: "Mock USD",
+          decimals: "18",
+          balance: "1500000000000000000",
+          usd_value: 1.5,
+          logo: "https://x.test/a.png",
+        },
         { token_address: B, symbol: "MON", name: "Monad", balance: "5", native_token: true },
         { token_address: C, symbol: "ZERO", name: "Zero", balance: "0" },
         { token_address: "nope", symbol: "BAD", balance: "1" },
@@ -122,7 +143,13 @@ describe("provider responses", () => {
         { token_address: C, name: "None", count: 0 },
       ],
     });
-    assert.deepEqual(out.map((h) => [h.address, h.count, h.spam]), [[A, 3, false], [B, 1, true]]);
+    assert.deepEqual(
+      out.map((h) => [h.address, h.count, h.spam]),
+      [
+        [A, 3, false],
+        [B, 1, true],
+      ],
+    );
   });
 
   it("reads token search results", () => {
@@ -183,14 +210,19 @@ const entry = (over: Partial<AssetEntry>): AssetEntry => ({
 /** A chain where `owner` holds 3 of A and 7 mUSD (B); C is a featured collection the list doesn't know. */
 const reader = (balances: Record<string, bigint> = { [A.toLowerCase()]: 3n, [B.toLowerCase()]: 7n }): ChainReader => ({
   balances: async (_owner, tokens) => tokens.map((t) => balances[t.toLowerCase()] ?? 0n),
-  labels: async (tokens) => tokens.map((t) => (t === C ? { name: "Chog Genesis", symbol: "CHOG", decimals: null } : { name: null, symbol: null, decimals: null })),
+  labels: async (tokens) =>
+    tokens.map((t) => (t === C ? { name: "Chog Genesis", symbol: "CHOG", decimals: null } : { name: null, symbol: null, decimals: null })),
 });
 
 const deps = (over: Partial<SearchDeps> = {}): SearchDeps => ({
   provider: null,
   reader: reader(),
   chainId: 10143,
-  assets: [entry({}), entry({ address: B, kind: "erc20", name: "Mock USD", symbol: "mUSD", category: "stablecoin" }), entry({ address: D, kind: "erc20", name: "Scam", symbol: "SCAM", status: "blocked" })],
+  assets: [
+    entry({}),
+    entry({ address: B, kind: "erc20", name: "Mock USD", symbol: "mUSD", category: "stablecoin" }),
+    entry({ address: D, kind: "erc20", name: "Scam", symbol: "SCAM", status: "blocked" }),
+  ],
   featured: [C],
   ...over,
 });
@@ -203,7 +235,10 @@ describe("runSearch on the chain alone", () => {
   it("lists what the wallet holds first, then verified assets, then featured ones", async () => {
     const r = await runSearch({ ...params, owner: wallet(1) }, deps());
     assert.equal(r.source, "chain");
-    assert.deepEqual(r.hits.map((h) => h.address), [A, B, C]);
+    assert.deepEqual(
+      r.hits.map((h) => h.address),
+      [A, B, C],
+    );
     assert.equal(r.hits[0].count, 3);
     assert.equal(r.hits[1].balance, "7");
     assert.ok(r.hits[0].held && r.hits[1].held && !r.hits[2].held);
@@ -216,14 +251,23 @@ describe("runSearch on the chain alone", () => {
 
   it("limits to holdings when asked", async () => {
     const r = await runSearch({ ...params, scope: "holdings", owner: wallet(3) }, deps());
-    assert.deepEqual(r.hits.map((h) => h.address), [A, B]);
+    assert.deepEqual(
+      r.hits.map((h) => h.address),
+      [A, B],
+    );
   });
 
   it("filters by kind and by the query", async () => {
     const tokens = await runSearch({ ...params, kind: "erc20", owner: wallet(4) }, deps());
-    assert.deepEqual(tokens.hits.map((h) => h.address), [B]);
+    assert.deepEqual(
+      tokens.hits.map((h) => h.address),
+      [B],
+    );
     const named = await runSearch({ ...params, query: "genesis", owner: wallet(4) }, deps());
-    assert.deepEqual(named.hits.map((h) => h.address), [C]);
+    assert.deepEqual(
+      named.hits.map((h) => h.address),
+      [C],
+    );
   });
 
   it("marks listed assets verified and the rest not", async () => {
@@ -249,23 +293,42 @@ describe("runSearch with a provider", () => {
     const r = await runSearch({ ...params, query: "e", owner: wallet(10) }, deps({ provider: provider() }));
     assert.equal(r.source, "moralis");
     assert.equal(r.degraded, false);
-    assert.deepEqual(r.hits.slice(0, 2).map((h) => h.address), [E, C]);
+    assert.deepEqual(
+      r.hits.slice(0, 2).map((h) => h.address),
+      [E, C],
+    );
     assert.ok(r.hits.some((h) => h.name === "Result for e" && !h.held));
   });
 
   it("searches only the holdings when asked, without spending a provider search", async () => {
     let searched = false;
-    const r = await runSearch({ ...params, scope: "holdings", owner: wallet(11) }, deps({ provider: provider({ searchTokens: async () => ((searched = true), []) }) }));
+    const r = await runSearch(
+      { ...params, scope: "holdings", owner: wallet(11) },
+      deps({ provider: provider({ searchTokens: async () => ((searched = true), []) }) }),
+    );
     assert.equal(searched, false);
     assert.ok(r.hits.every((h) => h.held));
   });
 
   it("falls back to the chain when the provider fails, and says so", async () => {
-    const down = provider({ walletTokens: async () => { throw new Error("401"); }, searchTokens: async () => { throw new Error("401"); } });
+    const down = provider({
+      walletTokens: async () => {
+        throw new Error("401");
+      },
+      searchTokens: async () => {
+        throw new Error("401");
+      },
+    });
     const r = await runSearch({ ...params, owner: wallet(12) }, deps({ provider: down }));
     assert.equal(r.degraded, true);
-    assert.ok(r.hits.some((h) => h.address === A && h.held), "the chain still finds the verified collection held");
-    assert.ok(r.hits.some((h) => h.address === C && h.held), "the collections the provider did answer are kept");
+    assert.ok(
+      r.hits.some((h) => h.address === A && h.held),
+      "the chain still finds the verified collection held",
+    );
+    assert.ok(
+      r.hits.some((h) => h.address === C && h.held),
+      "the collections the provider did answer are kept",
+    );
   });
 
   it("doesn't send an address to the token search", async () => {

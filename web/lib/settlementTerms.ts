@@ -7,7 +7,7 @@ import type { Settlement } from "./createFlow";
  * The facts come from ADR 0008 (signed swaps) and DeClubEscrow (locked deals).
  */
 export type SettlementTerm = {
-  /** The Guide anchor: /guide#<id>. */
+  /** The Deals guide anchor: /guide/deals#<id>. */
   id: string;
   mode: Settlement;
   label: string;
@@ -19,7 +19,7 @@ export type SettlementTerm = {
   detail: string;
 };
 
-export const SETTLEMENT_TERMS: readonly SettlementTerm[] = [
+const SETTLEMENT_TERMS: readonly SettlementTerm[] = [
   {
     id: "cant-fail",
     mode: "escrow",
@@ -79,5 +79,5 @@ export const SETTLEMENT_TERMS: readonly SettlementTerm[] = [
 export const termsFor = (mode: Settlement) => SETTLEMENT_TERMS.filter((t) => t.mode === mode);
 
 /** Where the Guide explains the choice, and where each term is explained. */
-export const SETTLEMENT_GUIDE = "/guide#settlement";
-export const termGuide = (term: Pick<SettlementTerm, "id">) => `/guide#${term.id}`;
+export const SETTLEMENT_GUIDE = "/guide/deals#settlement";
+export const termGuide = (term: Pick<SettlementTerm, "id">) => `/guide/deals#${term.id}`;

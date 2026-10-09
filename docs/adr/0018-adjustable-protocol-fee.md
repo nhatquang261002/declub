@@ -1,6 +1,6 @@
 # ADR 0018: An adjustable protocol fee, capped at deploy, with raises on a delay
 
-**Status:** Accepted · 2026-10-02 · Supersedes the "fixed at deploy" parts of [ADR 0015](0015-protocol-fee.md). Changes `OnDealV2` and `OnDealIntents` before their mainnet deploy; `OnDeal` (v1) is not deployed to mainnet. Who pays the fee, when it is paid, and in which token stay as ADR 0015 decided.
+**Status:** Accepted · 2026-10-02 · Supersedes the "fixed at deploy" parts of [ADR 0015](0015-protocol-fee.md). Changes `OnDealV2` and `OnDealIntents` before their mainnet deploy. Who pays the fee, when it is paid, and in which token stay as ADR 0015 decided. The amount is per NFT a side moves from [ADR 0033](0033-fee-per-nft.md) on.
 
 ## Context
 
@@ -62,7 +62,6 @@ A launch at **$5 per side** was also chosen, so the fee needs to be able to come
 - **No change to a deal already listed.** A deal keeps the fee it was listed with until it completes or ends.
 - **No raise without warning.** Seven days is enough for a maker to cancel and for the app to show the coming fee.
 - **No discounts or tiers.** One fee for everyone, as in ADR 0015.
-- **No v1 on mainnet.** `OnDeal` has no fee and would be a free path, so it is not deployed there. The app treats it as testnet-only.
 
 ## Consequences
 

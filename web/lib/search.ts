@@ -40,7 +40,12 @@ const NAME_MAX = 48;
 const SYMBOL_MAX = 16;
 
 const text = (value: unknown, max: number): string =>
-  typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max) : "";
+  typeof value === "string"
+    ? value
+        .replace(/[\u0000-\u001f\u007f]/g, "")
+        .trim()
+        .slice(0, max)
+    : "";
 
 const keyOf = (hit: Pick<SearchHit, "kind" | "address">) => `${hit.kind}:${hit.address.toLowerCase()}`;
 
@@ -70,13 +75,7 @@ export function rankHits(hits: readonly SearchHit[], query: string): SearchHit[]
       const quality = matchQuality(hit, query);
       return quality === null ? [] : [{ hit, quality }];
     })
-    .sort(
-      (a, b) =>
-        group(a.hit) - group(b.hit) ||
-        a.quality - b.quality ||
-        (b.hit.usd ?? 0) - (a.hit.usd ?? 0) ||
-        a.hit.name.localeCompare(b.hit.name),
-    )
+    .sort((a, b) => group(a.hit) - group(b.hit) || a.quality - b.quality || (b.hit.usd ?? 0) - (a.hit.usd ?? 0) || a.hit.name.localeCompare(b.hit.name))
     .map((row) => row.hit);
 }
 
@@ -114,7 +113,12 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 const rows = (json: unknown): Record<string, unknown>[] => {
   const result = record(json)?.result;
-  return Array.isArray(result) ? result.flatMap((row): Record<string, unknown>[] => { const r = record(row); return r ? [r] : []; }) : [];
+  return Array.isArray(result)
+    ? result.flatMap((row): Record<string, unknown>[] => {
+        const r = record(row);
+        return r ? [r] : [];
+      })
+    : [];
 };
 
 const addressOf = (value: unknown): Address | null => (typeof value === "string" && isAddress(value, { strict: false }) ? getAddress(value) : null);

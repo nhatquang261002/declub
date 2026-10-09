@@ -8,7 +8,7 @@ import { Tooltip } from "@/components/Tooltip";
 export function HolderBadge({ symbol }: { symbol?: string }) {
   return (
     <Tooltip
-      content={`Held ${symbol ?? "this asset"} when the Club last checked, at most a day ago. It isn’t a guarantee, and it doesn’t unlock anything.`}
+      content={`Held ${symbol ?? "this asset"} when the Club last checked, at most a day ago. It isn’t a guarantee. It can matter if the Owner limits posting to Holders.`}
       className="cursor-help"
     >
       <span className="chip chip-mint">

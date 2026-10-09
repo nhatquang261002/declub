@@ -32,7 +32,7 @@ const COLOR: Record<Outcome, string> = { pass: "32", fail: "31", skip: "90", war
 const tty = process.stdout.isTTY;
 const paint = (o: Outcome, s: string) => (tty ? `\x1b[${COLOR[o]}m${s}\x1b[0m` : s);
 
-/** `--only V2,IN-02` keeps cases whose id starts with any of the prefixes. */
+/** `--only ESC,IN-02` keeps cases whose id starts with any of the prefixes. */
 export function selected(id: string, only?: string): boolean {
   if (!only || only === "true") return true;
   return only.split(",").some((p) => id.toUpperCase().startsWith(p.trim().toUpperCase()));
@@ -83,7 +83,9 @@ export function finish(name: string, results: Result[], meta: Record<string, str
 
   let commit = "";
   try {
-    commit = execSync("git rev-parse --short HEAD", { cwd: REPO, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    commit = execSync("git rev-parse --short HEAD", { cwd: REPO, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
   } catch {}
   const at = new Date().toISOString();
   const info = { run: name, at, commit, ...meta };
@@ -101,8 +103,7 @@ export function finish(name: string, results: Result[], meta: Record<string, str
     "",
     "| ID | Case | Result | Notes |",
     "|---|---|---|---|",
-    ...results.map((r) =>
-      `| ${r.id} | ${cell(r.title)} | ${r.outcome} | ${cell([...r.notes, r.detail ?? ""].filter(Boolean).join("; "))} |`),
+    ...results.map((r) => `| ${r.id} | ${cell(r.title)} | ${r.outcome} | ${cell([...r.notes, r.detail ?? ""].filter(Boolean).join("; "))} |`),
     "",
   ].join("\n");
   writeFileSync(`${stem}.md`, md);

@@ -14,7 +14,10 @@ const SHOWN = 3;
 export function ClubsTeaser() {
   const { clubs } = useClubs();
   const rows = useMemo(() => {
-    const live = registry.clubs().filter((e) => e.club !== "archived").map(toClubInfo);
+    const live = registry
+      .clubs()
+      .filter((e) => e.club !== "archived")
+      .map(toClubInfo);
     if (!clubs) return live.slice(0, SHOWN).map((info) => ({ info, momentum: undefined }));
     const byToken = new Map(clubs.map((c) => [c.token, c.stats.momentum]));
     // Only Clubs with some activity: "busiest" shouldn't list a quiet one.

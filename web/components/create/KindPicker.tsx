@@ -21,15 +21,7 @@ const KINDS: ReadonlyArray<{ key: DealKind; title: string; blurb: string }> = [
 export type KindAvailability = Record<DealKind, { scope: string; unavailable?: string }>;
 
 /** Step 1's choice. `scope` says which assets the kind can move; `unavailable` disables it with a reason. */
-export function KindPicker({
-  value,
-  onChange,
-  availability,
-}: {
-  value: DealKind | null;
-  onChange: (kind: DealKind) => void;
-  availability: KindAvailability;
-}) {
+export function KindPicker({ value, onChange, availability }: { value: DealKind | null; onChange: (kind: DealKind) => void; availability: KindAvailability }) {
   return (
     <div role="radiogroup" aria-label="Deal type" className="grid gap-4 md:grid-cols-3">
       {KINDS.map(({ key, title, blurb }) => {
@@ -59,9 +51,7 @@ export function KindPicker({
               </span>
             </span>
             <span className="text-sm leading-6 text-muted">{blurb}</span>
-            <span className="mt-auto pt-1 text-xs font-semibold text-muted">
-              {unavailable ?? scope}
-            </span>
+            <span className="mt-auto pt-1 text-xs font-semibold text-muted">{unavailable ?? scope}</span>
           </button>
         );
       })}

@@ -36,7 +36,7 @@ export function postedAtOf(id: string): number | null {
 
 export const isXHandle = (value: unknown): value is string => typeof value === "string" && X_HANDLE.test(value);
 
-/** The card a shared X post shows. `own`: it was posted by the member's linked X account. */
+/** The card a shared X post shows (`own`, that it was posted by the member's linked X account, is added when it is stored). */
 export type XCard = {
   id: string;
   /** The author's handle, without the @. */
@@ -160,9 +160,7 @@ export function matchSignals(signals: ClubSignals, post: XPostFacts): SignalStre
   const mentions = new Set([...seen.mentions, ...(post.mentions ?? []).map((m) => m.toLowerCase())]);
   for (const account of signals.accounts) {
     if (mentions.has(account.handle)) return "strong";
-    const quoted = (post.referenced ?? []).some(
-      (r) => (account.xUserId && r.id === account.xUserId) || r.username?.toLowerCase() === account.handle,
-    );
+    const quoted = (post.referenced ?? []).some((r) => (account.xUserId && r.id === account.xUserId) || r.username?.toLowerCase() === account.handle);
     if (quoted) return "strong";
   }
 
@@ -179,7 +177,7 @@ export function matchSignals(signals: ClubSignals, post: XPostFacts): SignalStre
 /** How much a share counts for its strength. */
 export const strengthFactor = (strength: SignalStrength | null) => (strength === "strong" ? 1 : strength === "weak" ? 0.5 : 0);
 
-/** What counts, for the composer's hint: "links this Club, mentions @ChogNFT, or uses #chog / $CHOG". */
+/** What counts, for the composer's hint: "links this Club or its token, mentions @ChogNFT, or uses #chog / $CHOG". */
 export function signalsHint(signals: ClubSignals): string {
   const parts = ["links this Club or its token"];
   if (signals.accounts.length > 0) parts.push(`mentions ${signals.accounts.map((a) => `@${a.handle}`).join(" / ")}`);

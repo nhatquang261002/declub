@@ -14,7 +14,10 @@ export function useCopy(): [copied: boolean, copy: (text: string) => void] {
     return () => clearTimeout(timer);
   }, [copied]);
   const copy = useCallback((text: string) => {
-    navigator.clipboard?.writeText(text).then(() => setCopied(true), () => {});
+    navigator.clipboard?.writeText(text).then(
+      () => setCopied(true),
+      () => {},
+    );
   }, []);
   return [copied, copy];
 }

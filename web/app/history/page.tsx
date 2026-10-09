@@ -10,12 +10,12 @@ import { Tabs } from "@/components/Tabs";
 import { useFills } from "@/hooks/useFills";
 import { useNow } from "@/hooks/useNow";
 import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
-import { useDealsV2 } from "@/hooks/useDealsV2";
+import { useDeals } from "@/hooks/useDeals";
 import { useIntents } from "@/hooks/usePool";
 import { DECLUB_ESCROW_ADDRESS, SHOW_INTENTS } from "@/lib/config";
 import { intentAsListing } from "@/lib/intents";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
 type HistoryFilter = "all" | "active" | "completed" | "expired";
@@ -31,24 +31,18 @@ export default function HistoryPage() {
   const { address } = useConnection();
   const now = useNow();
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const v2 = useDealsV2({ limit: 200 });
+  const onChain = useDeals({ limit: 200 });
   // Signed swaps (ADR 0008) sit beside locked deals, every status.
   const signed = useIntents({ status: "all", maker: address, enabled: SHOW_INTENTS && !!address });
   const signedListings = useMemo(() => signed.intents.map(intentAsListing), [signed.intents]);
-  const deals = useMemo(() => [...signedListings, ...v2.deals], [signedListings, v2.deals]);
+  const deals = useMemo(() => [...signedListings, ...onChain.deals], [signedListings, onChain.deals]);
   const { info } = useDealsTokenInfo(deals);
   const { ids: fillIds } = useFills(address, DECLUB_ESCROW_ADDRESS);
-  const { error } = v2;
-  const isLoading = (v2.isLoading || signed.isLoading) && !error;
+  const { error } = onChain;
+  const isLoading = (onChain.isLoading || signed.isLoading) && !error;
 
-  const walletDeals = useMemo(
-    () => deals.filter((deal) => isWalletDeal(deal, address, fillIds)),
-    [address, fillIds, deals],
-  );
-  const statuses = useMemo(
-    () => walletDeals.map((deal) => displayStatus(deal, now)),
-    [now, walletDeals],
-  );
+  const walletDeals = useMemo(() => deals.filter((deal) => isWalletDeal(deal, address, fillIds)), [address, fillIds, deals]);
+  const statuses = useMemo(() => walletDeals.map((deal) => displayStatus(deal, now)), [now, walletDeals]);
   const counts = useMemo(
     () => ({
       active: statuses.filter((status) => status === "open").length,
@@ -58,10 +52,7 @@ export default function HistoryPage() {
     [statuses],
   );
   const visibleDeals = useMemo(
-    () =>
-      filter === "all"
-        ? walletDeals
-        : walletDeals.filter((deal) => displayStatus(deal, now) === filterStatus(filter)),
+    () => (filter === "all" ? walletDeals : walletDeals.filter((deal) => displayStatus(deal, now) === filterStatus(filter))),
     [filter, now, walletDeals],
   );
 
@@ -75,18 +66,18 @@ export default function HistoryPage() {
               Every deal,
               <span className="block text-accent">all in one place.</span>
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
-              Keep an eye on offers, swaps, and expired deals involving your wallet.
-            </p>
+            <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">Keep an eye on offers, swaps, and expired deals involving your wallet.</p>
           </div>
-          <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] shadow-[0.3rem_0.3rem_0_#111318] lg:min-w-56">
-            <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">
-              {address ? "Wallet connected" : "Wallet required"}
-            </p>
+          <div className="rounded-2xl border-2 border-[#111318] bg-[#fff4cf] p-5 text-[#111318] lg:min-w-56">
+            <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">{address ? "Wallet connected" : "Wallet required"}</p>
             <p className="mt-2 text-sm leading-6 text-[#4e5968]">
               {address ? "Showing your offers, fills, and direct requests." : "Connect to see your deal activity."}
             </p>
-            {!address && <div className="mt-4"><ConnectButton /></div>}
+            {!address && (
+              <div className="mt-4">
+                <ConnectButton />
+              </div>
+            )}
           </div>
         </div>
         <div className="grid border-t border-black/10 sm:grid-cols-3">
@@ -103,12 +94,7 @@ export default function HistoryPage() {
       </PageHeader>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          label="Filter deals"
-          value={filter}
-          options={FILTERS.map(([key, label]) => ({ value: key, label }))}
-          onChange={setFilter}
-        />
+        <Tabs label="Filter deals" value={filter} options={FILTERS.map(([key, label]) => ({ value: key, label }))} onChange={setFilter} />
         <p className="text-sm text-muted">
           Showing <span className="font-semibold text-[#111318]">{visibleDeals.length}</span> deal
           {visibleDeals.length === 1 ? "" : "s"}
@@ -116,7 +102,7 @@ export default function HistoryPage() {
       </div>
 
       {error ? (
-        <LoadError title="Couldn&apos;t load history" error={error} />
+        <LoadError title="Couldn't load history" error={error} />
       ) : isLoading ? (
         <EmptyState>Loading activity…</EmptyState>
       ) : !address ? (
@@ -135,11 +121,8 @@ export default function HistoryPage() {
   );
 }
 
-function isWalletDeal(deal: Pick<DealV2, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
-  return !!address
-    && (sameAddress(deal.maker, address)
-      || sameAddress(deal.taker, address)
-      || fillIds.some((id) => id === deal.id));
+function isWalletDeal(deal: Pick<Deal, "id" | "maker" | "taker">, address: string | undefined, fillIds: readonly bigint[]) {
+  return !!address && (sameAddress(deal.maker, address) || sameAddress(deal.taker, address) || fillIds.some((id) => id === deal.id));
 }
 
 function filterStatus(filter: Exclude<HistoryFilter, "all">): DisplayStatus {

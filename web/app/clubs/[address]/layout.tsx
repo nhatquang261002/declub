@@ -10,9 +10,22 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   const { address } = await params;
   const facts = await readClubFacts(address);
   if (!facts) return {};
-  const title = `${facts.name} Club on De(al) Club`;
+  // The root layout's title template adds the site name; shared cards say it in full.
+  const title = `${facts.name} Club`;
+  const shareTitle = `${title} on DeClub`;
   const description = `Own ${facts.symbol}, post about it, get paid: swap fees go back to the Club's Holders every epoch.`;
-  return { title, description, openGraph: { title, description, type: "website" }, twitter: { card: "summary_large_image", title, description } };
+  const image = `/clubs/${address}/opengraph-image`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title: shareTitle,
+      description,
+      type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: `${facts.name} Club preview on DeClub` }],
+    },
+    twitter: { card: "summary_large_image", title: shareTitle, description, images: [image] },
+  };
 }
 
 export default function ClubLayout({ children }: { children: ReactNode }) {

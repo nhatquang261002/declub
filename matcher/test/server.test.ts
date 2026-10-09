@@ -80,14 +80,20 @@ describe("pool HTTP API", { skip }, () => {
 
     const give = assetKey(w.chogOf(id));
     const byGive = await call("GET", `/intents?give=${give}`);
-    assert.deepEqual(byGive.json.intents.map((i: { hash: Hex }) => i.hash), [hash]);
+    assert.deepEqual(
+      byGive.json.intents.map((i: { hash: Hex }) => i.hash),
+      [hash],
+    );
     assert.equal((await call("GET", `/intents?want=${give}`)).json.intents.length, 0);
     assert.equal((await call("GET", `/intents?maker=${w.alice.address}&give=${give}`)).json.intents.length, 1);
     assert.equal((await call("GET", `/intents?maker=${w.bob.address}&give=${give}`)).json.intents.length, 0);
     assert.equal((await call("GET", `/intents?give=${give}&status=settled`)).json.intents.length, 0);
     const collection = w.chogOf(id).token;
     const byToken = await call("GET", `/intents?token=${collection}`);
-    assert.ok(byToken.json.intents.some((i: { hash: Hex }) => i.hash === hash), "any id of the collection");
+    assert.ok(
+      byToken.json.intents.some((i: { hash: Hex }) => i.hash === hash),
+      "any id of the collection",
+    );
     assert.equal((await call("GET", `/intents?token=${w.wmon}&maker=${w.alice.address}`)).json.intents.length, 0);
     assert.equal((await call("GET", "/intents?token=nope")).status, 400);
 
@@ -154,7 +160,10 @@ describe("pool HTTP API", { skip }, () => {
     assert.equal(mine.cycle.length, 2);
     assert.deepEqual(
       mine.cycle.map((i: { status: string; settlementTx: Hex }) => [i.status, i.settlementTx]),
-      [["settled", mine.txHash], ["settled", mine.txHash]],
+      [
+        ["settled", mine.txHash],
+        ["settled", mine.txHash],
+      ],
     );
 
     const forDave = await call("GET", `/settlements?maker=${w.dave.address}`);
@@ -165,9 +174,12 @@ describe("pool HTTP API", { skip }, () => {
 
     const byToken = await call("GET", `/settlements?token=${w.chogOf(id!).token}`);
     assert.ok(byToken.json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash));
-    assert.ok(byToken.json.settlements.every((s: { cycle: { intent: { give: { token: string }[]; want: { token: string }[] } }[] }) =>
-      s.cycle.some((i) => [...i.intent.give, ...i.intent.want].some((a) => a.token.toLowerCase() === w.chogOf(id!).token.toLowerCase())),
-    ), "every cycle names the token");
+    assert.ok(
+      byToken.json.settlements.every((s: { cycle: { intent: { give: { token: string }[]; want: { token: string }[] } }[] }) =>
+        s.cycle.some((i) => [...i.intent.give, ...i.intent.want].some((a) => a.token.toLowerCase() === w.chogOf(id!).token.toLowerCase())),
+      ),
+      "every cycle names the token",
+    );
     const later = await call("GET", `/settlements?after=${mine.at}`);
     assert.ok(!later.json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash), "after is exclusive");
     assert.ok((await call("GET", "/settlements?after=0")).json.settlements.some((s: { txHash: Hex }) => s.txHash === mine.txHash));

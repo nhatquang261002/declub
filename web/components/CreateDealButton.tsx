@@ -7,7 +7,9 @@ import Link from "next/link";
 export function CreateDealButton({ short = false, className = "" }: { short?: boolean; className?: string }) {
   return (
     <Link href="/create" className={`btn-primary whitespace-nowrap !pl-2.5 ${className}`.trim()}>
-      <span className="btn-plus" aria-hidden>+</span>
+      <span className="btn-plus" aria-hidden>
+        +
+      </span>
       <span>
         Create<span className={short ? "hidden sm:inline" : undefined}>&nbsp;deal</span>
       </span>

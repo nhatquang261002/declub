@@ -110,11 +110,17 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
     function test_refusesAWrongAmountAccountOrProof() public {
         Drop memory d = _abc(1);
         _open(1, d);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 4 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 4 ether)
+        );
         rewards.claim(1, alice, 4 ether, d.proofs[0]);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, stranger, 3 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, stranger, 3 ether)
+        );
         rewards.claim(1, stranger, 3 ether, d.proofs[0]);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 3 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 3 ether)
+        );
         rewards.claim(1, alice, 3 ether, d.proofs[1]);
     }
 
@@ -124,7 +130,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
         // Epoch 2 is published with the same root: epoch 1's leaves don't hash the same in it.
         _publish(2, one);
         vm.warp(block.timestamp + DELAY);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 2, alice, 3 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 2, alice, 3 ether)
+        );
         rewards.claim(2, alice, 3 ether, one.proofs[0]);
     }
 
@@ -133,7 +141,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
         DeClubRewards other = new DeClubRewards(operator, 0, WINDOW);
         vm.prank(operator);
         other.publish{value: 6 ether}(1, d.root);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 3 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, 3 ether)
+        );
         other.claim(1, alice, 3 ether, d.proofs[0]);
 
         bytes32 here = rewards.leaf(1, alice, 3 ether);
@@ -142,7 +152,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
     }
 
     function test_aLeafIsHashedTwiceAndBoundToChainAndContract() public view {
-        bytes32 inner = keccak256(abi.encode(block.chainid, address(rewards), uint64(1), alice, uint256(3 ether)));
+        bytes32 inner = keccak256(
+            abi.encode(block.chainid, address(rewards), uint64(1), alice, uint256(3 ether))
+        );
         assertEq(rewards.leaf(1, alice, 3 ether), keccak256(bytes.concat(inner)));
     }
 
@@ -162,7 +174,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
         vm.warp(block.timestamp + DELAY);
 
         _claim(1, bad, 0); // 3 of 4
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.OverClaim.selector, 1, 5 ether, 4 ether));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.OverClaim.selector, 1, 5 ether, 4 ether)
+        );
         _claim(1, bad, 1); // 2 more would be 5
         _claim(1, bad, 2); // 1 more is exactly 4
         assertEq(rewards.epochs(1).claimed, 4 ether);
@@ -179,7 +193,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
         Drop memory d = _drop(1, accounts, amounts);
         _open(1, d);
 
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(refuser)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(refuser))
+        );
         _claim(1, d, 0);
         assertFalse(rewards.isClaimed(1, address(refuser)));
         assertEq(rewards.epochs(1).claimed, 0);
@@ -198,7 +214,9 @@ contract DeClubRewardsClaimTest is DeClubRewardsBase {
         claimer.arm(1, 1 ether, d.proofs[0]);
 
         // The re-entry reverts inside `receive`, so the payout fails and the whole claim unwinds.
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(claimer)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(claimer))
+        );
         _claim(1, d, 0);
         assertFalse(rewards.isClaimed(1, address(claimer)));
         assertEq(address(rewards).balance, 2 ether);

@@ -76,7 +76,7 @@ contract HostileHandler is Test {
             _honestSide(c, offersUsdc ? askSeed & ~uint256(1) : askSeed, (askSeed >> 3) % 8 == 0);
         if (offered.length == 0 || requested.length == 0) return;
 
-        uint256 value = swap.fee();
+        uint256 value = swap.fee() * _units(offered);
         vm.prank(actors[m]);
         try swap.createTrade{value: value}(
             offered, requested, counterSeed & 4 != 0 ? actors[c] : address(0), 0
@@ -91,7 +91,7 @@ contract HostileHandler is Test {
         uint256 m = makerSeed % 3;
         IDeClubEscrow.Asset[] memory offered = _honestSide(m, offerSeed, false);
         if (offered.length == 0) return;
-        uint256 value = swap.fee();
+        uint256 value = swap.fee() * _units(offered);
         vm.prank(actors[m]);
         try swap.createOpenOffer{value: value}(offered, address(0), 0, "") {
             calls["offer"]++;
@@ -121,7 +121,7 @@ contract HostileHandler is Test {
         uint256 makerUsdc = usdc.balanceOf(t.maker);
         uint256 takerUsdc = usdc.balanceOf(taker);
         vm.prank(taker);
-        try swap.fillTrade{value: t.fee}(id) {
+        try swap.fillTrade{value: t.fee * _units(t.requested)}(id) {
             calls["fill"]++;
             if (!honest) ghost_hostileAccepted++;
             _expectOwner(t.offered, taker);
@@ -156,7 +156,7 @@ contract HostileHandler is Test {
         }
 
         vm.prank(actors[p]);
-        try swap.propose{value: t.fee}(id, assets) {
+        try swap.propose{value: t.fee * _units(assets)}(id, assets) {
             calls["propose"]++;
             if (hostile) ghost_hostileAccepted++;
         } catch {
@@ -256,13 +256,18 @@ contract HostileHandler is Test {
             (offered, found) = _hostileAsset(m, kind, seed);
             if (!found) return;
         } else {
-            offered = _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(usdc), 0, 1 ether));
+            offered =
+                _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(usdc), 0, 1 ether));
             requested = kind == 5
-                ? _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(usdc), seed % 100, 1))
+                ? _one(
+                    IDeClubEscrow.Asset(
+                        IDeClubEscrow.AssetType.ERC721, address(usdc), seed % 100, 1
+                    )
+                )
                 : _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(soft), 0, 1));
         }
 
-        uint256 value = swap.fee();
+        uint256 value = swap.fee() * _units(offered);
         vm.prank(actors[m]);
         try swap.createTrade{value: value}(offered, requested, address(0), 0) {
             ghost_hostileAccepted++;
@@ -272,6 +277,14 @@ contract HostileHandler is Test {
     }
 
     // ─────────────────────────────────────────────── helpers
+
+    /// @dev What a side's fee is multiplied by: its NFTs, or 1 if it has none.
+    function _units(IDeClubEscrow.Asset[] memory assets) internal pure returns (uint256 nfts) {
+        for (uint256 i; i < assets.length; ++i) {
+            if (assets[i].assetType == IDeClubEscrow.AssetType.ERC721) nfts++;
+        }
+        if (nfts == 0) nfts = 1;
+    }
 
     /// @dev One hostile asset for actor `a` to deposit:
     ///      0 a `soft` id another actor owns, 1 a `soft` id already in escrow, 2 a `liar` id `a`
@@ -285,20 +298,31 @@ contract HostileHandler is Test {
             address want = kind == 0 ? actors[(a + 1 + seed % 2) % 3] : address(swap);
             (uint256 id, bool ok) = _softOwnedBy(want, seed);
             if (!ok) return (out, false);
-            return (_one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(soft), id, 1)), true);
+            return
+                (
+                    _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(soft), id, 1)),
+                    true
+                );
         }
         if (kind == 2) {
             return (
-                _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(liar), LIAR_BASE + a, 1)),
+                _one(
+                    IDeClubEscrow.Asset(
+                        IDeClubEscrow.AssetType.ERC721, address(liar), LIAR_BASE + a, 1
+                    )
+                ),
                 true
             );
         }
         if (kind == 3) {
-            return
-                (
-                    _one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(usdc), seed % 100, 1)),
-                    true
-                );
+            return (
+                _one(
+                    IDeClubEscrow.Asset(
+                        IDeClubEscrow.AssetType.ERC721, address(usdc), seed % 100, 1
+                    )
+                ),
+                true
+            );
         }
         return (_one(IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC20, address(soft), 0, 1)), true);
     }
@@ -330,12 +354,18 @@ contract HostileHandler is Test {
             out[i++] = IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(soft), ids[k], 1);
         }
         if (withLiar) {
-            out[i] = IDeClubEscrow.Asset(IDeClubEscrow.AssetType.ERC721, address(liar), LIAR_BASE + a, 1);
+            out[i] = IDeClubEscrow.Asset(
+                IDeClubEscrow.AssetType.ERC721, address(liar), LIAR_BASE + a, 1
+            );
         }
     }
 
     /// @dev Whether `who` really holds every asset (a `liar` id never counts: it can't move).
-    function _holdsAll(address who, IDeClubEscrow.Asset[] memory assets) internal view returns (bool) {
+    function _holdsAll(address who, IDeClubEscrow.Asset[] memory assets)
+        internal
+        view
+        returns (bool)
+    {
         for (uint256 i; i < assets.length; ++i) {
             IDeClubEscrow.Asset memory a = assets[i];
             if (a.token == address(liar)) return false;
@@ -397,7 +427,11 @@ contract HostileHandler is Test {
         ok = p.status == IDeClubEscrow.ProposalStatus.Active;
     }
 
-    function _one(IDeClubEscrow.Asset memory a) internal pure returns (IDeClubEscrow.Asset[] memory r) {
+    function _one(IDeClubEscrow.Asset memory a)
+        internal
+        pure
+        returns (IDeClubEscrow.Asset[] memory r)
+    {
         r = new IDeClubEscrow.Asset[](1);
         r[0] = a;
     }

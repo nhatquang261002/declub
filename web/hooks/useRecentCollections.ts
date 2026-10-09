@@ -4,20 +4,14 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Address } from "viem";
 import { parseRecent, readRecentRaw, RECENT_EVENT, saveRecent } from "@/lib/collections";
 import { loadState, saveState } from "@/lib/userState";
+import { subscribeStorage } from "./subscribeStorage";
 import { useAccessToken } from "./useAccessToken";
 
 // The collections a person used lately, for the NFT picker (ADR 0012). The browser's list is the
 // working copy, so the picker never waits on a request. Signed in with Privy, it is also kept on
 // the server and merged both ways, so a second device starts with the same shortlist.
 
-function subscribe(onChange: () => void) {
-  window.addEventListener(RECENT_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(RECENT_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
+const subscribe = subscribeStorage(RECENT_EVENT);
 
 /** Recently used collections, newest first, and the server's copy folded in once per sign-in. */
 export function useRecentCollections(): Address[] {

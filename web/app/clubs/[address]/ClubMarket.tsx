@@ -24,7 +24,7 @@ type Market = ReturnType<typeof useClubMarket>;
 /** A completed swap links to its deal, or for a signed swap to its transaction. */
 function swapHref(e: ActivityEvent) {
   const signed = !!DECLUB_INTENTS_ADDRESS && e.contract === DECLUB_INTENTS_ADDRESS.toLowerCase();
-  return signed ? explorerTx(e.deal) : `/v2/deal/${e.deal}`;
+  return signed ? explorerTx(e.deal) : `/deal/${e.deal}`;
 }
 
 function RecentSwaps({ events, now }: { events: readonly ActivityEvent[]; now: number }) {
@@ -75,10 +75,7 @@ export function ClubMarket({ market, symbol, recent, now }: { market: Market; sy
   const { address } = useConnection();
   const [view, setView] = useState<View>("have");
 
-  const tokens = useMemo(
-    () => erc20Tokens([...market.have, ...market.wanted].flatMap((d) => [...d.offered, ...d.requested])),
-    [market.have, market.wanted],
-  );
+  const tokens = useMemo(() => erc20Tokens([...market.have, ...market.wanted].flatMap((d) => [...d.offered, ...d.requested])), [market.have, market.wanted]);
   const { info } = useTokenInfo(tokens);
 
   const options = [

@@ -1,10 +1,10 @@
 import { getAddress, isAddress, type Address } from "viem";
-import { toAsset, toRawAsset, type Asset, type TokenInfo } from "./assets";
+import { toAsset, type Asset, type TokenInfo } from "./assets";
 import { DEFAULT_FILTERS, type DealFilters, type DealSort, type MonFilter } from "./dealFilters";
-import { applyDealFiltersV2, involvesToken } from "./dealFiltersV2";
+import { applyDealFilters, involvesToken } from "./dealFilters";
 import { isExpired, sameAddress, type DealStatus } from "./deals";
-import type { DealV2 } from "./dealsV2";
-import { intentAsListing, intentToWire, parsePoolIntent, type PoolIntent, type SignedListing, type WireAsset } from "./intents";
+import type { Deal } from "./deals";
+import { intentAsListing, intentToWire, parsePoolIntent, wireAsset, type PoolIntent, type SignedListing, type WireAsset } from "./intents";
 
 /**
  * The deal book, filtered on the server (`GET /api/deals`) instead of over the newest 200 deals a
@@ -15,7 +15,7 @@ import { intentAsListing, intentToWire, parsePoolIntent, type PoolIntent, type S
 export type DealTab = "open" | "for-you" | "all";
 /** Which settlement to show: both, deals with locked assets, or signed swaps (ADR 0008). */
 export type BookKind = "any" | "locked" | "signed";
-export type Listing = DealV2 | SignedListing;
+type Listing = Deal | SignedListing;
 
 export type BookQuery = {
   tab: DealTab;
@@ -32,7 +32,7 @@ export type BookQuery = {
 
 export const MAX_PAGE_SIZE = 50;
 /** A Club has its own asset and at most one paired with it (lib/verifiedAssets.ts). */
-export const MAX_TOKENS = 2;
+const MAX_TOKENS = 2;
 const MAX_QUERY = 100;
 
 const TABS: readonly DealTab[] = ["open", "for-you", "all"];
@@ -92,7 +92,7 @@ export function parseBookQuery(p: URLSearchParams): BookQuery | string {
 
 /** What the server filters: the whole locked book, newest first, and the pool's signed swaps. */
 export type BookSource = {
-  deals: readonly DealV2[];
+  deals: readonly Deal[];
   /** Live signed swaps, newest first. */
   openSigned: readonly SignedListing[];
   /** Signed swaps of every status, for the "all" tab. */
@@ -101,7 +101,7 @@ export type BookSource = {
   info: ReadonlyMap<string, TokenInfo>;
 };
 
-export type BookResult = {
+type BookResult = {
   items: Listing[];
   /** Listings in the chosen tab that match, over every page. */
   total: number;
@@ -116,7 +116,7 @@ export function pageBook(source: BookSource, q: BookQuery, now: number): BookRes
   const locked = q.kind !== "signed" ? source.deals : [];
   const signed = (list: readonly SignedListing[]) => (q.kind !== "locked" ? list : []);
   const forToken = (t: Listing) => q.tokens.length === 0 || q.tokens.some((token) => involvesToken(t, token));
-  const filter = (list: Listing[]) => applyDealFiltersV2(list.filter(forToken), q.filters, now, source.info);
+  const filter = (list: Listing[]) => applyDealFilters(list.filter(forToken), q.filters, now, source.info);
 
   // Signed swaps first: they carry no timestamp or id to order them against deals by, and
   // "Ending soon" re-sorts the two together anyway.
@@ -157,12 +157,7 @@ export type BookResponse =
       signedError: string | null;
     };
 
-const wireAsset = (a: Asset): WireAsset => {
-  const raw = toRawAsset(a);
-  return { assetType: raw.assetType, token: raw.token, id: raw.id.toString(), amount: raw.amount.toString() };
-};
-
-export const wirePoolIntent = (row: PoolIntent) => ({ ...row, intent: intentToWire(row.intent) });
+const wirePoolIntent = (row: PoolIntent) => ({ ...row, intent: intentToWire(row.intent) });
 
 export function toWireListing(t: Listing): WireListing {
   if ("signed" in t) return { signed: wirePoolIntent(t.signed) };
@@ -190,7 +185,7 @@ function fromWireAsset(v: WireAsset): Asset | null {
   return toAsset({ assetType: v.assetType, token: getAddress(v.token), id, amount });
 }
 
-function fromWireDeal(v: WireDeal): DealV2 | null {
+function fromWireDeal(v: WireDeal): Deal | null {
   const id = uint(v?.id);
   const expiry = uint(v?.expiry);
   const fee = uint(v?.fee);

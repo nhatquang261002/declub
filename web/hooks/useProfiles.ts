@@ -13,7 +13,7 @@ const BATCH_MS = 10;
 const MAX_PER_REQUEST = 50;
 
 /** What other traders see of a wallet. */
-export type WalletCard = { profile: Profile | null; avatar: AvatarView | null };
+type WalletCard = { profile: Profile | null; avatar: AvatarView | null };
 
 type Waiting = (card: WalletCard) => void;
 let queue = new Map<string, Waiting[]>();

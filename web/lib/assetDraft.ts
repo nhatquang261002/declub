@@ -1,6 +1,6 @@
 import { isAddress, parseUnits, type Address } from "viem";
-import { MAX_TOKENS_PER_SIDE } from "./config";
-import { erc20Asset, nativeAsset, nftAsset, sameAsset, type Asset, type PlainKind } from "./assets";
+import { MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE } from "./config";
+import { erc20Asset, nativeAsset, nftAsset, nftCount, sameAsset, type Asset, type PlainKind } from "./assets";
 import { parseMon } from "./format";
 
 /** One row of the create form, as typed. `value` is an amount (MON, token) or a token id (NFT). */
@@ -41,7 +41,7 @@ function parseAmount(input: string, decimals: number): bigint | null {
   }
 }
 
-export type SideResult = { assets: Asset[]; errors: string[] };
+type SideResult = { assets: Asset[]; errors: string[] };
 
 /**
  * Turns typed rows into contract-ready assets, or says what is wrong with which row. The rules
@@ -86,6 +86,8 @@ export function draftToAssets(
     if (!/^\d+$/.test(row.value.trim())) return errors.push(`${label}: choose an NFT.`);
     assets.push(nftAsset(token, BigInt(row.value.trim())));
   });
+
+  if (nftCount(assets) > MAX_NFTS_PER_SIDE) errors.push(`Up to ${MAX_NFTS_PER_SIDE} NFTs per side.`);
 
   for (let i = 0; i < assets.length; i++) {
     if (assets.slice(0, i).some((earlier) => sameAsset(earlier, assets[i]))) {

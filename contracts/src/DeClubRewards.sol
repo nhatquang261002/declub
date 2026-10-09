@@ -140,7 +140,9 @@ contract DeClubRewards is IDeClubRewards, ReentrancyGuard {
     /// @inheritdoc IDeClubRewards
     function leaf(uint64 epoch, address account, uint256 amount) public view returns (bytes32) {
         return keccak256(
-            bytes.concat(keccak256(abi.encode(block.chainid, address(this), epoch, account, amount)))
+            bytes.concat(
+                keccak256(abi.encode(block.chainid, address(this), epoch, account, amount))
+            )
         );
     }
 

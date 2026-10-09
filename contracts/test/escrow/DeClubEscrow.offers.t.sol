@@ -13,7 +13,8 @@ import {BlocklistToken, FeeToken, HookToken} from "../utils/WeirdTokens.sol";
 contract DeClubEscrowOffersTest is DeClubEscrowBase {
     IDeClubEscrow.ProposalStatus internal constant ACTIVE = IDeClubEscrow.ProposalStatus.Active;
     IDeClubEscrow.ProposalStatus internal constant ACCEPTED = IDeClubEscrow.ProposalStatus.Accepted;
-    IDeClubEscrow.ProposalStatus internal constant WITHDRAWN = IDeClubEscrow.ProposalStatus.Withdrawn;
+    IDeClubEscrow.ProposalStatus internal constant WITHDRAWN =
+    IDeClubEscrow.ProposalStatus.Withdrawn;
     IDeClubEscrow.ProposalStatus internal constant REJECTED = IDeClubEscrow.ProposalStatus.Rejected;
 
     /// @dev alice offers Chog A1 + 20 WETH, no ask.
@@ -90,10 +91,14 @@ contract DeClubEscrowOffersTest is DeClubEscrowBase {
         vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.DuplicateAsset.selector, 1));
         swap.createOpenOffer(_list(_chog(A1), _chog(A1)), address(0), 0, "");
 
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 1 ether, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 1 ether, 0)
+        );
         swap.createOpenOffer(_list(_native(1 ether)), address(0), 0, "");
 
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.ExpiryInPast.selector, block.timestamp));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.ExpiryInPast.selector, block.timestamp)
+        );
         swap.createOpenOffer(_list(_chog(A1)), address(0), uint64(block.timestamp), "");
         vm.stopPrank();
     }
@@ -213,7 +218,9 @@ contract DeClubEscrowOffersTest is DeClubEscrowBase {
         vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.SameAssetBothSides.selector, 1, 0));
         swap.propose(id, _list(_erc20(address(weth), 1 ether)));
 
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 1 ether, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.WrongNativeAmount.selector, 1 ether, 0)
+        );
         swap.propose(id, _list(_native(1 ether)));
         vm.stopPrank();
     }
@@ -248,7 +255,9 @@ contract DeClubEscrowOffersTest is DeClubEscrowBase {
         uint256 id = _offer();
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubEscrow.UnsupportedToken.selector, address(fee)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubEscrow.UnsupportedToken.selector, address(fee))
+        );
         swap.propose(id, _list(_erc20(address(fee), 100 ether)));
         assertEq(fee.balanceOf(bob), 1_000 ether);
         assertEq(swap.proposalCount(id), 0);

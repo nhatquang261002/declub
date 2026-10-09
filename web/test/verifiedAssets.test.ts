@@ -90,11 +90,17 @@ describe("registry", () => {
 
   it("keeps an archived Club listed", () => {
     assert.equal(r.clubFor("0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298", 143)?.club, "archived");
-    assert.deepEqual(r.clubs(143).map((e) => e.address), ["0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298"]);
+    assert.deepEqual(
+      r.clubs(143).map((e) => e.address),
+      ["0xA3301cec17d13eD03E343cdfdd14Ab027b8ec298"],
+    );
   });
 
   it("lists a chain's Clubs", () => {
-    assert.deepEqual(r.clubs(10143).map((e) => e.address), [A]);
+    assert.deepEqual(
+      r.clubs(10143).map((e) => e.address),
+      [A],
+    );
   });
 
   it("ships a Club for the project's own test collection", () => {
@@ -106,11 +112,20 @@ describe("registry", () => {
       parseAssets([
         entry(),
         ...(["memecoin", "stablecoin", "wrapped", "other"] as const).map((category, i) =>
-          entry({ address: `0x${String(i + 1).padStart(40, "0")}`, kind: "erc20", category, symbol: category, ...(category === "memecoin" ? { club: false } : {}) }),
+          entry({
+            address: `0x${String(i + 1).padStart(40, "0")}`,
+            kind: "erc20",
+            category,
+            symbol: category,
+            ...(category === "memecoin" ? { club: false } : {}),
+          }),
         ),
       ]),
     );
-    assert.deepEqual(tokens.clubs(10143).map((e) => e.symbol), ["MCHOG"]);
+    assert.deepEqual(
+      tokens.clubs(10143).map((e) => e.symbol),
+      ["MCHOG"],
+    );
     assert.equal(tokens.clubFor(`0x${"1".padStart(40, "0")}`, 10143), null, "a memecoin with club: false has none");
     assert.equal(tokens.tier(`0x${"2".padStart(40, "0")}`, 10143), "verified");
   });
@@ -122,7 +137,11 @@ describe("paired Clubs", () => {
 
   it("puts a memecoin in its collection's Club", () => {
     const r = makeRegistry(parseAssets([entry(), coin()]));
-    assert.deepEqual(r.clubs(10143).map((e) => e.address), [A], "one Club, not two");
+    assert.deepEqual(
+      r.clubs(10143).map((e) => e.address),
+      [A],
+      "one Club, not two",
+    );
     assert.equal(r.clubFor(B, 10143)?.address, A, "the coin's address finds the collection's Club");
     assert.equal(r.clubFor(A, 10143)?.linked?.symbol, "CHOG");
     assert.equal(r.clubFor(B.toLowerCase(), 10143)?.linked?.address, B);

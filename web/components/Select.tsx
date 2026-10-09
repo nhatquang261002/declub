@@ -152,7 +152,16 @@ export function Select<T extends string>({
             >
               <span className={option.value === "" ? "opacity-55" : undefined}>{option.label}</span>
               {option.value === value && option.value !== "" && (
-                <svg className="size-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg
+                  className="size-4 shrink-0"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
                   <path d="m3 8.5 3.2 3.2L13 4.5" />
                 </svg>
               )}

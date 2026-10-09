@@ -89,11 +89,7 @@ describe("rate limiting over HTTP", () => {
   it("refuses POST and DELETE past the per-IP budget with 429 and Retry-After, and leaves GET alone", async () => {
     const post = () => fetch(`${base}/intents`, { method: "POST", body: "{}" });
     for (let i = 0; i < 2; i++) assert.equal((await post()).status, 400); // malformed, but served
-    assert.equal(
-      (await fetch(`${base}/intents/${hash(1)}`, { method: "DELETE", body: "{}" })).status,
-      400,
-      "DELETE uses the same budget",
-    );
+    assert.equal((await fetch(`${base}/intents/${hash(1)}`, { method: "DELETE", body: "{}" })).status, 400, "DELETE uses the same budget");
     const limited = await post();
     assert.equal(limited.status, 429);
     assert.equal(((await limited.json()) as { error: string }).error, "rate_limited");
@@ -131,8 +127,7 @@ describe("signatures of intents that left the book", () => {
   });
   after(() => server?.close());
 
-  const sigOf = async (h: Hex) =>
-    ((await (await fetch(`${base}/intents/${h}`)).json()) as { signature: string }).signature;
+  const sigOf = async (h: Hex) => ((await (await fetch(`${base}/intents/${h}`)).json()) as { signature: string }).signature;
 
   it("serves the signature only while the intent is live (open or stale)", async () => {
     assert.equal(await sigOf(hash(1)), SIG);
@@ -153,4 +148,3 @@ describe("signatures of intents that left the book", () => {
     assert.equal(s.settlements[0]!.cycle[0]!.signature, WITHHELD_SIGNATURE);
   });
 });
-

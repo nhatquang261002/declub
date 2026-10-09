@@ -41,19 +41,19 @@ On an open offer, takers escrow proposals and the maker accepts one. Proposal id
 
 | Function | What it does |
 |---|---|
-| `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` plus `fee()`. |
+| `createTrade(offered, requested, taker, expiry) payable` | Validates both sides, then pulls every offered asset into escrow. `msg.value` must equal the native amount in `offered` plus `fee()` for each NFT in `offered`, at least once (`feeUnits`, [ADR 0033](adr/0033-fee-per-nft.md)). |
 | `createTraitTrade(offered, requested, taker, expiry, spec) payable` | `createTrade` for a `requested` side with `ERC721Trait` assets. `spec` (1–1024 bytes) describes the sets for clients and is stored. [ADR 0006](adr/0006-trait-requests-in-v2.md). |
 | `createOpenOffer(offered, taker, expiry, note) payable` | Escrows `offered` with no ask. `msg.value` as for `createTrade`. `note` (0–280 bytes) tells proposers what the maker is after and binds nobody. A non-zero `taker` is the only address that may propose. |
-| `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested` plus the trade's `t.fee`. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker; both fee shares go to `FEE_RECIPIENT`. |
+| `fillTrade(id) payable` | `msg.value` must equal the native amount in `requested` plus the trade's `t.fee` for each NFT in `requested`, at least once. Requested assets go taker → maker (a failure reverts the fill); every offered asset goes escrow → taker; both fee shares go to `FEE_RECIPIENT`. |
 | `fillTraitTrade(id, fills) payable` | `fillTrade` for a trade with trait assets: `fills[k]` is `{tokenIds, proofs}` for the k-th trait asset. Also fills a trade with none, given no `fills`. `fillTrade` reverts with `TraitFillRequired` on a trait trade. |
-| `propose(id, assets) payable` | Escrows `assets` as a proposal on an open offer. `msg.value` = native amount in `assets` + `t.fee`. Returns the proposal id. |
+| `propose(id, assets) payable` | Escrows `assets` as a proposal on an open offer. `msg.value` = native amount in `assets` + `t.fee` for each NFT in `assets`, at least once. Returns the proposal id. |
 | `withdrawProposal(id, proposalId)` | Proposer takes an `Active` proposal back, at any time, whatever the trade's state. |
 | `rejectProposal(id, proposalId)` | Maker sends an `Active` proposal back to its proposer while the trade is open. |
 | `acceptProposal(id, proposalId)` | Maker settles the open offer: the proposal's assets go to the maker and the escrow to the proposer; both held fee shares go to `FEE_RECIPIENT`. Not payable. Other proposals stay `Active` for their proposers to withdraw. |
 | `cancelTrade(id)` | Maker, while open (expired or not). Refunds the offered side and the maker's fee share to the maker. |
 | `reclaimExpired(id)` | Anyone, once expired. Refunds to the maker. |
 | `claim(assetType, token, id)` | Collect a payout that was rejected earlier. |
-| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `offerNote(id)`, `proposalCount(id)`, `getProposal(id, proposalId)`, `getProposals(id, offset, limit)`, `claimable(account, assetType, token, id)`, `MAX_ASSETS_PER_SIDE` (10), `MAX_SPEC_BYTES` (1024), `MAX_NOTE_BYTES` (280), plus the [`FeeAdmin`](#feeadmin) views | Views. `getTrade(id).fee` is the fee that trade was listed with. `getProposals` returns proposals `offset .. offset + limit - 1`, clamped to what exists. |
+| `getTrade`, `isExpired`, `tradeCount`, `traitSpec(id)`, `offerNote(id)`, `proposalCount(id)`, `getProposal(id, proposalId)`, `getProposals(id, offset, limit)`, `claimable(account, assetType, token, id)`, `feeUnits(assets)`, `MAX_ASSETS_PER_SIDE` (10), `MAX_NFTS_PER_SIDE` (5), `MAX_SPEC_BYTES` (1024), `MAX_NOTE_BYTES` (280), plus the [`FeeAdmin`](#feeadmin) views | Views. `getTrade(id).fee` is the fee that trade was listed with. `getProposals` returns proposals `offset .. offset + limit - 1`, clamped to what exists. |
 
 ### Create-time checks
 
@@ -61,6 +61,7 @@ On an open offer, takers escrow proposals and the maker accepts one. Proposal id
 |---|---|
 | a side is empty (the offered side; and `requested` for `createTrade` / `createTraitTrade`) | `EmptySide` |
 | more than 10 assets on a side | `TooManyAssets(count, max)` |
+| more than 5 NFTs on a side (a trait request counts its `amount`) | `TooManyNfts(count, max)` |
 | field rules per type (see the ADR): native has no token/id, ERC-20 has a contract that doesn't report `IERC721` over ERC-165 and no id, ERC-721 has a contract that does and amount 1, amounts > 0 | `InvalidAsset(index)` |
 | same `(type, token, id)` twice on a side | `DuplicateAsset(index)` |
 | same `(type, token, id)` on both sides | `SameAssetBothSides(i, j)` |
@@ -116,22 +117,22 @@ Reasoning: [ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-
 
 The fee amount is the one thing that can change ([`FeeAdmin`](#feeadmin), shared with `DeClubIntents`). The fee admin can `setFee` lower at once, or queue a raise that the admin makes live with `applyFee` once `FEE_RAISE_DELAY` (7 days) has passed, never above `MAX_FEE`. The role moves in two steps, and `renounceFeeAdmin` fixes the fee for good. A zero admin at deploy is a fixed fee.
 
-**Each trade records `fee()` when it is created** (`Trade.fee`, a `uint96` packed beside `taker`), and both sides pay that recorded fee. A change never touches a deal already listed. Every side sends the trade's fee with its own call and the contract only **holds** it:
+**The fee is paid per NFT** ([ADR 0033](adr/0033-fee-per-nft.md)): a side pays the fee once for each NFT it moves (an `ERC721` is one, an `ERC721Trait` request counts its `amount`), and once if it moves none; MON and tokens don't count. `feeUnits(assets)` is that count. **Each trade records `fee()` when it is created** (`Trade.fee`, a `uint96` packed beside `taker`), the fee per NFT, and both sides pay that recorded fee. A change never touches a deal already listed. Every side sends `t.fee × its units` with its own call and the contract only **holds** it:
 
 | Call | `msg.value` | The share |
 |---|---|---|
-| `createTrade`, `createTraitTrade`, `createOpenOffer` | native offered + `fee()` | the maker's, held with the trade, recorded as `t.fee` |
-| `propose` | native proposed + `t.fee` | the proposer's, held with the proposal |
-| `fillTrade`, `fillTraitTrade` | native requested + `t.fee` | the taker's, released at once with the maker's |
+| `createTrade`, `createTraitTrade`, `createOpenOffer` | native offered + `fee()` × units(offered) | the maker's, held with the trade; `fee()` is recorded as `t.fee` |
+| `propose` | native proposed + `t.fee` × units(proposal) | the proposer's, held with the proposal |
+| `fillTrade`, `fillTraitTrade` | native requested + `t.fee` × units(requested) | the taker's, released at once with the maker's |
 | `acceptProposal` | none (non-payable) | both held shares released |
-| `cancelTrade`, `reclaimExpired` | none | the maker's share refunded to the maker |
-| `rejectProposal`, `withdrawProposal` | none | the proposer's share refunded to the proposer |
+| `cancelTrade`, `reclaimExpired` | none | the maker's share (`t.fee` × units(offered)) refunded to the maker |
+| `rejectProposal`, `withdrawProposal` | none | the proposer's share (`t.fee` × units(proposal)) refunded to the proposer |
 
-A completed deal sends `2 × t.fee` to the recipient in one payout. Refunds return `t.fee`. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + one `t.fee` per open trade and per active proposal + unclaimed credits.
+A completed deal sends `t.fee × (units(offered) + units(requested or the accepted proposal))` to the recipient in one payout (`FeeCharged.amount`). A refund returns that side's own share. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + `t.fee × units` per open trade and per active proposal + unclaimed credits.
 
-### Gas (worst case: 10 NFTs each way)
+### Gas (worst case: 5 NFTs each way)
 
-Create **2.2M**, fill **0.9M**. A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
+Create **1.24M**, fill **0.58M** (`test_worstCaseGas`; the cap was 10 NFTs, 2.2M and 0.9M, before [ADR 0033](adr/0033-fee-per-nft.md)). A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.
 
 ## DeClubIntents (signed swaps)
 
@@ -139,7 +140,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 - `settle(Intent[] cycle, bytes[] signatures)`: anyone, 2 to `MAX_CYCLE = 4` intents (`BadCycleSize`), one signature each (`SignatureCountMismatch`). `cycle[i].give` is paid in full to `cycle[(i+1) % n].maker` and must cover that maker's `want`. Every nonce is consumed before any asset moves; the function is `nonReentrant`; any failure reverts everything.
 - `invalidateNonces(word, mask)`: Permit2-style unordered nonces (bit `nonce & 0xff` of word `nonce >> 8`), so a maker can have many live intents and cancel any one.
-- Signatures: EIP-712 (`DeClubIntents`, version `3`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
+- Signatures: EIP-712 (`DeClubIntents`, version `1`), ECDSA or ERC-1271; malleable signatures are refused (`BadSignature`). `Intent` is `(maker, give, want, feeToken, maxFee, deadline, nonce)`.
 - Rules on every intent in a cycle:
 
   | Rule | Error |
@@ -147,7 +148,7 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
   | `maker` is not zero | `InvalidMaker(intent)` |
   | `deadline` is not zero, and not passed (`block.timestamp > deadline`) | `InvalidDeadline(intent)` / `IntentExpired(intent)` |
   | `feeToken == FEE_TOKEN` and `maxFee >= fee()` | `WrongFee(intent, feeToken, maxFee)` |
-  | each side has 1 to `MAX_ASSETS_PER_SIDE = 10` assets | `EmptySide(intent, give)` / `TooManyAssets(intent, give, count)` |
+  | each side has 1 to `MAX_ASSETS_PER_SIDE = 10` assets, and at most `MAX_NFTS_PER_SIDE = 5` NFTs | `EmptySide(intent, give)` / `TooManyAssets(intent, give, count)` / `TooManyNfts(intent, give, count)` |
   | only `ERC20` (contract that isn't an ERC-165 `IERC721`, id 0, amount > 0) and `ERC721` (`IERC721` contract, amount 1); `Native` is refused | `InvalidAsset(intent, give, index)` |
   | no asset twice on a side, none on both sides | `DuplicateAsset(intent, give, index)` / `SameAssetBothSides(intent)` |
   | valid signature, unused nonce, makers distinct within the cycle | `BadSignature(intent)` / `NonceUsed(maker, nonce)` / `DuplicateMaker(intent)` |
@@ -155,16 +156,16 @@ Settles signed intents wallet to wallet, with no escrow ([ADR 0008](adr/0008-tra
 
 - `want` is a floor: ERC-20 amounts are minimums, NFTs are exact ids. Each `give` is paid in full, so anything beyond the next maker's `want` (a larger amount, extra assets) goes to that maker.
 - The contract puts no upper bound on `deadline`. The pool only accepts deadlines 60 s to 7 days out; that's pool policy.
-- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `DeClubEscrow`. Each intent signs `feeToken` and `maxFee`, the most its maker pays. After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, n × fee)` is emitted. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
-- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`, as in V2); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
+- Protocol fee ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)): `constructor(feeToken, initialFee, maxFee, feeRecipient, admin)`. `FEE_TOKEN`, `FEE_RECIPIENT` and the ceiling `MAX_FEE` are immutable; the constructor reverts with `InvalidFeeToken` if the ceiling isn't 0 and the fee token isn't a contract. The amount, `fee()`, is set by the same [`FeeAdmin`](#feeadmin) as in `DeClubEscrow`. Each intent signs `feeToken` and `maxFee`, the most its maker pays **per NFT** they give ([ADR 0033](adr/0033-fee-per-nft.md)). After every `give` has moved, each maker in the cycle pays the current `fee()` of `FEE_TOKEN` (wrapped MON) for each NFT in their `give`, at least once, straight to `FEE_RECIPIENT`, and one `FeeCharged(recipient, token, total)` is emitted, the sum over the cycle. A cut keeps every signed intent valid and charges less; a raise makes the intents signed below it stale until they're signed again. A cycle that doesn't settle charges nobody, and a maker without the balance or approval reverts the whole cycle.
+- ERC-20 gives only move if the receiver's balance rises by exactly the amount (fee-on-transfer and lying tokens revert with `UnsupportedToken`); NFTs are checked with `ownerOf`, owned by the giver before and the receiver after (`NftNotReceived`). The fee transfer has no such check: `FEE_TOKEN` is trusted to be a plain wrapped-MON token.
 - Native MON can't be pulled from a wallet (use WMON); trait sets are not supported yet.
 - The contract never holds an asset (the fee goes from the maker's wallet to the recipient inside `settle`) and has no `receive()`. Its only admin is the fee admin, over the fee amount.
 - Events: `IntentFilled(intentHash, maker, recipient, nonce)` once per intent in a settled cycle, `FeeCharged(recipient, token, amount)`, `NoncesInvalidated(maker, word, mask)`, plus the `FeeAdmin` events.
-- Views: `MAX_CYCLE`, `MAX_ASSETS_PER_SIDE`, `FEE_TOKEN`, `hashIntent(intent)` (the EIP-712 struct hash), `intentDigest(intent)` (what the maker signs), `DOMAIN_SEPARATOR()`, `isNonceUsed(maker, nonce)`, plus the `FeeAdmin` views.
+- Views: `MAX_CYCLE`, `MAX_ASSETS_PER_SIDE`, `MAX_NFTS_PER_SIDE`, `FEE_TOKEN`, `hashIntent(intent)` (the EIP-712 struct hash), `intentDigest(intent)` (what the maker signs), `DOMAIN_SEPARATOR()`, `isNonceUsed(maker, nonce)`, plus the `FeeAdmin` views.
 
-### Gas (worst case: 4 makers × 10 NFTs each way)
+### Gas (worst case: 4 makers × 5 NFTs each way)
 
-`settle` costs **3.34M gas** without the fee and **3.41M** with it (four more token transfers and a read of the fee; `test_worstCaseRingGas`), which is why `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M (about 0.3M with the fee), a three-way ring about 0.5M.
+`settle` costs **1.68M gas** without the fee and **1.76M** with it (four more token transfers and a read of the fee; `test_worstCaseRingGas`; with 10 NFTs a side it was 3.34M and 3.41M, before [ADR 0033](adr/0033-fee-per-nft.md)), so `MAX_CYCLE` stays at 4. A plain NFT-for-ERC-20 swap is about 0.24M (about 0.3M with the fee), a three-way ring about 0.5M.
 
 ## FeeAdmin
 
@@ -218,7 +219,7 @@ A payout that the account refuses reverts the claim (`PayoutFailed`): nothing el
 
 ## Phase 3: trait-based requests
 
-Built in `DeClubEscrow` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)). The first version, overloads on the deleted v1 escrow, used the same design.
+Built in `DeClubEscrow` as `ERC721Trait` assets with `createTraitTrade` / `fillTraitTrade` ([ADR 0006](adr/0006-trait-requests-in-v2.md)).
 
 Traits live in off-chain metadata, so the contract can't read them. The options considered:
 
@@ -257,6 +258,14 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 - `mintBatch(to, quantity) → firstId`: owner only, sequential ids from 1; `InvalidQuantity` for 0, `MaxSupplyExceeded` past 1,969
 - `tokenURI(id)`: `METADATA_BASE` (the real collection's IPFS folder) + `id` + `.json`. Traits come from that metadata, not from the contract.
 
+### CollectionMirror
+
+[`CollectionMirror.sol`](../contracts/src/mocks/CollectionMirror.sol): a testnet copy of a mainnet collection, for the demo world ([12 · Demo](12-demo.md)).
+
+- `ERC721Enumerable`, `Ownable`; name, symbol, `MAX_SUPPLY`, base URI, URI suffix and `REVEAL_OFFSET` are set at construction
+- `mintBatch(to, quantity)`: sequential minting, owner only; `InvalidQuantity` and `MaxSupplyExceeded` as in `ChogGenesisMirror`
+- `tokenURI(id)`: token `n` reads metadata `((n - 1 + offset) % maxSupply) + 1`, so a shifted reveal like Chog Genesis's is reproduced
+
 ### MockERC20
 
 [`MockERC20.sol`](../contracts/src/mocks/MockERC20.sol): `ERC20(name, symbol)`, 18 decimals. `mint(to, amount)` is open to anyone, up to `MAX_MINT_PER_TX = 1_000_000 ether` per call (`InvalidAmount` for 0 or more). `DeployEscrow.s.sol` deploys it as "Mock USD" (mUSD).
@@ -267,7 +276,7 @@ Testnet and tests only, in [`contracts/src/mocks/`](../contracts/src/mocks/).
 
 ## Deployment
 
-Four scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). `DeployChog` deploys mocks, so it requires `block.chainid` 10143 (Monad testnet) or 31337 (Anvil) and reverts with "testnet deployment only" anywhere else; the other three also run on Monad mainnet (143), with stricter rules there, and revert with "unsupported chain" on any other chain. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
+Five scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses the env into a `Config`, calls `deploy(Config)` and logs the result, so tests can call `deploy` directly (env vars are process-wide and Forge runs tests in parallel). `DeployChog` and `DeployMirrors` deploy mocks, so they require `block.chainid` 10143 (Monad testnet) or 31337 (Anvil) and revert with "testnet deployment only" anywhere else; the other three also run on Monad mainnet (143), with stricter rules there, and revert with "unsupported chain" on any other chain. Commands are in [`contracts/script/README.md`](../contracts/script/README.md).
 
 ### `DeployEscrow.s.sol`
 
@@ -287,6 +296,10 @@ Four scripts in [`contracts/script/`](../contracts/script/). Each `run()` parses
 2. On mainnet, refuse an operator with no code (it must be a Safe) and a claim delay under a day.
 3. Print `NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS`, `NEXT_PUBLIC_DECLUB_REWARDS_DEPLOY_BLOCK`, and the operator, delay and window read back from the contract.
 
+### `DeployMirrors.s.sol` (testnet only)
+
+Deploys three `CollectionMirror`s for the demo: testnet copies of the Chog Genesis, skrumpeys and r3tards collections, with their names, symbols, supplies and metadata, minting nothing. It prints `DEMO_CHOG_ADDRESS`, `DEMO_SKRUMPEYS_ADDRESS` and `DEMO_R3TARDS_ADDRESS`; `web/scripts/demo.ts` mints the holdings and hands each mirror to its Club's Owner.
+
 ### `DeployChog.s.sol` (testnet only)
 
 1. With `DEPLOY_CHOG_MIRROR=true`, deploy `ChogGenesisMirror`, mint `DEMO_MINT_PER_WALLET` (default 5) to each address in `DEMO_WALLETS`, then mint the rest of the 1,969 to `MIRROR_CATALOG_OWNER` (default: the deployer) in batches of `MIRROR_MINT_BATCH` (default 20).
@@ -297,4 +310,6 @@ The printed deploy blocks are the simulation block, a lower bound; the exact blo
 
 ### Deployed vs source
 
-Nothing on testnet runs the current source. Every deployment predates the rename to DeClub ([ADR 0021](adr/0021-declub-pivot.md)): they were deployed as `ChogSwapV2` / `OnDealV2` and `ChogSwapIntents` / `OnDealIntents`, and the intents ones sign with an older EIP-712 domain, not `("DeClubIntents", "1")`. `DeClubEscrow` and `DeClubIntents` have to be deployed (`DeployEscrow.s.sol`, `DeployIntents.s.sol`) before the app works against them. The old records stay in `contracts/broadcast/` under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`, `DeployIntents.s.sol`); the [README](../README.md#retired-deployments) lists them.
+On testnet, all three contracts are deployed from the current source (the
+[demo deployment](12-demo.md); addresses in `.env` and `contracts/broadcast/`). Redeploy with
+[`contracts/script/README.md`](../contracts/script/README.md).

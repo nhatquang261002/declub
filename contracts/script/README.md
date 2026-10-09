@@ -6,10 +6,11 @@
 | `DeployIntents.s.sol` | `DeClubIntents`, optionally `MockWMON` | yes (and the matcher) |
 | `DeployRewards.s.sol` | `DeClubRewards` | yes (Rewards tab, Account, `npm run rewards:epoch`) |
 | `DeployChog.s.sol` | `MockChog` or the `ChogGenesisMirror` (testnet only) | the Chog collection |
+| `DeployMirrors.s.sol` | Three `CollectionMirror` contracts, testnet copies of Chog Genesis, skrumpeys and r3tards for the demo (testnet and Anvil only) | the demo world (`web/scripts/demo.ts`, [docs/12-demo.md](../../docs/12-demo.md)) |
 
 `DeployEscrow`, `DeployIntents` and `DeployRewards` run on Monad testnet (`10143`), local Anvil (`31337`, for tests) and Monad mainnet (`143`); any other chain reverts with "unsupported chain". On mainnet they also refuse mocks and demo wallets, a zero fee or ceiling, a missing `FEE_RECIPIENT`, `FEE_FIXED`, a `FEE_ADMIN` that is unset or equal to the recipient, and (intents) any `FEE_TOKEN` but the canonical WMON `0x3bd3…433A`. See [mainnet](#mainnet). `DeployChog.s.sol` deploys mocks, so it stays testnet-only: "testnet deployment only". Each `run()` only parses the env into a `Config` and calls `deploy(Config)`, so tests call `deploy` directly. All of them print ready-to-paste lines for the root `.env`.
 
-Nothing on testnet runs under the DeClub names yet: every deployment predates the rename, and the intents ones sign with an older EIP-712 domain, so deploy fresh. Details in [03 · Contract Design](../../docs/03-contract-design.md#deployed-vs-source).
+On testnet, `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` are deployed (the demo deployment). Earlier intents deployments predate the rename and sign with an older EIP-712 domain; don't point anything at them. Details in [03 · Contract Design](../../docs/03-contract-design.md#deployed-vs-source).
 
 ## `DeployEscrow.s.sol`
 
@@ -17,7 +18,7 @@ Deploys `DeClubEscrow` ([ADR 0005](../../docs/adr/0005-generic-asset-model.md)) 
 
 | Variable | |
 |---|---|
-| `PROTOCOL_FEE_WEI` | what each side pays per completed deal, in MON wei, until the fee admin changes it (default 0) |
+| `PROTOCOL_FEE_WEI` | what each side pays per NFT it moves in a completed deal (once if none), in MON wei, until the fee admin changes it (default 0; [ADR 0033](../../docs/adr/0033-fee-per-nft.md)) |
 | `PROTOCOL_FEE_MAX_WEI` | the ceiling the fee admin can never go above, at most 500 MON; required when `PROTOCOL_FEE_WEI` is set |
 | `FEE_RECIPIENT` | who receives it (a Safe); required when the ceiling is not 0 |
 | `FEE_ADMIN` | who may change the fee (a different Safe); required when the ceiling is not 0, unless `FEE_FIXED` is set |
@@ -54,7 +55,7 @@ Protocol fee, from the environment (all optional; with `PROTOCOL_FEE_WEI` unset 
 
 The same `PROTOCOL_FEE_WEI`, `PROTOCOL_FEE_MAX_WEI`, `FEE_RECIPIENT`, `FEE_ADMIN` and `FEE_FIXED` go to `DeployEscrow.s.sol` (there the fee is plain MON), so both contracts charge the same amount. Both print the fee settings they deployed with. The recipient, token and ceiling are immutable. The amount isn't: the fee admin calls `setFee` on each contract (a cut applies at once, a raise needs `applyFee` 7 days later), so keep the two in step.
 
-The recipient, token and ceiling can't be changed after deploy, so the scripts don't guess them (both share `script/FeeConfig.sol`): a fee without `PROTOCOL_FEE_MAX_WEI` is refused rather than given a default ceiling, and a non-zero ceiling without `FEE_ADMIN` is refused unless `FEE_FIXED=true` says a fee nobody can change is what you want. The contracts accept any ceiling up to 500; the roadmap's plan is about 4 × the launch fee.
+The recipient, token and ceiling can't be changed after deploy, so the scripts don't guess them (both share `script/FeeConfig.sol`): a fee without `PROTOCOL_FEE_MAX_WEI` is refused rather than given a default ceiling, and a non-zero ceiling without `FEE_ADMIN` is refused unless `FEE_FIXED=true` says a fee nobody can change is what you want. The contracts accept any ceiling up to 500; the plan is about 4 × the launch fee ([ADR 0018](../../docs/adr/0018-adjustable-protocol-fee.md), `.env.mainnet.example`).
 
 ```bash
 cd contracts
@@ -138,7 +139,7 @@ Browse on [MonadVision](https://testnet.monadvision.com/) or [Monadscan](https:/
 
 ## Broadcast records
 
-Each testnet broadcast writes `broadcast/<Script>.s.sol/10143/run-<timestamp>.json` and overwrites `run-latest.json` with the same content. So `run-latest.json` only records the most recent run, and earlier deployments live in the timestamped files: for example, `Deploy.s.sol/10143/run-latest.json` holds the deleted v1 `ChogSwap` and the `ChogGenesisMirror`, while the original v1 contract and `MockChog` are in `run-1790581370358.json`. Records from before the rename stay under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`). Commit both kinds so there's a record of every deployed address. Local (31337) runs and dry runs are gitignored.
+Each testnet broadcast writes `broadcast/<Script>.s.sol/10143/run-<timestamp>.json` and overwrites `run-latest.json` with the same content. So `run-latest.json` only records the most recent run, and earlier deployments live in the timestamped files. Records from before the rename stay under the scripts' old names (`Deploy.s.sol`, `DeployV2.s.sol`). Commit both kinds so there's a record of every deployed address. Local (31337) runs and dry runs are gitignored.
 
 ## Mainnet
 

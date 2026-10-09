@@ -81,7 +81,10 @@ function addressList(name: string): Set<string> | null {
   const v = process.env[name]?.trim();
   if (!v) return null;
   const out = new Set<string>();
-  for (const part of v.split(",").map((s) => s.trim()).filter(Boolean)) {
+  for (const part of v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     if (!isAddress(part, { strict: false })) throw new Error(`${name}: ${part} is not an address`);
     out.add(part.toLowerCase());
   }
@@ -101,11 +104,7 @@ export function loadConfig(): Config {
     chainId,
     rpcUrl: need("MATCHER_RPC_URL", "NEXT_PUBLIC_RPC_URL"),
     // Monad testnet and mainnet have Multicall3 at the canonical address; any other chain must opt in.
-    multicall3: multicall
-      ? (multicall as Address)
-      : chainId === 10143 || chainId === 143
-        ? CANONICAL_MULTICALL3
-        : undefined,
+    multicall3: multicall ? (multicall as Address) : chainId === 10143 || chainId === 143 ? CANONICAL_MULTICALL3 : undefined,
     swap,
     privateKey: key,
     // Loopback by default: this process holds a funded key. Set MATCHER_HOST=0.0.0.0 to expose the pool.

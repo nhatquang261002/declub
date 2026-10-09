@@ -1,19 +1,24 @@
-import {
-  type Address,
-  type Hex,
-  hashStruct,
-  hashTypedData,
-  isAddressEqual,
-  zeroAddress,
-} from "viem";
+import { type Address, type Hex, hashStruct, hashTypedData, isAddressEqual, zeroAddress } from "viem";
 import { type Asset, AssetType, type Intent } from "./types.ts";
 
 export const MAX_CYCLE = 4;
 export const MAX_ASSETS_PER_SIDE = 10;
+/** The most NFTs one side can move: the protocol fee is paid per NFT (ADR 0033). */
+export const MAX_NFTS_PER_SIDE = 5;
 
-export const domain = (chainId: number, verifyingContract: Address) =>
-  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
+/** The NFTs in `assets`. */
+export const nftCount = (assets: Asset[]): number => assets.filter((a) => a.assetType === AssetType.ERC721).length;
 
+/**
+ * What a maker's fee is multiplied by (`DeClubIntents`' per-NFT fee, ADR 0033): the NFTs they
+ * give, or one if they give none.
+ */
+export const feeUnits = (give: Asset[]): bigint => BigInt(Math.max(nftCount(give), 1));
+
+export const domain = (chainId: number, verifyingContract: Address) => ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
+
+// The EIP-712 types are written out in each package on purpose: the app and the matcher deploy on their own, and e2e checks both against a third copy (IN-01).
+// jscpd:ignore-start
 export const types = {
   Asset: [
     { name: "assetType", type: "uint8" },
@@ -31,6 +36,7 @@ export const types = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+// jscpd:ignore-end
 
 /** Not part of the contract: a maker-signed request to the pool to drop an intent. */
 export const cancelTypes = {
@@ -99,8 +105,9 @@ export function covers(gives: Asset[], want: Asset[]): boolean {
 }
 
 /**
- * The contract's per-intent rules (`_validateIntent`), minus the `token.code.length` check which
- * needs the chain. Returns the first problem, or null.
+ * The contract's per-intent rules (`_validateIntent`) that need no chain read: shape, sizes and
+ * duplicates. The checks that need the chain (token code, ERC-165 NFT detection, expiry) and the fee
+ * are left to the matcher's simulation and the contract. Returns the first problem, or null.
  */
 export function shapeProblem(intent: Intent): string | null {
   if (isAddressEqual(intent.maker, zeroAddress)) return "maker is the zero address";
@@ -111,6 +118,7 @@ export function shapeProblem(intent: Intent): string | null {
     if (assets.length > MAX_ASSETS_PER_SIDE) {
       return `${side} has more than ${MAX_ASSETS_PER_SIDE} assets`;
     }
+    if (nftCount(assets) > MAX_NFTS_PER_SIDE) return `${side} has more than ${MAX_NFTS_PER_SIDE} NFTs`;
     for (const [i, a] of assets.entries()) {
       if (a.assetType === AssetType.ERC20) {
         if (a.id !== 0n || a.amount === 0n) return `${side}[${i}]: ERC-20 needs id 0 and amount > 0`;

@@ -32,9 +32,16 @@ export function liveStreak(prev: Streak | undefined, current: number): number {
   return prev && prev.n >= current - 1 ? prev.count : 0;
 }
 
-/** The streaks after epoch `n` is built: qualifying members advance, everyone else keeps theirs (and lets it lapse). */
+/**
+ * The streaks after epoch `n` is built: qualifying members advance, everyone else keeps theirs (and
+ * lets it lapse). A member already counted for `n` stays as they are, so redoing the step after a
+ * crash, or running it on streaks that were already moved, changes nothing (ADR 0054).
+ */
 export function nextStreaks(prev: Streaks, n: number, qualifiedUsers: Iterable<string>): Streaks {
   const out: Streaks = { ...prev };
-  for (const userId of qualifiedUsers) out[userId] = { n, count: streakAt(prev[userId], n, true) };
+  for (const userId of qualifiedUsers) {
+    if (prev[userId]?.n === n) continue;
+    out[userId] = { n, count: streakAt(prev[userId], n, true) };
+  }
   return out;
 }

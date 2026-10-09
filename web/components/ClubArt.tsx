@@ -8,7 +8,7 @@ const THEMES = 5;
  * Which of the brand covers in globals.css (`.club-theme-N`) a Club wears, from its address: the
  * same Club looks the same on every screen, and nobody has to pick a colour.
  */
-export function clubTheme(token: string): string {
+function clubTheme(token: string): string {
   // Every byte of the address folded together, so any change to it can move the colour.
   const bytes = token.replace(/^0x/, "").match(/../g) ?? [];
   const n = bytes.reduce((acc, byte) => acc ^ (parseInt(byte, 16) || 0), 0);

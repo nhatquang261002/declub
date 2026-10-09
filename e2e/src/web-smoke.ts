@@ -10,6 +10,7 @@
  */
 import assert from "node:assert/strict";
 import { arg, loadRootEnv, str } from "./lib/env.ts";
+import { poolInfo } from "./lib/pool.ts";
 import { type Case, Warning, finish, runCases } from "./lib/report.ts";
 
 loadRootEnv();
@@ -40,9 +41,9 @@ function off(c: Ctx, what: string) {
   throw new Warning(`${what} is off here, so only its "off" answer was checked`);
 }
 
-const PAGES = ["/", "/deals", "/create", "/history", "/clubs", "/guide", "/guide/clubs", "/account"];
+const PAGES = ["/", "/deals", "/create", "/history", "/clubs", "/guide", "/guide/deals", "/account"];
 /** Old routes that now redirect (the app's three redirect pages). */
-const REDIRECTS: Record<string, string> = { "/v2/create": "/create", "/intents/new": "/create", "/intents": "/deals" };
+const REDIRECTS: Record<string, string> = { "/create": "/create", "/intents/new": "/create", "/intents": "/deals" };
 /** Next.js's error boundary text, which a 200 can still carry. */
 const BROKEN = /Application error: a (client|server)-side exception has occurred|Internal Server Error/;
 
@@ -101,7 +102,9 @@ const cases: Case<Ctx>[] = [
       assert.ok(r.json, "not JSON");
       if (r.json.enabled === false) off(c, "the deal book (NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS)");
       assert.ok(Array.isArray(r.json.items), "no items array");
-      note(`${(r.json.items as unknown[]).length} items, total ${String(r.json.total)}${r.json.signedError ? `, signed swaps: ${String(r.json.signedError)}` : ""}`);
+      note(
+        `${(r.json.items as unknown[]).length} items, total ${String(r.json.total)}${r.json.signedError ? `, signed swaps: ${String(r.json.signedError)}` : ""}`,
+      );
       if (r.json.signedError) throw new Warning(`the book couldn't read signed swaps from the pool: ${String(r.json.signedError)}`);
       const all = await get(c, "/api/deals?tab=all");
       assert.equal(all.status, 200);
@@ -113,7 +116,11 @@ const cases: Case<Ctx>[] = [
     id: "WEB-04",
     title: "Per-user routes refuse anonymous and forged-token callers",
     async run(c, note) {
-      const routes: [string, string][] = [["GET", "/api/state"], ["GET", "/api/profile"], ["GET", "/api/me/clubs"]];
+      const routes: [string, string][] = [
+        ["GET", "/api/state"],
+        ["GET", "/api/profile"],
+        ["GET", "/api/me/clubs"],
+      ];
       const statuses: string[] = [];
       let disabled = 0;
       for (const [method, path] of routes) {
@@ -156,7 +163,9 @@ const cases: Case<Ctx>[] = [
       if (unsigned.status === 503) off(c, "Privy webhooks (PRIVY_WEBHOOK_SIGNING_SECRET)");
       assert.equal(unsigned.status, 401, `unsigned: ${unsigned.status}`);
       const forged = await post(c, "/api/webhooks/privy", body, {
-        "svix-id": "msg_e2e", "svix-timestamp": String(Math.floor(Date.now() / 1000)), "svix-signature": "v1,ZTJlLWZvcmdlZA==",
+        "svix-id": "msg_e2e",
+        "svix-timestamp": String(Math.floor(Date.now() / 1000)),
+        "svix-signature": "v1,ZTJlLWZvcmdlZA==",
       });
       assert.equal(forged.status, 401, `forged signature: ${forged.status}`);
     },
@@ -189,9 +198,7 @@ const cases: Case<Ctx>[] = [
     title: "The intent pool the app uses is up and settles through the app's contract",
     skip: (c) => (c.poolUrl ? null : "no NEXT_PUBLIC_POOL_URL / E2E_POOL_URL"),
     async run(c, note) {
-      const r = await fetch(`${c.poolUrl}/info`, { signal: AbortSignal.timeout(10_000) });
-      assert.equal(r.status, 200, `GET /info: ${r.status}`);
-      const info = (await r.json()) as { swap: string; chainId: number };
+      const info = await poolInfo<{ swap: string; chainId: number }>(c.poolUrl);
       note(`pool ${c.poolUrl}: chain ${info.chainId}, swap ${info.swap}`);
       if (c.intents) assert.equal(info.swap.toLowerCase(), c.intents.toLowerCase(), "the pool settles through another intents contract");
       const cors = await fetch(`${c.poolUrl}/intents?limit=1`, { headers: { origin: c.url }, signal: AbortSignal.timeout(10_000) });

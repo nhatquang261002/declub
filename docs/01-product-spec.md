@@ -2,7 +2,7 @@
 
 > **De(al) Club: your community's market, owned by its members.**
 >
-> Every Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.
+> Every verified Monad NFT collection gets a Club, and its memecoin comes with it. Members trade inside it, talk in posts they sign and own, and Holders earn a share of the fees their Club's swaps pay.
 
 ## 0. De(al) Club
 
@@ -14,10 +14,11 @@
 |---|---|---|
 | **Gather** | A Club per verified NFT collection (its memecoin joins it): its Market, a Board, its Members ranked by Momentum, Holder badges, an Owner and Moderators | [09 · Clubs](09-clubs.md), [ADR 0016](adr/0016-clubs-and-momentum.md) |
 | **Trade** | Members swap inside the Club, wallet to wallet or through escrow, with no trust between them | `DeClubEscrow`, `DeClubIntents` (sections 1–8 below) |
-| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its Holders, by holdings, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
+| **Own the market** | Each week 50% of the fees a Club's swaps pay goes to its active Holders (the Owner can limit it to the most active), split by NFT count, and 25% to its Club fund, which the Owner collects | `DeClubRewards`, [ADR 0022](adr/0022-club-rewards.md) |
+| **Grow** | Fees are one source of rewards. The Owner runs challenges (points, trophies, an NFT or token prize), and anyone can sponsor a week: the MON joins the Holders' pool and the sponsor is named | [ADR 0035](adr/0035-sponsored-epochs.md), [ADR 0045](adr/0045-club-challenges.md), [ADR 0050](adr/0050-challenge-rewards-beyond-points.md) |
 | **Own the conversation** | Posts and follows are signed by the member's wallet and exported in full; the reader picks how the Board is ordered | [ADR 0023](adr/0023-signed-posts-and-lenses.md) |
 
-**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared with every Holder of the Club. Rewards follow holdings, which cost something to have, not posting, which costs nothing.
+**Why it can't be farmed.** Every completed swap pays the full fee on each side; at most 75% of it comes back, shared by the Club's active Holders. You have to hold to be paid, and take part to reach the floor; payouts follow NFTs held, so a ring of small accounts earns about what its NFTs would. Holdings are averaged over the week; posting and swapping also raise the share by a capped bonus (up to 25%); swaps are worth at most 14 of the 35 points, and a repeat counterparty counts half.
 
 **What it isn't.** A rating of assets, or a promise that a Club is safe. Momentum and rewards say a market is busy; the Club still tells you to check every asset before you sign.
 
@@ -70,7 +71,7 @@ Neither party has to trust the other.
 | 4.1 | Chog #421 | Chog #812 | ✅ |
 | 4.2 | Chog #421 + 2 MON | Chog #812 | ✅ |
 | 4.3 | Chog #421 | Chog #812 + 3 MON | ✅ |
-| —   | Chog #421, #500 | Chog #812 | ✅ (up to 10 assets per side, any mix of ERC-721, ERC-20 and MON) |
+| —   | Chog #421, #500 | Chog #812 | ✅ (up to 10 assets per side, at most 5 of them NFTs; any mix of ERC-721, ERC-20 and MON) |
 | 4.4 | Chog #421 | *Any* Chog with Wizard Hat + Blue Eyes, plus 3 MON | ✅ trait request: `createTraitTrade` / `fillTraitTrade` in `DeClubEscrow` ([ADR 0006](adr/0006-trait-requests-in-v2.md)) |
 | 4.5 | Chog #421 | "Make me an offer" | ✅ open offer: takers lock proposals, the maker accepts one ([ADR 0007](adr/0007-open-offers.md)) |
 | 4.6 | Chog #421, nothing locked | Bob's NFT, or a ring of up to 4 | ✅ signed swap, settled by a matcher ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)) |
@@ -127,7 +128,7 @@ The original "My Chogs" page is gone: the NFT picker in Create lists what a wall
 - ✅ Open offers ([ADR 0007](adr/0007-open-offers.md))
 - ✅ Trade intents and automated matching: signed swaps and the matcher ([ADR 0008](adr/0008-trade-intents.md), [`matcher/`](../matcher/README.md))
 - ✅ Multi-party (ring) swaps, up to 4 ([ADR 0009](adr/0009-ring-swaps.md))
-- ✅ Protocol fee, a flat amount per side of a completed deal, adjustable by a fee admin within a ceiling; raises wait 7 days ([ADR 0015](adr/0015-protocol-fee.md), [0018](adr/0018-adjustable-protocol-fee.md))
+- ✅ Protocol fee, an amount for each NFT a side moves (once if none) in a completed deal, adjustable by a fee admin within a ceiling; raises wait 7 days ([ADR 0015](adr/0015-protocol-fee.md), [0018](adr/0018-adjustable-protocol-fee.md), [0033](adr/0033-fee-per-nft.md))
 - ✅ Verified profiles and deal-by-@handle ([ADR 0011](adr/0011-verified-profiles.md), [0017](adr/0017-deal-by-handle.md), [10 · Privy](10-privy.md))
 - ✅ Clubs: a community per verified asset, with Momentum ([ADR 0016](adr/0016-clubs-and-momentum.md), [09 · Clubs](09-clubs.md))
 - Reputation (Momentum is the first step)
@@ -142,7 +143,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 2. Alice posts on the Board: *"WTB any Chog with a crown"*. Her wallet signs it; the post shows **Signed**. Bob **follows** her and switches the Board's lens to **Following**.
 3. Carol links the project's X account under **Manage → The Club on X** with a proof post: the Club page shows "@ChogNFT ✓". Alice posts on X about the Club, mentioning it, and shares the link in a note: the card says **Counts**, and her Momentum rises.
 4. Bob and Dave swap Chogs in the Club's Market. Each side pays the fee; the Club's Momentum goes up.
-5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is in development), 25% to the Club fund (Carol). The operator funds it on chain.
+5. The epoch closes. `npm run rewards:epoch -- --publish` splits the Club's share of the fees: 50% to the active Holders (Alice, with her "+N% active" bonus for her X post; counting its likes and reposts is built, and off until `X_BEARER_TOKEN` is set), 25% to the Club fund (Carol). The operator funds it on chain.
 6. Alice opens the **Rewards** tab and claims her MON. Carol sees "the Club fund is ready" and collects it.
 7. Open `/api/clubs/<Chog>/feed` and `/api/rewards/epochs/<n>`: every post and every payout is public and verifiable.
 
@@ -157,7 +158,7 @@ Run it on a deployment of the current source, with `NEXT_PUBLIC_REWARDS_EPOCH_SE
 
 ## 10. Pitch
 
-> **De(al) Club gives every Monad NFT collection a Club where members trade, talk in posts they own, and Holders earn a share of the fees their market pays.**
+> **DeClub gives every verified Monad NFT collection a Club where members trade, talk in posts they own, and Holders earn a share of the fees their market pays.**
 >
 > *The people who make a market should own a piece of it.*
 

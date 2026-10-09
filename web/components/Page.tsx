@@ -29,7 +29,5 @@ export function RequireWallet({ children, reason }: { children: ReactNode; reaso
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <div className="page-section px-6 py-12 text-center text-sm text-muted">{children}</div>
-  );
+  return <div className="page-section px-6 py-12 text-center text-sm text-muted">{children}</div>;
 }

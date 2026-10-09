@@ -5,13 +5,13 @@ import type { Address } from "viem";
 import { useBalance, useReadContracts } from "wagmi";
 import { CHAIN_ID, DECLUB_INTENTS_ADDRESS } from "@/lib/config";
 import { erc20Abi, erc721Abi, wmonAbi } from "@/lib/contracts";
-import { erc20Asset, formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
+import { erc20Asset, feeUnits, formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
 import { sameAddress } from "@/lib/deals";
 import { formatMon } from "@/lib/format";
 import type { IntentFee } from "./useProtocolFee";
 import type { WriteCall } from "./useTxFlow";
 
-export type ApprovalStep = { key: string; label: string; call: WriteCall };
+type ApprovalStep = { key: string; label: string; call: WriteCall };
 
 /** How wide an NFT approval is: one token (the default, ADR 0008) or the whole collection. */
 export type NftScope = "token" | "collection";
@@ -26,8 +26,8 @@ export type NftScope = "token" | "collection";
  * the maker chose to approve the collection. Run `steps[0]` and the list shrinks by itself,
  * because useTxFlow refetches every query after a write.
  *
- * `fee` is the protocol fee `settle` takes from the maker's wallet in the fee token, after the
- * gives move (ADR 0015). It is counted on top of whatever the maker gives of that same token. A
+ * `fee` is the protocol fee per NFT given: `settle` takes it, times the NFTs in `give` (once if
+ * none), from the maker's wallet in the fee token, after the gives move (ADR 0015, 0033). It is counted on top of whatever the maker gives of that same token. A
  * maker short of the fee token but holding enough MON gets a "wrap" step first, so someone with
  * only MON never has to find WMON elsewhere.
  */
@@ -39,7 +39,7 @@ export function useIntentReadiness(
   fee?: IntentFee,
 ) {
   const spender = DECLUB_INTENTS_ADDRESS;
-  const feeToken = fee && fee.amount > 0n ? fee : undefined;
+  const feeToken = useMemo(() => (fee && fee.amount > 0n ? { token: fee.token, amount: fee.amount * feeUnits(give) } : undefined), [fee, give]);
   // Every ERC-20 the wallet has to hold and approve: what it gives, plus the fee token. When the
   // fee token is also given, one approval has to cover both.
   const needs = useMemo(() => {
@@ -59,17 +59,22 @@ export function useIntentReadiness(
   const native = useBalance({ address: owner, chainId: CHAIN_ID, query: { enabled: enabled && !!feeToken } });
   const result = useReadContracts({
     contracts: [
-      ...needs.flatMap((n) => [
-        { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "balanceOf", args: [owner!] },
-        { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "allowance", args: [owner!, spender!] },
-      ] as const),
-      ...nfts.flatMap((a) => [
-        { address: a.token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "ownerOf", args: [a.id] },
-        { address: a.token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "getApproved", args: [a.id] },
-      ] as const),
+      ...needs.flatMap(
+        (n) =>
+          [
+            { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "balanceOf", args: [owner!] },
+            { address: n.token, abi: erc20Abi, chainId: CHAIN_ID, functionName: "allowance", args: [owner!, spender!] },
+          ] as const,
+      ),
+      ...nfts.flatMap(
+        (a) =>
+          [
+            { address: a.token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "ownerOf", args: [a.id] },
+            { address: a.token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "getApproved", args: [a.id] },
+          ] as const,
+      ),
       ...collections.map(
-        (token) =>
-          ({ address: token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "isApprovedForAll", args: [owner!, spender!] }) as const,
+        (token) => ({ address: token, abi: erc721Abi, chainId: CHAIN_ID, functionName: "isApprovedForAll", args: [owner!, spender!] }) as const,
       ),
     ],
     query: { enabled },

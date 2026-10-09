@@ -4,7 +4,7 @@ import type { TokenInfo } from "../assets";
 import { chain } from "../chain";
 import { DECLUB_INTENTS_ADDRESS, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import type { BookSource } from "../dealBook";
-import { toDealV2, type DealV2 } from "../dealsV2";
+import { toDeal, type Deal } from "../deals";
 import { intentAsListing, type PoolIntent } from "../intents";
 import { listIntents } from "../pool";
 
@@ -28,15 +28,15 @@ import { listIntents } from "../pool";
 export type BookReader = {
   tradeCount(): Promise<bigint>;
   /** Same order as `ids`. null where a deal can't be read or uses an asset type this build doesn't know. */
-  trades(ids: readonly bigint[]): Promise<(DealV2 | null)[]>;
+  trades(ids: readonly bigint[]): Promise<(Deal | null)[]>;
   /** Symbol and decimals of each token that answers. */
   tokenInfo(tokens: readonly Address[]): Promise<Map<string, TokenInfo>>;
 };
 
 /** The pool's book (matcher/). null when the intents contract isn't configured. */
-export type IntentReader = ((status: "open" | "all") => Promise<PoolIntent[]>) | null;
+type IntentReader = ((status: "open" | "all") => Promise<PoolIntent[]>) | null;
 
-export type BookOptions = {
+type BookOptions = {
   /** How old the book may get before a request refreshes it. */
   ttlMs?: number;
   /** `getTrade` reads per multicall. A deal holds up to 20 assets, so this keeps a response small. */
@@ -62,20 +62,20 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
   const tokenRetryMs = options.tokenRetryMs ?? 10 * 60_000;
   const now = options.now ?? Date.now;
 
-  const closed = new Map<bigint, DealV2>();
+  const closed = new Map<bigint, Deal>();
   const tokens = new Map<string, TokenInfo>();
   const tokenMisses = new Map<string, number>();
-  let deals: { at: number; list: DealV2[] } | null = null;
-  let refreshing: Promise<DealV2[]> | null = null;
+  let deals: { at: number; list: Deal[] } | null = null;
+  let refreshing: Promise<Deal[]> | null = null;
   const pool = new Map<"open" | "all", { at: number; rows: PoolIntent[] }>();
   const polling = new Map<"open" | "all", Promise<PoolIntent[]>>();
 
-  async function readDeals(): Promise<DealV2[]> {
+  async function readDeals(): Promise<Deal[]> {
     const total = await reader.tradeCount();
     const stale: bigint[] = [];
     for (let id = total; id >= 1n; id--) if (!closed.has(id)) stale.push(id);
 
-    const fresh = new Map<bigint, DealV2>();
+    const fresh = new Map<bigint, Deal>();
     let next = 0;
     await Promise.all(
       Array.from({ length: parallel }, async () => {
@@ -91,7 +91,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
       }),
     );
 
-    const list: DealV2[] = [];
+    const list: Deal[] = [];
     for (let id = total; id >= 1n; id--) {
       const deal = closed.get(id) ?? fresh.get(id);
       if (deal) list.push(deal);
@@ -100,7 +100,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     return list;
   }
 
-  async function readTokens(list: readonly DealV2[]) {
+  async function readTokens(list: readonly Deal[]) {
     const wanted = new Set<string>();
     for (const deal of list) {
       for (const a of [...deal.offered, ...deal.requested]) {
@@ -125,7 +125,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     }
   }
 
-  async function currentDeals(): Promise<DealV2[]> {
+  async function currentDeals(): Promise<Deal[]> {
     if (deals && now() - deals.at < ttlMs) return deals.list;
     refreshing ??= readDeals()
       .then((list) => {
@@ -165,9 +165,15 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     async source(tab) {
       const [list, open, all] = await Promise.all([
         currentDeals(),
-        currentIntents("open").then((rows) => ({ rows, error: null }), (error: unknown) => ({ rows: [], error })),
+        currentIntents("open").then(
+          (rows) => ({ rows, error: null }),
+          (error: unknown) => ({ rows: [], error }),
+        ),
         tab === "all"
-          ? currentIntents("all").then((rows) => ({ rows, error: null }), (error: unknown) => ({ rows: [], error }))
+          ? currentIntents("all").then(
+              (rows) => ({ rows, error: null }),
+              (error: unknown) => ({ rows: [], error }),
+            )
           : Promise.resolve(null),
       ]);
       const failed = open.error ?? all?.error;
@@ -185,7 +191,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
 let cachedClient: PublicClient | undefined;
 const client = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-export function viemBookReader(contract: Address): BookReader {
+function viemBookReader(contract: Address): BookReader {
   return {
     tradeCount: () => client().readContract({ address: contract, abi: deClubEscrowAbi, functionName: "tradeCount" }),
     async trades(ids) {
@@ -193,14 +199,17 @@ export function viemBookReader(contract: Address): BookReader {
         contracts: ids.map((id) => ({ address: contract, abi: deClubEscrowAbi, functionName: "getTrade", args: [id] }) as const),
         allowFailure: true,
       });
-      return results.map((r, i) => (r.status === "success" ? toDealV2(ids[i], r.result) : null));
+      return results.map((r, i) => (r.status === "success" ? toDeal(ids[i], r.result) : null));
     },
     async tokenInfo(list) {
       const results = await client().multicall({
-        contracts: list.flatMap((address) => [
-          { address, abi: erc20Abi, functionName: "symbol" },
-          { address, abi: erc20Abi, functionName: "decimals" },
-        ] as const),
+        contracts: list.flatMap(
+          (address) =>
+            [
+              { address, abi: erc20Abi, functionName: "symbol" },
+              { address, abi: erc20Abi, functionName: "decimals" },
+            ] as const,
+        ),
         allowFailure: true,
       });
       const out = new Map<string, TokenInfo>();

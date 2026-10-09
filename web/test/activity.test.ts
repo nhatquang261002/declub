@@ -6,7 +6,7 @@ import { activityKey, ingestTx, readActivity, recordActivity, type ReceiptLike, 
 import { fillsKey, listFills, recordFills } from "../lib/server/fills";
 import { memoryStore, type Store } from "../lib/server/store";
 
-const V2: Address = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
+const ESCROW: Address = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
 const NFT: Address = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const USD: Address = "0xd300f095f456D59AAc122B0100833fE195136F6c";
 const OTHER: Address = getAddress("0x00000000000000000000000000000000000000f1");
@@ -33,9 +33,9 @@ function log(address: Address, eventName: string, args: Record<string, unknown>,
   return { address, data, topics, logIndex };
 }
 
-const created = (offered: Raw[], requested: Raw[], logIndex = 0, address = V2) =>
+const created = (offered: Raw[], requested: Raw[], logIndex = 0, address = ESCROW) =>
   log(address, "TradeCreated", { tradeId: 7n, maker, taker: zeroAddress, offered, requested, expiry: 0n }, logIndex);
-const filled = (logIndex = 0, address = V2) => log(address, "TradeFilled", { tradeId: 7n, maker, taker }, logIndex);
+const filled = (logIndex = 0, address = ESCROW) => log(address, "TradeFilled", { tradeId: 7n, maker, taker }, logIndex);
 const receipt = (logs: ReturnType<typeof log>[], status: "success" | "reverted" = "success"): ReceiptLike => ({ status, blockNumber: 99n, logs });
 
 function fakeReader(over: { receipt?: Reader["receipt"]; trade?: { offered: Raw[]; requested: Raw[] }; proposal?: Raw[] } = {}) {
@@ -59,7 +59,7 @@ function fakeReader(over: { receipt?: Reader["receipt"]; trade?: { offered: Raw[
 }
 
 const clubOf = (token: string) => [NFT, USD].find((t) => t.toLowerCase() === token.toLowerCase()) ?? null;
-const opts = (reader: Reader) => ({ reader, contracts: [V2], clubOf });
+const opts = (reader: Reader) => ({ reader, contracts: [ESCROW], clubOf });
 
 describe("recordActivity", () => {
   let store: Store;
@@ -76,7 +76,7 @@ describe("recordActivity", () => {
       assert.deepEqual(event, {
         id: `${HASH}:0`,
         kind: "created",
-        contract: V2.toLowerCase(),
+        contract: ESCROW.toLowerCase(),
         deal: "7",
         block: 99,
         at: AT,
@@ -138,15 +138,15 @@ describe("recordActivity", () => {
 
   it("records a fill's protocol fee from the receipt, for that deal only", async () => {
     const { reader } = fakeReader({ trade: { offered: [nft(NFT)], requested: [] } });
-    const fee = log(V2, "FeeCharged", { tradeId: 7n, recipient: OTHER, amount: 4_000_000_000_000_000_000n }, 1);
-    const otherDeal = log(V2, "FeeCharged", { tradeId: 8n, recipient: OTHER, amount: 1n }, 2);
+    const fee = log(ESCROW, "FeeCharged", { tradeId: 7n, recipient: OTHER, amount: 4_000_000_000_000_000_000n }, 1);
+    const otherDeal = log(ESCROW, "FeeCharged", { tradeId: 8n, recipient: OTHER, amount: 1n }, 2);
     await recordActivity(store, HASH, receipt([filled(0), fee, otherDeal]), opts(reader));
     assert.equal((await readActivity(store, NFT))[0]!.fee, "4000000000000000000");
   });
 
   it("adds the proposal's assets when a fill came from accepting one", async () => {
     const { reader, calls } = fakeReader({ trade: { offered: [nft(OTHER)], requested: [] }, proposal: [erc20(USD, 4n)] });
-    const accepted = log(V2, "ProposalAccepted", { tradeId: 7n, proposalId: 2n }, 1);
+    const accepted = log(ESCROW, "ProposalAccepted", { tradeId: 7n, proposalId: 2n }, 1);
     await recordActivity(store, HASH, receipt([filled(0), accepted]), opts(reader));
     assert.equal(calls.proposal, 1);
     assert.equal((await readActivity(store, USD))[0]!.kind, "swapped");
@@ -162,7 +162,7 @@ describe("recordActivity", () => {
 
   it("ignores logs that aren't this contract's events", async () => {
     const { reader } = fakeReader();
-    const junk = { address: V2, data: "0x" as Hex, topics: [("0x" + "11".repeat(32)) as Hex], logIndex: 0 };
+    const junk = { address: ESCROW, data: "0x" as Hex, topics: [("0x" + "11".repeat(32)) as Hex], logIndex: 0 };
     assert.equal(await recordActivity(store, HASH, receipt([junk]), opts(reader)), 0);
   });
 
@@ -180,7 +180,10 @@ describe("recordActivity", () => {
     await recordActivity(store, HASH2, receipt([filled()]), opts(later.reader));
     await store.rank(activityKey(NFT), [{ member: "not json", score: AT + 999 }], 10);
     const events = await readActivity(store, NFT);
-    assert.deepEqual(events.map((e) => e.kind), ["swapped", "created"]);
+    assert.deepEqual(
+      events.map((e) => e.kind),
+      ["swapped", "created"],
+    );
   });
 
   it("keeps each chain's and each Club's log apart", async () => {
@@ -206,15 +209,15 @@ describe("ingestTx", () => {
 describe("recordFills (shared with History)", () => {
   it("still records a fill under the taker", async () => {
     const store = memoryStore();
-    const fill = log(V2, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(ESCROW, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill])), 1);
-    assert.deepEqual(await listFills(store, V2, taker), ["7"]);
-    assert.equal(fillsKey(V2, taker), fillsKey(V2, taker.toLowerCase()));
+    assert.deepEqual(await listFills(store, ESCROW, taker), ["7"]);
+    assert.equal(fillsKey(ESCROW, taker), fillsKey(ESCROW, taker.toLowerCase()));
   });
 
   it("records nothing for a reverted transaction or another contract", async () => {
     const store = memoryStore();
-    const fill = log(V2, "TradeFilled", { tradeId: 7n, maker, taker });
+    const fill = log(ESCROW, "TradeFilled", { tradeId: 7n, maker, taker });
     assert.equal(await recordFills(store, receipt([fill], "reverted")), 0);
     assert.equal(await recordFills(store, receipt([log(OTHER, "TradeFilled", { tradeId: 7n, maker, taker })])), 0);
   });

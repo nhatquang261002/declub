@@ -90,9 +90,18 @@ export function verifyWebhook(body: string, headers: Headers): unknown | null {
 export async function findUserIdByHandle(provider: ProfileProvider, username: string): Promise<string | null> {
   const users = client().users();
   try {
-    const user =
-      provider === "twitter" ? await users.getByTwitterUsername({ username }) : await users.getByDiscordUsername({ username });
+    const user = provider === "twitter" ? await users.getByTwitterUsername({ username }) : await users.getByDiscordUsername({ username });
     return user.id;
+  } catch (error) {
+    if (error instanceof NotFoundError) return null;
+    throw error;
+  }
+}
+
+/** The user who has linked this wallet, or `null` if nobody has. For restoring a membership from its signature (ADR 0053). */
+export async function findUserByWallet(address: string): Promise<User | null> {
+  try {
+    return await client().users().getByWalletAddress({ address });
   } catch (error) {
     if (error instanceof NotFoundError) return null;
     throw error;

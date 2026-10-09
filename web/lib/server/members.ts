@@ -3,6 +3,7 @@ import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { toScored, type ActivityEvent } from "../clubs";
 import {
+  HOLDER_SELF_RECHECK_MS,
   MAX_MEMBERS,
   RECHECK_PER_READ,
   coinRule,
@@ -14,7 +15,9 @@ import {
   type MemberRow,
   type MemberSort,
   type CoinRule,
+  type MembersPaging,
   type MembersView,
+  type PublicMember,
 } from "../members";
 import { score } from "../momentum";
 import { profileKey, userWalletsKey, type StoredProfile } from "../profiles";
@@ -23,17 +26,34 @@ import { withoutUser } from "../clubRoles";
 import { epochAt } from "../rewards";
 import { isBanned, loadProfile, loadRoles, saveRoles } from "./clubState";
 import { liveStreak, readStreaks } from "./streaks";
+import { trophiesKey } from "./challengeState";
+import type { Trophy } from "../challenges";
 import type { Store } from "./store";
 
 /**
  * Club membership in the store (ADR 0016, docs/09-clubs.md). A member is a Privy user, kept by
  * user id; their wallets are copied from Privy's linked accounts, never from a request. The Holder
- * badge is a balance read on the server and is out of date by at most a day.
+ * badge is a balance read on the server and is usually out of date by less than a day (see `listMembers`).
  */
 
 export const membersKey = (token: string) => `declub:club:${CHAIN_ID}:${token.toLowerCase()}:members`;
 export const memberKey = (token: string, userId: string) => `declub:club-member:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
+/** The member's signed consent to be listed (ADR 0053), by user id like the row it backs. */
+export const joinRecordKey = (token: string, userId: string) => `declub:club-join:${CHAIN_ID}:${token.toLowerCase()}:${userId}`;
 export const userClubsKey = (userId: string) => `declub:user-clubs:${userId}`;
+/**
+ * The memberships shown under a wallet (ADR 0042), as `token:userId`. Only a member's display wallet
+ * is indexed, the one the Members list already shows, so a profile says no more than the Clubs do:
+ * their other linked wallets are not tied to them here.
+ */
+export const walletMembershipsKey = (wallet: string) => `declub:wallet-clubs:${CHAIN_ID}:${wallet.toLowerCase()}`;
+
+/** Moves a membership's entry from the wallet it was shown under to the one it is shown under now. Idempotent. */
+async function reindex(store: Store, token: string, userId: string, from: string | undefined, to: string | undefined) {
+  const entry = `${token.toLowerCase()}:${userId}`;
+  if (from && from.toLowerCase() !== to?.toLowerCase()) await store.removeMember(walletMembershipsKey(from), entry);
+  if (to) await store.addMember(walletMembershipsKey(to), entry);
+}
 
 /**
  * One balance per wallet, in the same order, or `null` when the chain can't be read. The same
@@ -103,18 +123,30 @@ async function checked(entry: ClubEntry, row: MemberRow, deps: MemberDeps, coin:
   return { ...row, holder: results.includes(true), holderCheckedAt: nowOf(deps) };
 }
 
-export type JoinResult =
-  | { ok: true; row: MemberRow }
-  | { ok: false; reason: "archived" | "no_wallet" | "full" | "banned" };
-
-/** Joins `userId` to the Club. Joining twice is the same as once. */
-export async function joinClub(
+/**
+ * The member's row with the Holder badge re-read from the chain when its last check is older than
+ * `maxAge` (ms), saved if it changed; null for a non-member. For the member's own reads (their
+ * membership, a Holders-only entry), so an NFT bought in a swap counts within a minute rather than at
+ * the list's daily re-check (`HOLDER_RECHECK_MS`).
+ */
+export async function freshHolder(
   store: Store,
   entry: ClubEntry,
   userId: string,
-  wallets: readonly string[],
   deps: MemberDeps = {},
-): Promise<JoinResult> {
+  maxAge = HOLDER_SELF_RECHECK_MS,
+): Promise<MemberRow | null> {
+  const row = await getMember(store, entry.address, userId);
+  if (!row || nowOf(deps) - row.holderCheckedAt < maxAge) return row;
+  const next = await checked(entry, row, deps, (await coinRuleOf(store, entry))?.rule);
+  if (next !== row) await store.set(memberKey(entry.address, userId), next);
+  return next;
+}
+
+type JoinResult = { ok: true; row: MemberRow } | { ok: false; reason: "archived" | "no_wallet" | "full" | "banned" };
+
+/** Joins `userId` to the Club. Joining twice is the same as once. */
+export async function joinClub(store: Store, entry: ClubEntry, userId: string, wallets: readonly string[], deps: MemberDeps = {}): Promise<JoinResult> {
   if (entry.club === "archived") return { ok: false, reason: "archived" };
   if (wallets.length === 0) return { ok: false, reason: "no_wallet" };
   if (await isBanned(store, entry.address, userId)) return { ok: false, reason: "banned" };
@@ -131,6 +163,7 @@ export async function joinClub(
   await store.set(memberKey(entry.address, userId), row);
   await store.addMember(membersKey(entry.address), userId);
   await store.addMember(userClubsKey(userId), entry.address.toLowerCase());
+  await reindex(store, entry.address, userId, existing?.displayWallet, row.displayWallet);
   return { ok: true, row };
 }
 
@@ -142,8 +175,10 @@ export async function joinClub(
 export async function leaveClub(store: Store, token: string, userId: string): Promise<void> {
   const roles = await loadRoles(store, token);
   if (roles.owner === userId || roles.moderators.includes(userId)) await saveRoles(store, token, withoutUser(roles, userId));
-  await store.del(memberKey(token, userId));
+  const row = await getMember(store, token, userId);
+  await store.del(memberKey(token, userId), joinRecordKey(token, userId));
   await store.removeMember(membersKey(token), userId);
+  await reindex(store, token, userId, row?.displayWallet, undefined);
   await store.removeMember(userClubsKey(userId), token.toLowerCase());
 }
 
@@ -170,8 +205,21 @@ export async function syncMemberships(store: Store, userId: string, wallets: rea
       if (!row) return store.removeMember(userClubsKey(userId), token);
       const next = withWallets(row, wallets, display);
       if (next !== row) await store.set(memberKey(token, userId), next);
+      // Also fills in memberships made before the index existed, the next time their owner is read.
+      await reindex(store, token, userId, row.displayWallet, next.displayWallet);
     }),
   );
+}
+
+/** A wallet's memberships as the Members lists show them: the Clubs it is listed in, with the member's row. */
+export async function membershipsOfWallet(store: Store, wallet: string): Promise<{ token: string; row: MemberRow }[]> {
+  const entries = (await store.members(walletMembershipsKey(wallet))).flatMap((entry) => {
+    const at = entry.indexOf(":");
+    return at > 0 ? [{ token: entry.slice(0, at), userId: entry.slice(at + 1) }] : [];
+  });
+  const rows = await store.getMany<MemberRow>(entries.map((e) => memberKey(e.token, e.userId)));
+  // The index can lag a change by a moment; only a row that still shows this wallet counts.
+  return entries.flatMap((e, i) => (rows[i]?.displayWallet === wallet.toLowerCase() ? [{ token: e.token, row: rows[i]! }] : []));
 }
 
 /** Every member's row. Ids with no row (a half-finished leave) are skipped. */
@@ -186,7 +234,7 @@ export const memberCount = (store: Store, token: string) => store.countMembers(m
 
 /**
  * The Club's members, ranked. Balances older than a day are re-read first (at most
- * `RECHECK_PER_READ` per call, in one multicall each), so the badge never lags by more than that.
+ * `RECHECK_PER_READ` per call, in one multicall each), so the badge usually lags by less than a day; a big or unread Club can lag longer.
  */
 export async function listMembers(
   store: Store,
@@ -195,6 +243,7 @@ export async function listMembers(
   sort: MemberSort,
   nowSec: number,
   deps: MemberDeps = {},
+  paging?: MembersPaging,
 ): Promise<MembersView> {
   let rows = await allRows(store, entry.address);
   const coin = await coinRuleOf(store, entry);
@@ -211,7 +260,31 @@ export async function listMembers(
   const current = epochAt(nowSec);
   const recorded = await readStreaks(store, entry.address);
   const streaks = new Map(rows.map((row) => [row.userId, liveStreak(recorded[row.userId], current)]));
-  return rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks);
+  // Handles are read only for a search: they live in the profile store, one lookup per member.
+  let handles: Map<string, string> | undefined;
+  if (paging?.query?.trim()) {
+    const profiles = await store.getMany<StoredProfile>(rows.map((row) => profileKey(row.displayWallet)));
+    handles = new Map();
+    rows.forEach((row, i) => {
+      const profile = profiles[i];
+      if (profile && profile.userId === row.userId) handles!.set(row.displayWallet, profile.handle);
+    });
+  }
+  const view = rankMembers(rows, scores, events, sort, await loadRoles(store, entry.address), streaks, paging && { ...paging, handles });
+  return { ...view, members: await withTrophies(store, entry.address.toLowerCase(), rows, view.members) };
+}
+
+/**
+ * The page's members with the challenges each won in this Club (ADR 0050), read for that page only.
+ * Only wins published under the wallet the row shows count, so the list never ties two wallets.
+ */
+async function withTrophies(store: Store, club: string, rows: readonly MemberRow[], members: PublicMember[]): Promise<PublicMember[]> {
+  const userOf = new Map(rows.map((row) => [row.displayWallet, row.userId]));
+  const lists = await store.getMany<Trophy[]>(members.map((m) => trophiesKey(userOf.get(m.wallet) ?? "")));
+  return members.map((m, i) => {
+    const won = (lists[i] ?? []).filter((t) => t.club === club && t.wallet === m.wallet);
+    return won.length > 0 ? { ...m, trophies: won.map((t) => ({ challenge: t.challenge, title: t.title, place: t.place })) } : m;
+  });
 }
 
 /** How many members hold the asset, as of their last check. Reads every row. */

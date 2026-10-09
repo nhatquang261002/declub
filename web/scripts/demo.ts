@@ -8,6 +8,7 @@
  *   node --import ./test/register.mjs scripts/demo.ts chain     # mint the holdings, fund the personas, hand over the mirrors
  *   node --import ./test/register.mjs scripts/demo.ts trades    # the swaps, recorded to each Club's activity
  *   node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
+ *   node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
  *   node --import ./test/register.mjs scripts/demo.ts art       # each Club's tile art, into public/art/clubs/ (convert
  *                                                               # to a ~480px PNG after: Chog's is WebP)
  *   node --import ./test/register.mjs scripts/demo.ts status    # addresses and balances
@@ -23,9 +24,24 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadEnv } from "./env";
+import { loadEnv, requireStore } from "./env";
 import type { Address, Hex } from "viem";
-import { CLUBS, EXTRA_MEMBERS, FOLLOWS, HOLDINGS, PERSONAS, POSTS, TRADES, type ClubKey, type HolderKey, type PersonaKey, type Side } from "./demo/content";
+import type { StoredChallenge } from "../lib/challenges";
+import type { StoredPost } from "../lib/clubPosts";
+import {
+  CHALLENGES,
+  CLUBS,
+  EXTRA_MEMBERS,
+  FOLLOWS,
+  HOLDINGS,
+  PERSONAS,
+  POSTS,
+  TRADES,
+  type ClubKey,
+  type HolderKey,
+  type PersonaKey,
+  type Side,
+} from "./demo/content";
 
 const web = path.resolve(import.meta.dirname, "..");
 loadEnv(web);
@@ -36,7 +52,11 @@ const STATE = path.join(DIR, "state.json");
 
 type Wallets = { bank: Hex; personas: Record<PersonaKey, Hex> };
 /** What the trades step did, so a rerun skips it. Keyed by the trade's index in TRADES. */
-type State = { trades: Record<string, { tradeId: string; created: Hex; filled?: Hex }> };
+type State = {
+  trades: Record<string, { tradeId: string; created: Hex; filled?: Hex }>;
+  /** What the challenges step made: each challenge's id, by its key in CHALLENGES. */
+  challenges?: Record<string, string>;
+};
 
 const personaKeys = Object.keys(PERSONAS) as PersonaKey[];
 const clubKeys = Object.keys(CLUBS) as ClubKey[];
@@ -119,12 +139,35 @@ async function main() {
   const mirrorAbi = parseAbi(MIRROR_ABI);
   const clientOf = (key: Hex) => createWalletClient({ account: privateKeyToAccount(key), chain, transport: http(RPC_URL) });
 
+  /**
+   * Monad reverts (and still bills) a wallet's transaction when the wallet holds under 10 MON and sent another one in the last
+   * few blocks (its reserve balance rule), so a wallet's transactions are spaced out: the approval, then the trade.
+   */
+  const lastSent = new Map<string, number>();
+  const SPACING_MS = 3_000;
+  const spaced = async (address: Address) => {
+    const wait = (lastSent.get(address) ?? 0) + SPACING_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  };
+
   /** Sends one transaction and waits for it, failing loudly on a revert. */
   const send = async (key: Hex, request: { address: Address; abi: readonly unknown[]; functionName: string; args?: readonly unknown[]; value?: bigint }) => {
     // The estimate can come in a hair under what a fill really uses, and Monad bills the limit: triple the estimate, since Monad prices cold storage reads above the estimate.
-    const gas = await pub.estimateContractGas({ ...request, account: privateKeyToAccount(key).address } as never);
-    const hash = await clientOf(key).writeContract({ ...request, gas: gas * 3n } as never);
+    // But a wallet must afford the whole limit at the max fee (or the transaction fails and still pays), so the max fee is set here
+    // (1.3x the base fee, plus the tip) and the limit is capped at what the wallet can cover at that fee.
+    const from = privateKeyToAccount(key).address;
+    await spaced(from);
+    const estimate = await pub.estimateContractGas({ ...request, account: from } as never);
+    const wanted = (estimate * BigInt(process.env.DEMO_GAS_PCT || 300)) / 100n;
+    const tip = 2_000_000_000n;
+    const maxFeePerGas = (((await pub.getBlock()).baseFeePerGas ?? 100_000_000_000n) * 13n) / 10n + tip;
+    const balance = await pub.getBalance({ address: from });
+    const affordable = (((balance - (request.value ?? 0n)) / maxFeePerGas) * 95n) / 100n;
+    if (affordable < estimate) throw new Error(`${from} can't afford ${request.functionName}: ${formatEther(balance)} MON`);
+    const gas = wanted < affordable ? wanted : affordable;
+    const hash = await clientOf(key).writeContract({ ...request, gas, maxFeePerGas, maxPriorityFeePerGas: tip } as never);
     const receipt = await pub.waitForTransactionReceipt({ hash });
+    lastSent.set(from, Date.now());
     if (receipt.status !== "success") throw new Error(`${request.functionName} reverted: ${hash}`);
     return receipt;
   };
@@ -208,7 +251,13 @@ async function main() {
     const { IPFS_GATEWAY } = await import("../lib/config");
     for (const c of clubKeys) {
       const file = path.join(web, "public", CLUBS[c].image);
-      if (await readFile(file).then(() => true, () => false)) continue;
+      if (
+        await readFile(file).then(
+          () => true,
+          () => false,
+        )
+      )
+        continue;
       const meta = (await readMetadata(CLUBS[c].art)) as { image?: string } | null;
       if (!meta?.image) throw new Error(`${c}: no image in ${CLUBS[c].art}`);
       const url = meta.image.startsWith("ipfs://") ? IPFS_GATEWAY + meta.image.slice("ipfs://".length) : meta.image;
@@ -222,9 +271,7 @@ async function main() {
   }
 
   // The steps below write to the app's store.
-  if (!(process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL)) {
-    throw new Error("No store: set the Upstash credentials the app uses (UPSTASH_REDIS_REST_URL / _TOKEN).");
-  }
+  requireStore();
   const { getStore } = await import("../lib/server/store");
   const { registry } = await import("../lib/verifiedAssets");
   const store = getStore()!;
@@ -232,6 +279,25 @@ async function main() {
     const entry = registry.clubFor(clubAddress(c));
     if (!entry) throw new Error(`${clubAddress(c)} (${c}) has no Club: add it to web/data/assets.json.`);
     return entry;
+  };
+
+  /** The presenter's Privy user, found by their wallet: they must have signed in to the app once. */
+  const findPresenter = async (): Promise<{ id: string; wallets: Address[] } | null> => {
+    const secret = process.env.PRIVY_APP_SECRET?.trim();
+    const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
+    if (!presenter || !secret || !appId) {
+      console.warn("Without DEMO_PRESENTER_WALLET, NEXT_PUBLIC_PRIVY_APP_ID and PRIVY_APP_SECRET the presenter isn't added.");
+      return null;
+    }
+    const { PrivyClient } = await import("@privy-io/node");
+    const { linkedEthereumWallets } = await import("../lib/profiles");
+    try {
+      const user = await new PrivyClient({ appId, appSecret: secret }).users().getByWalletAddress({ address: presenter });
+      return { id: user.id, wallets: linkedEthereumWallets(user.linked_accounts) };
+    } catch (error) {
+      console.warn(`No Privy user links ${presenter}: sign in to the app with it once, then run this step again.`, error instanceof Error ? error.message : "");
+      return null;
+    }
   };
 
   if (step === "trades") {
@@ -295,7 +361,13 @@ async function main() {
       if (!t.taker) continue;
       await approve(t.taker, t.wants);
       const price = "mon" in t.wants ? parseEther(t.wants.mon) : 0n;
-      const receipt = await send(wallets.personas[t.taker], { address: escrow, abi: deClubEscrowAbi, functionName: "fillTrade", args: [tradeId], value: price + fee });
+      const receipt = await send(wallets.personas[t.taker], {
+        address: escrow,
+        abi: deClubEscrowAbi,
+        functionName: "fillTrade",
+        args: [tradeId],
+        value: price + fee,
+      });
       await record(receipt.transactionHash);
       state.trades[i]!.filled = receipt.transactionHash;
       await save();
@@ -313,40 +385,31 @@ async function main() {
     const { setNftAvatar } = await import("../lib/server/avatars");
     const { cleanText, checkProfileEdit } = await import("../lib/clubPosts");
     const { postTypedData, followTypedData, linkString } = await import("../lib/social");
-    const { linkedEthereumWallets } = await import("../lib/profiles");
 
     const state = (await readJson<State>(STATE)) ?? { trades: {} };
     const now = Date.now();
     const seconds = (ms: number) => Math.floor(ms / 1000);
 
     // The presenter's Privy user, so they can be a member and the Chog Club's Owner.
-    let presenterUser: { id: string; wallets: Address[] } | null = null;
-    const secret = process.env.PRIVY_APP_SECRET?.trim();
-    const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
-    if (presenter && secret && appId) {
-      const { PrivyClient } = await import("@privy-io/node");
-      try {
-        const user = await new PrivyClient({ appId, appSecret: secret }).users().getByWalletAddress({ address: presenter });
-        presenterUser = { id: user.id, wallets: linkedEthereumWallets(user.linked_accounts) };
-      } catch (error) {
-        console.warn(`No Privy user links ${presenter}: sign in to the app with it once, then run this step again.`, error instanceof Error ? error.message : "");
-      }
-    } else {
-      console.warn("Without DEMO_PRESENTER_WALLET, NEXT_PUBLIC_PRIVY_APP_ID and PRIVY_APP_SECRET the presenter isn't added.");
-    }
-    const userIdOf = (k: HolderKey) => (k === "you" ? presenterUser?.id ?? null : demoUserId(k));
+    const presenterUser = await findPresenter();
+    const userIdOf = (k: HolderKey) => (k === "you" ? (presenterUser?.id ?? null) : demoUserId(k));
 
     // 1. Profiles: each persona shares a Discord handle (posting needs a shared profile).
     for (const k of personaKeys) {
-      await syncProfile(store, demoUserId(k), [{ type: "wallet", chain_type: "ethereum", address: persona(k).address }, { type: "discord_oauth", username: PERSONAS[k].handle }] as never, false);
+      await syncProfile(
+        store,
+        demoUserId(k),
+        [
+          { type: "wallet", chain_type: "ethereum", address: persona(k).address },
+          { type: "discord_oauth", username: PERSONAS[k].handle },
+        ] as never,
+        false,
+      );
     }
     console.log(`profiles: ${personaKeys.length}`);
 
     // 2. Members: everyone in each Club they hold in, plus EXTRA_MEMBERS; joined before their first post.
-    const memberships: [HolderKey, ClubKey][] = [
-      ...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])),
-      ...EXTRA_MEMBERS,
-    ];
+    const memberships: [HolderKey, ClubKey][] = [...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])), ...EXTRA_MEMBERS];
     for (const [k, c] of memberships) {
       const userId = userIdOf(k);
       if (!userId) continue;
@@ -456,7 +519,181 @@ async function main() {
     return;
   }
 
-  throw new Error("Steps: wallets, chain, trades, social, art, status.");
+  if (step === "challenges") {
+    const { randomInt, randomUUID } = await import("node:crypto");
+    const { cancelChallenge, createChallenge, enterChallenge, listChallenges, settleDue } = await import("../lib/server/challenges");
+    const { CHALLENGE_RULES, checkChallenge } = await import("../lib/challenges");
+    const { challengeKey, challengesKey, enteredKey, entriesKey, entryOfKey } = await import("../lib/server/challengeState");
+    const { createSignedPost, likePost, likedKey, likesKey, postKey, postsKey, walletPostsKey } = await import("../lib/server/board");
+    const { appendLog } = await import("../lib/server/clubState");
+    const { getMember } = await import("../lib/server/members");
+    const { POSTS_KEPT, cleanText } = await import("../lib/clubPosts");
+    const { linkString, postId, postTypedData } = await import("../lib/social");
+    const { epochAt, epochWindow } = await import("../lib/rewards");
+
+    const state = (await readJson<State>(STATE)) ?? { trades: {} };
+    state.challenges ??= {};
+    const save = () => writeFile(STATE, JSON.stringify(state, null, 2) + "\n");
+    const presenterUser = CHALLENGES.some((c) => CLUBS[c.club].owner === "you") ? await findPresenter() : null;
+    const userIdOf = (k: HolderKey) => (k === "you" ? (presenterUser?.id ?? null) : demoUserId(k));
+
+    // "open" ones start in the running epoch, at most 30 hours ago; "ended" ones ran over the four days before it.
+    const now = Date.now();
+    const MIN = 60_000;
+    const epochStart = epochWindow(epochAt(Math.floor(now / 1000))).start * 1000;
+    const openStart = Math.max(epochStart + 10 * MIN, now - 30 * HOUR);
+    const openSpan = now - 10 * MIN - openStart;
+    if (openSpan < HOUR) throw new Error("The running epoch began under an hour ago: run this step a little later.");
+    const endedEnd = epochStart;
+    const endedStart = endedEnd - 96 * HOUR;
+    const endedSpan = endedEnd - 10 * MIN - endedStart;
+
+    // An invented X post, shared from an invented `dcdemo` handle: its id is a snowflake of the time it was posted.
+    const xCard = (k: PersonaKey, text: string, ms: number) => ({
+      id: (((BigInt(ms) - 1_288_834_974_657n) << 22n) | BigInt(randomInt(1 << 22))).toString(),
+      author: `dcdemo${k}`,
+      text,
+      postedAt: ms,
+    });
+    const signedPost = async (c: ClubKey, k: PersonaKey, text: string, link: string, ms: number) => {
+      const cleaned = cleanText(text);
+      if (!cleaned.ok) throw new Error(`Post "${text}" is ${cleaned.reason}`);
+      const message = { club: clubAddress(c), kind: "note" as const, text: cleaned.text, link, at: Math.floor(ms / 1000) };
+      return { message, signature: await persona(k).signTypedData(postTypedData(message) as never) };
+    };
+    const inputOf = (c: (typeof CHALLENGES)[number]) => {
+      const input = { ...c.input };
+      const rewards = input.rewards as { asset?: { token: string; amounts: string[] }; pinWinner?: boolean } | undefined;
+      if (rewards?.asset && rewards.asset.token in CLUBS)
+        input.rewards = { ...rewards, asset: { ...rewards.asset, token: clubAddress(rewards.asset.token as ClubKey) } };
+      return input;
+    };
+
+    for (const c of CHALLENGES) {
+      const entry = entryOf(c.club);
+      const token = entry.address.toLowerCase();
+      const done = state.challenges[c.key];
+      if (done && (await store.get(challengeKey(token, done)))) continue;
+      const ownerId = userIdOf(CLUBS[c.club].owner);
+      if (!ownerId) {
+        console.warn(`${c.key}: skipped, the ${c.club} Club's Owner is the presenter`);
+        continue;
+      }
+      const owner = { userId: ownerId, wallet: walletOf(CLUBS[c.club].owner).toLowerCase() };
+
+      if (c.when === "ended") {
+        // Written as the app would have kept it: a challenge that ran in the last epoch, its signed entries and likes.
+        // Nothing is recorded into that epoch's own inputs (active days, backing, Momentum), which may be frozen.
+        const checked = checkChallenge({ ...inputOf(c), epochs: 1 }, { registry });
+        if (!checked.ok) throw new Error(`${c.key}: ${checked.message}`);
+        // `epochs` only sets when it ends; this one's window is written below.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { epochs: _epochs, ...task } = checked.challenge;
+        const id = randomUUID();
+        const challenge: StoredChallenge = { id, ...task, startsAt: endedStart, endsAt: endedEnd, by: owner.wallet, state: "live" };
+        await store.set(challengeKey(token, id), challenge);
+        await store.rank(challengesKey(token), [{ member: id, score: endedStart }], CHALLENGE_RULES.kept);
+        await appendLog(
+          store,
+          token,
+          { actor: owner.wallet, action: "create_challenge", target: id, detail: `${task.title} · judged by ${task.judging}` },
+          endedStart,
+        );
+        for (const e of c.entries) {
+          const userId = demoUserId(e.by);
+          const row = await getMember(store, token, userId);
+          if (!row) throw new Error(`${c.key}: ${e.by} isn't a member of ${c.club}`);
+          const at = Math.round(endedStart + e.at * endedSpan);
+          const card = xCard(e.by, e.x, at - 3 * MIN);
+          const signed = await signedPost(c.club, e.by, e.post, linkString({ kind: "x", id: card.id }), at);
+          const post: StoredPost = {
+            id: postId(signed.message),
+            userId,
+            wallet: row.displayWallet,
+            kind: "note",
+            text: signed.message.text,
+            link: { kind: "x", id: card.id },
+            at,
+            signed: { signature: signed.signature, at: signed.message.at },
+            x: { ...card, own: true, counted: null },
+            entry: id,
+          };
+          await store.set(postKey(token, post.id), post);
+          await store.rank(postsKey(token), [{ member: post.id, score: at }], POSTS_KEPT);
+          await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: at }], POSTS_KEPT);
+          await store.addMember(entriesKey(token, id), `${post.id}|${userId}`);
+          await store.addMember(enteredKey(token, id), post.id);
+          await store.set(entryOfKey(token, post.id), id);
+          for (const liker of e.likes ?? []) {
+            await store.addMember(likesKey(token, post.id), demoUserId(liker));
+            await store.addMember(likedKey(token, demoUserId(liker)), post.id);
+          }
+        }
+        state.challenges[c.key] = id;
+        await save();
+        console.log(`${c.key}: ended ${new Date(endedEnd).toISOString()}, ${c.entries.length} entries`);
+        continue;
+      }
+
+      // Open (and cancelled) ones go through the app's own functions, at their own times.
+      const created = await createChallenge(store, entry, owner, inputOf(c), { now: () => openStart });
+      if (!created.ok) throw new Error(`${c.key}: ${created.reason}${created.message ? ` (${created.message})` : ""}`);
+      const id = created.id;
+      state.challenges[c.key] = id;
+      await save();
+      for (const e of c.entries) {
+        const userId = demoUserId(e.by);
+        const at = Math.round(openStart + e.at * openSpan);
+        const card = xCard(e.by, e.x, at - 3 * MIN);
+        const body = await signedPost(c.club, e.by, e.post, linkString({ kind: "x", id: card.id }), at);
+        await store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
+        const posted = await createSignedPost(store, entry, userId, body, {
+          now: () => at,
+          lookupX: async () => card,
+          xAccountOf: async () => ({ username: card.author, subject: `demo-${e.by}` }),
+        });
+        if (!posted.ok) throw new Error(`${c.key}: ${e.by}'s post was refused: ${posted.reason}`);
+        const entered = await enterChallenge(store, entry, userId, id, posted.post.id, { now: () => at + MIN });
+        if (!entered.ok) throw new Error(`${c.key}: ${e.by} couldn't enter: ${entered.reason}`);
+        for (const [i, liker] of (e.likes ?? []).entries()) {
+          const likedAt = Math.min(at + (i + 1) * 20 * MIN, now - MIN);
+          const liked = await likePost(store, entry, demoUserId(liker), posted.post.id, true, { now: () => likedAt });
+          if (!liked.ok) throw new Error(`${c.key}: ${liker} couldn't like ${e.by}'s entry: ${liked.reason}`);
+        }
+      }
+      if (c.when === "cancelled") {
+        const cancelled = await cancelChallenge(store, entry, owner, id, { now: () => now - 5 * MIN });
+        if (!cancelled.ok) throw new Error(`${c.key}: couldn't cancel: ${cancelled.reason}`);
+      }
+      console.log(`${c.key}: ${c.when}, ${c.entries.length} entries`);
+    }
+
+    // The app settles what has ended; a raffle commits a block, then draws once that block is final.
+    const clubs = [...new Set(CHALLENGES.map((c) => c.club))];
+    for (let tries = 0; tries < 20; tries++) {
+      for (const c of clubs) await settleDue(store, entryOf(c));
+      const waiting = CHALLENGES.filter((c) => c.when === "ended" && c.input.judging === "raffle" && state.challenges![c.key]);
+      const drawn = await Promise.all(
+        waiting.map(async (c) => (await store.get<StoredChallenge>(challengeKey(entryOf(c.club).address, state.challenges![c.key]!)))?.state !== "live"),
+      );
+      if (drawn.every(Boolean)) break;
+      if (tries === 19) console.warn("A raffle's block isn't final yet: it draws the next time its Club's challenges are read.");
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+
+    for (const c of clubs) {
+      console.log(`\n${CLUBS[c].name} (${entryOf(c).address})`);
+      for (const ch of await listChallenges(store, entryOf(c), {})) {
+        const won = ch.settled
+          ? ` · won: ${ch.settled.winners.map((w) => `${w.place}. ${w.wallet.slice(0, 8)} +${w.points}${w.prize ? ` & ${w.prize} ${ch.rewards?.asset?.symbol}` : ""}`).join(", ") || "nobody"}`
+          : "";
+        console.log(`  ${ch.phase.padEnd(9)} ${ch.judging.padEnd(8)} ${ch.title} · ${ch.entryCount} entries${won}`);
+      }
+    }
+    return;
+  }
+
+  throw new Error("Steps: wallets, chain, trades, social, challenges, art, status.");
 }
 
 main().catch((error: unknown) => {

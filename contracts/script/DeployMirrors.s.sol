@@ -51,7 +51,12 @@ contract DeployMirrors is Script {
         );
         r.r3tards = address(
             new CollectionMirror(
-                "r3tards", "R3TARDS", 1033, "https://www.scatter.art/api/instareveal/mfrvr5upu9925ja07o6ckk6v/", "", 0
+                "r3tards",
+                "R3TARDS",
+                1033,
+                "https://www.scatter.art/api/instareveal/mfrvr5upu9925ja07o6ckk6v/",
+                "",
+                0
             )
         );
         vm.stopBroadcast();

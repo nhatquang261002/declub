@@ -138,13 +138,7 @@ export function selectCycles(nodes: Node[], cycles: number[][]): number[][] {
   const total = (c: number[]) => c.reduce((s, i) => s + nodes[i]!.createdAt, 0);
   const key = (c: number[]) => c.map((i) => nodes[i]!.hash).join();
 
-  const ranked = [...cycles].sort(
-    (a, b) =>
-      b.length - a.length ||
-      oldest(a) - oldest(b) ||
-      total(a) - total(b) ||
-      key(a).localeCompare(key(b)),
-  );
+  const ranked = [...cycles].sort((a, b) => b.length - a.length || oldest(a) - oldest(b) || total(a) - total(b) || key(a).localeCompare(key(b)));
 
   const usedIntents = new Set<number>();
   const usedMakers = new Set<string>();

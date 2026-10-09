@@ -1,21 +1,23 @@
 import { isAddress } from "viem";
 import { linkedEthereumWallets } from "../profiles";
 import { clubInbox, type InboxDeps } from "./inbox";
-import type { MemberSort } from "../members";
+import { MEMBERS_MAX_PAGE, MEMBERS_QUERY_MAX, MEMBERS_SHOWN, type MemberSort } from "../members";
 import type { Registry } from "../verifiedAssets";
 import { roleIn, type Deps as BoardDeps } from "./board";
 import { clubEvents, type Deps } from "./clubs";
 import { fail, gateUser, json, type UserGate } from "./gate";
-import { clubsOf, getMember, joinClub, leaveClub, listMembers, syncMemberships, type MemberDeps } from "./members";
+import { hasSigned, recordJoin, type JoinDeps } from "./joinRecords";
+import { clubsOf, freshHolder, getMember, joinClub, leaveClub, listMembers, syncMemberships, type MemberDeps } from "./members";
 import { clientId, getStore, withinLimit } from "./store";
 
 /**
  * The Club membership routes, built over a registry like the read routes (lib/server/clubRoutes.ts)
  * so the rules can be tried against a list of their own. The route files bind the shipped one.
  */
-export type RouteDeps = Deps &
+type RouteDeps = Deps &
   MemberDeps &
-  BoardDeps & {
+  BoardDeps &
+  Pick<JoinDeps, "verifyJoin"> & {
     /** Who is calling. Privy in production; a stand-in in tests. */
     gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
   };
@@ -23,20 +25,47 @@ export type RouteDeps = Deps &
 export type Ctx = { params: Promise<{ token: string }> };
 
 /** The Club for `token`, or the response that says why there isn't one. */
-export async function clubOf(registry: Registry, ctx: Ctx) {
+async function clubOf(registry: Registry, ctx: Ctx) {
   const { token } = await ctx.params;
   if (!isAddress(token, { strict: false })) return fail(400, "bad_request", "Give a token address.");
   // Blocked, unlisted and listed-without-a-Club assets all read the same: there is no Club.
   return registry.clubFor(token) ?? fail(404, "not_found", "No Club for this asset.");
 }
 
-/** What the signed-in user's own membership looks like to them. */
-const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number }, role: string) => ({
+/**
+ * The start of a public read of a Club: its entry and the store, or the response that ends the call
+ * (no such Club, no store, which answers `off` uncached, or too many requests).
+ */
+export async function publicRead(registry: Registry, ctx: Ctx, request: Request, off: object) {
+  const entry = await clubOf(registry, ctx);
+  if (entry instanceof Response) return entry;
+  const store = getStore();
+  if (!store) return Response.json(off, { headers: { "Cache-Control": "no-store" } });
+  if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
+  return { entry, store };
+}
+
+/** The Club for `token` and the signed-in caller, or the response that ends the call (no such Club, not signed in, or too many requests). */
+export async function gatedClub(registry: Registry, ctx: Ctx, request: Request, deps: Pick<RouteDeps, "gate">, name: string, limit: number) {
+  const entry = await clubOf(registry, ctx);
+  if (entry instanceof Response) return entry;
+  const g = await (deps.gate ?? gateUser)(request, name, limit);
+  if (g instanceof Response) return g;
+  return { entry, store: g.store, user: g.user };
+}
+
+/**
+ * What the signed-in user's own membership looks like to them. `club` is the address a membership
+ * is signed for, and `signed` says whether it already is, for the wallet shown (ADR 0053).
+ */
+const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number }, role: string, club: string, signed: boolean) => ({
   member: true,
   wallet: row.displayWallet,
   holder: row.holder,
   joinedAt: row.joinedAt,
   role,
+  club,
+  signed,
 });
 
 /**
@@ -47,43 +76,69 @@ const mine = (row: { displayWallet: string; holder: boolean; joinedAt: number },
 export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
   return {
     async GET(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-member", 60);
-      if (g instanceof Response) return g;
-      const { store, user } = g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-member", 60);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
 
       await syncMemberships(store, user.id, linkedEthereumWallets(user.linked_accounts));
-      const row = await getMember(store, entry.address, user.id);
+      // A member without the badge is read fresh (at most once a minute), so an NFT they just
+      // swapped for shows as Holder now, not at the Members list's daily re-check.
+      const known = await getMember(store, entry.address, user.id);
+      const row = known && !known.holder ? await freshHolder(store, entry, user.id, deps) : known;
       const role = await roleIn(store, entry.address, user.id, deps);
       // An admin has staff powers in a Club they never joined, so the page needs to know.
-      return json({ enabled: true, ...(row ? mine(row, role) : { member: false, ...(role === "admin" ? { role } : {}) }) });
+      return json({
+        enabled: true,
+        ...(row
+          ? mine(row, role, entry.address, await hasSigned(store, entry.address, user.id, row.displayWallet))
+          : { member: false, ...(role === "admin" ? { role } : {}) }),
+      });
     },
 
     async POST(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-join", 20);
-      if (g instanceof Response) return g;
-      const { store, user } = g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
 
       const result = await joinClub(store, entry, user.id, linkedEthereumWallets(user.linked_accounts), deps);
-      if (result.ok) return json({ enabled: true, ...mine(result.row, await roleIn(store, entry.address, user.id, deps)) });
+      if (result.ok) {
+        const role = await roleIn(store, entry.address, user.id, deps);
+        return json({ enabled: true, ...mine(result.row, role, entry.address, await hasSigned(store, entry.address, user.id, result.row.displayWallet)) });
+      }
       if (result.reason === "archived") return fail(409, "archived", "This Club is archived and isn’t taking new members.");
       if (result.reason === "banned") return fail(403, "banned", "You can’t join this Club.");
       if (result.reason === "full") return fail(409, "full", "This Club is full.");
       return fail(422, "no_wallet", "Link a wallet to your account first, so the Club has one to show.");
     },
 
+    /** PUT { message, signature }: keeps the member's signed consent, the proof a backup is restored from (ADR 0053). */
+    async PUT(request: Request, ctx: Ctx) {
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
+      const body = (await request.json().catch(() => null)) as { message?: unknown; signature?: unknown } | null;
+      const result = await recordJoin(store, entry, user.id, { message: body?.message, signature: body?.signature }, deps);
+      if (result.ok) return json({ enabled: true, signed: true });
+      const refusals = {
+        unsigned: [400, "Sign the membership message with your Club wallet."],
+        not_member: [409, "Join the Club first."],
+        wrong_club: [422, "That message is for another Club."],
+        wrong_wallet: [422, "Sign with the wallet your membership is shown under."],
+        stale: [422, "That signature is too old. Sign again."],
+        bad_signature: [422, "The signature isn’t from that wallet."],
+      } as const;
+      const [status, message] = refusals[result.reason];
+      return fail(status, result.reason, message);
+    },
+
     async DELETE(request: Request, ctx: Ctx) {
-      const entry = await clubOf(registry, ctx);
-      if (entry instanceof Response) return entry;
-      const g = await (deps.gate ?? gateUser)(request, "club-join", 20);
-      if (g instanceof Response) return g;
+      const f = await gatedClub(registry, ctx, request, deps, "club-join", 20);
+      if (f instanceof Response) return f;
+      const { entry, store, user } = f;
       // An admin outranks any Club role, so only a real Owner is held back.
-      const role = await roleIn(g.store, entry.address, g.user.id, deps);
+      const role = await roleIn(store, entry.address, user.id, deps);
       if (role === "owner") return fail(409, "owner_cannot_leave", "Hand the Club to another member before you leave.");
-      await leaveClub(g.store, entry.address, g.user.id);
+      await leaveClub(store, entry.address, user.id);
       return json({ enabled: true, member: false });
     },
   };
@@ -91,7 +146,7 @@ export function membershipHandlers(registry: Registry, deps: RouteDeps = {}) {
 
 const SORTS = new Set<MemberSort>(["momentum", "new"]);
 
-/** GET /api/clubs/[token]/members?sort=momentum|new: the leaderboard. Public. */
+/** GET /api/clubs/[token]/members?sort=momentum|new&page=&size=&q=: one page of the leaderboard, or of the members whose wallet or handle contains q. Public. */
 export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
   return async function GET(request: Request, ctx: Ctx) {
     const entry = await clubOf(registry, ctx);
@@ -99,21 +154,32 @@ export function membersHandler(registry: Registry, deps: RouteDeps = {}) {
     const asked = new URL(request.url).searchParams.get("sort") ?? "momentum";
     if (!SORTS.has(asked as MemberSort)) return fail(400, "bad_request", "sort is momentum or new.");
 
+    const params = new URL(request.url).searchParams;
+    const page = params.get("page") === null ? 1 : Number(params.get("page"));
+    const size = params.get("size") === null ? MEMBERS_SHOWN : Number(params.get("size"));
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(size) || size < 1 || size > MEMBERS_MAX_PAGE) {
+      return fail(400, "bad_request", `page is a positive number, size at most ${MEMBERS_MAX_PAGE}.`);
+    }
+
+    const query = (params.get("q") ?? "").trim();
+    if (query.length > MEMBERS_QUERY_MAX) return fail(400, "bad_request", `q is at most ${MEMBERS_QUERY_MAX} characters.`);
+
     const store = getStore();
-    if (!store) return Response.json({ enabled: false, members: [], total: 0, holders: 0 }, { headers: { "Cache-Control": "no-store" } });
+    if (!store)
+      return Response.json(
+        { enabled: false, members: [], total: 0, matches: 0, holders: 0, topMomentum: 0, page: 1, size },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     if (!(await withinLimit(store, "clubs-read", clientId(request), 240, 60))) return fail(429, "rate_limited", "Too many requests.");
 
     const nowSec = deps.now?.() ?? Math.floor(Date.now() / 1000);
     const events = await clubEvents(store, entry, deps);
-    const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps);
-    return Response.json(
-      { enabled: true, ...view },
-      { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
-    );
+    const view = await listMembers(store, entry, events, asked as MemberSort, nowSec, deps, { page, size, query });
+    return Response.json({ enabled: true, ...view }, { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } });
   };
 }
 
-/** GET /api/me/club-inbox: likes on your posts, your pins and the rewards you earned (lib/server/inbox.ts). */
+/** GET /api/me/club-inbox: likes, replies, pins, counted X posts, rewards and your standing in the running epoch (lib/server/inbox.ts). */
 export function clubInboxHandler(deps: Pick<RouteDeps, "gate"> & Pick<InboxDeps, "now" | "standings"> = {}) {
   return async function GET(request: Request) {
     const g = await (deps.gate ?? gateUser)(request, "me-club-inbox", 60);

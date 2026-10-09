@@ -1,21 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { LoadError } from "@/components/ErrorPanel";
-import { Pills } from "@/components/Pills";
+import { Pagination } from "@/components/Pagination";
 import { HolderBadge } from "@/components/HolderBadge";
-import { BanIcon, CrownIcon, FlameIcon, ShieldIcon } from "@/components/Icons";
+import { BanIcon, CrownIcon, FlameIcon, ShieldIcon, TrophyIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
+import { Select } from "@/components/Select";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions } from "@/hooks/useClubBoard";
+import { useDebounced } from "@/hooks/useAssetSearch";
 import { useClubMembers, useClubMembership, type ViewerRole } from "@/hooks/useClubMembership";
 import { useFollows } from "@/hooks/useSocial";
 import { FollowButton } from "@/components/FollowButton";
 import { isOwnerOrAdmin, mayActOn } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
-import type { MemberSort, PublicMember } from "@/lib/members";
+import { MEMBERS_PAGE, MEMBERS_QUERY_MAX, type MemberSort, type PublicMember } from "@/lib/members";
 import { Empty, Loading } from "./parts";
 
 const SORTS = [
@@ -23,10 +25,10 @@ const SORTS = [
   { value: "new", label: "Newest" },
 ] as const;
 
-/** The top three get a podium once three members have traded. */
+/** The top three get a podium once three members have Momentum. */
 const PODIUM = 3;
 
-export function RoleChip({ role }: { role?: PublicMember["role"] }) {
+function RoleChip({ role }: { role?: PublicMember["role"] }) {
   if (role === "owner") {
     return (
       <span className="chip chip-dark">
@@ -47,12 +49,25 @@ export function RoleChip({ role }: { role?: PublicMember["role"] }) {
 }
 
 /** Epochs in a row of posting on the Board (ADR 0032); shown from the second. */
-export function StreakChip({ streak }: { streak?: number }) {
+function StreakChip({ streak }: { streak?: number }) {
   if (!streak || streak < 2) return null;
   return (
-    <span className="chip chip-peach" title={`Active on the Board ${streak} epochs in a row`}>
+    <span className="chip chip-peach" title={`Active on the Board ${streak} weeks (epochs) in a row`} aria-label={`${streak}-week streak`}>
       <FlameIcon />
-      {streak} wk
+      {streak} {streak === 1 ? "week" : "weeks"}
+    </span>
+  );
+}
+
+/** The challenges a member won in this Club (ADR 0050), as a count; the titles are in the tooltip. */
+function TrophyCount({ trophies }: { trophies?: PublicMember["trophies"] }) {
+  if (!trophies || trophies.length === 0) return null;
+  const titles = trophies.map((t) => `${t.place ? (["1st", "2nd", "3rd"][t.place - 1] ?? `${t.place}th`) : "Winner"}: ${t.title}`).join("\n");
+  const label = `${trophies.length} challenge ${trophies.length === 1 ? "win" : "wins"}: ${trophies.map((t) => t.title).join(", ")}`;
+  return (
+    <span className="trophy-count" title={titles} aria-label={label}>
+      <TrophyIcon />
+      {trophies.length}
     </span>
   );
 }
@@ -105,7 +120,7 @@ function Podium({
   // In a row the winner stands in the middle and highest; stacked on a phone, it's simply first.
   const place = ["sm:order-2", "sm:order-1 sm:mt-6", "sm:order-3 sm:mt-10"];
   return (
-    <ol className="mb-5 grid gap-3 sm:grid-cols-3 sm:items-start" aria-label="Top three traders">
+    <ol className="mb-5 grid gap-3 sm:grid-cols-3 sm:items-start" aria-label="Top three members">
       {members.slice(0, PODIUM).map((m, i) => {
         return (
           <li key={m.wallet} className={`club-panel relative flex flex-col items-center gap-2 px-4 py-5 text-center ${place[i]}`}>
@@ -115,7 +130,7 @@ function Podium({
               </span>
             )}
             <span className={`rank rank-${i + 1}`}>{i + 1}</span>
-            <WalletAvatar seed={m.wallet} size={i === 0 ? "3.5rem" : "3rem"} />
+            <WalletAvatar seed={m.wallet} size={i === 0 ? "3.5rem" : "3rem"} link />
             <span className="max-w-full truncate text-sm">
               <Who address={m.wallet} mine={mine === m.wallet} />
             </span>
@@ -124,6 +139,7 @@ function Podium({
               <RoleChip role={m.role} />
               {m.holder && <HolderBadge symbol={symbol} />}
               <StreakChip streak={m.streak} />
+              <TrophyCount trophies={m.trophies} />
             </span>
             <span className="text-xs text-muted">
               {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}
@@ -138,7 +154,15 @@ function Podium({
 /** The Club's leaderboard: members ranked by what their wallets added to its Momentum. */
 export function ClubMembers({ token, symbol, now }: { token: string; symbol: string; now: number }) {
   const [sort, setSort] = useState<MemberSort>("momentum");
-  const { view, isLoading, error } = useClubMembers(token, sort);
+  const [page, setPage] = useState(1);
+  const [text, setText] = useState("");
+  const search = useDebounced(text.trim());
+  const { view, isLoading, isFetching, error } = useClubMembers(token, sort, page, MEMBERS_PAGE, search);
+  const top = useRef<HTMLDivElement>(null);
+  const changePage = (next: number) => {
+    setPage(next);
+    top.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
   const me = useClubMembership(token);
   const actions = useClubActions(token);
   const follows = useFollows();
@@ -150,16 +174,45 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
   }
 
   const members = view?.members ?? [];
-  const podium = sort === "momentum" && members.length >= PODIUM && members[PODIUM - 1].momentum > 0;
+  // The podium is the first page's top three, and only without a search; later pages carry on from there.
+  const first = (view?.page ?? 1) === 1;
+  const podium = first && !search && sort === "momentum" && members.length >= PODIUM && members[PODIUM - 1].momentum > 0;
   const rest = podium ? members.slice(PODIUM) : members;
-  const top = Math.max(1, members[0]?.momentum ?? 0);
+  const scale = Math.max(1, view?.topMomentum ?? 0);
+  const totalPages = Math.max(1, Math.ceil((view?.matches ?? 0) / (view?.size ?? MEMBERS_PAGE)));
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Pills value={sort} options={SORTS} onChange={setSort} label="Sort members" />
+      <div ref={top} className="mb-5 flex scroll-mt-24 flex-wrap items-center justify-between gap-3">
+        <Select
+          className="w-auto"
+          aria-label="Sort members"
+          value={sort}
+          options={SORTS}
+          onChange={(next) => {
+            setSort(next);
+            setPage(1);
+          }}
+        />
+        <input
+          type="search"
+          className="input min-w-52 flex-1 sm:max-w-xs"
+          placeholder="Search by wallet or @handle"
+          aria-label="Search members"
+          maxLength={MEMBERS_QUERY_MAX}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPage(1);
+          }}
+        />
         {view && (
           <p className="text-sm text-muted">
+            {search && (
+              <>
+                <strong className="text-[#111318]">{view.matches.toLocaleString()}</strong> of{" "}
+              </>
+            )}
             <strong className="text-[#111318]">{view.total.toLocaleString()}</strong> {view.total === 1 ? "member" : "members"} ·{" "}
             <strong className="text-[#111318]">{view.holders.toLocaleString()}</strong> {view.holders === 1 ? "holds" : "hold"} {symbol}
           </p>
@@ -168,22 +221,22 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
 
       {isLoading ? (
         <Loading label="Loading members" rows={5} />
+      ) : members.length === 0 && search ? (
+        <Empty title="No members match">Nobody here has a wallet or X / Discord handle containing “{search}”.</Empty>
       ) : members.length === 0 ? (
         <Empty title="No members yet">Join to be the first on the list.</Empty>
       ) : (
         <>
-          {podium && (
-            <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />
-          )}
+          {podium && <Podium members={members} symbol={symbol} mine={me.wallet} menu={staff ? (m) => staffActions(me.role, m, actions) : undefined} />}
           {rest.length > 0 && (
-            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={podium ? PODIUM + 1 : 1}>
-              {rest.map((m, i) => {
-                const rank = i + 1 + (podium ? PODIUM : 0);
+            <ol className="club-panel divide-y divide-[#111318]/10 club-list" start={rest[0]?.rank}>
+              {rest.map((m) => {
+                const rank = m.rank;
                 const mine = me.wallet === m.wallet;
                 return (
                   <li key={m.wallet} className={`flex items-center gap-3 px-4 py-3 sm:px-5 ${mine ? "bg-white/70" : ""}`}>
                     {sort === "momentum" && <span className={`rank ${rank <= 3 && m.momentum > 0 ? `rank-${rank}` : ""}`}>{rank}</span>}
-                    <WalletAvatar seed={m.wallet} size="2.25rem" />
+                    <WalletAvatar seed={m.wallet} size="2.25rem" link />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                         <Who address={m.wallet} mine={mine} />
@@ -191,6 +244,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                         <RoleChip role={m.role} />
                         {m.holder && <HolderBadge symbol={symbol} />}
                         <StreakChip streak={m.streak} />
+                        <TrophyCount trophies={m.trophies} />
                       </div>
                       <p className="text-xs text-muted">
                         Joined {ago(Math.floor(m.joinedAt / 1000), now)} · {m.swaps} {m.swaps === 1 ? "swap" : "swaps"}
@@ -200,13 +254,11 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
                       <span className="font-black tabular-nums">{formatMomentum(m.momentum)}</span>
                       {sort === "momentum" && (
                         <span className="meter w-full" aria-hidden>
-                          <span style={{ width: `${m.momentum > 0 ? Math.max(3, (m.momentum / top) * 100) : 0}%` }} />
+                          <span style={{ width: `${m.momentum > 0 ? Math.max(3, (m.momentum / scale) * 100) : 0}%` }} />
                         </span>
                       )}
                     </div>
-                    {staff && (
-                      <span className="w-8">{!mine && <ActionMenu label="Member actions" groups={staffActions(me.role, m, actions)} />}</span>
-                    )}
+                    {staff && <span className="w-8">{!mine && <ActionMenu label="Member actions" groups={staffActions(me.role, m, actions)} />}</span>}
                   </li>
                 );
               })}
@@ -214,11 +266,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
           )}
         </>
       )}
-      {view && view.total > members.length && (
-        <p className="mt-3 text-xs text-muted">
-          Showing the first {members.length} of {view.total.toLocaleString()}.
-        </p>
-      )}
+      {view && totalPages > 1 && <Pagination page={view.page} totalPages={totalPages} onPage={changePage} loading={isFetching} label="Member pages" />}
     </>
   );
 }

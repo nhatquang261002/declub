@@ -1,4 +1,4 @@
-import { getAddress, hashStruct, isAddress, isHex, type Address, type Hex } from "viem";
+import { getAddress, hashStruct, isAddress, type Address, type Hex } from "viem";
 import { CHAIN_ID } from "./config";
 import { cleanText, linkFor, type PostLink } from "./clubPosts";
 import { xStatusUrl } from "./xPosts";
@@ -32,6 +32,12 @@ export const SOCIAL_TYPES = {
     { name: "following", type: "bool" },
     { name: "at", type: "uint64" },
   ],
+  /** A member's consent to be on a Club's list (ADR 0053): the proof a backup is restored from. */
+  Join: [
+    { name: "club", type: "address" },
+    { name: "wallet", type: "address" },
+    { name: "at", type: "uint64" },
+  ],
 } as const;
 
 /** The `at` to sign now: unix seconds. */
@@ -43,6 +49,8 @@ export const SIGNED_SKEW_SEC = 300;
 /** A post as signed. `at` is unix seconds; `link` is "", a deal id, an intent hash or an X post link. */
 export type PostMessage = { club: Address; kind: "note" | "looking"; text: string; link: string; at: number };
 export type FollowMessage = { follower: Address; target: Address; following: boolean; at: number };
+/** A membership as signed: `wallet` is the one the Members list shows for the member. */
+export type JoinMessage = { club: Address; wallet: Address; at: number };
 /** A reply as signed: `parent` is the replied-to post's id. */
 export type ReplyMessage = { club: Address; parent: string; text: string; at: number };
 
@@ -52,7 +60,11 @@ export const linkString = (link: PostLink | undefined) =>
 
 const wirePost = (m: PostMessage) => ({ ...m, at: BigInt(m.at) });
 const wireFollow = (m: FollowMessage) => ({ ...m, at: BigInt(m.at) });
+const wireJoin = (m: JoinMessage) => ({ ...m, at: BigInt(m.at) });
 const wireReply = (m: ReplyMessage) => ({ ...m, at: BigInt(m.at) });
+
+export const joinTypedData = (m: JoinMessage, chainId = CHAIN_ID) =>
+  ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Join", message: wireJoin(m) }) as const;
 
 export const postTypedData = (m: PostMessage, chainId = CHAIN_ID) =>
   ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Post", message: wirePost(m) }) as const;
@@ -62,17 +74,26 @@ export const followTypedData = (m: FollowMessage, chainId = CHAIN_ID) =>
 
 /** A post's id: its struct hash, without the 0x. The same signed post is the same post. */
 export const postId = (m: PostMessage) =>
-  hashStruct({ data: wirePost(m), primaryType: "Post", types: SOCIAL_TYPES }).slice(2).toLowerCase();
+  hashStruct({ data: wirePost(m), primaryType: "Post", types: SOCIAL_TYPES })
+    .slice(2)
+    .toLowerCase();
 
 export const replyTypedData = (m: ReplyMessage, chainId = CHAIN_ID) =>
   ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Reply", message: wireReply(m) }) as const;
 
 /** A reply's id: its struct hash, without the 0x. */
 export const replyId = (m: ReplyMessage) =>
-  hashStruct({ data: wireReply(m), primaryType: "Reply", types: SOCIAL_TYPES }).slice(2).toLowerCase();
+  hashStruct({ data: wireReply(m), primaryType: "Reply", types: SOCIAL_TYPES })
+    .slice(2)
+    .toLowerCase();
 
 /** The reply a client should sign: the text cleaned exactly as the server will check it. */
-export function draftReply(club: Address, parent: string, text: string, at: number): { ok: true; message: ReplyMessage } | { ok: false; reason: "empty" | "too_long" } {
+export function draftReply(
+  club: Address,
+  parent: string,
+  text: string,
+  at: number,
+): { ok: true; message: ReplyMessage } | { ok: false; reason: "empty" | "too_long" } {
   const clean = cleanText(text);
   if (!clean.ok) return clean;
   return { ok: true, message: { club: getAddress(club), parent: parent.toLowerCase(), text: clean.text, at } };
@@ -93,9 +114,13 @@ export function parseReplyMessage(input: unknown): ReplyMessage | null {
  * The post a client should sign for this input, or why it can't be one: the text cleaned and the
  * link in canonical form, exactly as the server will check them.
  */
-export function draftPost(club: Address, kind: "note" | "looking", text: string, link: string, at: number):
-  | { ok: true; message: PostMessage }
-  | { ok: false; reason: "empty" | "too_long" | "bad_link" } {
+export function draftPost(
+  club: Address,
+  kind: "note" | "looking",
+  text: string,
+  link: string,
+  at: number,
+): { ok: true; message: PostMessage } | { ok: false; reason: "empty" | "too_long" | "bad_link" } {
   const clean = cleanText(text);
   if (!clean.ok) return clean;
   let canonical = "";
@@ -118,6 +143,16 @@ export function parsePostMessage(input: unknown): PostMessage | null {
   return { club: getAddress(m.club), kind: m.kind, text: m.text, link: m.link, at: m.at };
 }
 
+/** A join message from a request body or a backup file, or null when it isn't one. */
+export function parseJoinMessage(input: unknown): JoinMessage | null {
+  if (!input || typeof input !== "object") return null;
+  const m = input as Record<string, unknown>;
+  if (typeof m.club !== "string" || !isAddress(m.club, { strict: false })) return null;
+  if (typeof m.wallet !== "string" || !isAddress(m.wallet, { strict: false })) return null;
+  if (typeof m.at !== "number" || !Number.isSafeInteger(m.at) || m.at < 0) return null;
+  return { club: getAddress(m.club), wallet: getAddress(m.wallet), at: m.at };
+}
+
 export function parseFollowMessage(input: unknown): FollowMessage | null {
   if (!input || typeof input !== "object") return null;
   const m = input as Record<string, unknown>;
@@ -127,9 +162,6 @@ export function parseFollowMessage(input: unknown): FollowMessage | null {
   if (typeof m.at !== "number" || !Number.isSafeInteger(m.at) || m.at < 0) return null;
   return { follower: getAddress(m.follower), target: getAddress(m.target), following: m.following, at: m.at };
 }
-
-/** A 65-byte signature, or a longer one a smart wallet (ERC-1271) may produce. */
-export const isSignature = (value: unknown): value is Hex => typeof value === "string" && isHex(value) && value.length >= 132 && value.length <= 4_002;
 
 /** A signed post as the export serves it: the message and signature anyone can verify. */
 export type SignedPost = {

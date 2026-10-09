@@ -12,14 +12,52 @@ export type DealFacts = {
   want: string;
   /** An open offer asks nothing: takers send proposals. */
   openOffer: boolean;
+  /** The Club of the first asset in the deal that has one: the card and the post say so. */
+  club?: string;
+  /** The Club's art, a path under `public/`, for the card's avatar. */
+  clubImage?: string;
+  /** Each side's assets as pictures; an open offer asks for none. */
+  giveItems?: CardItem[];
+  wantItems?: CardItem[];
 };
 
-/** The words for one side: NFTs grouped by collection, then tokens, then MON. */
-export function describeAssets(
+/** One asset of a deal, for the preview card to draw as its own picture. */
+export type CardItem = {
+  /** The collection's or token's name: "Chog Genesis", "mUSD", "MON". */
+  name: string;
+  /** An NFT's id ("#4"), or "ANY" for one of a kind. */
+  id?: string;
+  /** A token's amount, already worded ("1.5"). */
+  amount?: string;
+  native?: boolean;
+  /** Art the app ships under `public/`: the collection's, when it has one. */
+  image?: string;
+};
+
+/** The assets of one side as pictures: an NFT each, then a token or MON each. */
+export function cardItems(
   assets: readonly Asset[],
   info: ReadonlyMap<string, TokenInfo>,
-  nameOf: (token: string) => string | undefined,
-): string {
+  entryOf: (token: string) => { name: string; image?: string } | null | undefined,
+): CardItem[] {
+  const nfts: CardItem[] = [];
+  const rest: CardItem[] = [];
+  for (const a of assets) {
+    const entry = entryOf(a.token.toLowerCase());
+    const name = entry?.name ?? `${a.token.slice(0, 6)}…`;
+    if (a.kind === "erc721") nfts.push({ name, id: `#${a.id}`, image: entry?.image });
+    if (a.kind === "trait") nfts.push({ name, id: a.amount === 1n ? "ANY" : `ANY ×${a.amount}`, image: entry?.image });
+    if (a.kind === "erc20") {
+      const t = info.get(a.token.toLowerCase());
+      rest.push({ name: t?.symbol ?? name, amount: t ? formatUnits(a.amount, t.decimals) : undefined, image: entry?.image });
+    }
+    if (a.kind === "native") rest.push({ name: "MON", amount: formatMon(a.amount).replace(/ MON$/, ""), native: true });
+  }
+  return [...nfts, ...rest];
+}
+
+/** The words for one side: NFTs grouped by collection, then tokens, then MON. */
+export function describeAssets(assets: readonly Asset[], info: ReadonlyMap<string, TokenInfo>, nameOf: (token: string) => string | undefined): string {
   const parts: string[] = [];
   const nfts = new Map<string, bigint[]>();
   for (const a of assets) {
@@ -58,7 +96,7 @@ const clip = (text: string) => (text.length > 70 ? `${text.slice(0, 69)}…` : t
 export function dealPost(f: DealFacts, club?: string): string {
   const give = clip(f.give);
   const want = clip(f.want);
-  const where = club ? `In the ${club} Club on De(al) Club.` : "On De(al) Club.";
+  const where = club ? `In the ${club} Club on DeClub.` : "On DeClub.";
   if (f.status === "filled") return `Swapped ${give} for ${f.openOffer ? "an offer I accepted" : want} ✅\n\n${where} Escrowed on Monad, atomic, done.`;
   if (f.status === "open" && f.openOffer) return `Offering ${give}, open to offers 🤝\n\n${where} Escrowed on Monad. Make me an offer 👇`;
   if (f.status === "open") return `Offering ${give} for ${want} 🤝\n\n${where} Escrowed on Monad: both sides or nothing. Take the deal 👇`;

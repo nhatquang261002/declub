@@ -1,21 +1,13 @@
 import type { Address } from "viem";
 import { isAddressEqual } from "viem";
 import { erc20Abi, erc721Abi, intentsAbi } from "./abi.ts";
+import { feeUnits } from "./intent.ts";
 import type { Reader } from "./chain.ts";
 import { isRevert } from "./errors.ts";
 import { type Asset, AssetType, type Intent } from "./types.ts";
 
 export type ProblemCode =
-  | "expired"
-  | "nonce_used"
-  | "balance"
-  | "allowance"
-  | "wrong_fee"
-  | "fee_balance"
-  | "fee_allowance"
-  | "not_owner"
-  | "not_approved"
-  | "bad_token";
+  "expired" | "nonce_used" | "balance" | "allowance" | "wrong_fee" | "fee_balance" | "fee_allowance" | "not_owner" | "not_approved" | "bad_token";
 
 export interface Problem {
   code: ProblemCode;
@@ -32,12 +24,7 @@ async function read<T>(p: Promise<T>): Promise<T | null> {
   }
 }
 
-async function assetProblem(
-  reader: Reader,
-  swap: Address,
-  maker: Address,
-  a: Asset,
-): Promise<Problem | null> {
+async function assetProblem(reader: Reader, swap: Address, maker: Address, a: Asset): Promise<Problem | null> {
   if (a.assetType === AssetType.ERC20) {
     const [balance, allowance] = await Promise.all([
       read(reader.readContract({ address: a.token, abi: erc20Abi, functionName: "balanceOf", args: [maker] })),
@@ -86,24 +73,19 @@ async function assetProblem(
  * The protocol fee comes out of the maker's wallet after the gives move, in the same token a give
  * may use, so the fee is checked on top of whatever the maker gives of that token. (Anything the
  * maker receives in the same cycle is ignored: that makes this check conservative, never wrong
- * the other way.) `fee` is the contract's current `fee()`: that is what is charged, and the
- * intent's `maxFee` must cover it (ADR 0018).
+ * the other way.) `fee` is the contract's current `fee()`, per NFT the maker gives: that is what
+ * is charged, and the intent's `maxFee` must cover it (ADR 0018, 0033).
  */
-async function feeProblem(
-  reader: Reader,
-  swap: Address,
-  intent: Intent,
-  fee: bigint,
-): Promise<Problem | null> {
+async function feeProblem(reader: Reader, swap: Address, intent: Intent, fee: bigint): Promise<Problem | null> {
   if (intent.maxFee < fee) {
     return { code: "wrong_fee", detail: `the fee is ${fee}, above the signed maxFee ${intent.maxFee}` };
   }
   if (fee === 0n) return null;
   const token = intent.feeToken;
-  const alsoGiven = intent.give
-    .filter((a) => a.assetType === AssetType.ERC20 && isAddressEqual(a.token, token))
-    .reduce((sum, a) => sum + a.amount, 0n);
-  const needed = fee + alsoGiven;
+  const alsoGiven = intent.give.filter((a) => a.assetType === AssetType.ERC20 && isAddressEqual(a.token, token)).reduce((sum, a) => sum + a.amount, 0n);
+  // The fee is charged per NFT the maker gives, at least once (ADR 0033).
+  const totalFee = fee * feeUnits(intent.give);
+  const needed = totalFee + alsoGiven;
   const [balance, allowance] = await Promise.all([
     read(reader.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [intent.maker] })),
     read(
@@ -119,10 +101,10 @@ async function feeProblem(
     return { code: "bad_token", detail: `fee token ${token} is not an ERC-20` };
   }
   if (balance < needed) {
-    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${fee})` };
+    return { code: "fee_balance", detail: `fee token ${token}: balance ${balance} < ${needed} (fee ${totalFee})` };
   }
   if (allowance < needed) {
-    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${fee})` };
+    return { code: "fee_allowance", detail: `fee token ${token}: allowance ${allowance} < ${needed} (fee ${totalFee})` };
   }
   return null;
 }
@@ -134,13 +116,7 @@ async function feeProblem(
  * Returns the first problem, by priority (expired, nonce, each give asset, then the fee), or null.
  * `fee` is the contract's `fee()`, read once by the caller for a whole pass.
  */
-export async function checkIntent(
-  reader: Reader,
-  swap: Address,
-  intent: Intent,
-  nowSec: number,
-  fee: bigint,
-): Promise<Problem | null> {
+export async function checkIntent(reader: Reader, swap: Address, intent: Intent, nowSec: number, fee: bigint): Promise<Problem | null> {
   if (intent.deadline < BigInt(nowSec)) {
     return { code: "expired", detail: `deadline ${intent.deadline} has passed` };
   }

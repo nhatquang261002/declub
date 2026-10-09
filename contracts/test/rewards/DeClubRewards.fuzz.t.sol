@@ -35,7 +35,9 @@ contract DeClubRewardsFuzzTest is DeClubRewardsBase {
         Drop memory d = _abc(1);
         _open(1, d);
         vm.assume(asked != 3 ether);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, asked));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.InvalidProof.selector, 1, alice, asked)
+        );
         rewards.claim(1, alice, asked, d.proofs[0]);
     }
 

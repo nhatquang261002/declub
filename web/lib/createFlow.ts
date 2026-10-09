@@ -4,8 +4,8 @@ import { looksLikeHandle } from "./profiles";
 
 /**
  * The three ways to start a deal. "open" (makers list assets, takers send offers) and, when
- * DeClubEscrow is configured, "exact" and "trait" settle on V2 (ADR 0005–0007). Without V2, "exact"
- * and "trait" fall back to the Chog contract.
+ * DeClubEscrow is configured, "exact" and "trait" settle on DeClubEscrow (ADR 0005–0007). Without
+ * it the deal screens are off.
  */
 export type DealKind = "open" | "exact" | "trait";
 /**

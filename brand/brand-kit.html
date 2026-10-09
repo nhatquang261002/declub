@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>De(al) Club Brand Kit</title>
+<link rel="icon" href="logo/mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@800&family=Geist:wght@400;600;800;900&family=Geist+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #111318; --night: #171a22; --slate: #202735; --cream: #fff4cf; --canvas: #f4edda;
+    --gold: #f0b735; --red: #d83b45; --deep-red: #a9282f; --blue: #315ea8; --mint: #78c7a5; --mint-dark: #1f7a55;
+    --muted: #4e5968;
+    --sans: "Geist", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 400 1rem/1.55 var(--sans); }
+  a { color: var(--deep-red); }
+  .wrap { max-width: 68rem; margin: 0 auto; padding: 0 1rem 4rem; }
+
+  header.top { background: color-mix(in srgb, var(--ink) 94%, transparent); position: sticky; top: 0; z-index: 5; }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: .8rem; padding-bottom: .8rem; }
+  header.top img { height: 2.5rem; display: block; }
+  header.top nav { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+  header.top nav a { color: rgb(255 255 255 / .75); font-size: .8rem; font-weight: 800; text-decoration: none; }
+  header.top nav a:hover { color: #fff; }
+
+  h1 { font-size: clamp(2.2rem, 6vw, 3.8rem); line-height: .95; font-weight: 900; letter-spacing: -.04em; margin: 3rem 0 1rem; }
+  h1 em { display: block; font-style: normal; color: var(--red); }
+  h2 { font-size: 1.9rem; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; margin: 4rem 0 .4rem; }
+  h3 { font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 2rem 0 .6rem; }
+  p.lede { max-width: 40rem; font-size: 1.1rem; color: var(--muted); margin: 0 0 1rem; }
+  p { max-width: 44rem; }
+  code { font-family: var(--mono); font-size: .85em; }
+
+  /* the brand's own sticker language */
+  .sheet { position: relative; border: 2px solid var(--ink); border-radius: 1rem; background: var(--cream); padding: 1.25rem; }
+  .tape { position: absolute; top: -.7rem; left: 50%; width: 4rem; height: 1.15rem; background: rgb(216 59 69 / .82); transform: translateX(-50%) rotate(-2deg); }
+  .grid { display: grid; gap: 1rem; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+
+  .stage { display: grid; place-items: center; min-height: 11rem; border: 2px solid var(--ink); border-radius: 1rem; padding: 1.5rem; }
+  .stage.dark { background: var(--night); }
+  .stage.light { background: var(--canvas); }
+  .stage.white { background: #fff; }
+  .stage.cream { background: var(--cream); }
+  .stage.photo { background: linear-gradient(135deg, var(--blue), var(--red)); }
+  .stage img { max-width: 100%; }
+  .cap { margin: .5rem .15rem 0; font-size: .8rem; color: var(--muted); }
+  .cap b { color: var(--ink); font-family: var(--mono); font-size: .78rem; }
+
+  .swatches { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); }
+  .sw { border: 2px solid var(--ink); border-radius: 1rem; overflow: hidden; background: #fff; text-align: left; font: inherit; cursor: pointer; padding: 0; }
+  .sw:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+  .sw i { display: block; height: 5.5rem; border-bottom: 2px solid var(--ink); }
+  .sw span { display: block; padding: .55rem .75rem .7rem; }
+  .sw strong { display: block; font-weight: 900; }
+  .sw code { display: block; color: var(--muted); }
+  .sw small { display: block; color: var(--muted); font-size: .72rem; line-height: 1.3; margin-top: .15rem; }
+  .copied { font-weight: 800; color: var(--mint-dark); font-size: .8rem; margin-left: .5rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { text-align: left; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+  th, td { padding: .5rem .6rem; border-bottom: 1px solid rgb(17 19 24 / .14); vertical-align: middle; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .pair { display: inline-grid; place-items: center; min-width: 3.2rem; border: 1.5px solid rgb(17 19 24 / .3); border-radius: .5rem; padding: .15rem .5rem; font-weight: 900; }
+  .chip { display: inline-flex; border: 1.5px solid; border-radius: 9999px; padding: .1rem .55rem; font-size: .7rem; font-weight: 800; }
+  .chip.pass { border-color: var(--mint-dark); background: #e3f5ec; color: var(--mint-dark); }
+  .chip.warn { border-color: #b27500; background: #fff3d1; color: #6b4600; }
+
+  .type-brand { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; letter-spacing: -.04em; font-size: 3.2rem; line-height: 1; }
+  .type-brand small { font-size: .8em; opacity: .6; margin: 0 .04em; }
+  .type-hero { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; line-height: .95; letter-spacing: -.04em; }
+  .type-kicker { font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .type-mono { font-family: var(--mono); font-weight: 700; font-size: .9rem; }
+
+  /* components, as in web/app/globals.css */
+  .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .6rem 1rem; border: 2px solid var(--ink); border-radius: .75rem; font: 800 .875rem var(--sans); color: var(--ink); cursor: default; transition: transform 160ms ease; }
+  .btn:hover { transform: translate(-.1rem, -.1rem) rotate(-1.5deg); }
+  .btn.primary { background: var(--gold); } .btn.secondary { background: #fff; }
+  .btn.danger { background: #fff; color: var(--deep-red); border-color: var(--deep-red); }
+  .pill-tabs { display: inline-flex; gap: .25rem; padding: .25rem; border: 2px solid var(--ink); border-radius: .75rem; background: #fff; }
+  .pill-tabs span { padding: .4rem .85rem; border: 2px solid transparent; border-radius: .5rem; font-weight: 800; font-size: .875rem; color: var(--muted); }
+  .pill-tabs .on { border-color: var(--ink); background: var(--gold); color: var(--ink); }
+  .stamp { display: inline-flex; border: 3px solid #1f7a55; border-radius: .6rem; padding: .35rem .9rem; color: #1f7a55; box-shadow: inset 0 0 0 2px var(--cream), inset 0 0 0 3.5px #1f7a55; font-size: 1.3rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; transform: rotate(-6deg); mix-blend-mode: multiply; }
+  .row { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+  .cover { height: 6rem; border: 2px solid var(--ink); border-radius: 1rem; display: grid; place-items: center; font-weight: 900; font-size: 1.1rem; background: radial-gradient(var(--dot) 1.2px, transparent 1.7px) 0 0 / 14px 14px, linear-gradient(120deg, var(--a), var(--b)); color: var(--c); }
+
+  ul.rules { margin: 0; padding-left: 1.1rem; max-width: 44rem; }
+  ul.rules li { margin: .3rem 0; }
+  .dont { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); list-style: none; padding: 0; margin: 0; }
+  .dont li { border: 2px dashed rgb(17 19 24 / .35); border-radius: .75rem; padding: .6rem .8rem; background: rgb(255 255 255 / .5); font-size: .88rem; }
+  .dont li::before { content: "✕ "; color: var(--deep-red); font-weight: 900; }
+
+  footer { border-top: 2px solid var(--ink); margin-top: 4rem; padding-top: 1rem; color: var(--muted); font-size: .85rem; }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } .btn:hover { transform: none; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <img src="logo/logo-on-dark.svg" alt="De(al) Club">
+    <nav aria-label="Sections">
+      <a href="#logo">Logo</a><a href="#colour">Colour</a><a href="#type">Type</a><a href="#surface">Surface</a><a href="#voice">Voice</a><a href="#social">Social</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Communities that own<em>their market.</em></h1>
+  <p class="lede">The De(al) Club brand kit: a pinboard of trading stickers. Cream paper, thick ink outlines, a strip of red tape, and warm gold for the one thing to press. Written rules are in <code>docs/brand-kit.md</code>.</p>
+
+  <!-- LOGO -->
+  <h2 id="logo">Logo</h2>
+  <p class="lede">A “D” with a dot set into its bowl, on a tile with its own ink outline. In the words, “(al)” is smaller and dimmed so “Deal” hides inside “De(al) Club”.</p>
+
+  <div class="grid g2">
+    <div><div class="stage dark"><img src="logo/logo-on-dark.svg" alt="Logo on dark" width="360"></div><p class="cap"><b>logo-on-dark.svg</b> · dark backgrounds, the app header</p></div>
+    <div><div class="stage light"><img src="logo/logo-on-light.svg" alt="Logo on light" width="360"></div><p class="cap"><b>logo-on-light.svg</b> · cream, white and photo backgrounds</p></div>
+  </div>
+
+  <h3>Marks and glyphs</h3>
+  <div class="grid g3">
+    <div><div class="stage dark"><img src="logo/mark.svg" alt="Mark" width="96"></div><p class="cap"><b>mark.svg</b> · icon, avatars</p></div>
+    <div><div class="stage white"><img src="logo/mark-ink.svg" alt="Mark, ink tile" width="96"></div><p class="cap"><b>mark-ink.svg</b> · white paper, print</p></div>
+    <div><div class="stage cream"><img src="logo/glyph-ink.svg" alt="Glyph, ink" width="96"></div><p class="cap"><b>glyph-ink.svg</b> · one colour, stamps</p></div>
+    <div><div class="stage dark"><img src="logo/glyph-cream.svg" alt="Glyph, cream" width="96"></div><p class="cap"><b>glyph-cream.svg</b> · one colour, on dark</p></div>
+    <div><div class="stage light"><img src="logo/wordmark-ink.svg" alt="Wordmark, ink" width="220"></div><p class="cap"><b>wordmark-ink.svg</b> · the words alone</p></div>
+    <div><div class="stage dark"><img src="logo/wordmark-cream.svg" alt="Wordmark, cream" width="220"></div><p class="cap"><b>wordmark-cream.svg</b> · the words alone, on dark</p></div>
+  </div>
+
+  <h3>Size and space</h3>
+  <ul class="rules">
+    <li><b>Clear space:</b> a quarter of the tile's height on every side.</li>
+    <li><b>Minimum size:</b> mark 16 px; full logo 120 px wide. Below that, use the mark.</li>
+  </ul>
+  <div class="row" style="margin-top:1rem; align-items:flex-end">
+    <img src="logo/mark.svg" alt="" width="16" style="background:var(--night);border-radius:4px"><span class="cap">16 px</span>
+    <img src="logo/mark.svg" alt="" width="32" style="background:var(--night);border-radius:6px"><span class="cap">32 px</span>
+    <img src="logo/logo-on-light.svg" alt="" width="120"><span class="cap">120 px</span>
+  </div>
+
+  <h3>Don't</h3>
+  <ul class="dont">
+    <li>Recolour the mark or the wordmark</li>
+    <li>Stretch, rotate or add shadows and glows</li>
+    <li>Drop the dot from the D</li>
+    <li>Set the words in Geist or another face</li>
+    <li>Write “(al)” at full strength or full size</li>
+    <li>Put the tile where its outline disappears</li>
+  </ul>
+
+  <!-- COLOUR -->
+  <h2 id="colour">Colour</h2>
+  <p class="lede">Ink and cream carry the page. Gold is for the single thing to press. Red is for emphasis. Blue and mint are signals. Click a swatch to copy its hex.</p>
+  <div class="swatches" id="swatches">
+    <button class="sw" data-hex="#111318"><i style="background:#111318"></i><span><strong>Ink</strong><code>#111318</code><small>Text, outlines, the mark</small></span></button>
+    <button class="sw" data-hex="#171a22"><i style="background:#171a22"></i><span><strong>Night</strong><code>#171a22</code><small>Header, footer, dark panels</small></span></button>
+    <button class="sw" data-hex="#202735"><i style="background:#202735"></i><span><strong>Slate</strong><code>#202735</code><small>Controls on dark</small></span></button>
+    <button class="sw" data-hex="#fff4cf"><i style="background:#fff4cf"></i><span><strong>Cream</strong><code>#fff4cf</code><small>Panels and stickers</small></span></button>
+    <button class="sw" data-hex="#f4edda"><i style="background:#f4edda"></i><span><strong>Canvas</strong><code>#f4edda</code><small>The page</small></span></button>
+    <button class="sw" data-hex="#f0b735"><i style="background:#f0b735"></i><span><strong>Gold</strong><code>#f0b735</code><small>Primary action, active tab</small></span></button>
+    <button class="sw" data-hex="#d83b45"><i style="background:#d83b45"></i><span><strong>Red</strong><code>#d83b45</code><small>Accent, tape, “want” side</small></span></button>
+    <button class="sw" data-hex="#a9282f"><i style="background:#a9282f"></i><span><strong>Deep Red</strong><code>#a9282f</code><small>Small red text on cream</small></span></button>
+    <button class="sw" data-hex="#315ea8"><i style="background:#315ea8"></i><span><strong>Blue</strong><code>#315ea8</code><small>Info, link hover, “filled”</small></span></button>
+    <button class="sw" data-hex="#78c7a5"><i style="background:#78c7a5"></i><span><strong>Mint</strong><code>#78c7a5</code><small>Success on dark (<code style="display:inline">#1f7a55</code> on cream)</small></span></button>
+  </div>
+  <p class="cap" id="copied" aria-live="polite"></p>
+
+  <h3>Contrast</h3>
+  <div class="sheet" style="padding:.5rem 1rem"><div class="tape"></div>
+    <table>
+      <thead><tr><th>Pair</th><th>Ratio</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pair" style="background:#fff4cf;color:#111318">Aa</span> Ink on Cream</td><td class="n">16.9</td><td><span class="chip pass">Any text</span></td></tr>
+        <tr><td><span class="pair" style="background:#f0b735;color:#111318">Aa</span> Ink on Gold</td><td class="n">10.2</td><td><span class="chip pass">Any text</span></td></tr>
+        <tr><td><span class="pair" style="background:#171a22;color:#fff4cf">Aa</span> Cream on Night</td><td class="n">15.8</td><td><span class="chip pass">Any text</span></td></tr>
+        <tr><td><span class="pair" style="background:#171a22;color:#f0b735">Aa</span> Gold on Night</td><td class="n">9.6</td><td><span class="chip pass">Any text</span></td></tr>
+        <tr><td><span class="pair" style="background:#fff4cf;color:#a9282f">Aa</span> Deep Red on Cream</td><td class="n">6.3</td><td><span class="chip pass">Small red text</span></td></tr>
+        <tr><td><span class="pair" style="background:#d83b45;color:#fff">Aa</span> White on Red</td><td class="n">4.5</td><td><span class="chip warn">Bold text only</span></td></tr>
+        <tr><td><span class="pair" style="background:#fff4cf;color:#d83b45">Aa</span> Red on Cream</td><td class="n">4.1</td><td><span class="chip warn">Large text, icons, tape</span></td></tr>
+        <tr><td><span class="pair" style="background:#171a22;color:#d83b45">Aa</span> Red on Night</td><td class="n">3.8</td><td><span class="chip warn">Large text, icons</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- TYPE -->
+  <h2 id="type">Type</h2>
+  <p class="lede">Bricolage Grotesque is the wordmark's face and nothing else. Geist and Geist Mono do the rest, heavy and tight.</p>
+  <div class="grid g2">
+    <div class="sheet"><div class="tape"></div>
+      <div class="type-kicker">Bricolage Grotesque 800 · wordmark only</div>
+      <div class="type-brand">De<small>(al)</small> Club</div></div>
+    <div class="sheet"><div class="tape"></div>
+      <div class="type-kicker">Geist 900 · headings</div>
+      <div class="type-hero">Your community’s market, owned by its members.</div></div>
+    <div class="sheet"><div class="tape"></div>
+      <div class="type-kicker">Geist 800 · labels, uppercase, tracked</div>
+      <p style="margin:.4rem 0 0;font-size:.9rem" class="type-kicker">Top Holders · Active days · Momentum</p>
+      <p style="margin:.6rem 0 0">Geist 400 for body copy. Each completed swap pays a small fee, and every week a share of it goes back to the Club.</p></div>
+    <div class="sheet"><div class="tape"></div>
+      <div class="type-kicker">Geist Mono · addresses, IDs, counts</div>
+      <p class="type-mono" style="margin:.4rem 0 0">0x4f1c…a92e · #1159 · 1,240 MON</p></div>
+  </div>
+
+  <!-- SURFACE -->
+  <h2 id="surface">Shape and surface</h2>
+  <p class="lede">A 2 px ink outline on everything. Cream panels on the canvas. Tape on one panel per page. No shadows: depth comes from outline, tilt and overlap.</p>
+  <div class="sheet"><div class="tape"></div>
+    <h3 style="margin-top:.3rem">Buttons</h3>
+    <div class="row"><span class="btn primary">Create deal</span><span class="btn secondary">Browse deals</span><span class="btn danger">Cancel deal</span></div>
+    <h3>Tabs</h3>
+    <div class="pill-tabs"><span class="on">Board</span><span>Deals</span><span>Rewards</span></div>
+    <h3>Status stamp</h3>
+    <div class="row" style="padding:.4rem 0 .6rem"><span class="stamp">Live</span></div>
+  </div>
+
+  <h3>Club covers</h3>
+  <p class="cap" style="margin-top:0">Chosen from the Club's address; never recoloured for a campaign.</p>
+  <div class="grid g3" style="grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))">
+    <div class="cover" style="--a:#f0b735;--b:#ffd978;--dot:rgb(17 19 24/.13);--c:#111318">Gold</div>
+    <div class="cover" style="--a:#c4303a;--b:#ef6970;--dot:rgb(255 244 207/.2);--c:#fff4cf">Red</div>
+    <div class="cover" style="--a:#202735;--b:#315ea8;--dot:rgb(255 244 207/.15);--c:#fff4cf">Slate</div>
+    <div class="cover" style="--a:#3f9f7b;--b:#9bdcbf;--dot:rgb(17 19 24/.12);--c:#111318">Mint</div>
+    <div class="cover" style="--a:#315ea8;--b:#86aaea;--dot:rgb(255 244 207/.2);--c:#fff4cf">Blue</div>
+  </div>
+
+  <!-- VOICE -->
+  <h2 id="voice">Voice</h2>
+  <p class="lede">Short, direct, warm. Playful look, literal words about money.</p>
+  <div class="grid g2">
+    <div class="sheet"><div class="tape"></div><h3 style="margin-top:.3rem">We say</h3>
+      <ul class="rules">
+        <li>“Each completed swap pays a small fee.”</li>
+        <li>“Assets move only in transactions or signatures you approve.”</li>
+        <li>“Your community’s market, owned by its members.”</li>
+        <li>Swap and deal; Club, Holder, Owner, Board.</li>
+      </ul></div>
+    <div class="sheet"><div class="tape"></div><h3 style="margin-top:.3rem">We don't say</h3>
+      <ul class="rules">
+        <li>Anything that promises returns or prices.</li>
+        <li>“On Deal”, “Declub”, “DECLUB”, “De(al)Club”.</li>
+        <li>Rounded or vague fee and reward numbers.</li>
+        <li>Slang that dates it (proposed).</li>
+      </ul></div>
+  </div>
+
+  <!-- SOCIAL -->
+  <h2 id="social">Social</h2>
+  <div class="grid g2">
+    <div style="grid-column:1/-1"><img src="social/x-header-1500x500.png" alt="X header" style="width:100%;border:2px solid var(--ink);border-radius:1rem;display:block"><p class="cap"><b>x-header-1500x500.png</b></p></div>
+    <div><img src="social/link-preview-1200x630.png" alt="Link preview" style="width:100%;border:2px solid var(--ink);border-radius:1rem;display:block"><p class="cap"><b>link-preview-1200x630.png</b> · not wired into the app yet</p></div>
+    <div><img src="social/avatar-400.png" alt="Avatar" style="width:12rem;max-width:100%;border:2px solid var(--ink);border-radius:50%;display:block"><p class="cap"><b>avatar-400.png</b> · shown here with a circular crop</p></div>
+  </div>
+
+  <footer>
+    Tokens are in <code>web/app/globals.css</code>. The logo is <code>web/components/Logo.tsx</code> and <code>web/app/icon.svg</code>. The Chog artwork was supplied to the project and is not a DeClub mark.
+  </footer>
+</main>
+
+<script>
+  var out = document.getElementById("copied");
+  document.getElementById("swatches").addEventListener("click", function (e) {
+    var b = e.target.closest(".sw"); if (!b) return;
+    var hex = b.dataset.hex;
+    var done = function () { out.textContent = "Copied " + hex; };
+    try { navigator.clipboard.writeText(hex).then(done, function () { out.textContent = hex; }); }
+    catch (_) { out.textContent = hex; }
+  });
+</script>
+</body>
+</html>

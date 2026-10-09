@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type Address, getAddress } from "viem";
-import {
-  cancelDigest,
-  covers,
-  feeProblem,
-  intentDigest,
-  intentHash,
-  shapeProblem,
-} from "../src/intent.ts";
+import { getAddress } from "viem";
+import { cancelDigest, covers, feeProblem, feeUnits, intentDigest, intentHash, shapeProblem } from "../src/intent.ts";
 import { verifyEcdsa } from "../src/signature.ts";
 import { AssetType, type Asset, type Intent } from "../src/types.ts";
 import { WireError, intentFromWire, intentToWire } from "../src/wire.ts";
@@ -17,6 +10,7 @@ import { privateKeyToAccount } from "viem/accounts";
 const A = getAddress("0x00000000000000000000000000000000000000a1");
 const T = getAddress("0x00000000000000000000000000000000000000b2");
 const U = getAddress("0x00000000000000000000000000000000000000c3");
+const V = getAddress("0x00000000000000000000000000000000000000d4");
 const nft = (id: bigint, token = T): Asset => ({ assetType: AssetType.ERC721, token, id, amount: 1n });
 const erc20 = (amount: bigint, token = U): Asset => ({
   assetType: AssetType.ERC20,
@@ -75,6 +69,23 @@ describe("shapeProblem", () => {
     assert.match(bad({ want: [nft(1n)] })!, /both sides/);
     assert.match(bad({ maker: "0x0000000000000000000000000000000000000000" })!, /zero/);
   });
+
+  it("caps the NFTs on a side at five, whatever else rides along", () => {
+    const nfts = (n: number) => Array.from({ length: n }, (_, i) => nft(BigInt(i + 1)));
+    assert.equal(shapeProblem({ ...base, give: nfts(5) }), null);
+    assert.equal(shapeProblem({ ...base, give: [...nfts(5), erc20(1n, V)] }), null);
+    assert.match(shapeProblem({ ...base, give: nfts(6) })!, /give has more than 5 NFTs/);
+    assert.match(shapeProblem({ ...base, want: nfts(6), give: [erc20(1n, T)] })!, /want has more than 5 NFTs/);
+  });
+});
+
+describe("feeUnits", () => {
+  it("is one per NFT given, and one for a side without any", () => {
+    assert.equal(feeUnits([nft(1n)]), 1n);
+    assert.equal(feeUnits([nft(1n), nft(2n), nft(3n)]), 3n);
+    assert.equal(feeUnits([nft(1n), nft(2n), erc20(9n)]), 2n);
+    assert.equal(feeUnits([erc20(9n)]), 1n);
+  });
 });
 
 describe("feeProblem", () => {
@@ -110,14 +121,7 @@ describe("covers", () => {
 describe("hashing", () => {
   it("changes with any signed field", () => {
     const h = intentHash(base);
-    for (const patch of [
-      { nonce: 8n },
-      { maxFee: 3n },
-      { feeToken: T },
-      { deadline: 101n },
-      { want: [erc20(6n)] },
-      { give: [nft(2n)] },
-    ] as Partial<Intent>[]) {
+    for (const patch of [{ nonce: 8n }, { maxFee: 3n }, { feeToken: T }, { deadline: 101n }, { want: [erc20(6n)] }, { give: [nft(2n)] }] as Partial<Intent>[]) {
       assert.notEqual(intentHash({ ...base, ...patch }), h);
     }
   });
@@ -146,8 +150,7 @@ describe("verifyEcdsa", () => {
     const N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
     const s = BigInt(`0x${sig.slice(66, 130)}`);
     const v = Number(`0x${sig.slice(130)}`);
-    const twin =
-      `${sig.slice(0, 66)}${(N - s).toString(16).padStart(64, "0")}${(v === 27 ? 28 : 27).toString(16)}` as `0x${string}`;
+    const twin = `${sig.slice(0, 66)}${(N - s).toString(16).padStart(64, "0")}${(v === 27 ? 28 : 27).toString(16)}` as `0x${string}`;
     assert.ok(!(await verifyEcdsa(acct.address, digest, twin)), "high-s twin");
     assert.ok(!(await verifyEcdsa(acct.address, digest, `${sig.slice(0, 130)}00` as `0x${string}`)));
     assert.ok(!(await verifyEcdsa(acct.address, digest, sig.slice(0, 130) as `0x${string}`)));

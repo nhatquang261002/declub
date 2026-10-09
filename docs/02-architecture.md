@@ -5,17 +5,17 @@
 ```text
  ┌─────────────────────────────── Browser ────────────────────────────────┐
  │  Next.js (App Router, TypeScript, Tailwind)                            │
- │    ├─ pages: / · /deals · /create · /v2/deal/[id] · /intent/[hash]     │
- │    │         /history · /clubs · /clubs/[address] · /account           │
+ │    ├─ pages: / · /deals · /create · /deal/[id] · /intent/[hash]     │
+ │    │         /history · /clubs · /clubs/[address] · /profile/[address] · /settings           │
  │    │         /guide · /guide/clubs                                     │
- │    └─ hooks: useDealBook · useDealsV2 · useDealV2 · usePool            │
+ │    └─ hooks: useDealBook · useDeals · useDeal · usePool            │
  │              useFills · useNotifications · useTxFlow · useSignFlow     │
  │  wagmi + viem, Privy sign-in (injected-wallet fallback)                │
  └────┬───────────────────┬─────────────────────────────────┬─────────────┘
       │ RPC reads, txs    │ /api/*                          │ intents (HTTP)
       │ EIP-712 sigs      ▼                                 ▼
       │   ┌── Next.js server (web/app/api) ───┐   ┌────── matcher/ ──────┐
-      │   │ /api/deals: book of V2 + pool     │   │ pool: HTTP + sqlite  │
+      │   │ /api/deals: book of deals + pool     │   │ pool: HTTP + sqlite  │
       │   │ /api/cron/fills: fill watcher     │   │ matcher: pairs and   │
       │   │ /api/webhooks/privy (svix)        │   │ rings of up to 4,    │
       │   │ profiles, saves, Clubs, activity  │   │ simulate → settle    │
@@ -23,14 +23,14 @@
       │   │                                   │             │
       │   └───────────────┬───────────────────┘             │ settle(cycle, sigs)
       │                   │ storage reads, receipts,        │
-      │                   │ 100-block log scans             │
+      │                   │ log scans (HyperSync)           │
       ▼                   ▼                                 ▼
  ┌──────────────────────── Monad testnet (10143) ─────────────────────────┐
  │  ┌─────────────────────────┐         ┌─────────────────────────────┐   │
  │  │ DeClubEscrow            │         │ DeClubIntents               │   │
  │  │ locked deals: exact,    │         │ signed swaps: pairs and     │   │
  │  │ trait, open offers;     │         │ rings, wallet to wallet;    │   │
- │  │ fee in MON per side     │         │ fee in WMON per maker       │   │
+ │  │ fee in MON per NFT      │         │ fee in WMON per NFT given   │   │
  │  └────────────┬────────────┘         └──────────────┬──────────────┘   │
  │               └─────── both inherit FeeAdmin ───────┘                  │
  │                                  │ transfers                           │
@@ -47,7 +47,7 @@ No indexer: deals are read from storage ([ADR 0003](adr/0003-no-indexer-in-v1.md
 
 ### DeClubEscrow (`contracts/src/DeClubEscrow.sol`)
 
-The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No upgrade proxy. A trade is two `Asset[]` (ERC-721, ERC-20, MON, or an `ERC721Trait` request), up to 10 per side.
+The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No upgrade proxy. A trade is two `Asset[]` (ERC-721, ERC-20, MON, or an `ERC721Trait` request), up to 10 per side and at most 5 NFTs.
 
 | Responsibility | How |
 |---|---|
@@ -55,11 +55,11 @@ The deal contract the app uses ([ADR 0005](adr/0005-generic-asset-model.md)). No
 | Escrow | Holds the maker's offered assets, and each proposal's assets on an open offer |
 | Settlement | `fillTrade` / `fillTraitTrade` / `acceptProposal` pay both sides in one call |
 | Refunds | `cancelTrade` (maker), `reclaimExpired` (anyone, after expiry), `rejectProposal` / `withdrawProposal`, and `claim` (pull fallback when a push fails) |
-| Fee | A flat MON fee per side of a completed deal, recorded on the trade at creation ([ADR 0015](adr/0015-protocol-fee.md)) |
+| Fee | A MON fee for each NFT a side moves (once if none), up to 5 NFTs a side, recorded on the trade at creation ([ADR 0015](adr/0015-protocol-fee.md), [0033](adr/0033-fee-per-nft.md)) |
 
 ### DeClubIntents (`contracts/src/DeClubIntents.sol`)
 
-Settles signed EIP-712 intents wallet to wallet, nothing escrowed ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). `settle(cycle, signatures)` takes a pair or a ring of up to 4 and re-checks every signature, nonce, deadline and transfer. Each maker pays the fee in WMON, capped by the `maxFee` they signed. Domain `("DeClubIntents", "1")`.
+Settles signed EIP-712 intents wallet to wallet, nothing escrowed ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). `settle(cycle, signatures)` takes a pair or a ring of up to 4 and re-checks every signature, nonce, deadline and transfer. Each maker pays the fee in WMON for each NFT they give, capped by the per-NFT `maxFee` they signed. Domain `("DeClubIntents", "1")`.
 
 ### DeClubRewards (`contracts/src/DeClubRewards.sol`)
 
@@ -82,15 +82,15 @@ The full specs are in [03 · Contract Design](03-contract-design.md); the interf
 
 ### Frontend (`web/`)
 
-Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([ADR 0010](adr/0010-privy-sign-in.md)). It sends every transaction from the browser and reads most things straight from the chain. Its server routes (`web/app/api`) keep profiles, saves and Clubs in Upstash Redis ([ADR 0011](adr/0011-verified-profiles.md), [0012](adr/0012-server-side-saves.md), [0016](adr/0016-clubs-and-momentum.md)), hold the deal book so it can be searched and filtered whole (`/api/deals`, [ADR 0020](adr/0020-server-side-deal-book.md)), follow the chain for fills from a cron (`/api/cron/fills`, [ADR 0019](adr/0019-fill-watcher.md)), and take Privy's webhook (`/api/webhooks/privy`, [ADR 0013](adr/0013-privy-webhooks.md)). See [05 · Frontend](05-frontend.md).
+Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([ADR 0010](adr/0010-privy-sign-in.md)). It sends every transaction from the browser and reads most things straight from the chain. Its server routes (`web/app/api`) keep profiles, saves and Clubs in Upstash Redis ([ADR 0011](adr/0011-verified-profiles.md), [0012](adr/0012-server-side-saves.md), [0016](adr/0016-clubs-and-momentum.md)), hold the deal book so it can be searched and filtered whole (`/api/deals`, [ADR 0020](adr/0020-server-side-deal-book.md)), follow the chain for fills from a cron (`/api/cron/fills`, [ADR 0019](adr/0019-fill-watcher.md), finding transactions with Envio HyperSync when a token is set, [ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)), and take Privy's webhook (`/api/webhooks/privy`, [ADR 0013](adr/0013-privy-webhooks.md)). See [05 · Frontend](05-frontend.md).
 
 ### Intent pool and matcher (`matcher/`)
 
-A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `DeClubIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key, and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
+A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `DeClubIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key or as one [Railway](https://railway.com) service (the web app runs on Vercel, which can't host a long-lived process with a sqlite file), and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
 
 ### Indexer (deferred)
 
-Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
+Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md), [0051](adr/0051-hypersync-for-the-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
 
 ## Key flows
 
@@ -100,7 +100,7 @@ Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`
 Maker                          Token contracts                 DeClubEscrow
   │ approve / setApprovalForAll(escrow) ────►│                      │  (once per token)
   │ createTrade(offered, requested, taker, expiry)                  │
-  │   {value: offered MON + fee}  (or createTraitTrade / createOpenOffer)
+  │   {value: offered MON + fee × NFTs offered}  (or createTraitTrade / createOpenOffer)
   │ ───────────────────────────────────────────────────────────────►│
   │                                          │◄── transferFrom(maker → escrow) × offered
   │                                          │                      │── emit TradeCreated
@@ -112,7 +112,7 @@ Maker                          Token contracts                 DeClubEscrow
 ```text
 Taker                          Token contracts                 DeClubEscrow              Maker
   │ approve requested tokens ───────────────►│                      │                   │
-  │ fillTrade(id) {value: requested MON + fee}  (fillTraitTrade with proofs)            │
+  │ fillTrade(id) {value: requested MON + fee × NFTs requested}  (fillTraitTrade with proofs)            │
   │ ───────────────────────────────────────────────────────────────►│                   │
   │                                          │   status = Filled (effects first)        │
   │                                          │◄── taker → maker  × requested ──────────►│
@@ -161,18 +161,19 @@ declub/
 | | Testnet | Mainnet |
 |---|---|---|
 | Chain id | 10143 (confirmed against the live RPC, 2026-09-28) | 143 (unverified) |
-| RPC | `https://testnet-rpc.monad.xyz` | TBD |
+| RPC | Alchemy (`monad-testnet.g.alchemy.com`) in the app; the public `https://testnet-rpc.monad.xyz` has timed out | TBD |
 | Explorers | [MonadVision](https://testnet.monadvision.com/), [Monadscan](https://testnet.monadscan.com/) | |
 | Verification | Sourcify: `https://sourcify-api-monad.blockvision.org/` | |
 
-The first deployment's creation bytecode (the v1 escrow and MockChog; solc 0.8.28, `evm_version = prague`) was gas-estimated against the Monad testnet node before it was sent, so Monad's own EVM accepts it, not only Foundry's local EVM. The later contracts use the same compiler settings and were deployed the same way.
+Creation bytecode (solc 0.8.28, `evm_version = prague`) is gas-estimated against the Monad testnet node before it is sent, so Monad's own EVM accepts it, not only Foundry's local EVM.
 
 ### Deployed (testnet)
 
-Nothing is deployed under the DeClub names yet. Every testnet deployment predates the rename ([ADR 0021](adr/0021-declub-pivot.md)), so `DeClubEscrow`, `DeClubIntents` and `DeClubRewards` are deployed fresh from `contracts/script/`. The retired deployments and their broadcast records are listed in the [README](../README.md#retired-deployments).
+`DeClubEscrow`, `DeClubIntents` and `DeClubRewards` are deployed on testnet (the demo
+deployment, see the README and `contracts/broadcast/`). Redeploy from [`contracts/script/`](../contracts/script/README.md).
 
 A few Monad specifics that affect the design:
 
 - **Fast blocks:** the UI can wait for the transaction receipt instead of showing long "pending" states.
 - **Gas is charged on the gas limit, not gas used:** give fills sensible explicit limits rather than inflated defaults. Confirm this against Monad's docs.
-- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)).
+- **`eth_getLogs` is capped at 100 blocks** per request on the public testnet RPC (measured 2026-09-28). At ~2 blocks/s, scanning from the deploy block is impractical from a browser, so the app reads storage instead ([ADR 0004](adr/0004-read-deals-from-storage.md)). The server's fill watcher gets past the cap with Envio HyperSync when it has a token ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)).

@@ -28,5 +28,8 @@ registerHooks({
   },
 });
 
-// The deal contract is optional in the app (lib/config.ts); tests run against the testnet one.
-process.env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS ||= "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
+// The deal contract is optional in the app (lib/config.ts); tests run against the testnet one. Only
+// tests get this stand-in: the loader also runs the scripts (`rewards:epoch`, `demo.ts`), and a preset
+// value would win over the address in .env, which Next's env loading never overrides.
+const testing = !!process.env.NODE_TEST_CONTEXT || process.execArgv.includes("--test") || process.argv.slice(1).some((arg) => /\.test\.[cm]?[jt]s$/.test(arg));
+if (testing) process.env.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS ||= "0x73591F76d7deE66F683A979cEffb4356982EE1bB";

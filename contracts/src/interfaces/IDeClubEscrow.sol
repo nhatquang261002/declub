@@ -77,8 +77,9 @@ interface IDeClubEscrow is IFeeAdmin {
         Status status;
         /// @notice Only this address may fill. address(0) = anyone.
         address taker;
-        /// @notice What each side of this deal pays: the fee in force when it was created. The
-        ///         taker or proposer sends this, not the current `fee()`.
+        /// @notice What each side of this deal pays for each NFT it moves (once, if it moves
+        ///         none): the fee in force when it was created. The taker or proposer sends this
+        ///         times their units (`feeUnits`), not the current `fee()`.
         uint96 fee;
         /// @notice Escrowed by the maker at creation, paid to the taker on fill.
         Asset[] offered;
@@ -130,7 +131,8 @@ interface IDeClubEscrow is IFeeAdmin {
         uint256 id,
         uint256 amount
     );
-    /// @notice A deal completed and both sides' fee shares (`amount` = 2 × the trade's `fee`) went to
+    /// @notice A deal completed and both sides' fee shares (`amount` = the trade's `fee` times both
+    ///         sides' `feeUnits`) went to
     ///         `recipient`, or were credited to it for `claim` if it rejected the MON. Not
     ///         emitted when the fee is 0.
     event FeeCharged(uint256 indexed tradeId, address indexed recipient, uint256 amount);
@@ -140,6 +142,8 @@ interface IDeClubEscrow is IFeeAdmin {
     /// @notice A side has no assets.
     error EmptySide();
     error TooManyAssets(uint256 count, uint256 max);
+    /// @notice A side moves more NFTs than `MAX_NFTS_PER_SIDE` (a trait set counts its `amount`).
+    error TooManyNfts(uint256 count, uint256 max);
     /// @notice Asset `index` (within its side) breaks the field rules on `Asset`.
     error InvalidAsset(uint256 index);
     /// @notice The same asset is listed twice on one side.
@@ -190,9 +194,10 @@ interface IDeClubEscrow is IFeeAdmin {
     // ─────────────────────────────────────────────────────────────── Mutating
 
     /// @notice Escrow `offered` and open a trade for `requested`. Send exactly the native
-    ///         amount listed in `offered` plus `fee()` as `msg.value`. That share is held, and
-    ///         refunded if the trade is cancelled or reclaimed. The trade records it as `fee`,
-    ///         which is what the other side pays too.
+    ///         amount listed in `offered` plus `fee()` per NFT in it (`feeUnits(offered)` times
+    ///         `fee()`) as `msg.value`. That share is held, and refunded if the trade is
+    ///         cancelled or reclaimed. The trade records `fee()` as `fee`, which is what the
+    ///         other side pays per NFT too.
     function createTrade(
         Asset[] calldata offered,
         Asset[] calldata requested,
@@ -222,7 +227,7 @@ interface IDeClubEscrow is IFeeAdmin {
     ) external payable returns (uint256 tradeId);
 
     /// @notice Escrow `assets` as a proposal on an open offer. Send exactly the native amount
-    ///         listed in `assets` plus the trade's `fee` as `msg.value`. That share is held with
+    ///         listed in `assets` plus the trade's `fee` per NFT in them as `msg.value`. That share is held with
     ///         the proposal and refunded on withdraw or reject.
     function propose(uint256 tradeId, Asset[] calldata assets)
         external
@@ -243,7 +248,7 @@ interface IDeClubEscrow is IFeeAdmin {
     function acceptProposal(uint256 tradeId, uint256 proposalId) external;
 
     /// @notice Pay `requested` and receive `offered`. Send exactly the native amount listed in
-    ///         `requested` plus the trade's `fee` as `msg.value`. Both sides' fee shares go to
+    ///         `requested` plus the trade's `fee` per NFT in it as `msg.value`. Both sides' fee shares go to
     ///         `FEE_RECIPIENT`.
     function fillTrade(uint256 tradeId) external payable;
 
@@ -264,6 +269,12 @@ interface IDeClubEscrow is IFeeAdmin {
     // ─────────────────────────────────────────────────────────────── Views
 
     function MAX_ASSETS_PER_SIDE() external view returns (uint256);
+    /// @notice The most NFTs one side can move (a trait set counts its `amount`).
+    function MAX_NFTS_PER_SIDE() external view returns (uint256);
+
+    /// @notice How many times the per-NFT fee a side pays: the NFTs in `assets` (a trait set
+    ///         counts its `amount`), or 1 if there are none. Doesn't validate `assets`.
+    function feeUnits(Asset[] calldata assets) external pure returns (uint256);
     function MAX_NOTE_BYTES() external view returns (uint256);
     function MAX_SPEC_BYTES() external view returns (uint256);
     function tradeCount() external view returns (uint256);

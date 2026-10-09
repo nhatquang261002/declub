@@ -1,7 +1,7 @@
-import { createPublicClient, getAddress, http, verifyTypedData, type Address, type Hex, type PublicClient } from "viem";
-import { chain } from "../chain";
-import { CHAIN_ID, RPC_URL } from "../config";
+import { getAddress, type Address, type Hex } from "viem";
+import { CHAIN_ID } from "../config";
 import { SIGNED_SKEW_SEC, followTypedData, type FollowMessage } from "../social";
+import { verifySocialSignature } from "./socialSignature";
 import { withinLimit, type Store } from "./store";
 
 /**
@@ -10,16 +10,16 @@ import { withinLimit, type Store } from "./store";
  * record between two wallets wins, so an unfollow signed later undoes a follow signed earlier.
  */
 const base = `declub:follow:${CHAIN_ID}`;
-export const followsKey = (wallet: string) => `${base}:out:${wallet.toLowerCase()}`;
-export const followersKey = (wallet: string) => `${base}:in:${wallet.toLowerCase()}`;
-export const followRecordKey = (follower: string, target: string) => `${base}:rec:${follower.toLowerCase()}:${target.toLowerCase()}`;
+const followsKey = (wallet: string) => `${base}:out:${wallet.toLowerCase()}`;
+const followersKey = (wallet: string) => `${base}:in:${wallet.toLowerCase()}`;
+const followRecordKey = (follower: string, target: string) => `${base}:rec:${follower.toLowerCase()}:${target.toLowerCase()}`;
 
 /** A wallet follows at most this many others. */
-export const MAX_FOLLOWS = 1_000;
+const MAX_FOLLOWS = 1_000;
 /** Follow or unfollow at most this many times an hour per user. */
-export const FOLLOWS_PER_HOUR = 120;
+const FOLLOWS_PER_HOUR = 120;
 
-export type FollowRecord = { message: FollowMessage; signature: Hex };
+type FollowRecord = { message: FollowMessage; signature: Hex };
 
 export type FollowDeps = {
   /** Unix seconds. */
@@ -27,20 +27,9 @@ export type FollowDeps = {
   verifyFollow?: (message: FollowMessage, signature: Hex) => Promise<boolean>;
 };
 
-export type FollowRefusal = "unsigned" | "not_yours" | "self" | "stale" | "bad_signature" | "outdated" | "too_many" | "rate_limited";
+type FollowRefusal = "unsigned" | "not_yours" | "self" | "stale" | "bad_signature" | "outdated" | "too_many" | "rate_limited";
 
-let verifier: PublicClient | undefined;
-async function viemVerifyFollow(message: FollowMessage, signature: Hex): Promise<boolean> {
-  // A plain wallet's signature is checked here; only a smart wallet costs a call (ERC-1271).
-  if (await verifyTypedData({ address: message.follower, signature, ...followTypedData(message) }).catch(() => false)) return true;
-  verifier ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient;
-  try {
-    if (!(await verifier.getCode({ address: message.follower }))) return false;
-    return await verifier.verifyTypedData({ address: message.follower, signature, ...followTypedData(message) });
-  } catch {
-    return false;
-  }
-}
+const viemVerifyFollow = (message: FollowMessage, signature: Hex) => verifySocialSignature(message.follower, followTypedData(message), signature);
 
 /**
  * Records a signed follow or unfollow. The follower must be one of the caller's linked wallets

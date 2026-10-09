@@ -25,15 +25,29 @@ import { REPLIES_KEPT } from "../lib/clubPosts";
 import { exportFollows, followingOf, recordFollow, type FollowDeps } from "../lib/server/follows";
 import { joinClub } from "../lib/server/members";
 import { memoryStore, type Store } from "../lib/server/store";
-import { SOCIAL_TYPES, draftPost, draftReply, followTypedData, postId, postTypedData, replyTypedData, socialDomain, type FollowMessage, type PostMessage, type ReplyMessage } from "../lib/social";
+import {
+  SOCIAL_TYPES,
+  draftPost,
+  draftReply,
+  followTypedData,
+  postId,
+  postTypedData,
+  replyTypedData,
+  socialDomain,
+  type FollowMessage,
+  type PostMessage,
+  type ReplyMessage,
+} from "../lib/social";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
 const NFT = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
 const OTHER = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
-const reg = makeRegistry(parseAssets([
-  { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
-  { chainId: 10143, address: OTHER, kind: "erc721", name: "O", symbol: "O", status: "verified", note: "Why." },
-]));
+const reg = makeRegistry(
+  parseAssets([
+    { chainId: 10143, address: NFT, kind: "erc721", name: "N", symbol: "N", status: "verified", note: "Why." },
+    { chainId: 10143, address: OTHER, kind: "erc721", name: "O", symbol: "O", status: "verified", note: "Why." },
+  ]),
+);
 const club = reg.clubFor(NFT)!;
 const other = reg.clubFor(OTHER)!;
 
@@ -46,7 +60,10 @@ const deps: Deps = {
   verifyPost: async (signer, message, signature) => verifyTypedData({ address: signer, signature, ...postTypedData(message) }),
   verifyReply: async (signer, message, signature) => verifyTypedData({ address: signer, signature, ...replyTypedData(message) }),
 };
-const followDeps: FollowDeps = { now: () => NOW_SEC, verifyFollow: async (message, signature) => verifyTypedData({ address: message.follower, signature, ...followTypedData(message) }) };
+const followDeps: FollowDeps = {
+  now: () => NOW_SEC,
+  verifyFollow: async (message, signature) => verifyTypedData({ address: message.follower, signature, ...followTypedData(message) }),
+};
 
 async function member(store: Store, userId: string, wallet: string, holder = false, entry = club) {
   await store.set(profileKey(wallet.toLowerCase()), { provider: "twitter", handle: userId, userId, updatedAt: 1 });
@@ -117,13 +134,22 @@ describe("signed posts", () => {
 
   it("refuses a post signed for another Club, from another time, or not as stored", async () => {
     const elsewhere = message("hi", { club: OTHER as Hex });
-    assert.deepEqual(await createSignedPost(store, club, "ua", { message: elsewhere, signature: await sign(alice, elsewhere) }, deps), { ok: false, reason: "wrong_club" });
+    assert.deepEqual(await createSignedPost(store, club, "ua", { message: elsewhere, signature: await sign(alice, elsewhere) }, deps), {
+      ok: false,
+      reason: "wrong_club",
+    });
     const old = message("hi", { at: NOW_SEC - 301 });
     assert.deepEqual(await createSignedPost(store, club, "ua", { message: old, signature: await sign(alice, old) }, deps), { ok: false, reason: "stale" });
     const messy = message("hi", { text: " hi " });
-    assert.deepEqual(await createSignedPost(store, club, "ua", { message: messy, signature: await sign(alice, messy) }, deps), { ok: false, reason: "not_clean" });
+    assert.deepEqual(await createSignedPost(store, club, "ua", { message: messy, signature: await sign(alice, messy) }, deps), {
+      ok: false,
+      reason: "not_clean",
+    });
     const padded = message("hi", { kind: "looking", link: "007" });
-    assert.deepEqual(await createSignedPost(store, club, "ua", { message: padded, signature: await sign(alice, padded) }, deps), { ok: false, reason: "not_clean" });
+    assert.deepEqual(await createSignedPost(store, club, "ua", { message: padded, signature: await sign(alice, padded) }, deps), {
+      ok: false,
+      reason: "not_clean",
+    });
     assert.deepEqual(await createSignedPost(store, club, "ua", { message: message("hi"), signature: undefined }, deps), { ok: false, reason: "unsigned" });
   });
 
@@ -154,7 +180,10 @@ describe("signed posts", () => {
     const stored = (await store.get<Record<string, unknown>>(key))!;
     await store.set(key, { ...stored, hidden: "moderator" });
     assert.deepEqual(await exportPosts(store, club), []);
-    assert.deepEqual((await walletPosts(store, alice.address)).map((p) => p.message.text), ["also mine"]);
+    assert.deepEqual(
+      (await walletPosts(store, alice.address)).map((p) => p.message.text),
+      ["also mine"],
+    );
     await store.set(key, stored);
 
     const mine = await walletPosts(store, alice.address);
@@ -200,7 +229,10 @@ describe("lenses", () => {
     { id: "c", wallet: "0xcc", kind: "note" as const, at: 1_000 },
   ];
   const ctx: LensContext = { now: 3_000, follows: new Set(["0xcc"]), holders: new Set(["0xbb", "0xcc"]), momentum: new Map([["0xcc", 50]]) };
-  const order = (id: string) => lensOf(id).rank(posts, ctx).map((p) => p.id);
+  const order = (id: string) =>
+    lensOf(id)
+      .rank(posts, ctx)
+      .map((p) => p.id);
 
   it("orders and filters by the reader's choice", () => {
     assert.deepEqual(order("newest"), ["a", "b", "c"]);
@@ -208,20 +240,25 @@ describe("lenses", () => {
     assert.deepEqual(order("holders"), ["b", "c"]);
     assert.deepEqual(order("following"), ["c"]);
     assert.equal(lensOf("nonsense").id, "newest");
-    assert.deepEqual(LENSES.map((l) => l.id), ["newest", "momentum", "holders", "following"]);
+    assert.deepEqual(
+      LENSES.map((l) => l.id),
+      ["newest", "momentum", "holders", "following"],
+    );
   });
 
   it("applies to the Board: holders only, and the reader's follows", async () => {
     const store = memoryStore();
     await member(store, "ua", alice.address, true);
     await member(store, "ub", bob.address, false);
-    for (const [userId, account, text] of [["ua", alice, "from a Holder"], ["ub", bob, "from Bob"]] as const) {
+    for (const [userId, account, text] of [
+      ["ua", alice, "from a Holder"],
+      ["ub", bob, "from Bob"],
+    ] as const) {
       await clear(store, userId);
       const m = message(text);
       assert.ok((await createSignedPost(store, club, userId, { message: m, signature: await sign(account, m) }, deps)).ok);
     }
-    const read = async (lens: "newest" | "holders" | "following", as?: string) =>
-      (await listPosts(store, club, { lens, as }, deps)).posts.map((p) => p.text);
+    const read = async (lens: "newest" | "holders" | "following", as?: string) => (await listPosts(store, club, { lens, as }, deps)).posts.map((p) => p.text);
     assert.equal((await read("newest")).length, 2);
     assert.deepEqual(await read("holders"), ["from a Holder"]);
     assert.deepEqual(await read("following", alice.address), []);
@@ -240,7 +277,8 @@ describe("replies", () => {
     return { ...d.message, ...over };
   };
   const signReply = (account: typeof alice, m: ReplyMessage) => account.signTypedData(replyTypedData(m));
-  const clearReplies = (userId: string) => store.del(`declub:rl:club-reply-cd:${NFT.toLowerCase()}:${userId}`, `declub:rl:club-reply-hr:${NFT.toLowerCase()}:${userId}`);
+  const clearReplies = (userId: string) =>
+    store.del(`declub:rl:club-reply-cd:${NFT.toLowerCase()}:${userId}`, `declub:rl:club-reply-hr:${NFT.toLowerCase()}:${userId}`);
   const answer = async (account: typeof alice, userId: string, text: string) => {
     await clearReplies(userId);
     const m = reply(text);
@@ -263,11 +301,17 @@ describe("replies", () => {
     assert.ok(r.ok, JSON.stringify(r));
     assert.equal(r.post.parent, parent);
     const { posts } = await listPosts(store, club, {}, deps);
-    assert.deepEqual(posts.map((p) => p.id), [parent]);
+    assert.deepEqual(
+      posts.map((p) => p.id),
+      [parent],
+    );
     assert.equal(posts[0]!.replies, 1);
     const thread = await listReplies(store, club, parent, {}, deps);
     assert.ok(thread.ok);
-    assert.deepEqual(thread.replies.map((p) => p.text), ["gm back"]);
+    assert.deepEqual(
+      thread.replies.map((p) => p.text),
+      ["gm back"],
+    );
     // The export carries it, checkable against the Reply type; the wallet export of posts doesn't.
     const [exported] = await exportReplies(store, club);
     assert.ok(await verifyTypedData({ address: exported!.signer, signature: exported!.signature, ...replyTypedData(exported!.message) }));
@@ -280,7 +324,11 @@ describe("replies", () => {
     assert.ok(r.ok);
     await clearReplies("ub");
     assert.deepEqual(await createReply(store, club, "ub", r.post.id, { text: "nested" }, deps), { ok: false, reason: "not_found" });
-    assert.deepEqual(await pinPost(store, club, { userId: "ua", wallet: alice.address }, r.post.id, true, deps), { ok: false, reason: "not_found" }, "a reply can't be pinned");
+    assert.deepEqual(
+      await pinPost(store, club, { userId: "ua", wallet: alice.address }, r.post.id, true, deps),
+      { ok: false, reason: "not_found" },
+      "a reply can't be pinned",
+    );
     // As reports would: hidden, and still the Owner's.
     await store.set(postKey(NFT, parent), { ...(await store.get<object>(postKey(NFT, parent)))!, hidden: "reports" });
     await clearReplies("ub");
@@ -291,9 +339,15 @@ describe("replies", () => {
 
   it("must be signed by the member's wallet for this post", async () => {
     const m = reply("hi");
-    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: m, signature: await signReply(alice, m) }, deps), { ok: false, reason: "bad_signature" });
+    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: m, signature: await signReply(alice, m) }, deps), {
+      ok: false,
+      reason: "bad_signature",
+    });
     const elsewhere = reply("hi", { parent: "f".repeat(64) });
-    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: elsewhere, signature: await signReply(bob, elsewhere) }, deps), { ok: false, reason: "not_clean" });
+    assert.deepEqual(await createSignedReply(store, club, "ub", parent, { message: elsewhere, signature: await signReply(bob, elsewhere) }, deps), {
+      ok: false,
+      reason: "not_clean",
+    });
   });
 
   it("stop at a full thread", async () => {

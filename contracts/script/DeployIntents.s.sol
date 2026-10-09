@@ -8,7 +8,7 @@ import {FeeConfig} from "./FeeConfig.sol";
 
 /// @notice Deploys DeClubIntents with its protocol fee (any token can be traded). It needs no
 ///         mock tokens: the existing mUSD and Chog collection from the other deployments work.
-/// @dev The off-chain pool and matcher (../matcher) read the address from
+/// @dev The off-chain pool and matcher (../../matcher) read the address from
 ///      NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS. DeClubEscrow is untouched.
 ///      Env (all optional; the fee is off unless PROTOCOL_FEE_WEI is set):
 ///        PROTOCOL_FEE_WEI      fee per maker in `FEE_TOKEN` units (18 decimals)

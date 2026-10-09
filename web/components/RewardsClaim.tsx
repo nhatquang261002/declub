@@ -64,7 +64,7 @@ export function RewardsClaim({ account, club }: { account: Address | undefined; 
       ) : (
         <p className="text-xs text-muted">Claiming isn’t set up on this app yet (no rewards contract).</p>
       )}
-      <TxStatus state={tx.state} success="Claimed. The MON is in your wallet." />
+      <TxStatus state={tx.state} success="Claimed. The MON was sent to the Club wallet." />
     </div>
   );
 }

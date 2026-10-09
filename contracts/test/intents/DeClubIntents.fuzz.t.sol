@@ -77,8 +77,7 @@ contract DeClubIntentsFuzzTest is DeClubIntentsBase {
             }
         }
 
-        (IDeClubIntents.Intent[] memory cycle, bytes[] memory sigs,) =
-            _ring(n, start, gives, slack);
+        (IDeClubIntents.Intent[] memory cycle, bytes[] memory sigs,) = _ring(n, start, gives, slack);
         swap.settle(cycle, sigs);
 
         for (uint256 p; p < n; ++p) {
@@ -109,8 +108,7 @@ contract DeClubIntentsFuzzTest is DeClubIntentsBase {
         }
         uint256[4] memory slack; // everyone wants exactly the previous give...
 
-        (IDeClubIntents.Intent[] memory cycle, bytes[] memory sigs,) =
-            _ring(n, start, gives, slack);
+        (IDeClubIntents.Intent[] memory cycle, bytes[] memory sigs,) = _ring(n, start, gives, slack);
         // ...except the maker after `shortMaker`, who now asks for one more than is given.
         uint256 asker = (shortMaker + 1) % n;
         uint256 pos = (asker + n - start) % n;

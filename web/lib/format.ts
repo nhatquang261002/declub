@@ -35,6 +35,15 @@ function duration(seconds: number): string {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
+/** Time left to a deadline, to the two largest units that matter: "2d 4h", "22h 41m", "41m", "<1m". */
+export function countdown(seconds: number): string {
+  if (seconds < 60) return "<1m";
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 /** "just now", "5m ago", "3h ago", "2d ago". A time in the future reads as "just now". */
 export function ago(unixSec: number, nowSec: number): string {
   const delta = nowSec - unixSec;

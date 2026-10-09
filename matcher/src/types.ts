@@ -1,6 +1,6 @@
 import type { Address, Hex } from "viem";
 
-/** Numerically aligned with `IDeClubIntents.AssetType` (and V2). Native is never valid here. */
+/** Numerically aligned with `IDeClubIntents.AssetType` (and the `AssetType` values in `IDeClubEscrow`). Native is never valid here. */
 export const AssetType = { Native: 0, ERC20: 1, ERC721: 2 } as const;
 
 export interface Asset {
@@ -40,10 +40,4 @@ export type Status =
   | "consumed" //  nonce used on-chain by someone else (settled elsewhere, or invalidated)
   | "rejected"; // can never settle (bad signature, malformed, token that doesn't deliver)
 
-export const TERMINAL: ReadonlySet<Status> = new Set([
-  "settled",
-  "cancelled",
-  "expired",
-  "consumed",
-  "rejected",
-]);
+export const TERMINAL: ReadonlySet<Status> = new Set(["settled", "cancelled", "expired", "consumed", "rejected"]);

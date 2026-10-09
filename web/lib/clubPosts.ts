@@ -2,16 +2,14 @@ import { MAX_X_TAGS, normalizeTag, parseXStatus, type SignalStrength, type XAcco
 
 /**
  * Club posts (ADR 0016, docs/09-clubs.md): the first user-written text in the app, so the rules
- * are strict and live in one pure place. Posts are plain text: no HTML, markdown or links in the
- * text. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
+ * are strict and live in one pure place. Posts are plain text, rendered as text and never as HTML or
+ * markdown; control characters are stripped. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
  * for" post, or an X post on a note (ADR 0024).
  */
 export const POST_MAX = 280;
 export const POSTS_PER_HOUR = 5;
 export const POST_COOLDOWN_SEC = 30;
 export const REPORTS_PER_DAY = 20;
-/** This many distinct reports hide a post until a Moderator restores or deletes it. */
-export const REPORTS_TO_HIDE = 3;
 export const MAX_PINNED = 3;
 /** How many posts a Club keeps. Older ones fall off the list. */
 export const POSTS_KEPT = 500;
@@ -52,6 +50,12 @@ export type StoredPost = {
   x?: StoredXCard;
   /** On a reply: the top-level post it answers. Replies have no link and aren't on the Board list. */
   parent?: string;
+  /**
+   * The challenge this post was entered in (ADR 0048). The challenge's prize covers it: it still
+   * counts toward Momentum, but earns its author no epoch points of its own (no active day, X share
+   * or backing). Kept after a withdrawal; cleared if the challenge is cancelled.
+   */
+  entry?: string;
 };
 
 /**
@@ -90,17 +94,20 @@ export type PublicPost = {
 // post, and the last two can make one text read as another.
 const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u200b\u202a-\u202e\u2066-\u2069\ufeff]+/g;
 
-export type CleanText = { ok: true; text: string } | { ok: false; reason: "empty" | "too_long" };
+type CleanText = { ok: true; text: string } | { ok: false; reason: "empty" | "too_long" };
 
-/** The text as it is stored: unsafe characters become spaces, runs of space collapse, ends trimmed. */
-export function cleanText(input: unknown): CleanText {
+/** `input` as it is stored when at most `max` characters long: unsafe characters become spaces, runs of space collapse, ends trimmed. */
+export function cleanLine(input: unknown, max: number): CleanText {
   if (typeof input !== "string") return { ok: false, reason: "empty" };
   const text = input.replace(UNSAFE, " ").replace(/ {2,}/g, " ").trim();
   if (text.length === 0) return { ok: false, reason: "empty" };
   // Counted in characters, not UTF-16 units, so an emoji isn't two.
-  if ([...text].length > POST_MAX) return { ok: false, reason: "too_long" };
+  if ([...text].length > max) return { ok: false, reason: "too_long" };
   return { ok: true, text };
 }
+
+/** A post's text as it is stored. */
+export const cleanText = (input: unknown): CleanText => cleanLine(input, POST_MAX);
 
 /**
  * A deal id (digits), an intent hash (0x and 64 hex digits) or an X post link, or `null` for
@@ -116,7 +123,7 @@ export function parseLink(input: unknown): PostLink | null {
 }
 
 /** A note may share an X post; a "Looking for" post may point at a deal or a signed swap. */
-export const linkFits = (kind: PostKind, link: PostLink) => (kind === "note" ? link.kind === "x" : link.kind !== "x");
+const linkFits = (kind: PostKind, link: PostLink) => (kind === "note" ? link.kind === "x" : link.kind !== "x");
 
 /** The link `input` names, if it fits a post of `kind`; `null` otherwise. */
 export function linkFor(kind: PostKind, input: unknown): PostLink | null {
@@ -192,12 +199,12 @@ export const MAX_DESCRIPTION = 500;
 export const MAX_LINKS = 3;
 export const NO_PROFILE: ClubProfile = { description: "", links: [], holdersOnlyPosts: false, pinned: [] };
 
-export type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & {
+type ProfileEdit = Partial<Pick<ClubProfile, "description" | "links" | "holdersOnlyPosts">> & {
   xTags?: string[];
   /** Without `min`, the current minimum stays. */
   coinHolders?: { on: boolean; min?: string };
 };
-export type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
+type ProfileResult = { ok: true; edit: ProfileEdit } | { ok: false; reason: string };
 
 /** Checks an edit to the profile. Links must be plain `https://` addresses: they become anchors. */
 export function checkProfileEdit(input: unknown): ProfileResult {

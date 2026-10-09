@@ -19,9 +19,7 @@ contract DeClubIntentsRevertsTest is DeClubIntentsBase {
         b = _intent(bob, _list(_erc20(address(usdc), 100 ether)), _list(_chog(A1)), 0);
     }
 
-    function _settlePair(IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b)
-        internal
-    {
+    function _settlePair(IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) internal {
         IDeClubIntents.Intent[] memory cycle = _cycle2(a, b);
         bytes[] memory sigs = _sigs2(_sign(aliceKey, a), _sign(bobKey, b));
         swap.settle(cycle, sigs);
@@ -102,9 +100,7 @@ contract DeClubIntentsRevertsTest is DeClubIntentsBase {
     function test_revertsOnZeroMaker() public {
         (IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) = _pair();
         a.maker = address(0);
-        _expectAndSettlePair(
-            abi.encodeWithSelector(IDeClubIntents.InvalidMaker.selector, 0), a, b
-        );
+        _expectAndSettlePair(abi.encodeWithSelector(IDeClubIntents.InvalidMaker.selector, 0), a, b);
     }
 
     function test_revertsOnZeroDeadline() public {
@@ -228,46 +224,38 @@ contract DeClubIntentsRevertsTest is DeClubIntentsBase {
     function test_revertsWhenWantedNftIsNotGiven() public {
         (IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) = _pair();
         b.want = _list(_chog(A2)); // alice gives A1, not A2
-        _expectAndSettlePair(
-            abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 1, 0), a, b
-        );
+        _expectAndSettlePair(abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 1, 0), a, b);
         _assertUntouched();
     }
 
     function test_revertsWhenGivenAmountIsBelowWant() public {
         (IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) = _pair();
         a.want = _list(_erc20(address(usdc), 100 ether + 1));
-        _expectAndSettlePair(
-            abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 0), a, b
-        );
+        _expectAndSettlePair(abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 0), a, b);
     }
 
     function test_revertsWhenWantedTokenIsNotGiven() public {
         (IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) = _pair();
         a.want = _list(_erc20(address(weth), 100 ether));
-        _expectAndSettlePair(
-            abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 0), a, b
-        );
+        _expectAndSettlePair(abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 0), a, b);
     }
 
     function test_revertsWhenOneOfSeveralWantsIsMissing() public {
         (IDeClubIntents.Intent memory a, IDeClubIntents.Intent memory b) = _pair();
         a.want = _list(_erc20(address(usdc), 100 ether), _erc20(address(weth), 1 ether));
-        _expectAndSettlePair(
-            abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 1), a, b
-        );
+        _expectAndSettlePair(abi.encodeWithSelector(IDeClubIntents.WantNotMet.selector, 0, 1), a, b);
     }
 
     /// @dev In a ring a want is covered by the *previous* maker only, not by anyone else.
     function test_ringWantMustBeCoveredByThePreviousMakerOnly() public {
-        // carol gives USDC, but bob (not carol) precedes alice... order: alice → bob → carol.
+        // Ring alice → bob → carol: alice's want (USDC) is covered by carol, who precedes her, and bob's
+        // want (A1) by alice, but carol's want (A1) is only given by alice, and bob precedes carol.
         IDeClubIntents.Intent memory a =
             _intent(alice, _list(_chog(A1)), _list(_erc20(address(usdc), 5 ether)), 0);
         IDeClubIntents.Intent memory b =
             _intent(bob, _list(_erc20(address(weth), 1 ether)), _list(_chog(A1)), 0);
         IDeClubIntents.Intent memory c =
             _intent(carol, _list(_erc20(address(usdc), 5 ether)), _list(_chog(A1)), 0);
-        // carol's want (A1) is only given by alice, who is not carol's predecessor (bob is).
         IDeClubIntents.Intent[] memory cycle = _cycle3(a, b, c);
         bytes[] memory sigs = _sigs3(_sign(aliceKey, a), _sign(bobKey, b), _sign(carolKey, c));
 

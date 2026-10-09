@@ -1,23 +1,29 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call, type ViewerRole } from "@/hooks/useClubMembership";
 import { useSocialSign, type SocialStage } from "@/hooks/useSocial";
+import type { PublicChallenge } from "@/lib/challenges";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
 import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
 import type { LogEntry, Ban } from "@/lib/server/clubState";
+import type { ReportedItem } from "@/lib/server/board";
 import type { XShareVerdict } from "@/lib/server/xPosts";
+import type { OwnerRules } from "@/lib/rewards";
+import type { RulesView, RewardBanView } from "@/lib/server/rewardSettings";
 
 // The board, the Club's page text and the staff tools (docs/09-clubs.md). Reads are public; a
 // signed-in reader sends their token so they also see their own hidden posts and, as staff, all.
 
 const REFRESH_MS = 30_000;
+/** Posts shown at first and added by each "Show more". */
+const POSTS_PAGE = 20;
 
-async function read<T>(path: string, getToken?: () => Promise<string | null>): Promise<T> {
+export async function read<T>(path: string, getToken?: () => Promise<string | null>): Promise<T> {
   const token = await getToken?.();
   const res = await fetch(path, { headers: token ? { authorization: `Bearer ${token}` } : undefined });
   const body: unknown = await res.json().catch(() => null);
@@ -28,6 +34,34 @@ async function read<T>(path: string, getToken?: () => Promise<string | null>): P
   return body as T;
 }
 
+/** Where a post's like shows: the Board, a thread's replies, the timeline (posts of many Clubs) and challenge entries. */
+const LIKE_SHOWN_IN = ["club-posts", "club-replies", "timeline", "club-challenges"];
+
+/**
+ * Sets whether the viewer likes `id` in every list already loaded, without asking the server: the
+ * count moves by one, or is set to `count` when the server has said it. Safe to repeat: a post
+ * already in that state is left alone.
+ */
+function showLike(queryClient: ReturnType<typeof useQueryClient>, club: string, id: string, liked: boolean, count?: number) {
+  const next = <T extends { liked: boolean; likes: number }>(p: T): T =>
+    count !== undefined ? { ...p, liked, likes: count } : p.liked !== liked ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p;
+  const flip = <P extends PublicPost & { club?: string }>(p: P): P => (p.id === id && (p.club === undefined || p.club === club) ? next(p) : p);
+  const board = (data: InfiniteData<{ posts: PublicPost[] }> | undefined) =>
+    data && { ...data, pages: data.pages.map((page) => ({ ...page, posts: page.posts.map(flip) })) };
+  queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["club-posts", club] }, board);
+  // The timeline's key doesn't carry a Club: its posts say which one they are from.
+  queryClient.setQueriesData<InfiniteData<{ posts: PublicPost[] }>>({ queryKey: ["timeline"] }, board);
+  queryClient.setQueriesData<{ replies: PublicPost[] }>({ queryKey: ["club-replies", club] }, (data) => data && { ...data, replies: data.replies.map(flip) });
+  // A challenge entry is a Board post; it shows in the Club's list of challenges and on its own page.
+  const entries = (c: PublicChallenge): PublicChallenge =>
+    c.entries.some((e) => e.post === id) ? { ...c, entries: c.entries.map((e) => (e.post === id ? next(e) : e)) } : c;
+  queryClient.setQueriesData<{ challenges?: PublicChallenge[]; challenge?: PublicChallenge }>(
+    { queryKey: ["club-challenges", club] },
+    (data) =>
+      data && { ...data, ...(data.challenges && { challenges: data.challenges.map(entries) }), ...(data.challenge && { challenge: entries(data.challenge) }) },
+  );
+}
+
 /**
  * The Club's board, through the reader's lens (ADR 0023). `as` is the reader's wallet, which the
  * `following` lens needs.
@@ -35,14 +69,37 @@ async function read<T>(path: string, getToken?: () => Promise<string | null>): P
 export function useClubPosts(token: string, lens: LensId = "newest", as?: string) {
   const getToken = useAccessToken();
   const key = token.toLowerCase();
-  const params = new URLSearchParams(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }).toString();
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["club-posts", key, !!getToken, lens, as?.toLowerCase()],
-    queryFn: () => read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null }>(`/api/clubs/${token}/posts${params ? `?${params}` : ""}`, getToken),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({
+        limit: String(POSTS_PAGE),
+        offset: String(pageParam),
+        ...(lens === "newest" ? {} : { lens, ...(as ? { as } : {}) }),
+      });
+      return read<{ enabled: boolean; posts: PublicPost[]; role: ViewerRole | null; total: number }>(`/api/clubs/${token}/posts?${params}`, getToken);
+    },
+    getNextPageParam: (last, all) => {
+      const loaded = all.reduce((n, page) => n + page.posts.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
-  return { enabled: query.data?.enabled !== false, posts: query.data?.posts ?? [], isLoading: query.isLoading, error: query.error };
+  const pages = query.data?.pages ?? [];
+  // A post that arrives between two pages shifts the next one by a row; show each post once.
+  const posts = [...new Map(pages.flatMap((page) => page.posts).map((post) => [post.id, post])).values()];
+  return {
+    enabled: pages[0]?.enabled !== false,
+    posts,
+    total: pages[0]?.total ?? 0,
+    hasMore: query.hasNextPage,
+    loadMore: () => void query.fetchNextPage(),
+    loadingMore: query.isFetchingNextPage,
+    isLoading: query.isLoading,
+    error: query.error,
+  };
 }
 
 /** A post's replies (ADR 0032), oldest first; read only while the thread is open. */
@@ -59,17 +116,25 @@ export function useClubReplies(token: string, postId: string, enabled: boolean) 
 }
 
 /** The Club's X signals (ADR 0024): its linked project accounts, its tags, and "what counts" in words. */
-export type ClubX = { accounts: { handle: string; proof: string; linkedAt: number }[]; tags: string[]; hint: string };
+type ClubX = { accounts: { handle: string; proof: string; linkedAt: number }[]; tags: string[]; hint: string };
 
 /** Whether the Club's memecoin earns the Holder badge (ADR 0026): `min` in base units; `set` once the Owner chose. */
 export type ClubCoin = { token: string; symbol: string; on: boolean; min: string; set: boolean };
 
-export type ClubPage = { enabled: boolean; description: string; links: string[]; holdersOnlyPosts: boolean; hasOwner: boolean; x: ClubX; coin: ClubCoin | null };
+type ClubPage = {
+  enabled: boolean;
+  description: string;
+  links: string[];
+  holdersOnlyPosts: boolean;
+  hasOwner: boolean;
+  x: ClubX;
+  coin: ClubCoin | null;
+};
 
 /** Why a member's own X post didn't count, in words. */
 const NOT_COUNTED: Record<NonNullable<XShareVerdict["reason"]>, string> = {
   not_own: "",
-  not_holder: "Only Holders’ X posts count toward the Club’s activity.",
+  not_holder: "Only Holders’ X posts count toward the Club’s Momentum.",
   too_old: "Only X posts from the last 48 hours count.",
   no_signal: "It doesn’t link the Club, mention its X account or use its tags.",
   daily_limit: "One X post a day counts per Club; this one is shown, not counted.",
@@ -101,6 +166,8 @@ export function useClubActions(token: string) {
 
   const refresh = (...names: string[]) => {
     for (const name of names) void queryClient.invalidateQueries({ queryKey: [name, key] });
+    // The timeline (ADR 0041) shows the same posts, across Clubs.
+    if (names.includes("club-posts")) void queryClient.invalidateQueries({ queryKey: ["timeline"] });
   };
   const useAct = <V, R = unknown>(run: (v: V) => Promise<R>, refreshes: string[], done?: string) =>
     useMutation({
@@ -111,63 +178,115 @@ export function useClubActions(token: string) {
       },
       onError: (error) => toast.error(error),
     });
-  const send = <T,>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
+  const send = <T>(method: string, path: string, body?: unknown) => call<T>(getToken!, method, `${base}${path}`, body);
 
   return {
     postStage,
     replyStage,
     // A post is signed by the member's Club wallet before it's sent (ADR 0023).
-    post: useAct(async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
-      const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
-      if (!draft.ok) {
-        throw new Error(
-          draft.reason !== "bad_link" ? "Write something first, at most 280 characters." : v.kind === "note" ? "Paste the link of an X post." : "Link a deal id or a signed-swap hash.",
-        );
-      }
-      let result: { xShare?: XShareVerdict };
-      try {
-        setPostStage("signing");
-        const { signature } = await sign(postTypedData(draft.message), v.wallet);
-        setPostStage("sending");
-        result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
-      } finally {
-        setPostStage(undefined);
-      }
-      // Tell the author whether their own X post counted (ADR 0024); someone else's is just a card.
-      const share = result.xShare;
-      if (share?.counted) {
-        toast.show({
-          tone: "success",
-          title: "Your X post counts for the Club",
-          message: share.counted === "weak" ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full." : "It adds to your Momentum and your Holder bonus.",
-        });
-      } else if (share?.own && share.reason && NOT_COUNTED[share.reason]) {
-        toast.show({ tone: "info", title: "Posted, not counted", message: NOT_COUNTED[share.reason] });
-      }
-      return result;
-    }, ["club-posts", "clubs", "club-members"]),
+    post: useAct(
+      async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
+        const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
+        if (!draft.ok) {
+          throw new Error(
+            draft.reason !== "bad_link"
+              ? "Write something first, at most 280 characters."
+              : v.kind === "note"
+                ? "Paste the link of an X post."
+                : "Link a deal id or a signed-swap hash.",
+          );
+        }
+        let result: { xShare?: XShareVerdict };
+        try {
+          setPostStage("signing");
+          const { signature } = await sign(postTypedData(draft.message), v.wallet);
+          setPostStage("sending");
+          result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
+        } finally {
+          setPostStage(undefined);
+        }
+        // Tell the author whether their own X post counted (ADR 0024); someone else's is just a card.
+        const share = result.xShare;
+        if (share?.counted) {
+          toast.show({
+            tone: "success",
+            title: "Your X post counts for the Club",
+            message:
+              share.counted === "weak"
+                ? "It only matched a tag, so it counts half. Linking the Club or its X account counts in full."
+                : "It adds to your Momentum, and to your Holder bonus if you hold the Club’s NFT.",
+          });
+        } else if (share?.own && share.reason && NOT_COUNTED[share.reason]) {
+          toast.show({ tone: "info", title: "Posted, not counted", message: NOT_COUNTED[share.reason] });
+        }
+        return result;
+      },
+      ["club-posts", "clubs", "club-members"],
+    ),
     // A reply is signed too, with its own type (ADR 0032).
-    reply: useAct(async (v: { parent: string; text: string; wallet?: string }) => {
-      const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
-      if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
-      try {
-        setReplyStage("signing");
-        const { signature } = await sign(replyTypedData(draft.message), v.wallet);
-        setReplyStage("sending");
-        return await send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
-      } finally {
-        setReplyStage(undefined);
-      }
-    }, ["club-replies", "club-posts"]),
-    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log"]),
-    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies"], "Reported. Thank you."),
-    like: useAct((v: { id: string; like: boolean }) => send(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`), ["club-posts", "club-replies"]),
-    hide: useAct((v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }), ["club-posts", "club-replies", "club-log"]),
+    reply: useAct(
+      async (v: { parent: string; text: string; wallet?: string }) => {
+        const draft = draftReply(token as `0x${string}`, v.parent, v.text, signingTime());
+        if (!draft.ok) throw new Error("Write something first, at most 280 characters.");
+        try {
+          setReplyStage("signing");
+          const { signature } = await sign(replyTypedData(draft.message), v.wallet);
+          setReplyStage("sending");
+          return await send("POST", `/posts/${v.parent}/replies`, { message: draft.message, signature });
+        } finally {
+          setReplyStage(undefined);
+        }
+      },
+      ["club-replies", "club-posts"],
+    ),
+    remove: useAct((id: string) => send("DELETE", `/posts/${id}`), ["club-posts", "club-replies", "club-log", "club-reported"]),
+    report: useAct((id: string) => send("POST", `/posts/${id}/report`), ["club-posts", "club-replies", "club-reported"], "Reported. Thank you."),
+    // A like shows at once and is taken back if the server refuses it (a heart that waits for the
+    // round trip feels broken). Likes in a Club go one at a time, so quick taps can't arrive out of order.
+    // Nothing is read again afterwards: a fresh read can lag the write and blink the heart back, or
+    // move the post under a ranked lens. The server's count is shown instead, and the next poll catches up.
+    like: useMutation({
+      mutationKey: ["club-like", key],
+      scope: { id: `club-like:${key}` },
+      mutationFn: (v: { id: string; like: boolean }) => send<{ likes: number }>(v.like ? "POST" : "DELETE", `/posts/${v.id}/like`),
+      onMutate: async (v) => {
+        await Promise.all(LIKE_SHOWN_IN.map((name) => queryClient.cancelQueries({ queryKey: [name, key] })));
+        showLike(queryClient, key, v.id, v.like);
+      },
+      // The exact count, unless another tap is still queued (it already shows, and would be undone for a moment).
+      onSuccess: (result, v) => {
+        if (queryClient.isMutating({ mutationKey: ["club-like", key] }) <= 1 && typeof result?.likes === "number")
+          showLike(queryClient, key, v.id, v.like, result.likes);
+      },
+      onError: (error, v) => {
+        showLike(queryClient, key, v.id, !v.like);
+        toast.error(error);
+      },
+    }),
+    hide: useAct(
+      (v: { id: string; hidden: boolean }) => send("POST", `/posts/${v.id}/hide`, { hidden: v.hidden }),
+      ["club-posts", "club-replies", "club-log", "club-reported"],
+    ),
     pin: useAct((v: { id: string; pinned: boolean }) => send("POST", `/posts/${v.id}/pin`, { pinned: v.pinned }), ["club-posts", "club-log"]),
-    ban: useAct((v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v), ["club-posts", "club-bans", "club-log", "club-members", "clubs"], "Banned."),
+    ban: useAct(
+      (v: { wallet?: string; post?: string; everywhere?: boolean }) => send("POST", "/bans", v),
+      ["club-posts", "club-bans", "club-log", "club-members", "clubs"],
+      "Banned.",
+    ),
     unban: useAct((v: { wallet: string; everywhere?: boolean }) => send("DELETE", "/bans", v), ["club-bans", "club-log"], "Ban lifted."),
-    role: useAct((v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v), ["club-members", "club-membership", "club-log", "club-posts"], "Done."),
+    role: useAct(
+      (v: { wallet: string; role: "owner" | "moderator" | null }) => send("PUT", "/roles", v),
+      ["club-members", "club-membership", "club-log", "club-posts"],
+      "Done.",
+    ),
     claim: useAct(() => send("POST", "/claim"), ["club-members", "club-membership", "club-profile", "club-log"], "You’re the Owner of this Club."),
+    // The Club's reward rules and bans from rewards (ADR 0044): the Owner or an app admin.
+    rules: useAct((v: Partial<OwnerRules>) => send("PATCH", "/rules", v), ["club-rules", "club-log"], "Saved. The new rules apply from the next epoch."),
+    rewardBan: useAct(
+      (v: { wallet: string; ban: boolean }) => send(v.ban ? "POST" : "DELETE", "/reward-bans", { wallet: v.wallet }),
+      ["club-reward-bans", "club-log", "club-standings"],
+      "Done.",
+    ),
     profile: useAct(
       (v: { description?: string; links?: string[]; holdersOnlyPosts?: boolean; xTags?: string[]; coinHolders?: { on: boolean; min?: string } }) =>
         send("PATCH", "/profile", v),
@@ -181,7 +300,7 @@ export function useClubActions(token: string) {
   };
 }
 
-export type StaffView = { enabled: boolean; log: LogEntry[]; ownership: { claimed: string; onchain: string | null; changed: boolean } | null };
+type StaffView = { enabled: boolean; log: LogEntry[]; ownership: { claimed: string; onchain: string | null; changed: boolean } | null };
 
 /** The moderation log and bans. Only staff are allowed to ask. */
 export function useClubStaff(token: string, enabled: boolean) {
@@ -200,5 +319,41 @@ export function useClubStaff(token: string, enabled: boolean) {
     enabled: enabled && !!getToken,
     retry: 1,
   });
-  return { log: log.data?.log ?? [], ownership: log.data?.ownership ?? null, bans: bans.data, isLoading: log.isLoading };
+  // Posts and replies members reported, for the Manage tab (ADR 0040: a report alone hides nothing).
+  const reported = useQuery({
+    queryKey: ["club-reported", key],
+    queryFn: () => call<{ enabled: boolean; reported: ReportedItem[] }>(getToken!, "GET", `/api/clubs/${token}/reported`),
+    enabled: enabled && !!getToken,
+    refetchInterval: REFRESH_MS,
+    retry: 1,
+  });
+  return {
+    log: log.data?.log ?? [],
+    ownership: log.data?.ownership ?? null,
+    bans: bans.data,
+    reported: reported.data?.reported ?? [],
+    isLoading: log.isLoading,
+  };
+}
+
+/** The Club's reward rules now, any change waiting for the next epoch, and the bounds (public, ADR 0044). */
+export function useClubRules(token: string) {
+  const query = useQuery({
+    queryKey: ["club-rules", token.toLowerCase()],
+    queryFn: () => read<{ enabled: boolean } & Partial<RulesView>>(`/api/clubs/${token}/rules`),
+    retry: 1,
+  });
+  return query.data?.enabled && query.data.current ? (query.data as RulesView) : null;
+}
+
+/** Members banned from the Club's rewards (staff only, ADR 0044). */
+export function useRewardBans(token: string, enabled: boolean) {
+  const getToken = useAccessToken();
+  const query = useQuery({
+    queryKey: ["club-reward-bans", token.toLowerCase()],
+    queryFn: () => call<{ bans: RewardBanView[] }>(getToken!, "GET", `/api/clubs/${token}/reward-bans`),
+    enabled: enabled && !!getToken,
+    retry: 1,
+  });
+  return query.data?.bans ?? [];
 }

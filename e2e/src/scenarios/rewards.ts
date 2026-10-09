@@ -20,7 +20,7 @@ type Web = {
   buildEpoch: (store: unknown, n: number, deps: unknown) => Promise<{ status: string; record?: EpochRecord }>;
   parseAssets: (list: unknown) => unknown[];
   REWARDS: { holderBps: number; fundBps: number };
-  activityPoints: (events: unknown[], reach: null, wallets: readonly string[], end: number) => { bonusBps: number };
+  activityPoints: (events: unknown[], reach: null, wallets: readonly string[], days?: number) => { bonusBps: number };
   rewardLeaf: (chainId: number, contract: Address, epoch: number, account: Address, amount: bigint) => Hex;
   buildMerkleTree: (leaves: readonly Hex[]) => { root: Hex; proofs: Hex[][] };
 };
@@ -59,10 +59,10 @@ async function web(): Promise<Web> {
   } as Web;
 }
 
-const localOnly = (w: World) => (w.target !== "local" ? "warps the chain and deploys its own DeClubRewards: local only" : !w.rewards ? "no DeClubRewards deployed" : null);
+const localOnly = (w: World) =>
+  w.target !== "local" ? "warps the chain and deploys its own DeClubRewards: local only" : !w.rewards ? "no DeClubRewards deployed" : null;
 const abi = () => REWARDS_ARTIFACT().abi as Abi;
-const claims = (record: EpochRecord, epoch: bigint) =>
-  record.leaves.map((l) => ({ epoch, account: l.account, amount: BigInt(l.amount), proof: l.proof }));
+const claims = (record: EpochRecord, epoch: bigint) => record.leaves.map((l) => ({ epoch, account: l.account, amount: BigInt(l.amount), proof: l.proof }));
 
 /** Built in RW-01, published and claimed by the later cases. */
 let built: EpochRecord | undefined;
@@ -89,23 +89,23 @@ export const rewardCases: Case<World>[] = [
 
       // Alice sells Bob an NFT for MON through the escrow: both sides pay the fee.
       const [sold] = await w.mintNfts(w.alice, 3);
-      await w.approveAll(w.alice, w.v2);
-      const fee = await w.v2Fee();
+      await w.approveAll(w.alice, w.escrow);
+      const fee = await w.escrowFee();
       const offered = [w.nftAsset(sold!)];
       const price = parseEther("0.001");
-      const created = await w.send(w.alice, w.v2, w.abi.v2, "createTrade", [offered, [w.monAsset(price)], zeroAddress, (await w.now()) + 3600n], fee);
-      const [ev] = w.events<{ tradeId: bigint }>(created, w.abi.v2, "TradeCreated", w.v2);
-      const filled = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [ev!.tradeId], price + fee);
+      const created = await w.send(w.alice, w.escrow, w.abi.escrow, "createTrade", [offered, [w.monAsset(price)], zeroAddress, (await w.now()) + 3600n], fee);
+      const [ev] = w.events<{ tradeId: bigint }>(created, w.abi.escrow, "TradeCreated", w.escrow);
+      const filled = await w.send(w.bob, w.escrow, w.abi.escrow, "fillTrade", [ev!.tradeId], price + fee);
 
       // The server records it as it would a report: from the receipt, with the fee it paid.
       const reader = {
         receipt: (hash: Hex) => w.pub.getTransactionReceipt({ hash }),
         timestamp: async (block: bigint) => Number((await w.pub.getBlock({ blockNumber: block })).timestamp),
-        trade: (contract: Address, id: bigint) => w.read(contract, w.abi.v2, "getTrade", [id]),
+        trade: (contract: Address, id: bigint) => w.read(contract, w.abi.escrow, "getTrade", [id]),
         proposalAssets: async () => [],
       };
       const club = (t: string) => (t.toLowerCase() === w.nft.toLowerCase() ? w.nft : null);
-      assert.equal(await app.recordActivity(store, filled.transactionHash, filled, { reader, contracts: [w.v2], clubOf: club }), 1);
+      assert.equal(await app.recordActivity(store, filled.transactionHash, filled, { reader, contracts: [w.escrow], clubOf: club }), 1);
       const events = await app.readActivity(store, w.nft);
       assert.equal(events.length, 1);
       assert.equal(events[0]!.fee, (2n * fee).toString(), "the activity log didn't keep the swap's fee");
@@ -113,7 +113,11 @@ export const rewardCases: Case<World>[] = [
       // Alice and Bob join holding NFTs; Carol, who holds none, is the Owner.
       const holdings = async (token: Address, wallets: readonly Address[]) =>
         Promise.all(wallets.map((a) => w.read<bigint>(token, w.abi.nft, "balanceOf", [a])));
-      for (const [id, who] of [["ua", w.alice], ["ub", w.bob], ["uc", w.carol]] as const) {
+      for (const [id, who] of [
+        ["ua", w.alice],
+        ["ub", w.bob],
+        ["uc", w.carol],
+      ] as const) {
         assert.ok((await app.joinClub(store, entry, id, [who.address.toLowerCase()], { holdings })).ok, `${who.name} joins`);
       }
       await app.saveRoles(store, w.nft, { owner: "uc", moderators: [] });
@@ -136,20 +140,24 @@ export const rewardCases: Case<World>[] = [
       const holderPool = (fees * BigInt(app.REWARDS.holderBps)) / 10_000n;
       const fundPool = (fees * BigInt(app.REWARDS.fundBps)) / 10_000n;
       // Earlier scenarios may have left any of them holding NFTs: each holds what the chain says.
-      // Each Holder's shares count (1 + bonus): Alice and Bob traded in the epoch, Carol didn't (ADR 0024).
+      // Each Holder's shares count (1 + bonus). Only X posts and active days earn a bonus (ADR 0029, 0032), so Alice and
+      // Bob, who only traded, get none, same as Carol.
       const [a, b, c] = await holdings(w.nft, [w.alice.address, w.bob.address, w.carol.address]);
-      const bonus = (who: Address) => BigInt(app.activityPoints(events, null, [who.toLowerCase()], at + 50).bonusBps);
+      const bonus = (who: Address) => BigInt(app.activityPoints(events, null, [who.toLowerCase()]).bonusBps);
       const weight = (held: bigint, who: Address) => held * (10_000n + bonus(who));
       const [wa, wb, wc] = [weight(a!, w.alice.address), weight(b!, w.bob.address), weight(c!, w.carol.address)];
       const total = wa + wb + wc;
-      assert.ok(bonus(w.alice.address) > 0n && bonus(w.carol.address) === 0n, "the traders earn an activity bonus");
+      assert.ok(
+        [w.alice, w.bob, w.carol].every((who) => bonus(who.address) === 0n),
+        "trading earns no bonus",
+      );
       const amountOf = (who: Address) => BigInt(built!.leaves.find((l) => l.account === who)?.amount ?? "0");
       assert.equal(amountOf(w.alice.address), (holderPool * wa) / total, "Alice's Holder share");
       assert.equal(amountOf(w.bob.address), (holderPool * wb) / total, "Bob's Holder share");
       assert.equal(amountOf(w.carol.address), fundPool + (holderPool * wc) / total, "the Owner's Club fund (plus any Holder share)");
       note(
         `fees ${w.fmt(fees)} MON; Holders ${w.fmt(holderPool)} over ${a! + b! + c!} NFTs (Alice ${a}, Bob ${b}, Carol ${c}; ` +
-          `traders +${Number(bonus(w.alice.address)) / 100}%); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`,
+          `no bonus for trading); fund ${w.fmt(fundPool)} to Carol; root ${built.root}`,
       );
     },
   },

@@ -20,7 +20,7 @@ import {FeeConfig} from "./FeeConfig.sol";
 ///        DEPLOY_MOCK_ERC20  true → also deploy "Mock USD" (mUSD) with an open mint
 ///        DEMO_WALLETS       comma-separated addresses to mint mUSD to
 ///        DEMO_MINT_AMOUNT   mUSD (whole tokens) per demo wallet (default 1000)
-///      V1 (Deploy.s.sol) is untouched and keeps running; the two contracts are independent.
+///      DeClubIntents is deployed separately (DeployIntents.s.sol) and independent of this contract.
 contract DeployEscrow is Script {
     struct Config {
         uint256 fee;

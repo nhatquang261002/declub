@@ -58,6 +58,13 @@ export const deClubEscrowAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'MAX_NFTS_PER_SIDE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'MAX_NOTE_BYTES',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -251,6 +258,29 @@ export const deClubEscrowAbi = [
     name: 'feeAdmin',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      {
+        name: 'assets',
+        internalType: 'struct IDeClubEscrow.Asset[]',
+        type: 'tuple[]',
+        components: [
+          {
+            name: 'assetType',
+            internalType: 'enum IDeClubEscrow.AssetType',
+            type: 'uint8',
+          },
+          { name: 'token', internalType: 'address', type: 'address' },
+          { name: 'id', internalType: 'uint256', type: 'uint256' },
+          { name: 'amount', internalType: 'uint256', type: 'uint256' },
+        ],
+      },
+    ],
+    name: 'feeUnits',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'pure',
   },
   {
     type: 'function',
@@ -1107,6 +1137,14 @@ export const deClubEscrowAbi = [
   },
   {
     type: 'error',
+    inputs: [
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+      { name: 'max', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyNfts',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'tradeId', internalType: 'uint256', type: 'uint256' }],
     name: 'TradeIsExpired',
   },
@@ -1224,6 +1262,13 @@ export const deClubIntentsAbi = [
     type: 'function',
     inputs: [],
     name: 'MAX_FEE_LIMIT',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_NFTS_PER_SIDE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1771,6 +1816,15 @@ export const deClubIntentsAbi = [
       { name: 'count', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'TooManyAssets',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'intent', internalType: 'uint256', type: 'uint256' },
+      { name: 'give', internalType: 'bool', type: 'bool' },
+      { name: 'count', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyNfts',
   },
   {
     type: 'error',

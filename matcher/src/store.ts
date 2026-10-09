@@ -135,14 +135,7 @@ export class Store {
           `INSERT INTO intents (hash, maker, deadline, created_at, status, intent, signature)
            VALUES (?, ?, ?, ?, 'open', ?, ?)`,
         )
-        .run(
-          hash,
-          intent.maker.toLowerCase(),
-          Number(intent.deadline),
-          now,
-          JSON.stringify(intentToWire(intent)),
-          signature,
-        );
+        .run(hash, intent.maker.toLowerCase(), Number(intent.deadline), now, JSON.stringify(intentToWire(intent)), signature);
       const add = this.db.prepare("INSERT INTO intent_assets (hash, side, key) VALUES (?, ?, ?)");
       for (const a of intent.give) add.run(hash, "give", assetKey(a));
       for (const a of intent.want) add.run(hash, "want", assetKey(a));
@@ -174,9 +167,7 @@ export class Store {
     for (const side of ["give", "want"] as const) {
       const key = f[side];
       if (key) {
-        where.push(
-          "EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND a.side = ? AND a.key = ?)",
-        );
+        where.push("EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND a.side = ? AND a.key = ?)");
         args.push(side, key.toLowerCase());
       }
     }
@@ -222,9 +213,7 @@ export class Store {
   }
 
   countLive(maker: Address): number {
-    const r = this.db
-      .prepare("SELECT COUNT(*) AS n FROM intents WHERE maker = ? AND status IN ('open', 'stale')")
-      .get(maker.toLowerCase()) as DbRow;
+    const r = this.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE maker = ? AND status IN ('open', 'stale')").get(maker.toLowerCase()) as DbRow;
     return Number(r.n);
   }
 
@@ -245,14 +234,10 @@ export class Store {
     if (makers.length) where.push(`i.maker NOT IN (${list(makers)})`);
     const banned = [...(f.excludeTokens ?? [])];
     if (banned.length) {
-      where.push(
-        `NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) IN (${list(banned)}))`,
-      );
+      where.push(`NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) IN (${list(banned)}))`);
     }
     if (f.onlyTokens) {
-      where.push(
-        `NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) NOT IN (${list(f.onlyTokens)}))`,
-      );
+      where.push(`NOT EXISTS (SELECT 1 FROM intent_assets a WHERE a.hash = i.hash AND substr(a.key, 3, 42) NOT IN (${list(f.onlyTokens)}))`);
     }
     args.push(f.limit);
     const sql = `SELECT i.* FROM intents i WHERE ${where.join(" AND ")}
@@ -314,21 +299,14 @@ export class Store {
   }
 
   recordFailure(maker: Address, hash: Hex, reason: string, now: number) {
-    this.db
-      .prepare("INSERT INTO failures (maker, at, hash, reason) VALUES (?, ?, ?, ?)")
-      .run(maker.toLowerCase(), now, hash, reason);
+    this.db.prepare("INSERT INTO failures (maker, at, hash, reason) VALUES (?, ?, ?, ?)").run(maker.toLowerCase(), now, hash, reason);
   }
 
   /**
    * Makers left out of matching right now: `maxFailures` or more failures since `failuresSince`,
    * or `maxStrikes` or more on-chain reverts since `strikesSince`. Lower-case.
    */
-  bannedMakers(b: {
-    failuresSince: number;
-    maxFailures: number;
-    strikesSince: number;
-    maxStrikes: number;
-  }): Set<string> {
+  bannedMakers(b: { failuresSince: number; maxFailures: number; strikesSince: number; maxStrikes: number }): Set<string> {
     const rows = this.db
       .prepare(
         `SELECT maker FROM failures WHERE at >= ? GROUP BY maker HAVING COUNT(*) >= ?
@@ -341,15 +319,11 @@ export class Store {
 
   /** A settlement that passed its simulation reverted on-chain with this maker in the cycle. */
   recordStrike(maker: Address, txHash: Hex, now: number) {
-    this.db
-      .prepare("INSERT INTO strikes (maker, at, tx_hash) VALUES (?, ?, ?)")
-      .run(maker.toLowerCase(), now, txHash);
+    this.db.prepare("INSERT INTO strikes (maker, at, tx_hash) VALUES (?, ?, ?)").run(maker.toLowerCase(), now, txHash);
   }
 
   strikeCount(maker: Address, sinceMs: number): number {
-    const r = this.db
-      .prepare("SELECT COUNT(*) AS n FROM strikes WHERE maker = ? AND at >= ?")
-      .get(maker.toLowerCase(), sinceMs) as DbRow;
+    const r = this.db.prepare("SELECT COUNT(*) AS n FROM strikes WHERE maker = ? AND at >= ?").get(maker.toLowerCase(), sinceMs) as DbRow;
     return Number(r.n);
   }
 
@@ -370,9 +344,7 @@ export class Store {
   }
 
   failureCount(maker: Address, sinceMs: number): number {
-    const r = this.db
-      .prepare("SELECT COUNT(*) AS n FROM failures WHERE maker = ? AND at >= ?")
-      .get(maker.toLowerCase(), sinceMs) as DbRow;
+    const r = this.db.prepare("SELECT COUNT(*) AS n FROM failures WHERE maker = ? AND at >= ?").get(maker.toLowerCase(), sinceMs) as DbRow;
     return Number(r.n);
   }
 }

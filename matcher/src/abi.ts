@@ -44,6 +44,4 @@ export const erc721Abi = parseAbi([
   "function isApprovedForAll(address owner, address operator) view returns (bool)",
 ]);
 
-export const erc1271Abi = parseAbi([
-  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
-]);
+export const erc1271Abi = parseAbi(["function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)"]);

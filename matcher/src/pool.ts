@@ -2,14 +2,7 @@ import { type Address, type Hex, isAddressEqual } from "viem";
 import { erc20Abi } from "./abi.ts";
 import { checkIntent } from "./checks.ts";
 import { type Reader, readFee } from "./chain.ts";
-import {
-  cancelDigest,
-  feeProblem,
-  intentDigest,
-  intentHash,
-  sameAsset,
-  shapeProblem,
-} from "./intent.ts";
+import { cancelDigest, feeProblem, intentDigest, intentHash, sameAsset, shapeProblem } from "./intent.ts";
 import type { RateLimiter } from "./ratelimit.ts";
 import { verifyMakerSignature } from "./signature.ts";
 import type { LiveCursor, Row, Store } from "./store.ts";
@@ -86,12 +79,7 @@ export class Pool {
   private readonly makerLimit: RateLimiter | null;
   private pruneCursor: LiveCursor | null = null;
 
-  constructor(
-    store: Store,
-    reader: Reader,
-    cfg: PoolConfig,
-    hooks: { onNew?: () => void; log?: (msg: string) => void; makerLimit?: RateLimiter } = {},
-  ) {
+  constructor(store: Store, reader: Reader, cfg: PoolConfig, hooks: { onNew?: () => void; log?: (msg: string) => void; makerLimit?: RateLimiter } = {}) {
     this.store = store;
     this.reader = reader;
     this.cfg = cfg;
@@ -101,10 +89,7 @@ export class Pool {
   }
 
   /** Validate and store a `{ intent, signature }` body. Re-posting a known intent is a no-op. */
-  async submit(
-    body: unknown,
-    now = Date.now(),
-  ): Promise<{ hash: Hex; status: Status; created: boolean }> {
+  async submit(body: unknown, now = Date.now()): Promise<{ hash: Hex; status: Status; created: boolean }> {
     let signed;
     try {
       signed = signedFromWire(body);
@@ -145,21 +130,13 @@ export class Pool {
     const others = this.store.liveByMaker(intent.maker);
     const cap = this.cfg.maxLivePerMaker ?? DEFAULT_MAX_LIVE_PER_MAKER;
     if (others.length >= cap) {
-      throw new PoolError(
-        422,
-        "too_many_intents",
-        `a maker can have at most ${cap} open intents in this pool; cancel one or let it expire`,
-      );
+      throw new PoolError(422, "too_many_intents", `a maker can have at most ${cap} open intents in this pool; cancel one or let it expire`);
     }
     for (const a of intent.give) {
       if (a.assetType !== AssetType.ERC721) continue;
       const twin = others.find((r) => r.intent.give.some((g) => sameAsset(g, a)));
       if (twin) {
-        throw new PoolError(
-          422,
-          "nft_committed",
-          `${a.token} #${a.id} is already given by open intent ${twin.hash}; cancel it first`,
-        );
+        throw new PoolError(422, "nft_committed", `${a.token} #${a.id} is already given by open intent ${twin.hash}; cancel it first`);
       }
     }
 
@@ -274,4 +251,3 @@ export class Pool {
     return report;
   }
 }
-

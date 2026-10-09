@@ -1,6 +1,6 @@
 # ADR 0027: On-chain asset search, with your holdings first
 
-**Status:** Accepted · 2026-10-06 · Web only: no contract change. Builds on [ADR 0014](0014-verified-collections-list.md) (the verified list) and [ADR 0020](0020-server-side-deal-book.md) (server-side search). Replaces the "no indexer, so no 'all collections' and no 'everything I own'" limit in [05 · Frontend](../05-frontend.md#nft-picker).
+**Status:** Accepted · 2026-10-06 · Web only: no contract change. Builds on [ADR 0014](0014-verified-collections-list.md) (the verified list) and [ADR 0020](0020-server-side-deal-book.md) (server-side search). Replaces the "no indexer, so no 'all collections' and no 'everything I own'" limit in [05 · Frontend](../05-frontend.md#choosing-nfts-nft-picker).
 
 ## Context
 

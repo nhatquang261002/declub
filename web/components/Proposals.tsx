@@ -7,14 +7,17 @@ import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
 import { Alert } from "@/components/Alert";
 import { FeeNote } from "@/components/FeeNote";
+import { TrustCheck } from "@/components/TrustCheck";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
+import { useAssetTrust } from "@/hooks/useAssetTrust";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
+import { allVerified, blockedProblem, sideTrust } from "@/lib/assetTrust";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
-import { toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
-import { swapV2 } from "@/lib/contracts";
-import type { ProposalStatus, ProposalV2 } from "@/lib/proposals";
+import { feeUnits, sideFee, toRawAsset, type Asset, type TokenInfo } from "@/lib/assets";
+import { swapEscrow } from "@/lib/contracts";
+import type { ProposalStatus, Proposal } from "@/lib/proposals";
 import { sameAddress } from "@/lib/deals";
 import { Who } from "@/components/Who";
 
@@ -53,7 +56,7 @@ export function ProposalList({
   dealId,
   canDecide,
 }: {
-  proposals: readonly ProposalV2[];
+  proposals: readonly Proposal[];
   total: bigint;
   hasMore: boolean;
   onLoadMore: () => void;
@@ -100,23 +103,18 @@ export function ProposalList({
   );
 }
 
-function ProposalRow({
-  proposal,
-  info,
-  dealId,
-  canDecide,
-}: {
-  proposal: ProposalV2;
-  info: Info;
-  dealId: bigint;
-  canDecide: boolean;
-}) {
+function ProposalRow({ proposal, info, dealId, canDecide }: { proposal: Proposal; info: Info; dealId: bigint; canDecide: boolean }) {
   const { address } = useConnection();
   const decide = useTxFlow();
   const mine = sameAddress(proposal.proposer, address);
   const isActive = proposal.status === "active";
   const call = (functionName: "acceptProposal" | "rejectProposal" | "withdrawProposal") =>
-    decide.run({ ...swapV2!, functionName, args: [dealId, proposal.id] });
+    decide.run({ ...swapEscrow!, functionName, args: [dealId, proposal.id] });
+  // The maker receives this offer's assets: unverified ones need a tick, blocked ones can't be taken (ADR 0014).
+  const trust = sideTrust(proposal.assets, useAssetTrust(proposal.assets, info));
+  const [checked, setChecked] = useState(false);
+  const deciding = isActive && canDecide;
+  const acceptBlocked = trust.blocked.length > 0 || (!allVerified(trust) && !checked);
 
   return (
     <div className="offer-card space-y-3 p-4" data-status={proposal.status}>
@@ -132,12 +130,17 @@ function ProposalRow({
         </span>
       </div>
       <AssetList assets={proposal.assets} info={info} />
+      {deciding && <TrustCheck side={trust} info={info} confirmed={checked} onConfirm={setChecked} receiving="this offer gives you" />}
       {isActive && (canDecide || mine) && (
         <div className="flex flex-wrap items-center gap-3">
           {canDecide && (
             <>
-              <TxButton state={decide.state} onClick={() => call("acceptProposal")}>Accept &amp; swap</TxButton>
-              <TxButton state={decide.state} variant="secondary" onClick={() => call("rejectProposal")}>Reject</TxButton>
+              <TxButton state={decide.state} disabled={acceptBlocked} onClick={() => call("acceptProposal")}>
+                Accept &amp; swap
+              </TxButton>
+              <TxButton state={decide.state} variant="secondary" onClick={() => call("rejectProposal")}>
+                Reject
+              </TxButton>
             </>
           )}
           {mine && (
@@ -169,7 +172,7 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
 
   const draft = draftToAssets(rows, decimalsOf);
   const problems = draft.errors.map((e) => `Your offer — ${e}`);
-  const overlap = problems.length === 0 ? overlapError(offered, draft.assets) : null;
+  const overlap = problems.length === 0 ? (overlapError(offered, draft.assets) ?? blockedProblem(draft.assets)) : null;
 
   const { steps } = useAssetApprovals(address, draft.assets, info);
   const nextApproval = problems.length === 0 ? steps[0] : undefined;
@@ -178,10 +181,10 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
     if (problems.length > 0) return setValidation(problems[0]);
     if (overlap) return setValidation(overlap);
     setValidation(null);
-    // The native amount in the offer, plus this wallet's share of the protocol fee.
-    const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
+    // The native amount in the offer, plus this wallet's share of the protocol fee: one per NFT it offers.
+    const native = (draft.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, draft.assets);
     const receipt = await tx.run({
-      ...swapV2!,
+      ...swapEscrow!,
       functionName: "propose",
       args: [dealId, draft.assets.map(toRawAsset)],
       value: native,
@@ -206,9 +209,9 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
           </Alert>
         )}
         {problems.length > 0 && !validation && <p className="text-xs text-muted">{problems[0]}</p>}
-        <FeeNote amount={fee}>
-          Sent with your offer and held with it. It&apos;s only charged if the maker accepts. If you withdraw it, or the
-          maker rejects it, it comes back to you.
+        <FeeNote amount={fee} units={feeUnits(draft.assets)}>
+          Sent with your offer and held with it, once for each NFT in it. It&apos;s only charged if the maker accepts. If you withdraw it, or the maker rejects
+          it, it comes back to you.
         </FeeNote>
         {nextApproval ? (
           <TxButton state={approval.state} onClick={() => approval.run(nextApproval.call)}>
@@ -216,7 +219,9 @@ export function ProposalForm({ dealId, offered, fee }: { dealId: bigint; offered
             {steps.length > 1 ? ` (1 of ${steps.length})` : ""}
           </TxButton>
         ) : (
-          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap} onClick={send}>Send offer</TxButton>
+          <TxButton state={tx.state} disabled={problems.length > 0 || !!overlap} onClick={send}>
+            Send offer
+          </TxButton>
         )}
         <TxStatus state={approval.state} success="Approved." />
         <TxStatus state={tx.state} success="Offer sent." />

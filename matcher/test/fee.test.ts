@@ -75,6 +75,62 @@ describe("a fee change under a live pool", { skip }, () => {
     await w.setFee(FEE); // back up for the next test (a raise: the clock moves a week)
   });
 
+  it("charges a maker the fee for every NFT they give (ADR 0033)", async () => {
+    await w.setFee(FEE);
+    const now = await chainNow();
+    const deadline = BigInt(Math.floor(now / 1000) + 14 * DAY);
+    const ids = await w.mintChogs(w.alice.address, 3);
+    for (const id of ids) await w.approveChog(w.alice, id);
+    await w.mintToken(w.usd, w.bob.address, 3n * ONE);
+    await w.approveToken(w.bob, w.usd, 3n * ONE);
+    const sell = w.intent(
+      w.alice.address,
+      ids.map((id) => w.chogOf(id)),
+      [w.tokenOf(w.usd, 3n * ONE)],
+      { deadline, maxFee: FEE },
+    );
+    const buy = w.intent(
+      w.bob.address,
+      [w.tokenOf(w.usd, 3n * ONE) as Asset],
+      ids.map((id) => w.chogOf(id)),
+      { deadline, maxFee: FEE },
+    );
+    await pool.submit(await w.body(w.alice, sell), now);
+    await pool.submit(await w.body(w.bob, buy), now);
+    const aliceBefore = await w.balanceOf(w.wmon, w.alice.address);
+    const bobBefore = await w.balanceOf(w.wmon, w.bob.address);
+    const paidBefore = await w.balanceOf(w.wmon, w.feeRecipient);
+
+    const report = await matcher.runOnce();
+
+    assert.equal(report.settled.length, 1);
+    assert.equal(await w.balanceOf(w.wmon, w.alice.address), aliceBefore - 3n * FEE); // three NFTs
+    assert.equal(await w.balanceOf(w.wmon, w.bob.address), bobBefore - FEE); // none, so one
+    assert.equal(await w.balanceOf(w.wmon, w.feeRecipient), paidBefore + 4n * FEE);
+  });
+
+  it("checks a maker holds the fee for every NFT they give before taking the intent", async () => {
+    await w.setFee(FEE);
+    const now = await chainNow();
+    const ids = await w.mintChogs(w.alice.address, 3);
+    for (const id of ids) await w.approveChog(w.alice, id);
+    // Leave alice enough WMON for two NFTs' fees, not three.
+    const balance = await w.balanceOf(w.wmon, w.alice.address);
+    await w.transferToken(w.alice, w.wmon, w.carol.address, balance - 2n * FEE);
+
+    const sell = w.intent(
+      w.alice.address,
+      ids.map((id) => w.chogOf(id)),
+      [w.tokenOf(w.usd, ONE)],
+      {
+        deadline: BigInt(Math.floor(now / 1000) + DAY),
+        maxFee: FEE,
+      },
+    );
+    await assert.rejects(pool.submit(await w.body(w.alice, sell), now), (e: { code?: string }) => e.code === "fee_balance");
+    await w.transferToken(w.carol, w.wmon, w.alice.address, balance - 2n * FEE); // put it back
+  });
+
   it("refuses new intents signed below the fee after a raise", async () => {
     // The previous test raised it back to FEE; go above.
     await w.setFee(FEE + ONE);
@@ -85,10 +141,7 @@ describe("a fee change under a live pool", { skip }, () => {
       deadline: BigInt(Math.floor(now / 1000) + DAY),
       maxFee: FEE,
     });
-    await assert.rejects(
-      pool.submit(await w.body(w.alice, intent), now),
-      (e: { code?: string }) => e.code === "wrong_fee",
-    );
+    await assert.rejects(pool.submit(await w.body(w.alice, intent), now), (e: { code?: string }) => e.code === "wrong_fee");
     await w.setFee(FEE); // a cut: applies at once
   });
 

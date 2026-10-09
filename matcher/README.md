@@ -20,7 +20,7 @@ cd matcher && npm install && npm start      # http://127.0.0.1:8787
 
 The contract comes from `contracts/script/DeployIntents.s.sol` ([how to deploy](../contracts/script/README.md)). The key is the matcher's own account: it only pays gas and never holds anyone's assets. Use a key with testnet funds only. Real environment variables override `.env`.
 
-The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md)): every maker in a settled cycle pays a flat amount of WMON from their wallet to the fee recipient, and signs the most they'll pay (`maxFee`) into the intent. The fee admin can change the amount ([ADR 0018](../docs/adr/0018-adjustable-protocol-fee.md)), so the matcher reads the token and recipient once at start but the amount for every submission, every prune pass and `/info`. An intent whose `maxFee` is below the fee is refused (`wrong_fee`), or goes `stale` if a raise priced it out (revived by a cut, and not counted against its maker). The matcher never receives or holds any of the fee.
+The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md)): every maker in a settled cycle pays a set amount of WMON for each NFT they give (once if none, [ADR 0033](../docs/adr/0033-fee-per-nft.md)) from their wallet to the fee recipient, and signs the most they'll pay per NFT (`maxFee`) into the intent. The pool checks the maker holds and has approved the fee for every NFT they give, and refuses an intent with more than 5 NFTs on a side. The fee admin can change the amount ([ADR 0018](../docs/adr/0018-adjustable-protocol-fee.md)), so the matcher reads the token and recipient once at start but the amount for every submission, every prune pass and `/info`. An intent whose `maxFee` is below the fee is refused (`wrong_fee`), or goes `stale` if a raise priced it out (revived by a cut, and not counted against its maker). The matcher never receives or holds any of the fee.
 
 | Variable | Default | |
 |---|---|---|
@@ -41,6 +41,23 @@ The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md
 | `MATCHER_MAX_SEARCH_STEPS` | `200000` | edges the cycle search may look at per pass |
 | `MATCHER_TOKEN_BAN_MS` | `86400000` (24 h) | how long a token in a settlement that reverted on-chain is suspended |
 | `MATCHER_MAX_STRIKES` | `3` | on-chain reverts (within 30 days) after which a maker is left out of matching |
+
+## Host it on Railway
+
+The web app runs on Vercel, which can't host this: the matcher is a long-lived process with a sqlite file. `Dockerfile` and `railway.toml` run it as one Railway service.
+
+1. New project, deploy from the GitHub repo. In the service settings set **Root Directory** to `matcher`.
+2. Add a **Volume** mounted at `/data` (the image sets `MATCHER_DB_PATH=/data/pool.sqlite`). Keep one replica: the pool is a single file.
+3. Set the variables, with the key as a secret:
+   - `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`, `NEXT_PUBLIC_CHAIN_ID`, `MATCHER_RPC_URL`
+   - `MATCHER_PRIVATE_KEY`: a testnet-only key with a little MON
+   - `MATCHER_TOKEN_ALLOWLIST`: the tokens you accept, WMON included
+   - `MATCHER_TRUST_PROXY=true`: Railway's proxy sets `X-Forwarded-For`; without this every client shares one rate-limit bucket
+   - `MATCHER_PORT=8787`
+4. **Settings > Networking > Generate Domain**, pointing at port `8787`. Check `https://<domain>/info` returns the contract and the fee.
+5. Set that URL as `NEXT_PUBLIC_POOL_URL` in the web app's environment and redeploy it; the value is read at build time.
+
+Railway checks `GET /intents?limit=1`, which only touches the sqlite file, so an RPC outage doesn't restart the service.
 
 ## HTTP API
 
@@ -68,7 +85,9 @@ On top of that, a maker's intents are checked together, so one balance can't bac
 | `balance_committed` | the maker's live intents and this one together give more of an ERC-20 than the maker holds |
 | `token_not_allowed` | `MATCHER_TOKEN_ALLOWLIST` is set and the intent names a token not on it |
 | `token_banned` | the intent names a token suspended after an on-chain revert |
-| `rate_limited` (429) | too many intents from this maker; only posts with the maker's valid signature count, so nobody can use up someone else's budget | Cancelling only drops it from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
+| `rate_limited` (429) | too many intents from this maker; only posts with the maker's valid signature count, so nobody can use up someone else's budget |
+
+Cancelling only drops an intent from this pool: a copy elsewhere can still settle, so a short deadline (or `invalidateNonces`) is the real cancel.
 
 ## How matching works
 

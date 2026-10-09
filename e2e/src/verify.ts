@@ -2,27 +2,20 @@
  * Read-only checks of a deployment: safe against mainnet, needs no key and sends nothing.
  *
  *   node src/verify.ts                 the addresses in the root .env
- *   node src/verify.ts --mainnet       stricter: an EOA fee admin, a missing expectation, demo
- *                                      flags or a default Chog collection fail instead of warn
+ *   node src/verify.ts --mainnet       stricter: an EOA fee admin, a missing expectation, a blank
+ *                                      Chog address or a blank FILL_WATCHER_START_BLOCK fail instead of warn
  *
  * Expectations (optional; checked when set): EXPECT_FEE_WEI, EXPECT_MAX_FEE_WEI,
  * EXPECT_FEE_RECIPIENT, EXPECT_FEE_ADMIN, EXPECT_FEE_TOKEN, EXPECT_CHAIN_ID.
+ * Other variables: VERIFY_RPC_URL (default NEXT_PUBLIC_RPC_URL), VERIFY_ESCROW_ADDRESS and
+ * VERIFY_INTENTS_ADDRESS (default the root .env addresses), E2E_MATCHER_MIN_MON (matcher balance floor).
  * Writes e2e/results/verify-<time>.{json,md}. Exits 1 if anything failed.
  */
 import assert from "node:assert/strict";
-import {
-  type Abi,
-  type Address,
-  type Hex,
-  type PublicClient,
-  createPublicClient,
-  formatEther,
-  hashDomain,
-  http,
-  isAddressEqual,
-  zeroAddress,
-} from "viem";
-import { type Artifact, INTENTS, MOCK_WMON, V2 } from "./lib/artifacts.ts";
+import { type Abi, type Address, type Hex, type PublicClient, createPublicClient, formatEther, http, isAddressEqual, zeroAddress } from "viem";
+import { type Artifact, INTENTS, MOCK_WMON, ESCROW } from "./lib/artifacts.ts";
+import { poolInfo } from "./lib/pool.ts";
+import { domainSeparator } from "./lib/eip712.ts";
 import { addr, arg, big, loadRootEnv, needAddr, str } from "./lib/env.ts";
 import { type Case, Warning, finish, runCases } from "./lib/report.ts";
 import { DOMAIN_NAME, DOMAIN_VERSION } from "./lib/world.ts";
@@ -33,10 +26,10 @@ const mainnet = arg("mainnet") !== undefined;
 interface Ctx {
   pub: PublicClient;
   chainId: number;
-  v2: Address;
+  escrow: Address;
   intents: Address;
   poolUrl?: string;
-  v2Art: Artifact;
+  escrowArt: Artifact;
   intentsArt: Artifact;
 }
 
@@ -95,7 +88,10 @@ const cases: Case<Ctx>[] = [
     title: "Deployed code is this checkout's build (immutables masked)",
     async run(c, note) {
       const problems: string[] = [];
-      for (const [name, address, art] of [["DeClubEscrow", c.v2, c.v2Art], ["DeClubIntents", c.intents, c.intentsArt]] as const) {
+      for (const [name, address, art] of [
+        ["DeClubEscrow", c.escrow, c.escrowArt],
+        ["DeClubIntents", c.intents, c.intentsArt],
+      ] as const) {
         const code = await c.pub.getCode({ address });
         if (!code || code === "0x") {
           problems.push(`${name} ${address}: no code`);
@@ -114,7 +110,10 @@ const cases: Case<Ctx>[] = [
     async run(c, note) {
       const fails: string[] = [];
       const warns: string[] = [];
-      for (const [name, address, abi] of [["DeClubEscrow", c.v2, c.v2Art.abi], ["DeClubIntents", c.intents, c.intentsArt.abi]] as const) {
+      for (const [name, address, abi] of [
+        ["DeClubEscrow", c.escrow, c.escrowArt.abi],
+        ["DeClubIntents", c.intents, c.intentsArt.abi],
+      ] as const) {
         const f = await feeConfig(c, address, abi);
         note(`${name}: fee ${formatEther(f.fee)}, ceiling ${formatEther(f.max)}, recipient ${f.recipient}, admin ${f.admin}`);
         if (f.fee > f.max) fails.push(`${name}: fee above the ceiling`);
@@ -140,7 +139,8 @@ const cases: Case<Ctx>[] = [
           if (!(await isContract(c, f.admin))) warns.push(`${name}: fee admin ${f.admin} is an EOA, not a Safe`);
         }
         if (f.max > 0n && !(await isContract(c, f.recipient))) warns.push(`${name}: fee recipient ${f.recipient} is an EOA, not a Safe`);
-        if (f.pending !== 0n) warns.push(`${name}: a raise to ${formatEther(f.pending)} is queued (from ${new Date(Number(f.pendingAt) * 1000).toISOString()})`);
+        if (f.pending !== 0n)
+          warns.push(`${name}: a raise to ${formatEther(f.pending)} is queued (from ${new Date(Number(f.pendingAt) * 1000).toISOString()})`);
         if (f.pendingAdmin !== zeroAddress) warns.push(`${name}: an admin handover to ${f.pendingAdmin} is pending`);
         if (f.delay !== 7n * 24n * 3600n) fails.push(`${name}: FEE_RAISE_DELAY is ${f.delay}s, not 7 days`);
       }
@@ -156,10 +156,7 @@ const cases: Case<Ctx>[] = [
       const max = await read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_FEE");
       if (max === 0n && token === zeroAddress) return note("no fee: no fee token");
       const abi = MOCK_WMON().abi;
-      const [decimals, symbol] = await Promise.all([
-        read<number>(c, token, abi, "decimals"),
-        read<string>(c, token, abi, "symbol"),
-      ]);
+      const [decimals, symbol] = await Promise.all([read<number>(c, token, abi, "decimals"), read<string>(c, token, abi, "symbol")]);
       note(`${symbol} ${token}, ${decimals} decimals`);
       assert.equal(Number(decimals), 18, "fee token is not 18 decimals");
       const expected = addr("EXPECT_FEE_TOKEN");
@@ -168,7 +165,11 @@ const cases: Case<Ctx>[] = [
       // A wrap from a funded stranger succeeds; an unwrap from an empty one doesn't. Nothing is sent.
       const stranger = "0x00000000000000000000000000000000000e2e01" as Address;
       await c.pub.simulateContract({
-        account: stranger, address: token, abi, functionName: "deposit", value: 1n,
+        account: stranger,
+        address: token,
+        abi,
+        functionName: "deposit",
+        value: 1n,
         stateOverride: [{ address: stranger, balance: 10n ** 18n }],
       });
       await assert.rejects(
@@ -182,13 +183,7 @@ const cases: Case<Ctx>[] = [
     title: `Intents EIP-712 domain is ("${DOMAIN_NAME}", "${DOMAIN_VERSION}"), as the app and matcher sign`,
     async run(c, note) {
       const onChain = await read<Hex>(c, c.intents, c.intentsArt.abi, "DOMAIN_SEPARATOR");
-      const ours = hashDomain({
-        domain: { name: DOMAIN_NAME, version: DOMAIN_VERSION, chainId: BigInt(c.chainId), verifyingContract: c.intents },
-        types: { EIP712Domain: [
-          { name: "name", type: "string" }, { name: "version", type: "string" },
-          { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" },
-        ] },
-      });
+      const ours = domainSeparator({ name: DOMAIN_NAME, version: DOMAIN_VERSION, chainId: BigInt(c.chainId), verifyingContract: c.intents });
       let named = "";
       try {
         const d = await read<[Hex, string, string]>(c, c.intents, c.intentsArt.abi, "eip712Domain");
@@ -202,7 +197,7 @@ const cases: Case<Ctx>[] = [
     id: "DEP-06",
     title: "Both contracts charge the same fee, ceiling, recipient and admin",
     async run(c) {
-      const [a, b] = await Promise.all([feeConfig(c, c.v2, c.v2Art.abi), feeConfig(c, c.intents, c.intentsArt.abi)]);
+      const [a, b] = await Promise.all([feeConfig(c, c.escrow, c.escrowArt.abi), feeConfig(c, c.intents, c.intentsArt.abi)]);
       const diff = (["fee", "max", "recipient", "admin", "pending"] as const).filter((k) => String(a[k]).toLowerCase() !== String(b[k]).toLowerCase());
       if (diff.length) strict(`DeClubEscrow and DeClubIntents differ in: ${diff.map((k) => `${k} (${a[k]} vs ${b[k]})`).join(", ")}`);
     },
@@ -212,9 +207,13 @@ const cases: Case<Ctx>[] = [
     title: "The matcher's /info agrees with the chain, and its gas wallet is funded",
     skip: (c) => (c.poolUrl ? null : "no pool URL (NEXT_PUBLIC_POOL_URL or E2E_POOL_URL)"),
     async run(c, note) {
-      const r = await fetch(`${c.poolUrl}/info`, { signal: AbortSignal.timeout(10_000) });
-      assert.equal(r.status, 200, `GET /info: ${r.status}`);
-      const info = (await r.json()) as { chainId: number; swap: Address; matcher: Address; fee: { token: Address; amount: string; recipient: Address }; maxCycle: number };
+      const info = await poolInfo<{
+        chainId: number;
+        swap: Address;
+        matcher: Address;
+        fee: { token: Address; amount: string; recipient: Address };
+        maxCycle: number;
+      }>(c.poolUrl);
       assert.equal(Number(info.chainId), c.chainId, "the matcher is on another chain");
       assert.ok(isAddressEqual(info.swap, c.intents), `the matcher settles through ${info.swap}, not ${c.intents}`);
       const [token, fee, recipient] = await Promise.all([
@@ -236,16 +235,22 @@ const cases: Case<Ctx>[] = [
     id: "DEP-08",
     title: "Protocol constants",
     async run(c, note) {
-      const [v2Assets, inAssets, cycle, note_, spec] = await Promise.all([
-        read<bigint>(c, c.v2, c.v2Art.abi, "MAX_ASSETS_PER_SIDE"),
+      const [escrowNfts, inNfts] = await Promise.all([
+        read<bigint>(c, c.escrow, c.escrowArt.abi, "MAX_NFTS_PER_SIDE"),
+        read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_NFTS_PER_SIDE"),
+      ]);
+      const [escrowAssets, inAssets, cycle, note_, spec] = await Promise.all([
+        read<bigint>(c, c.escrow, c.escrowArt.abi, "MAX_ASSETS_PER_SIDE"),
         read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_ASSETS_PER_SIDE"),
         read<bigint>(c, c.intents, c.intentsArt.abi, "MAX_CYCLE"),
-        read<bigint>(c, c.v2, c.v2Art.abi, "MAX_NOTE_BYTES"),
-        read<bigint>(c, c.v2, c.v2Art.abi, "MAX_SPEC_BYTES"),
+        read<bigint>(c, c.escrow, c.escrowArt.abi, "MAX_NOTE_BYTES"),
+        read<bigint>(c, c.escrow, c.escrowArt.abi, "MAX_SPEC_BYTES"),
       ]);
-      note(`assets per side ${v2Assets}/${inAssets}, max cycle ${cycle}, note ${note_} bytes, spec ${spec} bytes`);
-      assert.equal(v2Assets, 10n);
+      note(`assets per side ${escrowAssets}/${inAssets}, NFTs per side ${escrowNfts}/${inNfts}, max cycle ${cycle}, note ${note_} bytes, spec ${spec} bytes`);
+      assert.equal(escrowAssets, 10n);
       assert.equal(inAssets, 10n);
+      assert.equal(escrowNfts, 5n);
+      assert.equal(inNfts, 5n);
       assert.equal(cycle, 4n);
     },
   },
@@ -271,15 +276,23 @@ async function main() {
   const ctx: Ctx = {
     pub,
     chainId: await pub.getChainId(),
-    v2: needAddr("VERIFY_V2_ADDRESS", "NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
+    escrow: needAddr("VERIFY_ESCROW_ADDRESS", "NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS"),
     intents: needAddr("VERIFY_INTENTS_ADDRESS", "NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS"),
     poolUrl: str("E2E_POOL_URL", str("NEXT_PUBLIC_POOL_URL")) || undefined,
-    v2Art: V2(),
+    escrowArt: ESCROW(),
     intentsArt: INTENTS(),
   };
-  console.log(`verifying chain ${ctx.chainId} via ${rpcUrl}${mainnet ? " (mainnet rules)" : ""}\n  DeClubEscrow ${ctx.v2}\n  DeClubIntents ${ctx.intents}\n`);
+  console.log(
+    `verifying chain ${ctx.chainId} via ${rpcUrl}${mainnet ? " (mainnet rules)" : ""}\n  DeClubEscrow ${ctx.escrow}\n  DeClubIntents ${ctx.intents}\n`,
+  );
   const results = await runCases(cases, ctx, arg("only"));
-  process.exitCode = finish("verify", results, { chainId: String(ctx.chainId), rpc: rpcUrl, v2: ctx.v2, intents: ctx.intents, mode: mainnet ? "mainnet" : "default" });
+  process.exitCode = finish("verify", results, {
+    chainId: String(ctx.chainId),
+    rpc: rpcUrl,
+    escrow: ctx.escrow,
+    intents: ctx.intents,
+    mode: mainnet ? "mainnet" : "default",
+  });
 }
 
 main().catch((e) => {

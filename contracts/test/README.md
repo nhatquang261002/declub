@@ -2,12 +2,12 @@
 
 | Where | What | Tests |
 |---|---|---|
-| `test/` (top level) | `FeeAdmin.t.sol` (24 tests run against both `DeClubEscrow` and `DeClubIntents`, so 48), `MockChog`, `MockWMON`, `ChogGenesisMirror`, `DeployChog.s.sol` | 63 |
+| `test/` (top level) | `FeeAdmin.t.sol` (24 tests run against both `DeClubEscrow` and `DeClubIntents`, so 48), `MockChog`, `MockWMON`, `ChogGenesisMirror`, `CollectionMirror` (the demo mirrors), `DeployChog.s.sol` | 67 |
 | `test/escrow/` | `DeClubEscrow`: exact, trait and open-offer deals, claims, tokens, the fee, `DeployEscrow.s.sol`, `MockERC20` | 206, plus two suites in `escrow/invariant/`: V1–V9, proposal statuses and liveness, and V3 against hostile collections |
 | `test/intents/` | `DeClubIntents`: settlement, reverts, signatures, nonces, tokens, the fee, gas, `DeployIntents.s.sol` | 108, plus two suites in `intents/invariant/` (N1, N2, N5, N6 and conservation; settlement against hostile collections) and a Halmos check in `intents/symbolic/` |
 | `test/rewards/` | `DeClubRewards`: publish, claim, revoke, sweep, the operator role, fuzz, a root built by the web app, `DeployRewards.s.sol` | 49, plus one suite in `rewards/invariant/` (R1–R4 and every call behaving, with underfunded roots) |
 
-`forge test` runs 431 tests in 38 suites (each invariant suite counts as one). What each file covers, the invariants, the threat → test mapping and the Slither triage are in [docs/04-security.md](../../docs/04-security.md).
+`forge test` runs 435 tests in 39 suites (each invariant suite counts as one). What each file covers, the invariants, the threat → test mapping and the Slither triage are in [docs/04-security.md](../../docs/04-security.md).
 
 ```bash
 forge test -vvv                         # all

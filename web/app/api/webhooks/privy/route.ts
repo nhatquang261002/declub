@@ -7,7 +7,7 @@ import { getStore } from "@/lib/server/store";
  * Privy's webhook endpoint (ADR 0013). Register `https://<your host>/api/webhooks/privy` under
  * Configuration > Webhooks in the Privy dashboard and subscribe to user.linked_account,
  * user.unlinked_account, user.transferred_account and user.deleted. It keeps shared profiles in
- * step with the owner's linked accounts without waiting for them to open /account.
+ * step with the owner's linked accounts without waiting for them to open their profile page.
  *
  * The signature is the only credential, so nothing is read before it checks out. Any 2xx counts as
  * delivered, so events this route has no use for are acknowledged; a failure answers 5xx and Privy

@@ -1,11 +1,4 @@
-import {
-  createPublicClient,
-  decodeEventLog,
-  http,
-  type Address,
-  type Hex,
-  type PublicClient,
-} from "viem";
+import { createPublicClient, decodeEventLog, http, type Address, type Hex, type PublicClient } from "viem";
 import { deClubEscrowAbi } from "../abi";
 import { toAsset, type Asset, type RawAsset } from "../assets";
 import { chain } from "../chain";
@@ -22,8 +15,8 @@ import type { Store } from "./store";
  * hash is trusted, and a fake or repeated report records nothing new.
  *
  * One event goes into the log of every Club it names, once per Club however many of the Club's
- * assets it names. Deals made outside the app are missed until a watcher feeds the same function
- * (docs/09-clubs.md).
+ * assets it names. Deals made outside the app come in through the fill watcher (ADR 0019), which
+ * feeds the same function.
  */
 
 /** What this module needs from a receipt, so tests can hand one in without a node. */
@@ -43,10 +36,8 @@ export type Reader = {
   proposalAssets(contract: Address, tradeId: bigint, proposalId: bigint): Promise<readonly RawAsset[]>;
 };
 
-export type { ActivityEvent };
-
 /** The oldest events age out past this, per Club. */
-export const MAX_EVENTS_PER_CLUB = 5_000;
+const MAX_EVENTS_PER_CLUB = 5_000;
 
 export const activityKey = (token: string) => `declub:activity:${CHAIN_ID}:${token.toLowerCase()}`;
 
@@ -81,7 +72,7 @@ export function viemReader(): Reader {
   };
 }
 
-/** The DeClubEscrow contracts whose events count. V2 is optional (see lib/config.ts). */
+/** The DeClubEscrow contracts whose events count. It is optional (see lib/config.ts). */
 export const ACTIVITY_CONTRACTS: Address[] = DECLUB_ESCROW_ADDRESS ? [DECLUB_ESCROW_ADDRESS] : [];
 
 export type IngestOptions = {
@@ -94,13 +85,16 @@ export type IngestOptions = {
   clubOf?: (token: string) => string | null;
 };
 
-export type ActivityResult =
+type ActivityResult =
   | { status: "recorded"; events: number }
   /** The node doesn't have the receipt yet (or there is no such transaction). Worth retrying. */
   | { status: "pending" };
 
 const tokensOf = (assets: readonly RawAsset[]): string[] =>
-  assets.map(toAsset).filter((a): a is Asset => a !== null && a.kind !== "native").map((a) => a.token.toLowerCase());
+  assets
+    .map(toAsset)
+    .filter((a): a is Asset => a !== null && a.kind !== "native")
+    .map((a) => a.token.toLowerCase());
 
 const distinct = (list: string[]) => [...new Set(list)];
 
@@ -119,7 +113,13 @@ export async function recordActivity(store: Store, hash: Hex, receipt: ReceiptLi
   const reader = options.reader ?? viemReader();
   const watched = (options.contracts ?? ACTIVITY_CONTRACTS).map((c) => c.toLowerCase());
   const clubOf = options.clubOf ?? ((token: string) => registry.clubFor(token)?.address ?? null);
-  const clubsOf = (tokens: readonly string[]) => distinct(tokens.map(clubOf).filter((c): c is string => c !== null).map((c) => c.toLowerCase()));
+  const clubsOf = (tokens: readonly string[]) =>
+    distinct(
+      tokens
+        .map(clubOf)
+        .filter((c): c is string => c !== null)
+        .map((c) => c.toLowerCase()),
+    );
 
   type Decoded = ReturnType<typeof decodeEventLog<typeof deClubEscrowAbi>>;
   const decoded: { log: ReceiptLike["logs"][number]; event: Decoded }[] = [];

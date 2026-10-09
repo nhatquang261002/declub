@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address, type Hex } from "viem";
-import { MAX_SPEC_BYTES, MAX_TOKENS_PER_SIDE } from "./config";
+import { MAX_NFTS_PER_SIDE, MAX_SPEC_BYTES } from "./config";
 import { buildMerkleSet, type MerkleSet } from "./merkle";
 
 /** How many traits one request can combine. The contract doesn't care; the spec's size limit does. */
@@ -50,7 +50,7 @@ export function traitOptions(catalog: TraitCatalog): { traitType: string; values
 }
 
 /** The token ids the clause matches: the set the deal commits to. */
-export function matchingIds(catalog: TraitCatalog, clause: Pick<TraitClause, "mode" | "picks">): bigint[] {
+function matchingIds(catalog: TraitCatalog, clause: Pick<TraitClause, "mode" | "picks">): bigint[] {
   if (clause.picks.length === 0) return [];
   const wanted = clause.picks.map(traitKey);
   return catalog.tokens
@@ -91,7 +91,7 @@ export function encodeSpec(clauses: readonly TraitClause[]): string {
   return JSON.stringify({ v: 1, c: body });
 }
 
-export const specBytes = (text: string) => new TextEncoder().encode(text).length;
+const specBytes = (text: string) => new TextEncoder().encode(text).length;
 
 /** What is wrong with a set of clauses before it goes on-chain, or null. */
 export function clausesError(clauses: readonly TraitClause[], resolved: readonly ResolvedClause[]): string | null {
@@ -102,7 +102,7 @@ export function clausesError(clauses: readonly TraitClause[], resolved: readonly
     if (c.picks.length === 0) return `${label}choose at least one trait.`;
     const { ids } = resolved[i];
     if (ids.length === 0) return `${label}no NFT matches. Try "any of" or fewer traits.`;
-    if (c.amount < 1 || c.amount > MAX_TOKENS_PER_SIDE) return `${label}ask for between 1 and ${MAX_TOKENS_PER_SIDE} NFTs.`;
+    if (c.amount < 1 || c.amount > MAX_NFTS_PER_SIDE) return `${label}ask for between 1 and ${MAX_NFTS_PER_SIDE} NFTs.`;
     if (c.amount > ids.length) return `${label}only ${ids.length} NFT${ids.length === 1 ? "" : "s"} match, so you can't ask for ${c.amount}.`;
   }
   for (const [i, a] of resolved.entries()) {
@@ -124,7 +124,7 @@ export function parseSpec(text: string): TraitClause[] | null {
     const out: TraitClause[] = [];
     for (const raw of json.c as SpecClause[]) {
       if (!raw || !isAddress(raw.t) || (raw.m !== "any" && raw.m !== "all") || !Array.isArray(raw.p)) return null;
-      if (!Number.isInteger(raw.n) || raw.n < 1 || raw.n > MAX_TOKENS_PER_SIDE) return null;
+      if (!Number.isInteger(raw.n) || raw.n < 1 || raw.n > MAX_NFTS_PER_SIDE) return null;
       const picks = raw.p.map(([traitType, value]) => ({ traitType: String(traitType), value: String(value) }));
       if (picks.length === 0 || picks.length > MAX_TRAIT_PICKS) return null;
       out.push({ token: getAddress(raw.t), mode: raw.m, picks, amount: raw.n });

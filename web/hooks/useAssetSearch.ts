@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import type { SearchHit, SearchKind } from "@/lib/search";
 
-export type AssetSearchQuery = {
+type AssetSearchQuery = {
   query: string;
   /** The wallet whose holdings come first. */
   owner?: Address;

@@ -1,11 +1,10 @@
-import { Tooltip } from "@/components/Tooltip";
 import { heat } from "@/lib/clubs";
+import { MOMENTUM } from "@/lib/momentum";
 
 /** Momentum is shown whole: a decimal would suggest a precision it doesn't have. */
 export const formatMomentum = (value: number) => Math.round(value).toLocaleString();
 
-export const MOMENTUM_EXPLAINED =
-  "Momentum shows how busy this Club has been. Completed swaps count most; new deals and Holders' own X posts about the Club count a little; anything older than a week counts for less. It doesn't say the asset is safe or valuable.";
+export const MOMENTUM_EXPLAINED = `Momentum shows how busy this Club has been. Completed swaps count most; new deals and Holders' Board posts and own X posts about the Club count a little. Points halve every ${MOMENTUM.halfLifeDays} days and are gone after ${MOMENTUM.windowDays}. It doesn't say the asset is safe or valuable.`;
 
 /** Five rising bars, lit up to `level` (0, quiet, lights none). Decoration: say the level in words beside it. */
 export function HeatBars({ level }: { level: number }) {
@@ -38,24 +37,5 @@ export function MomentumChange({ change }: { change: number }) {
       {moved > 0 ? "▲" : "▼"} {Math.abs(moved).toLocaleString()}
       <span className="sr-only"> since last week</span>
     </span>
-  );
-}
-
-/**
- * A Club's activity score and how it moved over the week. "Momentum" is explained in place, because
- * what it counts (completed swaps, recent activity) is what stops it being a vanity number.
- */
-export function MomentumBadge({ value, change, explain = false }: { value: number; change: number; explain?: boolean }) {
-  const badge = (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-2xl leading-none font-extrabold tabular-nums">{formatMomentum(value)}</span>
-      <MomentumChange change={change} />
-    </span>
-  );
-  if (!explain) return badge;
-  return (
-    <Tooltip content={MOMENTUM_EXPLAINED} className="cursor-help">
-      {badge}
-    </Tooltip>
   );
 }

@@ -1,6 +1,5 @@
-import { fail, json } from "@/lib/server/gate";
-import { cronAuthorized, startBlockFromEnv, watchFills } from "@/lib/server/fillWatcher";
-import { getStore } from "@/lib/server/store";
+import { fail, gateCron, json } from "@/lib/server/gate";
+import { startBlockFromEnv, watchFills } from "@/lib/server/fillWatcher";
 
 /**
  * The fill watcher (ADR 0019).
@@ -16,10 +15,8 @@ import { getStore } from "@/lib/server/store";
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const store = getStore();
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!store || !secret) return fail(503, "disabled", "The fill watcher is not configured.");
-  if (!cronAuthorized(request, secret)) return fail(401, "unauthorized", "Missing or wrong cron secret.");
+  const store = gateCron(request, "The fill watcher");
+  if (store instanceof Response) return store;
 
   try {
     return json(await watchFills(store, { startBlock: startBlockFromEnv() }));

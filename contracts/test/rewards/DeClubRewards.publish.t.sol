@@ -31,11 +31,17 @@ contract DeClubRewardsPublishTest is DeClubRewardsBase {
     }
 
     function test_constructorRefusesTimingOutOfBounds() public {
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, 7 days + 1, WINDOW));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, 7 days + 1, WINDOW)
+        );
         new DeClubRewards(operator, 7 days + 1, WINDOW);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, DELAY, 1 days - 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, DELAY, 1 days - 1)
+        );
         new DeClubRewards(operator, DELAY, 1 days - 1);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, DELAY, 365 days + 1));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.BadTiming.selector, DELAY, 365 days + 1)
+        );
         new DeClubRewards(operator, DELAY, 365 days + 1);
         // The bounds themselves are fine.
         new DeClubRewards(operator, 7 days, 365 days);
@@ -145,11 +151,15 @@ contract DeClubRewardsPublishTest is DeClubRewardsBase {
         vm.prank(operator);
         rewards.transferOperator(bob);
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.NotPendingOperator.selector, stranger));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.NotPendingOperator.selector, stranger)
+        );
         rewards.acceptOperator();
         // With nothing pending, the zero address can't "accept" either.
         vm.prank(address(0));
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.NotPendingOperator.selector, address(0)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.NotPendingOperator.selector, address(0))
+        );
         rewards.acceptOperator();
     }
 }

@@ -36,9 +36,18 @@ describe("token filter", () => {
   });
 
   it("finds intents that name a token on either side, whatever the id", () => {
-    assert.deepEqual(store.list({ token: COLLECTION }).map((r) => r.hash), [hash(1)]);
-    assert.deepEqual(store.list({ token: TOKEN }).map((r) => r.hash), [hash(1), hash(2)]);
-    assert.deepEqual(store.list({ token: OTHER_NFT }).map((r) => r.hash), [hash(2), hash(3)]);
+    assert.deepEqual(
+      store.list({ token: COLLECTION }).map((r) => r.hash),
+      [hash(1)],
+    );
+    assert.deepEqual(
+      store.list({ token: TOKEN }).map((r) => r.hash),
+      [hash(1), hash(2)],
+    );
+    assert.deepEqual(
+      store.list({ token: OTHER_NFT }).map((r) => r.hash),
+      [hash(2), hash(3)],
+    );
   });
 
   it("matches the address in any case and never part of one", () => {
@@ -48,7 +57,10 @@ describe("token filter", () => {
   });
 
   it("combines with the other filters", () => {
-    assert.deepEqual(store.list({ token: TOKEN, maker: BOB }).map((r) => r.hash), [hash(2)]);
+    assert.deepEqual(
+      store.list({ token: TOKEN, maker: BOB }).map((r) => r.hash),
+      [hash(2)],
+    );
     assert.deepEqual(store.list({ token: TOKEN, status: "settled" }), []);
   });
 });
@@ -70,27 +82,54 @@ describe("settlements", () => {
   });
 
   it("lists newest first, and by token", () => {
-    assert.deepEqual(store.settlements().map((s) => s.txHash), [hash(901), hash(900)]);
-    assert.deepEqual(store.settlements({ token: COLLECTION }).map((s) => s.txHash), [hash(900)]);
-    assert.deepEqual(store.settlements({ token: OTHER_NFT }).map((s) => s.txHash), [hash(901)]);
+    assert.deepEqual(
+      store.settlements().map((s) => s.txHash),
+      [hash(901), hash(900)],
+    );
+    assert.deepEqual(
+      store.settlements({ token: COLLECTION }).map((s) => s.txHash),
+      [hash(900)],
+    );
+    assert.deepEqual(
+      store.settlements({ token: OTHER_NFT }).map((s) => s.txHash),
+      [hash(901)],
+    );
     assert.deepEqual(store.settlements({ token: addr(0x9999) }), []);
   });
 
   it("names a token that only the other side of a cycle holds", () => {
     // TOKEN is in both intents of 900 and in no intent of 901.
-    assert.deepEqual(store.settlements({ token: TOKEN }).map((s) => s.txHash), [hash(900)]);
-    assert.deepEqual(store.settlements({ token: WMON }).map((s) => s.txHash), [hash(901)]);
+    assert.deepEqual(
+      store.settlements({ token: TOKEN }).map((s) => s.txHash),
+      [hash(900)],
+    );
+    assert.deepEqual(
+      store.settlements({ token: WMON }).map((s) => s.txHash),
+      [hash(901)],
+    );
   });
 
   it("pages forward from a time, oldest first, without skipping", () => {
-    assert.deepEqual(store.settlements({ after: 0 }).map((s) => s.txHash), [hash(900), hash(901)]);
-    assert.deepEqual(store.settlements({ after: 5_000 }).map((s) => s.txHash), [hash(901)]);
+    assert.deepEqual(
+      store.settlements({ after: 0 }).map((s) => s.txHash),
+      [hash(900), hash(901)],
+    );
+    assert.deepEqual(
+      store.settlements({ after: 5_000 }).map((s) => s.txHash),
+      [hash(901)],
+    );
     assert.deepEqual(store.settlements({ after: 6_000 }), []);
-    assert.deepEqual(store.settlements({ after: 0, limit: 1 }).map((s) => s.txHash), [hash(900)]);
+    assert.deepEqual(
+      store.settlements({ after: 0, limit: 1 }).map((s) => s.txHash),
+      [hash(900)],
+    );
   });
 
   it("combines token, maker and after", () => {
-    assert.deepEqual(store.settlements({ token: OTHER_NFT, maker: CAROL }).map((s) => s.txHash), [hash(901)]);
+    assert.deepEqual(
+      store.settlements({ token: OTHER_NFT, maker: CAROL }).map((s) => s.txHash),
+      [hash(901)],
+    );
     assert.deepEqual(store.settlements({ token: OTHER_NFT, maker: ALICE }), []);
     assert.deepEqual(store.settlements({ token: COLLECTION, after: 5_000 }), []);
   });
@@ -114,20 +153,28 @@ describe("limits and bans", () => {
     assert.equal(store.countLive(ALICE), 2);
     store.setStatus(hash(2), "cancelled");
     assert.equal(store.countLive(ALICE), 1);
-    assert.deepEqual(store.liveByMaker(ALICE.toLowerCase() as Address).map((r) => r.hash), [hash(1)]);
+    assert.deepEqual(
+      store.liveByMaker(ALICE.toLowerCase() as Address).map((r) => r.hash),
+      [hash(1)],
+    );
   });
 
   it("pages through live intents from a cursor", () => {
     const first = store.live({ limit: 3 });
-    assert.deepEqual(first.map((r) => r.hash), [hash(1), hash(2), hash(3)]);
+    assert.deepEqual(
+      first.map((r) => r.hash),
+      [hash(1), hash(2), hash(3)],
+    );
     const last = first[2]!;
-    assert.deepEqual(store.live({ after: { createdAt: last.createdAt, hash: last.hash }, limit: 3 }).map((r) => r.hash), [hash(4)]);
+    assert.deepEqual(
+      store.live({ after: { createdAt: last.createdAt, hash: last.hash }, limit: 3 }).map((r) => r.hash),
+      [hash(4)],
+    );
     assert.equal(store.live().length, 4);
   });
 
   it("leaves banned makers, banned tokens, unlisted tokens and near deadlines out of the matchable window", () => {
-    const hashes = (f: Partial<Parameters<Store["matchable"]>[0]>) =>
-      store.matchable({ limit: 500, minDeadline: 0, ...f }).map((r) => r.hash);
+    const hashes = (f: Partial<Parameters<Store["matchable"]>[0]>) => store.matchable({ limit: 500, minDeadline: 0, ...f }).map((r) => r.hash);
     assert.deepEqual(hashes({}), [hash(1), hash(2), hash(3), hash(4)]);
     assert.deepEqual(hashes({ minDeadline: 100 }), [hash(1), hash(2), hash(3)]);
     assert.deepEqual(hashes({ excludeMakers: [ALICE.toLowerCase()] }), [hash(3), hash(4)]);

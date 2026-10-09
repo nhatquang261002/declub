@@ -58,6 +58,17 @@ export function JoinClubButton({
         <ActionMenu
           label="Membership"
           groups={[
+            ...(m.signed
+              ? []
+              : [
+                  [
+                    {
+                      label: m.backingUp ? "Waiting for your wallet…" : "Sign to keep your spot",
+                      icon: <CheckIcon />,
+                      onSelect: m.backup,
+                    },
+                  ],
+                ]),
             [
               {
                 label: m.pending ? "Leaving…" : "Leave this Club",

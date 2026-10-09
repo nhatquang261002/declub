@@ -37,7 +37,7 @@ const abi = parseAbi(["function ownerOf(uint256) view returns (address)", "funct
 let cachedClient: PublicClient | undefined;
 const rpc = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL), batch: { multicall: true } }) as PublicClient);
 
-export const viemAvatarChain: AvatarChain = {
+const viemAvatarChain: AvatarChain = {
   async owners(tokens) {
     if (tokens.length === 0) return [];
     const results = await rpc().multicall({
@@ -65,11 +65,16 @@ const ascii = (bytes: Uint8Array, from: number, text: string) => Buffer.from(byt
 /** Whether the bytes are what the type says, so a stored picture can't be some other kind of file. */
 function looksLike(type: AvatarImageType, bytes: Uint8Array): boolean {
   switch (type) {
-    case "image/png": return startsWith(bytes, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
-    case "image/jpeg": return startsWith(bytes, 0xff, 0xd8, 0xff);
-    case "image/webp": return ascii(bytes, 0, "RIFF") && ascii(bytes, 8, "WEBP");
-    case "image/gif": return ascii(bytes, 0, "GIF8");
-    case "image/svg+xml": return /<svg[\s>]/i.test(Buffer.from(bytes).toString("utf8"));
+    case "image/png":
+      return startsWith(bytes, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    case "image/jpeg":
+      return startsWith(bytes, 0xff, 0xd8, 0xff);
+    case "image/webp":
+      return ascii(bytes, 0, "RIFF") && ascii(bytes, 8, "WEBP");
+    case "image/gif":
+      return ascii(bytes, 0, "GIF8");
+    case "image/svg+xml":
+      return /<svg[\s>]/i.test(Buffer.from(bytes).toString("utf8"));
   }
 }
 

@@ -32,27 +32,63 @@ export type PublicMember = {
   momentum: number;
   /** Completed swaps the member's wallets were part of. */
   swaps: number;
+  /** 1-based place in the whole Club under the sort asked for, so a search keeps true ranks. */
+  rank: number;
   /** Set for the Club's Owner and Moderators. */
   role?: "owner" | "moderator";
   /** Epochs in a row with enough active days on the Board (ADR 0032), when still alive. */
   streak?: number;
+  /** The challenges they won in this Club under this wallet (ADR 0050), newest first; absent when none. */
+  trophies?: { challenge: string; title: string; place: number | null }[];
 };
 
 export type MemberSort = "momentum" | "new";
 
 export type MembersView = {
-  /** The top `MEMBERS_SHOWN` of the sort. */
+  /** One page of the sort. */
   members: PublicMember[];
+  /** Everyone in the Club. */
   total: number;
+  /** How many of them match the search; all of them without one. The pages count these. */
+  matches: number;
   holders: number;
+  /** The highest Momentum in the Club, so a page's meters share one scale. */
+  topMomentum: number;
+  /** The page served (1-based) and its size, as the server clamped them. */
+  page: number;
+  size: number;
 };
+
+export type MembersPaging = {
+  page: number;
+  size: number;
+  /** Text to find in a member's wallet or in the X / Discord handle they show. */
+  query?: string;
+  /** Lowercase display wallet to the handle it shows, for the search. */
+  handles?: ReadonlyMap<string, string>;
+};
+
+/** The longest search the server reads. */
+export const MEMBERS_QUERY_MAX = 64;
+
+/** Whether a wallet, or the handle shown under it, contains `query` (an "@" in front is ignored). */
+function matchesMember(wallet: string, handle: string | undefined, query: string): boolean {
+  const q = query.trim().toLowerCase().replace(/^@/, "");
+  if (!q) return true;
+  return wallet.toLowerCase().includes(q) || (handle?.toLowerCase().includes(q) ?? false);
+}
 
 /** A balance is re-read when its check is older than this. */
 export const HOLDER_RECHECK_MS = 24 * 60 * 60 * 1000;
+/** A member's own badge is re-read when they ask (their membership, a Holders-only entry) and its check is older than this. */
+export const HOLDER_SELF_RECHECK_MS = 60 * 1000;
 /** The most rows one request re-checks, so a big Club can't turn a page load into a flood of reads. */
 export const RECHECK_PER_READ = 50;
-/** How many members the list shows. */
+/** How many members a request returns when it doesn't say. */
 export const MEMBERS_SHOWN = 100;
+/** The page the Members tab asks for, and the most one request may return. */
+export const MEMBERS_PAGE = 25;
+export const MEMBERS_MAX_PAGE = 100;
 /** A Club stops taking members here (the list reads every row, so it is bounded). */
 export const MAX_MEMBERS = 2_000;
 
@@ -117,12 +153,14 @@ export function rankMembers(
   roles?: Roles,
   /** Each member's live streak, by user id. */
   streaks?: ReadonlyMap<string, number>,
+  paging: MembersPaging = { page: 1, size: MEMBERS_SHOWN },
 ): MembersView {
   const swaps = events.filter((e) => e.kind === "swapped");
   const all: PublicMember[] = rows.map((row) => {
     const own = new Set(row.wallets);
     return {
       wallet: row.displayWallet,
+      rank: 0,
       holder: row.holder,
       joinedAt: row.joinedAt,
       momentum: memberScore(scores, row.wallets),
@@ -134,5 +172,19 @@ export function rankMembers(
   // Ties fall back to the earlier join, so the order is stable between reads.
   const byJoin = (a: PublicMember, b: PublicMember) => a.joinedAt - b.joinedAt || (a.wallet < b.wallet ? -1 : 1);
   all.sort(sort === "new" ? (a, b) => byJoin(b, a) : (a, b) => b.momentum - a.momentum || byJoin(a, b));
-  return { members: all.slice(0, MEMBERS_SHOWN), total: all.length, holders: all.filter((m) => m.holder).length };
+  all.forEach((m, i) => (m.rank = i + 1));
+  const query = paging.query?.trim() ?? "";
+  const found = query ? all.filter((m) => matchesMember(m.wallet, paging.handles?.get(m.wallet), query)) : all;
+  // A page past the end is the last one, so a Club that shrank doesn't leave a reader on an empty page.
+  const size = Math.min(MEMBERS_MAX_PAGE, Math.max(1, Math.floor(paging.size)));
+  const page = Math.min(Math.max(1, Math.floor(paging.page)), Math.max(1, Math.ceil(found.length / size)));
+  return {
+    members: found.slice((page - 1) * size, page * size),
+    total: all.length,
+    matches: found.length,
+    holders: all.filter((m) => m.holder).length,
+    topMomentum: Math.max(0, ...all.map((m) => m.momentum)),
+    page,
+    size,
+  };
 }

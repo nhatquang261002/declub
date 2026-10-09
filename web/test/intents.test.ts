@@ -8,9 +8,7 @@ import { type Intent, intentFromWire, intentHash, intentToWire, intentTypedData 
 // (src/DeClubIntents.sol), hashed by hand the way its Foundry test does, so a drift in
 // lib/intents.ts breaks here instead of in every wallet.
 const ASSET_TYPE = "Asset(uint8 assetType,address token,uint256 id,uint256 amount)";
-const INTENT_TYPE =
-  "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 maxFee,uint64 deadline,uint256 nonce)" +
-  ASSET_TYPE;
+const INTENT_TYPE = "Intent(address maker,Asset[] give,Asset[] want,address feeToken,uint256 maxFee,uint64 deadline,uint256 nonce)" + ASSET_TYPE;
 
 const MAKER = getAddress("0x00000000000000000000000000000000000000a1");
 const SWAP = getAddress("0x00000000000000000000000000000000000000c0");
@@ -80,10 +78,7 @@ describe("signed intents (ADR 0008, 0018)", () => {
         ],
       ),
     );
-    assert.equal(
-      hashTypedData(intentTypedData(SWAP, intent)),
-      keccak256(concat(["0x1901", domainSeparator, expectedStructHash])),
-    );
+    assert.equal(hashTypedData(intentTypedData(SWAP, intent)), keccak256(concat(["0x1901", domainSeparator, expectedStructHash])));
   });
 
   it("speak the pool's JSON, with maxFee as a decimal string", () => {

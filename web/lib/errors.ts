@@ -1,11 +1,4 @@
-import {
-  BaseError,
-  ContractFunctionRevertedError,
-  HttpRequestError,
-  InsufficientFundsError,
-  TimeoutError,
-  UserRejectedRequestError,
-} from "viem";
+import { BaseError, ContractFunctionRevertedError, HttpRequestError, InsufficientFundsError, TimeoutError, UserRejectedRequestError } from "viem";
 import { PoolError } from "./pool";
 
 // Contract error name → UI copy. Kept in sync with docs/05-frontend.md#error-messages.
@@ -24,12 +17,13 @@ const COPY: Record<string, string> = {
   WrongNativeAmount: "The MON sent doesn't match the deal plus the protocol fee.",
   WrongFee: "The protocol fee is now higher than this signed swap agreed to pay, or it names another fee token.",
   TooManyAssets: "Up to 10 assets per side.",
+  TooManyNfts: "Up to 5 NFTs per side.",
   InvalidAsset: "One of the assets in this deal isn't valid.",
   DuplicateAsset: "The same asset is listed twice on one side.",
   SameAssetBothSides: "The same asset can't be on both sides of a deal.",
   UnsupportedToken: "This token takes a fee on transfer or otherwise changes amounts, so it can't be escrowed.",
   NftNotReceived: "The NFT didn't arrive in escrow, so the deal wasn't created.",
-  NoteTooLong: "The note is too long. Keep it under 280 bytes.",
+  NoteTooLong: "The note is too long. Keep it to at most 280 bytes.",
   NotOpenOffer: "This deal has a fixed ask, so it doesn't take offers.",
   OpenOfferNoFill: "This is an open offer. Send the maker an offer instead of accepting it directly.",
   SelfPropose: "You can't make an offer on your own deal.",
@@ -91,13 +85,12 @@ export function describeError(error: unknown): AppError {
   const details = (message: string) => (raw && raw !== message ? clip(raw) : undefined);
 
   if (error instanceof PoolError) {
-    return { kind: "pool", title: "Intent pool refused this", message: error.message, details: `Pool code: ${error.code}` };
+    return { kind: "pool", title: "Swap pool refused this", message: error.message, details: `Pool code: ${error.code}` };
   }
 
   const rejected =
     (error as { code?: number } | null)?.code === 4001 ||
-    (error instanceof BaseError &&
-      error.walk((e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001));
+    (error instanceof BaseError && error.walk((e) => e instanceof UserRejectedRequestError || (e as { code?: number }).code === 4001));
   if (rejected) {
     return { kind: "rejected", title: "Request cancelled", message: "You rejected the request in your wallet. Nothing was sent." };
   }
@@ -106,9 +99,7 @@ export function describeError(error: unknown): AppError {
     const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
     if (reverted instanceof ContractFunctionRevertedError) {
       const name = reverted.data?.errorName;
-      const message =
-        (name && COPY[name]) ||
-        (name ? `The contract rejected this (${name}).` : (reverted.reason ?? "The contract rejected this transaction."));
+      const message = (name && COPY[name]) || (name ? `The contract rejected this (${name}).` : (reverted.reason ?? "The contract rejected this transaction."));
       return {
         kind: "reverted",
         title: "This can't go through",
@@ -149,9 +140,4 @@ export function describeError(error: unknown): AppError {
 
   const message = error instanceof BaseError ? error.shortMessage || error.message : raw;
   return { kind: "unknown", title: "Something went wrong", message, details: details(message) };
-}
-
-/** Just the one readable sentence from `describeError`. */
-export function errorMessage(error: unknown): string {
-  return describeError(error).message;
 }

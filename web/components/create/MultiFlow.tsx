@@ -15,14 +15,15 @@ import { useEscrowFee } from "@/hooks/useProtocolFee";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { draftToAssets, draftTokens, newRow, overlapError, type DraftRow } from "@/lib/assetDraft";
-import { toRawAsset, traitAsset } from "@/lib/assets";
-import { MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
-import { swapV2, swapV2Abi } from "@/lib/contracts";
+import { feeUnits, nftCount, sideFee, toRawAsset, traitAsset } from "@/lib/assets";
+import { MAX_NFTS_PER_SIDE, MAX_NOTE_BYTES, MAX_TOKENS_PER_SIDE } from "@/lib/config";
+import { swapEscrow, swapEscrowAbi } from "@/lib/contracts";
 import { expiryTimestamp, takerAddress, takerError, type Step, type Terms } from "@/lib/createFlow";
-import { noteBytes } from "@/lib/dealsV2";
+import { noteBytes } from "@/lib/deals";
 import { draftClause, newTraitDraft, resolveDrafts, type TraitDraft } from "@/lib/traitDraft";
 import { clausesError, encodeSpec, type TraitClause } from "@/lib/traitSpec";
-import { ConfirmCard, NextButton, ReviewStage, ReviewTerms, StepHeading, StepNav, TermsFields } from "./parts";
+import { blockedProblem } from "@/lib/assetTrust";
+import { ConfirmCard, ReviewStage, ReviewTerms, StepContinue, StepHeading, TermsFields } from "./parts";
 import { DealStageSide } from "@/components/DealSheet";
 import { LockIcon } from "@/components/Icons";
 import { TraitRequests } from "./TraitRequests";
@@ -57,10 +58,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
 
   // Decimals and symbols come from the token contracts, for both sides at once.
   const isTrait = kind === "trait";
-  const tokens = useMemo(
-    () => draftTokens([...offeredRows, ...(isTrait ? extraRows : requestedRows)]),
-    [offeredRows, requestedRows, extraRows, isTrait],
-  );
+  const tokens = useMemo(() => draftTokens([...offeredRows, ...(isTrait ? extraRows : requestedRows)]), [offeredRows, requestedRows, extraRows, isTrait]);
   const { info } = useTokenInfo(tokens);
   const decimalsOf = (token: Address) => info.get(token.toLowerCase())?.decimals;
 
@@ -72,10 +70,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
   // Trait requests: each draft's collection is scanned server-side (once), then its set is
   // rebuilt here so the root, the count and the proofs are never typed by anyone.
   const statuses = useCollectionCatalogs(isTrait ? traitDrafts.map((d) => d.collection) : []);
-  const resolved = useMemo(
-    () => resolveDrafts(traitDrafts, (collection) => statusOf(statuses, collection)),
-    [traitDrafts, statuses],
-  );
+  const resolved = useMemo(() => resolveDrafts(traitDrafts, (collection) => statusOf(statuses, collection)), [traitDrafts, statuses]);
   const traitError = ((): string | null => {
     if (!isTrait) return null;
     for (const [i, draft] of traitDrafts.entries()) {
@@ -87,63 +82,66 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
     }
     const clauses = traitDrafts.map((d) => draftClause(d)!);
     const ready = resolved.filter((r): r is NonNullable<typeof r> => r !== null);
-    return clausesError(clauses, ready) ?? (clauses.length + plain.assets.length > MAX_TOKENS_PER_SIDE ? `Up to ${MAX_TOKENS_PER_SIDE} requests and assets on this side.` : null);
+    const nfts = clauses.reduce((sum, c) => sum + c.amount, 0) + nftCount(plain.assets);
+    return (
+      clausesError(clauses, ready) ??
+      (clauses.length + plain.assets.length > MAX_TOKENS_PER_SIDE ? `Up to ${MAX_TOKENS_PER_SIDE} requests and assets on this side.` : null) ??
+      (nfts > MAX_NFTS_PER_SIDE ? `Up to ${MAX_NFTS_PER_SIDE} NFTs on this side, counting the ones a trait request asks for.` : null)
+    );
   })();
   const clauses = useMemo<TraitClause[]>(() => traitDrafts.flatMap((d) => draftClause(d) ?? []), [traitDrafts]);
   // What the contract is asked for: trait assets first (the spec lists them in this order), then the rest.
   const requested = {
     errors: plain.errors,
     assets: [
-      ...(isTrait
-        ? resolved.flatMap((r) => (r && r.set.count > 0 ? [traitAsset(r.clause.token, r.set.root, r.clause.amount)] : []))
-        : []),
+      ...(isTrait ? resolved.flatMap((r) => (r && r.set.count > 0 ? [traitAsset(r.clause.token, r.set.root, r.clause.amount)] : [])) : []),
       ...plain.assets,
     ],
   };
 
   // What blocks "Continue" on step 1 (the ask) and step 2 (the offer and terms).
   const askError = isOpen
-    ? bytes > MAX_NOTE_BYTES ? `The note is ${bytes} bytes; the limit is ${MAX_NOTE_BYTES}.` : null
+    ? bytes > MAX_NOTE_BYTES
+      ? `The note is ${bytes} bytes; the limit is ${MAX_NOTE_BYTES}.`
+      : null
     : isTrait
-      ? (traitError ?? plain.errors[0] ?? null)
-      : (requested.errors[0] ?? null);
+      ? (traitError ?? plain.errors[0] ?? blockedProblem(requested.assets))
+      : (requested.errors[0] ?? blockedProblem(requested.assets));
   const offerError =
-    offered.errors[0] ??
-    (isOpen ? null : overlapError(offered.assets, plain.assets)) ??
-    takerError(terms.taker, address);
+    offered.errors[0] ?? blockedProblem(offered.assets) ?? (isOpen ? null : overlapError(offered.assets, plain.assets)) ?? takerError(terms.taker, address);
 
   const { steps } = useAssetApprovals(address, offered.assets, info);
   const nextApproval = askError || offerError ? undefined : steps[0];
 
   async function create() {
-    if (!address || !swapV2 || askError || offerError || fee === undefined) return;
-    // The native amount in the offer, plus this side's share of the protocol fee.
-    const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + fee;
+    if (!address || !swapEscrow || askError || offerError || fee === undefined) return;
+    // The native amount in the offer, plus this side's share of the protocol fee: one per NFT it gives.
+    const native = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + sideFee(fee, offered.assets);
     const expiry = expiryTimestamp(terms.expiry);
     const to = takerAddress(terms.taker);
     const receipt = isOpen
       ? await tx.run({
-          ...swapV2,
+          ...swapEscrow,
           functionName: "createOpenOffer",
           args: [offered.assets.map(toRawAsset), to, expiry, note.trim()],
           value: native,
         })
       : isTrait
         ? await tx.run({
-            ...swapV2,
+            ...swapEscrow,
             functionName: "createTraitTrade",
             args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry, encodeSpec(clauses)],
             value: native,
           })
         : await tx.run({
-          ...swapV2,
-          functionName: "createTrade",
-          args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry],
-          value: native,
-        });
+            ...swapEscrow,
+            functionName: "createTrade",
+            args: [offered.assets.map(toRawAsset), requested.assets.map(toRawAsset), to, expiry],
+            value: native,
+          });
     if (!receipt) return;
-    const id = parseEventLogs({ abi: swapV2Abi, eventName: "TradeCreated", logs: receipt.logs })[0]?.args.tradeId;
-    if (id !== undefined) router.push(`/v2/deal/${id.toString()}`);
+    const id = parseEventLogs({ abi: swapEscrowAbi, eventName: "TradeCreated", logs: receipt.logs })[0]?.args.tradeId;
+    if (id !== undefined) router.push(`/deal/${id.toString()}`);
   }
 
   if (step === 1) {
@@ -156,7 +154,9 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
         {isOpen ? (
           <section className="page-section space-y-3 p-4">
             <div>
-              <label className="label !mb-0" htmlFor="note">Note (optional)</label>
+              <label className="label !mb-0" htmlFor="note">
+                Note (optional)
+              </label>
               <p className="mt-1 text-xs text-muted">
                 Anyone can send you an offer. This note is a hint for them: it isn&apos;t enforced, and you can accept any offer.
               </p>
@@ -198,9 +198,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
             info={info}
           />
         )}
-        <StepNav hint={askError}>
-          <NextButton disabled={!!askError} onClick={() => onStep(2)} />
-        </StepNav>
+        <StepContinue error={askError} onNext={() => onStep(2)} />
       </div>
     );
   }
@@ -215,9 +213,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
           onChange={onTerms}
           takerLabel={isOpen ? "Only this wallet can send offers (optional)" : "Only this wallet can accept (optional)"}
         />
-        <StepNav onBack={() => onStep(1)} hint={offerError}>
-          <NextButton disabled={!!offerError} onClick={() => onStep(3)} />
-        </StepNav>
+        <StepContinue onBack={() => onStep(1)} error={offerError} onNext={() => onStep(3)} />
       </div>
     );
   }
@@ -227,7 +223,15 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
       <StepHeading title="Review and confirm" blurb="Check both sides. Once it's on-chain you can cancel, but not edit." />
       <ReviewStage
         give={
-          <DealStageSide side="give" title="You give" note={<><LockIcon /> Locked on create</>}>
+          <DealStageSide
+            side="give"
+            title="You give"
+            note={
+              <>
+                <LockIcon /> Locked on create
+              </>
+            }
+          >
             <AssetList assets={offered.assets} info={info} />
             <p className="text-xs text-muted">Held in escrow until someone accepts or you cancel.</p>
           </DealStageSide>
@@ -235,15 +239,12 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
         want={
           isOpen ? (
             <DealStageSide side="want" title="You're looking for" note="Not enforced">
-              <p className="whitespace-pre-wrap break-words text-sm">
-                {note.trim() || "Nothing specified. Anyone can send you an offer."}
-              </p>
+              <p className="whitespace-pre-wrap break-words text-sm">{note.trim() || "Nothing specified. Anyone can send you an offer."}</p>
               <p className="text-xs text-muted">You can accept any offer you like.</p>
             </DealStageSide>
           ) : (
             <DealStageSide side="want" title="You get" note="Sent to you on accept">
-              {isTrait &&
-                resolved.map((r) => r && <TraitClauseSummary key={r.clause.token + r.set.root} clause={r.clause} matches={r.ids.length} />)}
+              {isTrait && resolved.map((r) => r && <TraitClauseSummary key={r.clause.token + r.set.root} clause={r.clause} matches={r.ids.length} />)}
               {plain.assets.length > 0 && <AssetList assets={plain.assets} info={info} />}
             </DealStageSide>
           )
@@ -257,11 +258,12 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
       {fee !== undefined && (
         <FeeNote
           amount={fee}
+          units={feeUnits(offered.assets)}
           pending={pendingFee}
           pendingNote="A deal listed before then keeps today's fee, for both sides, until it completes or ends."
         >
-          Sent with your {isOpen ? "offer" : "deal"} and held with it. It&apos;s only charged if the deal completes, and the
-          other side pays the same. If you cancel it, or it expires, it comes back to you with your assets.
+          Sent with your {isOpen ? "offer" : "deal"} and held with it. It&apos;s only charged if the deal completes, and the other side pays the same for each
+          NFT it gives. If you cancel it, or it expires, it comes back to you with your assets.
         </FeeNote>
       )}
       <ConfirmCard

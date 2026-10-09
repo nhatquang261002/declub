@@ -5,7 +5,7 @@ import { checkProfileEdit, linkFor, parseLink } from "../lib/clubPosts";
 import type { ActivityEvent } from "../lib/clubs";
 import { MOMENTUM, memberScore, score } from "../lib/momentum";
 import { profileKey, userWalletsKey } from "../lib/profiles";
-import { REWARDS, activityPoints, bonusBps, splitClub, type ReachRecord } from "../lib/rewards";
+import { DEFAULT_CLUB_RULES, REWARDS, activityPoints, bonusBps, splitClub, type ReachRecord } from "../lib/rewards";
 import { createPost, deletePost, hidePost, reportPost, updateProfile, type Deps } from "../lib/server/board";
 import { clubEvents } from "../lib/server/clubs";
 import { loadProfile, saveRoles } from "../lib/server/clubState";
@@ -49,7 +49,13 @@ describe("X links", () => {
     ]) {
       assert.equal(parseXStatus(url), id, url);
     }
-    for (const bad of ["https://x.com/jack", "https://evil.com/jack/status/1", "https://x.com/jack/status/abc", "1861113297428627788", `https://x.com.evil.io/a/status/${id}`]) {
+    for (const bad of [
+      "https://x.com/jack",
+      "https://evil.com/jack/status/1",
+      "https://x.com/jack/status/abc",
+      "1861113297428627788",
+      `https://x.com.evil.io/a/status/${id}`,
+    ]) {
       assert.equal(parseXStatus(bad), null, bad);
     }
   });
@@ -177,19 +183,22 @@ async function member(store: Store, userId: string, n: number, holder = true) {
 
 /** One X post per id, with the text given; authors by id. */
 function xWorld(posts: Record<string, { author: string; text: string }>) {
-  const lookupX = async (id: string): Promise<XCard | null> => (posts[id] ? { id, author: posts[id].author, text: posts[id].text, postedAt: postedAtOf(id) } : null);
+  const lookupX = async (id: string): Promise<XCard | null> =>
+    posts[id] ? { id, author: posts[id].author, text: posts[id].text, postedAt: postedAtOf(id) } : null;
   return lookupX;
 }
 
-const accounts: Record<string, { username: string; subject: string }> = { m1: { username: "alice_x", subject: "111" }, m2: { username: "bob_x", subject: "222" } };
+const accounts: Record<string, { username: string; subject: string }> = {
+  m1: { username: "alice_x", subject: "111" },
+  m2: { username: "bob_x", subject: "222" },
+};
 const baseDeps = (lookupX: Deps["lookupX"], now = NOW): Deps => ({
   now: () => now,
   lookupX,
   xAccountOf: async (userId) => accounts[userId] ?? null,
   admins: new Set(),
 });
-const clear = (store: Store, userId: string) =>
-  store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
+const clear = (store: Store, userId: string) => store.del(`declub:rl:club-post-cd:${token}:${userId}`, `declub:rl:club-post-hr:${token}:${userId}`);
 const share = async (store: Store, userId: string, id: string, deps: Deps) => {
   await clear(store, userId);
   return createPost(store, club, userId, { kind: "note", text: "look", link: `https://x.com/a/status/${id}` }, deps);
@@ -215,7 +224,10 @@ describe("X shares", () => {
     assert.deepEqual(b.xShare, { own: false, counted: null, reason: "not_own" });
 
     const shares = await readXShares(store, token);
-    assert.deepEqual(shares.map((s) => [s.tweet, s.wallet, s.strength]), [[own, wallet(1), "strong"]]);
+    assert.deepEqual(
+      shares.map((s) => [s.tweet, s.wallet, s.strength]),
+      [[own, wallet(1), "strong"]],
+    );
   });
 
   it("refuses a missing post, and says when X can't be read", async () => {
@@ -280,15 +292,24 @@ describe("X shares", () => {
     assert.equal((await readXShares(store, token)).length, 0);
   });
 
-  it("stops counting when reports hide the post", async () => {
+  it("keeps counting when members report the post, and stops when a moderator hides it (ADR 0040)", async () => {
     const store = memoryStore();
     await member(store, "m1", 1);
-    for (const [u, n] of [["r1", 11], ["r2", 12], ["r3", 13]] as const) await member(store, u, n);
+    const owner = await member(store, "own", 5);
+    await saveRoles(store, token, { owner: "own", moderators: [] });
+    for (const [u, n] of [
+      ["r1", 11],
+      ["r2", 12],
+      ["r3", 13],
+    ] as const)
+      await member(store, u, n);
     const id = idAt(NOW - 60_000);
     const deps = baseDeps(xWorld({ [id]: { author: "alice_x", text: `gm ${NFT}` } }));
     const r = await share(store, "m1", id, deps);
     assert.ok(r.ok);
     for (const u of ["r1", "r2", "r3"]) await reportPost(store, club, u, r.post.id, deps);
+    assert.equal((await readXShares(store, token)).length, 1, "reports alone hide nothing");
+    await hidePost(store, club, owner, r.post.id, true, deps);
     assert.equal((await readXShares(store, token)).length, 0);
   });
 
@@ -298,9 +319,12 @@ describe("X shares", () => {
     const id = idAt(NOW - 60_000);
     assert.ok((await share(store, "m1", id, baseDeps(xWorld({ [id]: { author: "alice_x", text: `gm ${NFT}` } })))).ok);
     const events = await clubEvents(store, club, { settlements: async () => [] });
-    assert.deepEqual(events.map((e) => e.kind), ["xshare"]);
-    const scores = score(events.map((e) => ({ kind: e.kind, at: e.at, parties: e.parties, weight: e.weight })), Math.floor(NOW / 1000));
-    assert.equal(memberScore(scores, [wallet(1)]), MOMENTUM.xShareWeight);
+    assert.deepEqual(events.map((e) => e.kind).sort(), ["post", "xshare"], "the Board post that shared it counts too");
+    const scores = score(
+      events.map((e) => ({ kind: e.kind, at: e.at, parties: e.parties, weight: e.weight })),
+      Math.floor(NOW / 1000),
+    );
+    assert.equal(memberScore(scores, [wallet(1)]), MOMENTUM.xShareWeight + MOMENTUM.postWeight);
     assert.equal(scores.uniqueWallets, 0);
   });
 
@@ -329,11 +353,17 @@ describe("linking the project's X account", () => {
     assert.ok(started.text.includes(started.code) && started.text.includes("@ChogNFT"));
 
     const posts: Record<string, { author: string; text: string }> = { "500": { author: "ChogNFT", text: started.text } };
-    const linked = await verifyXLink(store, club, owner, { handle: "chognft", url: "https://x.com/ChogNFT/status/500" }, {
-      now: () => NOW,
-      lookupX: xWorld(posts),
-      xUserIdOf: async () => "777",
-    });
+    const linked = await verifyXLink(
+      store,
+      club,
+      owner,
+      { handle: "chognft", url: "https://x.com/ChogNFT/status/500" },
+      {
+        now: () => NOW,
+        lookupX: xWorld(posts),
+        xUserIdOf: async () => "777",
+      },
+    );
     assert.ok(linked.ok);
     assert.deepEqual(linked.profile.x?.accounts, [{ handle: "ChogNFT", proof: "500", linkedAt: NOW, xUserId: "777" }]);
 
@@ -359,7 +389,11 @@ describe("linking the project's X account", () => {
 
     assert.deepEqual(await verify({ "500": { author: "Impostor", text: started.text } }), { ok: false, reason: "xlink_mismatch" });
     assert.deepEqual(await verify({ "500": { author: "ChogNFT", text: "no code here" } }), { ok: false, reason: "xlink_mismatch" });
-    assert.deepEqual(await verify({ "500": { author: "Other", text: started.text } }, NOW, "Other"), { ok: false, reason: "xlink_expired" }, "a code is for one handle");
+    assert.deepEqual(
+      await verify({ "500": { author: "Other", text: started.text } }, NOW, "Other"),
+      { ok: false, reason: "xlink_expired" },
+      "a code is for one handle",
+    );
     assert.deepEqual(await verify({ "500": { author: "ChogNFT", text: started.text } }, NOW + 25 * 3_600_000), { ok: false, reason: "xlink_expired" });
   });
 
@@ -368,11 +402,17 @@ describe("linking the project's X account", () => {
     for (const handle of ["one", "two", "three"]) {
       const s = await startXLink(store, club, owner, handle, { now: () => NOW });
       assert.ok(s.ok);
-      const r = await verifyXLink(store, club, owner, { handle, url: "https://x.com/x/status/7" }, {
-        now: () => NOW,
-        lookupX: xWorld({ "7": { author: handle, text: s.text } }),
-        xUserIdOf: async () => null,
-      });
+      const r = await verifyXLink(
+        store,
+        club,
+        owner,
+        { handle, url: "https://x.com/x/status/7" },
+        {
+          now: () => NOW,
+          lookupX: xWorld({ "7": { author: handle, text: s.text } }),
+          xUserIdOf: async () => null,
+        },
+      );
       assert.ok(r.ok, handle);
     }
     assert.deepEqual(await startXLink(store, club, owner, "four", { now: () => NOW }), { ok: false, reason: "too_many_accounts" });
@@ -382,7 +422,13 @@ describe("linking the project's X account", () => {
     const { store, owner } = await owned();
     const s = await startXLink(store, club, owner, "ChogNFT", { now: () => NOW });
     assert.ok(s.ok);
-    await verifyXLink(store, club, owner, { handle: "ChogNFT", url: "https://x.com/x/status/7" }, { now: () => NOW, lookupX: xWorld({ "7": { author: "ChogNFT", text: s.text } }), xUserIdOf: async () => null });
+    await verifyXLink(
+      store,
+      club,
+      owner,
+      { handle: "ChogNFT", url: "https://x.com/x/status/7" },
+      { now: () => NOW, lookupX: xWorld({ "7": { author: "ChogNFT", text: s.text } }), xUserIdOf: async () => null },
+    );
     const r = await updateProfile(store, club, owner, { xTags: ["#chog"] });
     assert.ok(r.ok);
     assert.deepEqual(r.profile.x?.tags, ["#chog"]);
@@ -429,7 +475,15 @@ describe("the reach read", () => {
 
   it("counts a deleted post as nothing, and records that reach wasn't read without a token", async () => {
     const { store, a } = await shared();
-    const gone = await collectReach(store, 0, { now: () => GENESIS + LENGTH, clubs: [club], genesis: GENESIS, length: LENGTH, configured: true, xAccountOf: async (u) => accounts[u] ?? null, posts: api([]) });
+    const gone = await collectReach(store, 0, {
+      now: () => GENESIS + LENGTH,
+      clubs: [club],
+      genesis: GENESIS,
+      length: LENGTH,
+      configured: true,
+      xAccountOf: async (u) => accounts[u] ?? null,
+      posts: api([]),
+    });
     assert.equal(gone.posts[a]?.reason, "deleted");
     const off = await collectReach(store, 0, { now: () => GENESIS + LENGTH, clubs: [club], genesis: GENESIS, length: LENGTH, configured: false });
     assert.deepEqual(off.posts, {});
@@ -448,20 +502,67 @@ const swapEvent = (at: number, parties: string[], seq = 0): ActivityEvent => ({
   tokens: [token],
   fee: "1000",
 });
-const xEvent = (at: number, w: string, tweet: string, weight = 1): ActivityEvent => ({ id: `x:${tweet}`, kind: "xshare", contract: "", deal: tweet, block: 0, at, parties: [w], tokens: [token], weight });
+const xEvent = (at: number, w: string, tweet: string, weight = 1): ActivityEvent => ({
+  id: `x:${tweet}`,
+  kind: "xshare",
+  contract: "",
+  deal: tweet,
+  block: 0,
+  at,
+  parties: [w],
+  tokens: [token],
+  weight,
+});
 
 describe("the Holder bonus", () => {
-  it("ignores trading, so wash trading earns nothing", () => {
-    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2)];
+  it("counts a swap with another wallet, never one between the member's own wallets (ADR 0034)", () => {
+    const events = [swapEvent(100, [wallet(1), wallet(2)], 1), swapEvent(200, [wallet(1), wallet(1)], 2), swapEvent(300, [wallet(1), wallet(3)], 3)];
     const a = activityPoints(events, null, [wallet(1)]);
-    assert.deepEqual(a, { x: 0, days: 0, points: 0, bonusBps: 0 });
+    assert.deepEqual(a, {
+      x: 0,
+      days: 0,
+      swaps: 2 * REWARDS.swapPoints,
+      backed: 0,
+      points: 2 * REWARDS.swapPoints,
+      bonusBps: bonusBps(2 * REWARDS.swapPoints),
+    });
+    const mine = activityPoints([swapEvent(100, [wallet(1), wallet(4)], 1)], null, [wallet(1), wallet(4)]);
+    assert.equal(mine.swaps, 0, "two wallets of the same member swapping earns nothing");
+    assert.equal(activityPoints(events, null, [wallet(9)]).swaps, 0, "a swap the member isn't on earns nothing");
   });
 
-  it("adds active days, at most 7, and a daily poster who shares on X each day earns the whole bonus", () => {
-    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), { x: 0, days: 3, points: 3 * REWARDS.dayPoints, bonusBps: bonusBps(3 * REWARDS.dayPoints) });
+  it("halves a swap with a wallet already swapped with that week, and caps the swap points", () => {
+    const DAY = 86_400;
+    const again = [
+      swapEvent(100, [wallet(1), wallet(2)], 1),
+      swapEvent(100 + DAY, [wallet(1), wallet(2)], 2),
+      swapEvent(100 + 9 * DAY, [wallet(1), wallet(2)], 3),
+    ];
+    assert.equal(activityPoints(again, null, [wallet(1)]).swaps, REWARDS.swapPoints * (1 + 0.5 + 1), "the third is more than 7 days after the second");
+    const many = Array.from({ length: 40 }, (_, i) => swapEvent(100 + i, [wallet(1), `0xee${String(i).padStart(38, "0")}`], i));
+    assert.equal(activityPoints(many, null, [wallet(1)]).swaps, REWARDS.swapCapPerEpoch);
+    const farm = Array.from({ length: 40 }, (_, i) => swapEvent(100 + i, [wallet(1), wallet(2)], i));
+    assert.equal(activityPoints(farm, null, [wallet(1)]).swaps, REWARDS.swapCapPerEpoch, "forty swaps with one partner can't beat the cap");
+    assert.equal(activityPoints(farm, null, [wallet(1)]).bonusBps, bonusBps(REWARDS.swapCapPerEpoch), "so trading alone is worth at most that bonus");
+  });
+
+  it("adds active days, at most 7, and backing; acting alone can't reach the whole bonus (ADR 0038)", () => {
+    assert.deepEqual(activityPoints([], null, [wallet(1)], 3), {
+      x: 0,
+      days: 3,
+      swaps: 0,
+      backed: 0,
+      points: 3 * REWARDS.dayPoints,
+      bonusBps: bonusBps(3 * REWARDS.dayPoints),
+    });
     assert.equal(activityPoints([], null, [wallet(1)], 12).days, 7);
     const week = Array.from({ length: 7 }, (_, i) => xEvent(100 + i, wallet(1), `t${i}`));
-    assert.equal(activityPoints(week, null, [wallet(1)], 7).bonusBps, REWARDS.maxBonusBps);
+    const alone = activityPoints(week, null, [wallet(1)], 7);
+    assert.ok(alone.bonusBps < REWARDS.maxBonusBps, "a post and an X share every day is not enough on its own");
+    const backed = activityPoints(week, null, [wallet(1)], 7, 12.5);
+    assert.equal(backed.backed, 12.5);
+    assert.equal(backed.points, alone.points + 12.5);
+    assert.equal(backed.bonusBps, REWARDS.maxBonusBps, "other Holders' backing takes it the rest of the way");
   });
 
   it("adds X shares: base points, reach on a log scale, capped per epoch", () => {
@@ -490,27 +591,40 @@ describe("the Holder bonus", () => {
       fees: 10_000n,
       carried: { holders: 1n, fund: 0n },
       holders: [
-        { wallet: wallet(1), shares: 1n, bonusBps: 5_000 },
-        { wallet: wallet(2), shares: 1n, bonusBps: 0 },
-        { wallet: wallet(3), shares: 2n, bonusBps: 99_999 },
+        { wallet: wallet(1), shares: 1n, points: 12, bonusBps: 5_000 },
+        { wallet: wallet(2), shares: 1n, points: 11, bonusBps: 0 },
+        { wallet: wallet(3), shares: 2n, points: 13, bonusBps: 99_999 },
       ],
       owner: null,
     });
     const paid = Object.fromEntries(split.payouts.map((p) => [p.wallet, p.amount]));
-    // Weights 1.5 : 1 : 3 (the third is capped at +50%) over a pool of 5,001.
-    assert.equal(paid[wallet(1)], (5_001n * 15_000n) / 55_000n);
-    assert.equal(paid[wallet(3)], (5_001n * 30_000n) / 55_000n);
+    // Weights 1.25 : 1 : 2.5 (bonuses are capped at +25%) over a pool of 5,001.
+    assert.equal(paid[wallet(1)], (5_001n * 12_500n) / 47_500n);
+    assert.equal(paid[wallet(3)], (5_001n * 25_000n) / 47_500n);
     assert.equal(split.paidHolders + split.carry.holders, split.holderPool);
     assert.equal(split.payouts.find((p) => p.wallet === wallet(3))?.bonusBps, REWARDS.maxBonusBps);
   });
 
   it("gains nothing by splitting holdings across accounts", () => {
-    const one = splitClub({ club: token, fees: 1_000_000n, carried: { holders: 0n, fund: 0n }, holders: [{ wallet: wallet(1), shares: 2n, bonusBps: 2_000 }, { wallet: wallet(9), shares: 2n, bonusBps: 0 }], owner: null });
+    const one = splitClub({
+      club: token,
+      fees: 1_000_000n,
+      carried: { holders: 0n, fund: 0n },
+      holders: [
+        { wallet: wallet(1), shares: 2n, bonusBps: 2_000 },
+        { wallet: wallet(9), shares: 2n, bonusBps: 0 },
+      ],
+      owner: null,
+    });
     const two = splitClub({
       club: token,
       fees: 1_000_000n,
       carried: { holders: 0n, fund: 0n },
-      holders: [{ wallet: wallet(1), shares: 1n, bonusBps: 2_000 }, { wallet: wallet(2), shares: 1n, bonusBps: 2_000 }, { wallet: wallet(9), shares: 2n, bonusBps: 0 }],
+      holders: [
+        { wallet: wallet(1), shares: 1n, bonusBps: 2_000 },
+        { wallet: wallet(2), shares: 1n, bonusBps: 2_000 },
+        { wallet: wallet(9), shares: 2n, bonusBps: 0 },
+      ],
       owner: null,
     });
     const sum = (s: typeof one, ws: string[]) => s.payouts.filter((p) => ws.includes(p.wallet)).reduce((t, p) => t + p.amount, 0n);
@@ -525,7 +639,12 @@ describe("the Holder bonus", () => {
     await member(store, "m2", 2);
     const at = GENESIS + 60;
     const events = [swapEvent(at, [wallet(1), wallet(5)], 1), xEvent(at, wallet(2), "t1")];
-    const reach: ReachRecord = { n: 0, collectedAt: at, available: true, posts: { t1: { club: token, wallet: wallet(2), ok: true, strength: "strong", engagement: 15 } } };
+    const reach: ReachRecord = {
+      n: 0,
+      collectedAt: at,
+      available: true,
+      posts: { t1: { club: token, wallet: wallet(2), ok: true, strength: "strong", engagement: 15 } },
+    };
     const result = await buildEpoch(store, 0, {
       now: () => GENESIS + LENGTH,
       clubs: [club],
@@ -536,11 +655,13 @@ describe("the Holder bonus", () => {
       genesis: GENESIS,
       length: LENGTH,
       reach: async () => reach,
+      // A floor of one point: this test is about what the points turn into, not about being paid.
+      rules: () => ({ ...DEFAULT_CLUB_RULES, minPoints: 1 }),
     });
     assert.equal(result.status, "built");
     const record = result.status === "built" ? result.record : null;
     const holder = (w: string) => record!.leaves.find((l) => l.account === getAddress(w))!.breakdown.find((b) => b.kind === "holder")!;
-    assert.equal(holder(wallet(1)).bonusBps, 0, "a swap earns no bonus");
+    assert.equal(holder(wallet(1)).bonusBps, bonusBps(REWARDS.swapPoints), "a swap with another wallet earns its points");
     assert.equal(holder(wallet(2)).bonusBps, bonusBps(REWARDS.xShareBase + REWARDS.reachWeight * 4));
     assert.equal(holder(wallet(1)).shares, "1");
     assert.deepEqual(record!.reach, reach, "the reach is published with the epoch");
@@ -550,6 +671,16 @@ describe("the Holder bonus", () => {
 describe("X share events", () => {
   it("credit the member's Club wallet with the share's strength", () => {
     const [e] = xShareEvents([{ tweet: "5", club: token, userId: "u", wallet: wallet(1).toUpperCase(), postId: "p", at: 9, strength: "weak" }]);
-    assert.deepEqual(e, { id: "x:5", kind: "xshare", contract: "", deal: "5", block: 0, at: 9, parties: [wallet(1).toLowerCase()], tokens: [token], weight: 0.5 });
+    assert.deepEqual(e, {
+      id: "x:5",
+      kind: "xshare",
+      contract: "",
+      deal: "5",
+      block: 0,
+      at: 9,
+      parties: [wallet(1).toLowerCase()],
+      tokens: [token],
+      weight: 0.5,
+    });
   });
 });

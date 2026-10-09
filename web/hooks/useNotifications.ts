@@ -14,9 +14,10 @@ import {
   type ClubInboxItem,
 } from "@/lib/notifications";
 import { loadState, saveState } from "@/lib/userState";
+import { subscribeStorage } from "./subscribeStorage";
 import { useAccessToken } from "./useAccessToken";
 import { useNow } from "./useNow";
-import { useDealsV2 } from "./useDealsV2";
+import { useDeals } from "./useDeals";
 import { useIntents } from "./usePool";
 
 // Notifications are derived from deal state (lib/notifications.ts). All that is stored is which
@@ -51,14 +52,7 @@ function writeStore(key: string, value: string) {
   }
 }
 
-function subscribe(onChange: () => void) {
-  window.addEventListener(EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
+const subscribe = subscribeStorage(EVENT);
 
 function parseKeys(raw: string): Set<string> {
   try {
@@ -74,12 +68,12 @@ const canAlert = () => typeof window !== "undefined" && "Notification" in window
 export function useNotifications() {
   const { address } = useConnection();
   const now = useNow(30_000);
-  const { deals, isLoading: dealsLoading } = useDealsV2({ limit: 200, enabled: !!address });
+  const { deals, isLoading: dealsLoading } = useDeals({ limit: 200, enabled: !!address });
 
   // Signed intents live in the pool, not on-chain. A pool that is down just adds nothing here.
   const intents = useIntents({ status: "all", maker: address, enabled: !!address });
 
-  // What the Clubs say (likes, pins, rewards) needs the server's read of the member's posts, so it
+  // What the Clubs say (likes, replies, pins, counted X posts, rewards, your rank, challenges) needs the server's read of the member's posts, so it
   // only exists signed in. Without it the bell shows deals alone.
   const inboxToken = useAccessToken();
   const inbox = useQuery({
@@ -107,8 +101,16 @@ export function useNotifications() {
   );
 
   // The snapshot is the raw string so React can compare it by value. "" = never opened.
-  const raw = useSyncExternalStore(subscribe, () => readStore(address ? readKey(address) : null), () => "");
-  const alertsRaw = useSyncExternalStore(subscribe, () => readStore(ALERTS_KEY), () => "");
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => readStore(address ? readKey(address) : null),
+    () => "",
+  );
+  const alertsRaw = useSyncExternalStore(
+    subscribe,
+    () => readStore(ALERTS_KEY),
+    () => "",
+  );
   const read = useMemo(() => parseKeys(raw), [raw]);
 
   // The server's copy for this wallet, folded in once per sign-in. Until it has been, a wallet
@@ -179,19 +181,12 @@ export function useNotifications() {
     [address, read, pushSeen],
   );
   const markRead = useCallback((key: string) => persist([...read, key]), [persist, read]);
-  const markAllRead = useCallback(
-    () => persist([...read, ...notifications.map((n) => n.key)]),
-    [persist, read, notifications],
-  );
+  const markAllRead = useCallback(() => persist([...read, ...notifications.map((n) => n.key)]), [persist, read, notifications]);
 
-  const unread = useMemo(
-    () => (seeded ? notifications.filter((n) => !read.has(n.key)) : []),
-    [notifications, read, seeded],
-  );
+  const unread = useMemo(() => (seeded ? notifications.filter((n) => !read.has(n.key)) : []), [notifications, read, seeded]);
 
   // Browser alerts, only while a tab is open (no server can push to a closed one).
-  const alertsEnabled =
-    alertsRaw === "on" && canAlert() && Notification.permission === "granted";
+  const alertsEnabled = alertsRaw === "on" && canAlert() && Notification.permission === "granted";
   const announced = useRef<{ account?: string; keys: Set<string> }>({ keys: new Set() });
   useEffect(() => {
     if (!address || !seeded || isLoading) return;
@@ -208,8 +203,7 @@ export function useNotifications() {
 
   const enableAlerts = useCallback(async () => {
     if (!canAlert()) return;
-    const permission =
-      Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
     writeStore(ALERTS_KEY, permission === "granted" ? "on" : "off");
   }, []);
   const disableAlerts = useCallback(() => writeStore(ALERTS_KEY, "off"), []);

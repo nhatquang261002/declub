@@ -1,8 +1,8 @@
 import { getAddress, hashStruct, isAddress, type Address, type Hex } from "viem";
-import { toAsset, toRawAsset, type Asset } from "./assets";
-import { CHAIN_ID, MAX_TOKENS_PER_SIDE } from "./config";
+import { nftCount, toAsset, toRawAsset, type Asset } from "./assets";
+import { CHAIN_ID, MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE } from "./config";
 import { sameAddress } from "./deals";
-import type { DealV2 } from "./dealsV2";
+import type { Deal } from "./deals";
 
 // Signed trade intents (ADR 0008, 0009). Everything here mirrors matcher/src/intent.ts and
 // matcher/src/wire.ts: the EIP-712 types, the struct hash that identifies an intent, and the
@@ -14,9 +14,9 @@ export type Intent = {
   give: Asset[];
   want: Asset[];
   /**
-   * The protocol fee token, and the most the maker agrees to pay if the cycle settles (ADR 0015,
-   * 0018). The contract charges its current `fee()`, and refuses the intent while that is above
-   * `maxFee`.
+   * The protocol fee token, and the most the maker agrees to pay for each NFT they give if the
+   * cycle settles (ADR 0015, 0018, 0033). The contract charges its current `fee()` for each of
+   * them (once if they give none), and refuses the intent while that is above `maxFee`.
    */
   feeToken: Address;
   maxFee: bigint;
@@ -24,7 +24,9 @@ export type Intent = {
   nonce: bigint;
 };
 
-export const INTENT_TYPES = {
+// The EIP-712 types are written out in each package on purpose: the app and the matcher deploy on their own, and e2e checks both against a third copy (IN-01).
+// jscpd:ignore-start
+const INTENT_TYPES = {
   Asset: [
     { name: "assetType", type: "uint8" },
     { name: "token", type: "address" },
@@ -41,14 +43,14 @@ export const INTENT_TYPES = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+// jscpd:ignore-end
 
 /** Not part of the contract: a maker-signed request that the pool drop an intent. */
-export const CANCEL_TYPES = {
+const CANCEL_TYPES = {
   CancelIntent: [{ name: "intentHash", type: "bytes32" }],
 } as const;
 
-export const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) =>
-  ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
+const intentDomain = (verifyingContract: Address, chainId = CHAIN_ID) => ({ name: "DeClubIntents", version: "1", chainId, verifyingContract }) as const;
 
 const message = (intent: Intent) => ({
   maker: intent.maker,
@@ -79,14 +81,13 @@ export const cancelTypedData = (verifyingContract: Address, intentHash: Hex) =>
   }) as const;
 
 /** The EIP-712 struct hash: the id the pool uses and the contract emits in `IntentFilled`. */
-export const intentHash = (intent: Intent): Hex =>
-  hashStruct({ data: message(intent), primaryType: "Intent", types: INTENT_TYPES });
+export const intentHash = (intent: Intent): Hex => hashStruct({ data: message(intent), primaryType: "Intent", types: INTENT_TYPES });
 
 // ─────────────────────────────────────────────────────────────── The pool's JSON
 
 /** Every bigint is a decimal string. */
 export type WireAsset = { assetType: number; token: Address; id: string; amount: string };
-export type WireIntent = {
+type WireIntent = {
   maker: Address;
   give: WireAsset[];
   want: WireAsset[];
@@ -96,7 +97,7 @@ export type WireIntent = {
   nonce: string;
 };
 
-const wireAsset = (a: Asset): WireAsset => {
+export const wireAsset = (a: Asset): WireAsset => {
   const raw = toRawAsset(a);
   return { assetType: raw.assetType, token: raw.token, id: raw.id.toString(), amount: raw.amount.toString() };
 };
@@ -143,9 +144,7 @@ export function intentFromWire(v: unknown): Intent | null {
 }
 
 export type IntentStatus = "open" | "stale" | "settled" | "cancelled" | "expired" | "consumed" | "rejected";
-const STATUSES: ReadonlySet<string> = new Set<IntentStatus>([
-  "open", "stale", "settled", "cancelled", "expired", "consumed", "rejected",
-]);
+const STATUSES: ReadonlySet<string> = new Set<IntentStatus>(["open", "stale", "settled", "cancelled", "expired", "consumed", "rejected"]);
 
 /** One row of the pool's book. */
 export type PoolIntent = {
@@ -218,7 +217,8 @@ export const STATUS_LABEL: Record<IntentStatus, string> = {
   open: "Open",
   stale: "Paused",
   settled: "Settled",
-  cancelled: "Cancelled",
+  // Only this pool dropped it; a copy can still settle until the deadline, so not "Cancelled".
+  cancelled: "Removed",
   expired: "Expired",
   consumed: "Used elsewhere",
   rejected: "Dropped",
@@ -226,10 +226,10 @@ export const STATUS_LABEL: Record<IntentStatus, string> = {
 
 /** What a status means for the maker, in one sentence. */
 export const STATUS_HELP: Record<IntentStatus, string> = {
-  open: "Waiting for a match. It settles on its own when intents that fit are found.",
+  open: "Waiting for a match. It settles on its own when swaps that fit are found.",
   stale: "The matcher skips it for now because your wallet can't honour it. It comes back by itself once it can.",
   settled: "Matched and swapped on-chain.",
-  cancelled: "Removed from the pool. A copy of the signature elsewhere could still settle until it expires.",
+  cancelled: "Removed from the pool. A copy of the signature elsewhere could still settle until it expires, unless it's cancelled on-chain.",
   expired: "Its deadline passed, so it can no longer settle.",
   consumed: "Its nonce was used, so this signature can't settle any more.",
   rejected: "The matcher gave up on it after it failed on-chain checks.",
@@ -243,16 +243,16 @@ export function reasonText(reason: string | null): string | null {
   if (!reason) return null;
   const code = reason.split(":")[0];
   const copy: Record<string, string> = {
-    balance: "You no longer hold everything this intent gives.",
-    allowance: "Your token approval for this intent is missing or too small.",
+    balance: "You no longer hold everything this swap gives.",
+    allowance: "Your token approval for this swap is missing or too small.",
     fee_balance: "You don't hold enough WMON for the protocol fee any more.",
     fee_allowance: "Your WMON approval for the protocol fee is missing or too small.",
-    wrong_fee: "The protocol fee went up past the most this intent agreed to pay. Sign it again to keep it in play.",
-    not_owner: "You no longer own an NFT this intent gives.",
-    not_approved: "An NFT this intent gives isn't approved for DeClub any more.",
-    bad_token: "A token in this intent stopped answering.",
-    nonce_used: "This intent's nonce was already used.",
-    expired: "This intent's deadline passed.",
+    wrong_fee: "The protocol fee went up past the most this swap agreed to pay. Sign it again to keep it in play.",
+    not_owner: "You no longer own an NFT this swap gives.",
+    not_approved: "An NFT this swap gives isn't approved for DeClub any more.",
+    bad_token: "A token in this swap stopped answering.",
+    nonce_used: "This swap's nonce was already used.",
+    expired: "This swap's deadline passed.",
   };
   return (code && copy[code]) || reason;
 }
@@ -279,6 +279,9 @@ export function intentProblem(give: readonly Asset[], want: readonly Asset[]): s
   if (give.length > MAX_TOKENS_PER_SIDE || want.length > MAX_TOKENS_PER_SIDE) {
     return `Up to ${MAX_TOKENS_PER_SIDE} assets per side.`;
   }
+  if (nftCount(give) > MAX_NFTS_PER_SIDE || nftCount(want) > MAX_NFTS_PER_SIDE) {
+    return `Up to ${MAX_NFTS_PER_SIDE} NFTs per side.`;
+  }
   const same = (a: Asset, b: Asset) => a.kind === b.kind && sameAddress(a.token, b.token) && a.id === b.id;
   if (give.some((g) => want.some((w) => same(g, w)))) {
     return "The same asset can't be on both sides. Give and ask for different assets.";
@@ -292,23 +295,24 @@ export const nonceBit = (nonce: bigint) => ({ word: nonce >> 8n, mask: 1n << (no
 // ─────────────────────────────────────────────────────────────── In the deals list
 
 /**
- * A signed intent shaped like a V2 deal, so deals and signed swaps can share one list and one set
+ * A signed intent shaped like a DeClubEscrow deal, so deals and signed swaps can share one list and one set
  * of filters (search, MON, sort). `id` is -1n so a numeric search never matches it; the card links
  * by `signed.hash` instead. An intent has no counterparty, so `taker` is always null.
  */
-export type SignedListing = DealV2 & { signed: PoolIntent };
+export type SignedListing = Deal & { signed: PoolIntent };
 
 export const intentAsListing = (row: PoolIntent): SignedListing => ({
   id: -1n,
   maker: row.intent.maker,
   taker: null,
   expiry: row.intent.deadline,
-  status: isLive(row.status) ? "open" : row.status === "settled" ? "filled" : "cancelled",
-  // The most each side pays. What is charged is the contract's fee at settlement, never more.
+  // An expired intent stays "open" like an expired locked deal, so displayStatus derives "expired" from its past deadline.
+  status: isLive(row.status) || row.status === "expired" ? "open" : row.status === "settled" ? "filled" : "cancelled",
+  // The most each side pays per NFT it gives. What is charged is the contract's fee at settlement, never more.
   fee: row.intent.maxFee,
   offered: row.intent.give,
   requested: row.intent.want,
   signed: row,
 });
 
-export const isSignedListing = (listing: DealV2): listing is SignedListing => "signed" in listing;
+export const isSignedListing = (listing: Deal): listing is SignedListing => "signed" in listing;

@@ -10,11 +10,11 @@ state and Clubs.
 
 | Capability | Current behavior | Frontend / server surface |
 |---|---|---|
-| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on Monad testnet only. Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
-| Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/account`, `components/ConnectButton.tsx` |
-| Multiple wallets | Linked wallets are shown on `/account`; a connected wallet can be made active without changing the account. | `/account`, `useSetActiveWallet` |
+| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on the app's network (Monad testnet, or Monad mainnet in the mainnet flavor). Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
+| Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/settings`, `components/ConnectButton.tsx` |
+| Multiple wallets | Linked wallets are shown on `/settings`; a connected wallet can be made active without changing the account. | `/settings`, `useSetActiveWallet` |
 | Embedded wallets | Disabled by default (`createOnLogin: "off"`). Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one at login for users who have no wallet (`"users-without-wallets"`). | `components/Providers.tsx`, `lib/config.ts` |
-| Shared trader profiles | A user explicitly shares an X or Discord profile. Google and email can be linked for sign-in/recovery but are never shown as trader profiles. | `/account`, `/api/profile`, `lib/server/profileSync.ts` |
+| Shared trader profiles | A user explicitly shares an X or Discord profile. Google and email can be linked for sign-in/recovery but are never shown as trader profiles. | `/profile/<address>` (edit), `/api/profile`, `lib/server/profileSync.ts` |
 | Handle-based deals | A maker can find a shared X or Discord handle, choose one of that user's shared wallets, and lock the taker address in the deal flow. | `/create`, `/api/profiles/lookup`, `lib/server/handleLookup.ts` |
 | Server authorization | Per-user routes accept a Privy access token, verify it server-side, then fetch the user from Privy. The browser cannot choose the user id, handle, or wallet to authorize. | `lib/server/privy.ts`, `lib/server/gate.ts` |
 | Clubs | Membership, roles, moderation, and Holder checks are keyed to the Privy user. Linked Ethereum wallets are synchronized so a wallet unlink stops counting for Holder status. | `/clubs`, `/clubs/[address]`, `lib/server/members.ts` |
@@ -35,11 +35,11 @@ The implementation is deliberately fail-closed at the integration boundary:
 The header's wallet control renders one of two modes, selected at build time:
 
 1. **Privy mode** when `NEXT_PUBLIC_PRIVY_APP_ID` is set. The button reads **Sign in**. A user
-   can sign in, connect a linked wallet, switch the active wallet, open `/account`, or sign out.
+   can sign in, connect a linked wallet, switch the active wallet, open `/settings`, or sign out.
 2. **Injected-wallet mode** when the app id is absent. The button reads **Connect wallet**; wagmi
    exposes installed EIP-6963 wallets and there is no Privy account or linked-account screen.
 
-In both modes a wallet on another chain sees **Switch to Monad Testnet**. `components/Providers.tsx`
+In both modes a wallet on another chain sees **Switch to Monad Testnet** (**Switch to Monad** in the mainnet flavor). `components/Providers.tsx`
 wraps the app in `PrivyProvider` and `@privy-io/wagmi`'s `WagmiProvider` in Privy mode, and in
 wagmi's own `WagmiProvider` otherwise.
 
@@ -48,12 +48,13 @@ in the current browser. The header offers **Connect wallet** or **Link a wallet*
 different from silently creating an embedded wallet: embedded creation only happens when the
 explicit environment flag and dashboard setting enable it.
 
-The `/account` page has three relevant states:
+The `/settings` page (Account settings) has three relevant states:
 
 - Privy is not configured: explains that the app is using an installed wallet.
 - Privy is configured but the user is signed out: offers **Sign in**.
 - The user is signed in: shows linked social/email accounts, linked wallets, active-wallet
-  switching, optional embedded-wallet export, and the shared-profile controls.
+  switching, Club rewards and optional embedded-wallet export. The shared-handle, avatar and
+  name controls are on the owner's own profile page ([ADR 0042](adr/0042-profile-page.md)).
 
 Unlinking a wallet removes it from Privy sign-in and from the app's linked-wallet identity
 set; it does not destroy the wallet or move its assets.

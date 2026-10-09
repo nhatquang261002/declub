@@ -1,14 +1,6 @@
 import type { Address, Hex } from "viem";
 import { POOL_URL } from "./config";
-import {
-  intentToWire,
-  parsePoolIntent,
-  parseSettlement,
-  type Intent,
-  type IntentStatus,
-  type PoolIntent,
-  type Settlement,
-} from "./intents";
+import { intentToWire, parsePoolIntent, parseSettlement, type Intent, type IntentStatus, type PoolIntent, type Settlement } from "./intents";
 
 // The intent pool's HTTP API (matcher/README.md). The pool is not trusted for safety, only
 // for liveness: everything it returns is re-checked here (parsePoolIntent recomputes hashes).
@@ -66,7 +58,7 @@ async function call(path: string, init?: RequestInit): Promise<unknown> {
   return body;
 }
 
-export type PoolInfo = { chainId: number; swap: string; matcher: string | null; maxCycle: number };
+type PoolInfo = { chainId: number; swap: string; matcher: string | null; maxCycle: number };
 
 export async function getInfo(): Promise<PoolInfo> {
   const body = (await call("/info")) as Partial<PoolInfo>;
@@ -107,11 +99,7 @@ export async function getIntent(hash: Hex): Promise<PoolIntent | null> {
 }
 
 /** Settled cycles, newest first. `token` keeps the ones that name that token. */
-export async function listSettlements({
-  maker,
-  token,
-  limit = 50,
-}: { maker?: Address; token?: Address; limit?: number } = {}): Promise<Settlement[]> {
+export async function listSettlements({ maker, token, limit = 50 }: { maker?: Address; token?: Address; limit?: number } = {}): Promise<Settlement[]> {
   const q = new URLSearchParams({ limit: String(limit) });
   if (maker) q.set("maker", maker);
   if (token) q.set("token", token);

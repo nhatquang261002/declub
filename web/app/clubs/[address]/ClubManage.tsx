@@ -15,6 +15,7 @@ import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
 import { Panel } from "./parts";
+import { RewardSettings } from "./RewardSettings";
 import { CopyAddress } from "@/components/CopyAddress";
 
 /** What a log line says, in words. */
@@ -37,6 +38,13 @@ const ACTIONS: Record<string, string> = {
   edit_profile: "edited the Club page",
   link_x: "linked the X account",
   unlink_x: "unlinked the X account",
+  edit_rules: "changed the reward rules",
+  reward_ban: "banned from rewards:",
+  reward_unban: "lifted the rewards ban on",
+  create_challenge: "started a challenge:",
+  cancel_challenge: "cancelled a challenge:",
+  settle_challenge: "settled a challenge:",
+  prize_sent: "sent a challenge prize:",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
@@ -96,7 +104,7 @@ function PageEditor({ token }: { token: string }) {
           onChange={(e) => setDraft({ ...current, holdersOnlyPosts: e.target.checked })}
         />
         <span>
-          <span className="font-bold">Only holders can post</span>
+          <span className="font-bold">Only Holders can post</span>
           <span className="block text-xs text-muted">Members who don’t hold the asset can still read and report. Moderators can always post.</span>
         </span>
       </label>
@@ -145,12 +153,15 @@ function CoinEditor({ token, coin }: { token: string; coin: ClubCoin }) {
       }}
     >
       <label className="flex items-start gap-3 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
-        <input type="checkbox" className="mt-0.5 size-4 accent-[#d83b45]" checked={current.on} onChange={(e) => setDraft({ ...current, on: e.target.checked })} />
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-[#d83b45]"
+          checked={current.on}
+          onChange={(e) => setDraft({ ...current, on: e.target.checked })}
+        />
         <span>
           <span className="font-bold">Holding {coin.symbol} makes a member a Holder</span>
-          <span className="block text-xs text-muted">
-            Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.
-          </span>
+          <span className="block text-xs text-muted">Off: only the collection’s NFTs earn the badge. Either way, Club Rewards are shared by NFTs only.</span>
         </span>
       </label>
       {current.on && (
@@ -205,13 +216,23 @@ function XEditor({ token }: { token: string }) {
           <ul className="flex flex-col gap-1.5">
             {accounts.map((a) => (
               <li key={a.handle} className="flex flex-wrap items-center gap-2 text-sm">
-                <a className="inline-flex items-center gap-1.5 font-bold hover:underline" href={`https://x.com/${a.handle}`} target="_blank" rel="noopener noreferrer">
+                <a
+                  className="inline-flex items-center gap-1.5 font-bold hover:underline"
+                  href={`https://x.com/${a.handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <XLogoIcon className="size-3.5" />@{a.handle} ✓
                 </a>
                 <a className="text-xs text-muted hover:underline" href={`https://x.com/i/status/${a.proof}`} target="_blank" rel="noopener noreferrer">
                   proof
                 </a>
-                <button type="button" className="ml-auto text-xs font-bold text-muted hover:text-danger" disabled={xUnlink.isPending} onClick={() => xUnlink.mutate(a.handle)}>
+                <button
+                  type="button"
+                  className="ml-auto text-xs font-bold text-muted hover:text-danger"
+                  disabled={xUnlink.isPending}
+                  onClick={() => xUnlink.mutate(a.handle)}
+                >
                   Unlink
                 </button>
               </li>
@@ -241,8 +262,8 @@ function XEditor({ token }: { token: string }) {
         {proof && (
           <div className="flex flex-col gap-2 rounded-xl border-2 border-[#111318]/15 bg-white/60 p-3 text-sm">
             <p>
-              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete
-              the post once it’s linked.
+              Post this from <span className="font-bold">@{proof.handle}</span>, then paste the post’s link. The code is good for 24 hours; you can delete the
+              post once it’s linked.
             </p>
             <p className="rounded-lg bg-white p-2 font-mono text-xs break-all">{proof.text}</p>
             <a
@@ -260,7 +281,13 @@ function XEditor({ token }: { token: string }) {
                 xVerify.mutate({ handle: proof.handle, url }, { onSuccess: () => (setProof(null), setHandle("")) });
               }}
             >
-              <input className={`${field} min-w-48 flex-1`} value={url} inputMode="url" placeholder="https://x.com/…/status/…" onChange={(e) => setUrl(e.target.value)} />
+              <input
+                className={`${field} min-w-48 flex-1`}
+                value={url}
+                inputMode="url"
+                placeholder="https://x.com/…/status/…"
+                onChange={(e) => setUrl(e.target.value)}
+              />
               <button type="submit" className="btn-primary btn-sm" aria-busy={xVerify.isPending} disabled={xVerify.isPending || url.trim().length === 0}>
                 {xVerify.isPending && <Spinner />}
                 {xVerify.isPending ? "Checking…" : "Check and link"}
@@ -290,7 +317,11 @@ function XEditor({ token }: { token: string }) {
             : `Up to ${MAX_X_TAGS}, separated by spaces. A post that only matches a tag counts half. The Club’s ticker is always one.`}
         </span>
         {page?.x?.hint && <span className="text-xs text-muted">Right now a member’s own X post counts when it {page.x.hint}.</span>}
-        <button type="submit" className="btn-secondary btn-sm mt-1 w-fit" disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}>
+        <button
+          type="submit"
+          className="btn-secondary btn-sm mt-1 w-fit"
+          disabled={profile.isPending || tags === null || !!badTag || parsed.length > MAX_X_TAGS}
+        >
           Save tags
         </button>
       </form>
@@ -300,8 +331,8 @@ function XEditor({ token }: { token: string }) {
 
 /** The staff view: the Club's page text, bans, the moderation log, and claiming ownership. */
 export function ClubManage({ token, role, now }: { token: string; role: ViewerRole; now: number }) {
-  const { log, ownership, bans, isLoading } = useClubStaff(token, true);
-  const { unban } = useClubActions(token);
+  const { log, ownership, bans, reported, isLoading } = useClubStaff(token, true);
+  const { unban, hide, remove } = useClubActions(token);
   const page = useClubPage(token);
   const owner = isOwnerOrAdmin(role);
   const banned = bans ? [...bans.club.map((b) => ({ ...b, everywhere: false })), ...bans.everywhere.map((b) => ({ ...b, everywhere: true }))] : [];
@@ -311,9 +342,14 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
       {ownership?.changed && (
         <Alert tone="warn" title="Ownership changed on-chain">
           The Owner claimed this Club as <CopyAddress address={ownership.claimed} />, but the contract’s owner() is now{" "}
-          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold the Club.
+          {ownership.onchain ? <CopyAddress address={ownership.onchain} /> : <span className="font-mono">unreadable or removed</span>}. Review who should hold
+          the Club.
         </Alert>
       )}
+
+      <Panel title="Rewards">
+        <RewardSettings token={token} owner={owner} now={now} />
+      </Panel>
 
       {owner && (
         <Panel title="Club page">
@@ -332,6 +368,46 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
           <XEditor token={token} />
         </Panel>
       )}
+
+      <Panel title={`Reported${reported.length ? ` · ${reported.length}` : ""}`}>
+        <p className="-mt-1 mb-3 text-xs text-muted">
+          Reports never hide a post by themselves: a hidden post’s backing counts for nothing, so only a moderator decides. Holders’ reports are counted apart.
+        </p>
+        {reported.length === 0 ? (
+          <p className="text-sm text-muted">Nothing is waiting for review.</p>
+        ) : (
+          <ul className="-mx-5 divide-y divide-[#111318]/10 border-y border-[#111318]/10">
+            {reported.map(({ post, reports, holderReports }) => (
+              <li key={post.id} className="flex flex-col gap-2 px-5 py-3 text-sm">
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <WalletAvatar seed={post.wallet} size="1.5rem" />
+                  <Who address={post.wallet} />
+                  {post.parent && <span className="chip">Reply</span>}
+                  {post.hidden && <span className="chip chip-warn">Hidden</span>}
+                  <span className="text-xs text-muted">
+                    {reports} {reports === 1 ? "report" : "reports"}
+                    {holderReports > 0 && ` · ${holderReports} from Holders or staff`} · {ago(Math.floor(post.at / 1000), now)}
+                  </span>
+                </p>
+                {post.text !== null && <p className="break-words whitespace-pre-wrap">{post.text}</p>}
+                <div className="flex flex-wrap gap-2">
+                  {!post.hidden && (
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => hide.mutate({ id: post.id, hidden: true })}>
+                      Hide
+                    </button>
+                  )}
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => hide.mutate({ id: post.id, hidden: false })}>
+                    {post.hidden ? "Restore" : "Dismiss reports"}
+                  </button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => remove.mutate(post.id)}>
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
       <Panel title={`Bans${banned.length ? ` · ${banned.length}` : ""}`}>
         {banned.length === 0 ? (
@@ -369,7 +445,12 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
                 <p className="flex flex-wrap items-baseline gap-x-1.5">
                   <CopyAddress address={entry.actor} className="text-xs font-bold" />
                   <span>{ACTIONS[entry.action] ?? entry.action}</span>
-                  {entry.target && (entry.target.length > 20 ? <CopyAddress address={entry.target} className="text-xs" /> : <span className="font-mono text-xs break-all">{entry.target}</span>)}
+                  {entry.target &&
+                    (entry.target.length > 20 ? (
+                      <CopyAddress address={entry.target} className="text-xs" />
+                    ) : (
+                      <span className="font-mono text-xs break-all">{entry.target}</span>
+                    ))}
                   {entry.detail && <span className="text-xs text-muted">({entry.detail})</span>}
                 </p>
                 <p className="text-xs text-muted">{ago(Math.floor(entry.at / 1000), now)}</p>

@@ -3,13 +3,7 @@
 import type { ReactNode } from "react";
 import { Select, type SelectOption } from "@/components/Select";
 import { Tabs, type TabOption } from "@/components/Tabs";
-import {
-  DEFAULT_FILTERS,
-  isFiltering,
-  type MonFilter,
-  type DealFilters,
-  type DealSort,
-} from "@/lib/dealFilters";
+import { DEFAULT_FILTERS, isFiltering, type MonFilter, type DealFilters, type DealSort } from "@/lib/dealFilters";
 import type { DealTab } from "@/lib/dealBook";
 
 const MON_OPTIONS: Array<SelectOption<MonFilter>> = [
@@ -24,17 +18,7 @@ const SORT_OPTIONS: Array<SelectOption<DealSort>> = [
 ];
 
 /** Open · For you · All, with live counts on the first two. */
-export function DealTabs({
-  tab,
-  onTab,
-  openCount,
-  forYouCount,
-}: {
-  tab: DealTab;
-  onTab: (tab: DealTab) => void;
-  openCount: number;
-  forYouCount: number;
-}) {
+export function DealTabs({ tab, onTab, openCount, forYouCount }: { tab: DealTab; onTab: (tab: DealTab) => void; openCount: number; forYouCount: number }) {
   const tabs: Array<TabOption<DealTab>> = [
     { value: "open", label: `Open (${openCount})` },
     { value: "for-you", label: `For you (${forYouCount})` },
@@ -66,20 +50,8 @@ export function DealFilterBar({
         value={filters.query}
         onChange={(e) => onChange({ query: e.target.value })}
       />
-      <Select
-        className="w-auto"
-        aria-label="Filter by MON"
-        value={filters.mon}
-        options={MON_OPTIONS}
-        onChange={(mon) => onChange({ mon })}
-      />
-      <Select
-        className="w-auto"
-        aria-label="Sort deals"
-        value={filters.sort}
-        options={SORT_OPTIONS}
-        onChange={(sort) => onChange({ sort })}
-      />
+      <Select className="w-auto" aria-label="Filter by MON" value={filters.mon} options={MON_OPTIONS} onChange={(mon) => onChange({ mon })} />
+      <Select className="w-auto" aria-label="Sort deals" value={filters.sort} options={SORT_OPTIONS} onChange={(sort) => onChange({ sort })} />
       {extra}
       {isFiltering(filters) && (
         <button type="button" className="btn-secondary" onClick={() => onChange(DEFAULT_FILTERS)}>

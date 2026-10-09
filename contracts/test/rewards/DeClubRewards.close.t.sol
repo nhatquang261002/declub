@@ -58,7 +58,9 @@ contract DeClubRewardsCloseTest is DeClubRewardsBase {
         vm.prank(address(refuser));
         rewards.publish{value: 6 ether}(1, d.root);
         vm.prank(address(refuser));
-        vm.expectRevert(abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(refuser)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDeClubRewards.PayoutFailed.selector, address(refuser))
+        );
         rewards.revoke(1);
         // Nothing changed: the epoch is still there with its MON.
         assertEq(rewards.epochs(1).total, 6 ether);

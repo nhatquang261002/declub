@@ -4,7 +4,7 @@ import { toAsset, type Asset, type RawAsset } from "./assets";
 export type ProposalStatus = "active" | "accepted" | "withdrawn" | "rejected";
 
 /** A taker's answer to an open offer (DeClubEscrow.Proposal). `assets` sit in escrow while it is active. */
-export type ProposalV2 = {
+export type Proposal = {
   dealId: bigint;
   /** Index within the deal, oldest first. */
   id: bigint;
@@ -14,12 +14,12 @@ export type ProposalV2 = {
 };
 
 /** The shape `getProposal` / `getProposals` return (IDeClubEscrow.Proposal). */
-export type RawProposal = { proposer: Address; status: number; assets: readonly RawAsset[] };
+type RawProposal = { proposer: Address; status: number; assets: readonly RawAsset[] };
 
 const STATUS: Record<number, ProposalStatus> = { 1: "active", 2: "accepted", 3: "withdrawn", 4: "rejected" };
 
 /** null for status None or an asset type this build doesn't know. */
-export function toProposal(dealId: bigint, id: bigint, raw: RawProposal): ProposalV2 | null {
+export function toProposal(dealId: bigint, id: bigint, raw: RawProposal): Proposal | null {
   const status = STATUS[raw.status];
   if (!status) return null;
   const assets = raw.assets.map(toAsset);

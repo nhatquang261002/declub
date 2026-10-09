@@ -13,9 +13,9 @@ export const xApiConfigured = () => Boolean(token());
 const API = "https://api.x.com/2";
 const FETCH_TIMEOUT_MS = 15_000;
 /** The most ids one /2/tweets call takes. */
-export const X_IDS_PER_CALL = 100;
+const X_IDS_PER_CALL = 100;
 
-export type XApiDeps = { fetch?: typeof fetch; token?: string };
+type XApiDeps = { fetch?: typeof fetch; token?: string };
 
 /** One post as the reach read needs it. */
 export type XApiPost = {

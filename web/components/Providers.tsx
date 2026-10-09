@@ -10,9 +10,7 @@ import { chain, wagmiConfig } from "@/lib/wagmi";
 import { ToastProvider } from "./Toast";
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { staleTime: 4_000 } } }),
-  );
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 4_000 } } }));
 
   const app = <ToastProvider>{children}</ToastProvider>;
 

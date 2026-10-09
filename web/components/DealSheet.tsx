@@ -9,7 +9,7 @@ import { Who } from "./Who";
 /**
  * The pieces of a deal's page (globals.css, "Deals"): a sheet with a stamped status, the two
  * sides on a stage, the terms as facts, and a dock with what this wallet can do next. Locked
- * deals, V2 deals and signed swaps all build their page from these, so they read as one thing.
+ * deals and signed swaps all build their page from these, so they read as one thing.
  */
 
 /** What a stamp can show. Locked deals use their display status; signed swaps map onto these. */
@@ -35,10 +35,7 @@ export function DealStamp({ status, label, note }: { status: StampStatus; label:
 
 export function BackToDeals() {
   return (
-    <Link
-      href="/deals"
-      className="mb-4 inline-flex items-center gap-1.5 rounded-full px-1 text-sm font-bold text-muted transition-colors hover:text-accent"
-    >
+    <Link href="/deals" className="mb-4 inline-flex items-center gap-1.5 rounded-full px-1 text-sm font-bold text-muted transition-colors hover:text-accent">
       <ArrowLeftIcon className="size-4" />
       All deals
     </Link>
@@ -50,17 +47,7 @@ export function DealSheet({ children }: { children: ReactNode }) {
 }
 
 /** Kind chips, the big title, who made it, and the stamp on the right. */
-export function DealSheetHead({
-  chips,
-  title,
-  byline,
-  stamp,
-}: {
-  chips?: ReactNode;
-  title: ReactNode;
-  byline?: ReactNode;
-  stamp: ReactNode;
-}) {
+export function DealSheetHead({ chips, title, byline, stamp }: { chips?: ReactNode; title: ReactNode; byline?: ReactNode; stamp: ReactNode }) {
   return (
     <header className="deal-sheet-head">
       <div className="min-w-0 space-y-3">
@@ -84,17 +71,7 @@ export function DealTitle({ prefix = "Deal", id }: { prefix?: string; id: ReactN
 }
 
 /** The two sides with a seal between them. `live` turns the seal's ring while it can be taken. */
-export function DealStage({
-  status,
-  live,
-  gives,
-  wants,
-}: {
-  status: StampStatus;
-  live: boolean;
-  gives: ReactNode;
-  wants: ReactNode;
-}) {
+export function DealStage({ status, live, gives, wants }: { status: StampStatus; live: boolean; gives: ReactNode; wants: ReactNode }) {
   return (
     <div className="deal-stage" data-status={status}>
       {gives}
@@ -174,9 +151,7 @@ export function DealByline({
           {expiry === 0n ? (
             "no expiry"
           ) : (
-            <span className={left < 3_600 ? "font-bold text-danger" : "font-semibold text-[#111318]"}>
-              ends in {countdown(expiry, now)}
-            </span>
+            <span className={left < 3_600 ? "font-bold text-danger" : "font-semibold text-[#111318]"}>ends in {countdown(expiry, now)}</span>
           )}
         </>
       )}
@@ -184,7 +159,7 @@ export function DealByline({
   );
 }
 
-export type Fact = { label: string; value: ReactNode; hint?: ReactNode };
+type Fact = { label: string; value: ReactNode; hint?: ReactNode };
 
 /** The terms, as a row of facts along the bottom of the sheet. */
 export function DealFacts({ facts }: { facts: readonly Fact[] }) {
@@ -232,7 +207,7 @@ export function DealDock({
   );
 }
 
-export type Step = { label: string; state: "done" | "current" | "todo" };
+type Step = { label: string; state: "done" | "current" | "todo" };
 
 /** Where a taker is in accepting: connect, choose, approve, swap. */
 export function DealSteps({ steps }: { steps: readonly Step[] }) {

@@ -1,4 +1,5 @@
 import { linkedEthereumWallets } from "../profiles";
+import { syncAbout } from "./about";
 import { syncAvatar } from "./avatars";
 import { syncMemberships } from "./members";
 import { syncProfile } from "./profileSync";
@@ -11,7 +12,7 @@ import type { Store } from "./store";
  */
 
 /** Looks a user's current linked accounts up at Privy. `null` when the user no longer exists. */
-export type LoadAccounts = (userId: string) => Promise<readonly { type: string }[] | null>;
+type LoadAccounts = (userId: string) => Promise<readonly { type: string }[] | null>;
 
 const SYNC_EVENTS = new Set([
   "user.linked_account",
@@ -25,7 +26,7 @@ const SYNC_EVENTS = new Set([
 const ID = /^[A-Za-z0-9]{1,64}$/;
 
 /** The user ids an event says may have changed. Anything that isn't a plain id is ignored. */
-export function affectedUsers(event: unknown): string[] {
+function affectedUsers(event: unknown): string[] {
   if (typeof event !== "object" || event === null) return [];
   const e = event as Record<string, unknown>;
   if (typeof e.type !== "string" || !SYNC_EVENTS.has(e.type)) return [];
@@ -53,6 +54,8 @@ export async function handlePrivyEvent(event: unknown, store: Store, load: LoadA
     await syncMemberships(store, userId, linkedEthereumWallets(accounts ?? []));
     // So does the avatar (ADR 0028): it leaves an unlinked wallet, and an NFT one leaves with its holder.
     await syncAvatar(store, userId, linkedEthereumWallets(accounts ?? []));
+    // And the name and bio on the profile page (ADR 0042) follow the wallets the same way.
+    await syncAbout(store, userId, linkedEthereumWallets(accounts ?? []));
   }
   return users;
 }

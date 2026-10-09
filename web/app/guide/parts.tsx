@@ -1,20 +1,21 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CheckIcon, SwapIcon, UsersIcon } from "@/components/Icons";
+import { CheckIcon, SwapIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import { SUPPORT_MAILTO, X_HANDLE, X_URL } from "@/lib/contact";
 
-// The Guide has two bases side by side, Deals (/guide) and Clubs (/guide/clubs), and both share this
+// The Guide has two bases side by side, Clubs (/guide, the app's purpose, so it comes first) and Deals (/guide/deals), and both share this
 // frame: a hero with the switch between them, a numbered contents list, and sections that read like a short manual. Button names
 // are in bold so they match the screens. docs/07-user-guide.md is the longer version of both.
 
-export const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf] shadow-[0.3rem_0.3rem_0_rgb(0_0_0/0.16)]";
+export const CARD = "rounded-xl border-2 border-[#111318] bg-[#fff4cf]";
 export const MUTED = "text-[#4e5968]";
 
 export type GuideSection = { id: string; label: string };
 type GuideBase = "deals" | "clubs";
 
 const BASES: ReadonlyArray<{ key: GuideBase; href: string; label: string; icon: ReactNode }> = [
-  { key: "deals", href: "/guide", label: "Deals", icon: <SwapIcon className="size-4" /> },
-  { key: "clubs", href: "/guide/clubs", label: "Clubs", icon: <UsersIcon className="size-4" /> },
+  { key: "clubs", href: "/guide", label: "Clubs", icon: <UsersIcon className="size-4" /> },
+  { key: "deals", href: "/guide/deals", label: "Deals", icon: <SwapIcon className="size-4" /> },
 ];
 
 function BaseSwitch({ base }: { base: GuideBase }) {
@@ -141,7 +142,9 @@ export function Section({
           </span>
           {sections[index]?.label}
         </p>
-        <h2 id={`${id}-title`} className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{title}</h2>
+        <h2 id={`${id}-title`} className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">
+          {title}
+        </h2>
         {intro && <p className="mt-2 max-w-2xl leading-7 text-muted">{intro}</p>}
       </header>
       {children}
@@ -155,9 +158,7 @@ export function CardGrid({ items, cols = 3 }: { items: ReadonlyArray<{ title: st
     <ul className={`grid gap-4 ${cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
       {items.map((item) => (
         <li key={item.title} className={`${CARD} p-5`}>
-          {item.icon && (
-            <span className="mb-4 grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">{item.icon}</span>
-          )}
+          {item.icon && <span className="mb-4 grid size-9 place-items-center rounded-full border-2 border-[#111318] bg-peach">{item.icon}</span>}
           <h3 className="font-black">{item.title}</h3>
           <p className={`mt-1.5 text-sm leading-6 ${MUTED}`}>{item.body}</p>
         </li>
@@ -166,7 +167,26 @@ export function CardGrid({ items, cols = 3 }: { items: ReadonlyArray<{ title: st
   );
 }
 
-export function Checklist({ items }: { items: readonly string[] }) {
+/** Numbered steps in one card, read top to bottom. */
+export function Steps({ items }: { items: ReadonlyArray<{ title: string; body: ReactNode }> }) {
+  return (
+    <ol className={`${CARD} divide-y divide-[#111318]/10`}>
+      {items.map((step, i) => (
+        <li key={step.title} className="flex gap-4 p-5 sm:p-6">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#111318] bg-accent text-sm font-black text-white">
+            {i + 1}
+          </span>
+          <div>
+            <h3 className="font-black">{step.title}</h3>
+            <p className={`mt-1 text-sm leading-6 ${MUTED}`}>{step.body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Checklist({ items }: { items: readonly string[] }) {
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
       {items.map((line) => (
@@ -181,14 +201,16 @@ export function Checklist({ items }: { items: readonly string[] }) {
   );
 }
 
-export function Faq({ items }: { items: ReadonlyArray<readonly [string, string]> }) {
+function Faq({ items }: { items: ReadonlyArray<readonly [string, string]> }) {
   return (
     <div className={`${CARD} divide-y divide-[#111318]/10`}>
       {items.map(([question, answer]) => (
         <details key={question} className="group px-5 sm:px-6">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-bold">
             {question}
-            <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>+</span>
+            <span className="text-xl font-normal text-accent transition-transform group-open:rotate-45" aria-hidden>
+              +
+            </span>
           </summary>
           <p className={`pb-5 pr-8 text-sm leading-6 ${MUTED}`}>{answer}</p>
         </details>
@@ -198,20 +220,57 @@ export function Faq({ items }: { items: ReadonlyArray<readonly [string, string]>
 }
 
 /** The end of a guide: a link to the other one, and how to reach support. */
-export function GuideFooter({ other }: { other: { href: string; title: string; body: string } }) {
+function GuideFooter({ other }: { other: { href: string; title: string; body: string } }) {
   return (
     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
       <Link href={other.href} className={`${CARD} group block p-6 transition-transform hover:-translate-y-0.5`}>
         <p className="text-xs font-black tracking-[0.16em] text-[#a9282f] uppercase">Also in the Guide</p>
         <p className="mt-2 text-xl font-black">
-          {other.title} <span aria-hidden className="inline-block transition-transform group-hover:translate-x-1">→</span>
+          {other.title}{" "}
+          <span aria-hidden className="inline-block transition-transform group-hover:translate-x-1">
+            →
+          </span>
         </p>
         <p className={`mt-1 text-sm ${MUTED}`}>{other.body}</p>
       </Link>
       <div className={`${CARD} flex flex-col justify-center gap-3 p-6`}>
         <p className="font-black">Still stuck?</p>
-        <a href="mailto:support@declub.app" className="btn-secondary">Contact support</a>
+        <a href={SUPPORT_MAILTO} className="btn-secondary">
+          Contact support
+        </a>
+        <a href={X_URL} target="_blank" rel="noreferrer" className="btn-secondary">
+          <XLogoIcon /> @{X_HANDLE}
+        </a>
       </div>
     </div>
+  );
+}
+
+/** The last stretch every guide shares: its safety checklist, the questions and a link to the other guide. */
+export function GuideEnd({
+  sections,
+  safetyTitle,
+  safety,
+  faq,
+  other,
+}: {
+  sections: readonly GuideSection[];
+  safetyTitle: string;
+  safety: readonly string[];
+  faq: ReadonlyArray<readonly [string, string]>;
+  other: { href: string; title: string; body: string };
+}) {
+  return (
+    <>
+      <Section sections={sections} id="safety" title={safetyTitle}>
+        <Checklist items={safety} />
+      </Section>
+
+      <Section sections={sections} id="faq" title="Questions, answered">
+        <Faq items={faq} />
+      </Section>
+
+      <GuideFooter other={other} />
+    </>
   );
 }

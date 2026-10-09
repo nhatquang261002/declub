@@ -26,7 +26,7 @@ const ERC721 = "0x80ac58cd";
 const ENUMERABLE = "0x780e9d63";
 
 /** Bigger collections are refused: a partial set would silently leave tokens out of a deal. */
-export const MAX_SCAN_TOKENS = 10_000;
+const MAX_SCAN_TOKENS = 10_000;
 const URI_BATCH = 100;
 const FETCH_CONCURRENCY = 24;
 const FETCH_TIMEOUT_MS = 8_000;
@@ -39,7 +39,7 @@ const MAX_JOBS = 3;
  * purpose; past this, the tokens not yet read count as `failed` and the scan ends with what it has,
  * so a few hostile collections can't hold every slot for long.
  */
-export const JOB_BUDGET_MS = 3 * 60_000;
+const JOB_BUDGET_MS = 3 * 60_000;
 const READY_TTL_MS = 10 * 60_000;
 const FAILED_TTL_MS = 2 * 60_000;
 
@@ -52,11 +52,8 @@ export type WireCatalog = {
   failed: number;
 };
 
-export type ScanSnapshot =
-  | { state: "scanning"; done: number; total: number }
-  | { state: "ready"; catalog: WireCatalog }
-  | { state: "unsupported"; reason: string }
-  | { state: "busy" };
+type ScanSnapshot =
+  { state: "scanning"; done: number; total: number } | { state: "ready"; catalog: WireCatalog } | { state: "unsupported"; reason: string } | { state: "busy" };
 
 type Job = { snapshot: ScanSnapshot; expires: number };
 const jobs = new Map<string, Job>();
@@ -120,7 +117,8 @@ async function run(collection: Address, job: Job, budget: AbortSignal) {
   const supply = await rpc.readContract({ address, abi, functionName: "totalSupply" }).catch(() => null);
   if (supply === null) throw new Unsupported("This collection doesn't say how many tokens it has, so its traits can't be listed.");
   if (supply === 0n) throw new Unsupported("This collection has no tokens yet.");
-  if (supply > BigInt(MAX_SCAN_TOKENS)) throw new Unsupported(`This collection has more than ${MAX_SCAN_TOKENS.toLocaleString()} tokens, which is more than trait requests support for now.`);
+  if (supply > BigInt(MAX_SCAN_TOKENS))
+    throw new Unsupported(`This collection has more than ${MAX_SCAN_TOKENS.toLocaleString()} tokens, which is more than trait requests support for now.`);
   const total = Number(supply);
 
   const enumerable = (await rpc.readContract({ address, abi, functionName: "supportsInterface", args: [ENUMERABLE] }).catch(() => false)) === true;
@@ -199,7 +197,10 @@ async function enumerate(rpc: PublicClient, address: Address, total: number): Pr
 /** Without enumeration, assume ids run 0..n-1 or 1..n, and check the assumption on the last id. */
 async function sequential(rpc: PublicClient, address: Address, total: number): Promise<bigint[]> {
   const exists = (id: number) =>
-    rpc.readContract({ address, abi, functionName: "ownerOf", args: [BigInt(id)] }).then(() => true, () => false);
+    rpc.readContract({ address, abi, functionName: "ownerOf", args: [BigInt(id)] }).then(
+      () => true,
+      () => false,
+    );
   const from = (await exists(0)) ? 0 : 1;
   if (!(await exists(from + total - 1)) || (await exists(from + total))) {
     throw new Unsupported("This collection's token ids aren't a simple 0..n or 1..n range, so they can't be listed without an index.");
@@ -208,7 +209,6 @@ async function sequential(rpc: PublicClient, address: Address, total: number): P
 }
 
 // ── Metadata ───────────────────────────────────────────────────────────────────────────────────
-
 
 /**
  * Addresses a metadata fetch must never reach: loopback, private (RFC 1918), CGNAT, link-local
@@ -219,15 +219,39 @@ async function sequential(rpc: PublicClient, address: Address, total: number): P
  */
 const BLOCKED_V4 = new BlockList();
 for (const [net, prefix] of [
-  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12],
-  ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.88.99.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15],
-  ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
-] as const) BLOCKED_V4.addSubnet(net, prefix, "ipv4");
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],
+  ["192.88.99.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["198.51.100.0", 24],
+  ["203.0.113.0", 24],
+  ["224.0.0.0", 4],
+  ["240.0.0.0", 4],
+] as const)
+  BLOCKED_V4.addSubnet(net, prefix, "ipv4");
 const BLOCKED_V6 = new BlockList();
 for (const [net, prefix] of [
-  ["::", 96], ["::ffff:0:0", 96], ["64:ff9b::", 96], ["64:ff9b:1::", 48], ["100::", 64], ["2001::", 23],
-  ["2001:db8::", 32], ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
-] as const) BLOCKED_V6.addSubnet(net, prefix, "ipv6");
+  ["::", 96],
+  ["::ffff:0:0", 96],
+  ["64:ff9b::", 96],
+  ["64:ff9b:1::", 48],
+  ["100::", 64],
+  ["2001::", 23],
+  ["2001:db8::", 32],
+  ["2002::", 16],
+  ["fc00::", 7],
+  ["fe80::", 10],
+  ["fec0::", 10],
+  ["ff00::", 8],
+] as const)
+  BLOCKED_V6.addSubnet(net, prefix, "ipv6");
 BLOCKED_V6.addAddress("::1", "ipv6");
 
 /** Whether `ip` (a literal address) is a public unicast address a fetch may go to. */

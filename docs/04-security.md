@@ -4,7 +4,7 @@
 
 > **Every escrowed asset has a deterministic path to settlement or refund. Nothing is ever locked forever.**
 
-The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow) and [`DeClubIntents`](#declubintents) each have their own invariants, threats and tests. The first contract, a Chog-only escrow (v1), was deleted in [ADR 0021](adr/0021-declub-pivot.md); its record is in git history.
+The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow) and [`DeClubIntents`](#declubintents) each have their own invariants, threats and tests.
 
 ## Trust model
 
@@ -22,7 +22,7 @@ The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow
 
 `forge lint` is clean. Intentional patterns are suppressed inline with a reason, so any new finding stands out.
 
-**Slither 0.11.4 on everything** (`slither . --filter-paths "lib/|test/|script/|src/mocks/"`, run 2026-10-03 over `DeClubEscrow`, `DeClubIntents`, `FeeAdmin` and the since-deleted v1) returned 102 results, none of them a bug. The rows for v1 are left out:
+**Slither 0.11.4 on everything** (`slither . --filter-paths "lib/|test/|script/|src/mocks/"`, run 2026-10-03 over `DeClubEscrow`, `DeClubIntents` and `FeeAdmin`) returned 102 results, none of them a bug:
 
 | Detector | Impact | Where | Verdict |
 |---|---|---|---|
@@ -31,7 +31,7 @@ The trust model below covers both deal contracts. [`DeClubEscrow`](#declubescrow
 | `reentrancy-eth` ×8 | High | `DeClubEscrow` fill, accept, reject, withdraw, cancel, reclaim | **False positive**: every entry point is `nonReentrant` (Slither doesn't model OZ 5's storage-slot guard), and the only state written after a call is a credit for a send that *failed*. Covered by the re-entry tests in `DeClubEscrow.tokens.t.sol` and `DeClubEscrow.offers.t.sol`. |
 | `uninitialized-state` | High | `DeClubEscrow._proposals` | **False positive.** A mapping; entries are written in `propose`. |
 | `missing-zero-check` | Low | `FeeAdmin.transferFeeAdmin` | Intended: a zero `next` cancels a pending handover. |
-| `calls-loop` ×53, `timestamp` ×8 | Low | loops over a capped side; expiries and deadlines | Intended: sides are capped at 10 assets, one failing transfer must revert the whole deal, and deadlines are hours long. |
+| `calls-loop` ×53, `timestamp` ×8 | Low | loops over a capped side; expiries and deadlines | Intended: sides are capped at 10 assets and 5 NFTs, one failing transfer must revert the whole deal, and deadlines are hours long. |
 | `naming-convention` ×16, `low-level-calls` ×3, `cyclomatic-complexity` ×3 | Info | | `UPPER_CASE` immutables and constants, the deliberate `call`s in payouts, `_validateSide`. |
 
 **Slither 0.11.6 on `DeClubRewards`** (`slither src/DeClubRewards.sol --filter-paths lib/`, run 2026-10-06) returned 15 results, none of them a bug:
@@ -74,7 +74,7 @@ Recomputed from the trades themselves in `test/escrow/invariant/`, over native, 
 | V8 | `fillTrade` never settles an open offer, and every valid proposal call succeeds. |
 | Liveness | A fill the taker can pay, and any cancel by the maker, never reverts, even with a blocklisted recipient. An expired open trade can always be reclaimed. |
 
-**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)). The invariant suite starts with a 3 MON fee (ceiling 12), a fee recipient that sometimes rejects MON, and a fee admin that changes the fee during the run, so trades carry different fees. V1 becomes `balance == Σ native offered by Open trades + each Open trade's own fee, once for the trade and once per Active proposal + Σ native credits` (the recipient's credit included), and **V9** says the recipient holds exactly `2 × the trade's fee` per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler, at the trade's own fee. The fee suite (`DeClubEscrow.fee.t.sol`, 37 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a deal listed before a raise or a cut that fills, proposes and refunds at its own fee, a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
+**Protocol fee** ([ADR 0015](adr/0015-protocol-fee.md), [ADR 0018](adr/0018-adjustable-protocol-fee.md)). The invariant suite starts with a 3 MON fee (ceiling 12), a fee recipient that sometimes rejects MON, and a fee admin that changes the fee during the run, so trades carry different fees. V1 becomes `balance == Σ native offered by Open trades + each Open trade's own fee × its side's NFTs (at least one), for the trade and for each Active proposal + Σ native credits` ([ADR 0033](adr/0033-fee-per-nft.md)) (the recipient's credit included), and **V9** says the recipient holds exactly the trade's fee per NFT, both sides together (one unit for a side with none), per completed deal (a fill or an accepted proposal), as MON or as a credit, and nothing for a deal that was cancelled, reclaimed, rejected or withdrawn. Refunds and releases are checked per call in the handler, at the trade's own fee. The fee suite (`DeClubEscrow.fee.t.sol`, 37 tests) covers the exact `msg.value` on every payable entry, release on fill and accept, refund on cancel, reclaim, reject and withdraw (also after the offer ended), a deal listed before a raise or a cut that fills, proposes and refunds at its own fee, a recipient that rejects MON or tries to re-enter, the zero fee and the constructor guards.
 
 **Fee admin** (`FeeAdmin.t.sol`, 24 tests, run against both contracts): a cut applies at once and drops a queued raise, a raise only applies through `applyFee` after exactly 7 days and within the 7 days after that (`FeeRaiseExpired` once stale, so an old notice can't be used months on), a newer one restarts the clock, never above the ceiling, the two-step handover and its cancellation, renounce dropping any queued raise or handover, a zero admin at deploy, and everything a stranger or the recipient is refused. A fuzz test checks that the fee never exceeds the ceiling and never rises without the full delay.
 
@@ -101,16 +101,16 @@ Mutation checks: removing the credit on a failed payout, redirecting reclaimed a
 | **USDT-style token with no return value** | `SafeERC20` | `test_noReturnTokenWorksOnBothSides` |
 | **Unfillable trade** (same asset both sides, duplicates) | Rejected at creation | `test_revertsSameAssetOnBothSides`, `test_revertsDuplicateAssetOnOneSide` |
 | **Partial fill** | One asset failing reverts the whole fill | `test_fillIsAtomic` |
-| **Unbounded gas per trade** | `MAX_ASSETS_PER_SIDE = 10`; worst case measured at 2.2M create / 0.9M fill | `test_worstCaseGas` |
+| **Unbounded gas per trade** | `MAX_ASSETS_PER_SIDE = 10`, `MAX_NFTS_PER_SIDE = 5`; worst case measured at 1.24M create / 0.58M fill | `test_worstCaseGas` |
 
 ### Accepted limitations
 
-- **Any token can be listed.** A scam token only hurts whoever fills a trade that names it. The UI has to show the on-chain symbol, decimals and address.
+- **Any token can be listed.** A scam token only hurts whoever fills a trade that names it. The UI shows the on-chain symbol, decimals and address, and every asset's standing on the verified list ([ADR 0014](adr/0014-verified-collections-list.md), `web/lib/assetTrust.ts`): a person about to receive an unverified asset must tick that they've checked its address before **Approve** or **Accept & swap**, one named like a verified asset is flagged as a lookalike, and a blocked one can't be listed or accepted in the app. The contract still takes them all.
 - **A fee-charging token can still be *requested*.** The maker receives less than the listed amount. It's their own choice of token.
 - **A permanently blocked recipient** (the token itself blacklists them) keeps the credit in the escrow forever. The escrow can't do more than offer the claim.
 - **Gas-burning token or receiver.** One that burns all forwarded gas can make fills of *its own* trades fail. Takers lose gas, nobody loses assets.
-- **Approvals.** The app approves each ERC-20 to `DeClubEscrow` for the exact amount of the deal, not unlimited, and each NFT collection with `setApprovalForAll` (the only way to cover several ids in one transaction; `web/hooks/useAssetApprovals.ts`). For signed swaps it approves `DeClubIntents` for the exact ERC-20 amount (plus the fee), and each NFT on its own with `approve(id)` unless the maker chooses to approve the whole collection (`web/hooks/useIntentReadiness.ts`). The app has no revoke button.
-- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON), and the deploy scripts take whatever `PROTOCOL_FEE_MAX_WEI` says (they refuse to guess one), so check `MAX_FEE()` on the deployed contract. It can't touch a deal already listed, charge an intent more than its `maxFee`, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
+- **Approvals.** The app approves each ERC-20 to `DeClubEscrow` for the exact amount of the deal, not unlimited, and each NFT collection with `setApprovalForAll` (the only way to cover several ids in one transaction; `web/hooks/useAssetApprovals.ts`). For signed swaps it approves `DeClubIntents` for the exact ERC-20 amount (plus the fee), and each NFT on its own with `approve(id)` unless the maker chooses to approve the whole collection (`web/hooks/useIntentReadiness.ts`). A collection approval stays on until revoked, and the escrow only needs one inside the transaction that pulls the assets, so the deal page offers to revoke what's left once the wallet's part is done, and **Your approvals** (`/approvals`, in the wallet menu) lists and revokes every approval to either contract among the verified assets, recent collections, the fee token, what live signed swaps give and any address the person adds. The chain has no index of a wallet's approvals, so a contract outside those isn't found by itself, and a single-NFT `approve(id)` isn't listed (it ends when the NFT moves). Signed swaps default to a 1-hour deadline; choosing 7 days shows a warning.
+- **A compromised fee admin** can raise the fee to `MAX_FEE` after 7 days' public notice (`FeeChangeQueued`, then `applyFee`), or cut it to zero at once. The contract accepts any ceiling up to `MAX_FEE_LIMIT` (500 MON), and the deploy scripts take whatever `PROTOCOL_FEE_MAX_WEI` says (they refuse to guess one), so check `MAX_FEE()` on the deployed contract. The ceiling is per NFT, so a deal of 5 NFTs a side can be charged up to 5 × `MAX_FEE` by each side ([ADR 0033](adr/0033-fee-per-nft.md)); the delay and the notice are the same. It can't touch a deal already listed, charge an intent more than its `maxFee` for each NFT it gives, or move anyone's assets. Keep the admin Safe's signers apart from the recipient's, and watch for `FeeChangeQueued` ([ADR 0018](adr/0018-adjustable-protocol-fee.md)).
 - No external review yet.
 
 ### Test suite
@@ -133,7 +133,7 @@ contracts/test/escrow/
 contracts/test/utils/WeirdTokens.sol   fee, lying, soft, no-return, blocklist and hook tokens
 ```
 
-`test/escrow/` holds 202 tests plus the two invariant suites (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubEscrow.sol` is 100% of lines, statements, branches and functions.
+`test/escrow/` holds 206 tests plus the two invariant suites (unit, fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubEscrow.sol` is 100% of lines, statements, branches and functions.
 
 ## DeClubIntents
 
@@ -148,7 +148,7 @@ contracts/test/intents/
 ├── DeClubIntents.nonces.t.sol     replay, invalidation, word boundaries, per-maker bitmap
 ├── DeClubIntents.tokens.t.sol     fee / lying / no-return / blocklist tokens, re-entry through a token hook
 ├── DeClubIntents.fuzz.t.sol       rings of any size and rotation pay exactly `give` and receive at least `want`
-├── DeClubIntents.gas.t.sol        worst-case ring (4 × 10 NFTs), with and without the fee
+├── DeClubIntents.gas.t.sol        worst-case ring (4 × 5 NFTs), with and without the fee
 ├── DeClubIntents.fee.t.sol        the protocol fee (ADR 0015), signed as a maximum (ADR 0018)
 ├── DeployIntents.t.sol            deploy script: fee from config and env, MockWMON vs a given fee token, WMON check, refusals, other chains
 ├── invariant/                       handler + invariants N1, N2, N5, N6 and conservation;
@@ -156,7 +156,7 @@ contracts/test/intents/
 └── symbolic/                        Halmos: every pair and 3-ring pays every want (run with halmos, not forge)
 ```
 
-`test/intents/` holds 104 tests plus the two invariant suites (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubIntents.sol` is 100% of lines, statements, branches and functions. Slither is triaged [above](#static-analysis).
+`test/intents/` holds 108 tests plus the two invariant suites (fuzz at 1000 runs, invariants at 256 runs × depth 64). Coverage on `DeClubIntents.sol` is 100% of lines, statements, branches and functions. Slither is triaged [above](#static-analysis).
 
 **Hostile collections** (`DeClubIntents.hostile.invariant.t.sol`). Signed pairs and 3-rings where each give is either honest or hostile: a `SoftNft` id the receiver already owns, one a third actor owns, one whose maker revoked approval (so `SoftNft` silently refuses), a `LyingNft`, USDC given as an ERC-721 or an NFT given as an ERC-20. Every maker signs, so the signature never stops a bad cycle; the contract's checks have to. Honest cycles must settle and leave every NFT with the next maker and every USDC balance exact; hostile ones must revert. Invariants: the contract holds nothing, `LyingNft` ids never move, and USDC is conserved. Removing the `ownerOf == from` check in `_send` makes it fail within one run.
 
@@ -205,10 +205,13 @@ Mutation checks: removing the over-claim check, letting a revoke through after c
 | **A claim sent for someone else** | Allowed: the MON always goes to the leaf's account | `test_anyoneCanClaimButTheMonGoesToTheAccount` |
 | **The operator takes the MON** | Only before claims open (`revoke`) or the unclaimed rest after `CLAIM_WINDOW` (`sweep`); the window is fixed at deploy and at least a day | `DeClubRewards.close.t.sol`, `testFuzz_delayBoundary` |
 | **The web builder and the contract disagree** on the leaf | A root built by `web/lib/rewards.ts` is verified and paid by the contract in a fixture test | `DeClubRewards.leafFixture.t.sol`, `web/test/rewards.test.ts` |
+| **A Safe signer signs a root or value that isn't the built epoch**, or one whose books don't add up | Each signer runs `npm run rewards:verify:mainnet -- --epoch N --root 0x… --value 12.5MON` with what the Safe transaction shows, and signs only on PASS (see below) | `web/test/rewardsVerify.test.ts` |
+| **The epoch credits the Clubs with more fees than the protocol charged** (inflated store, forged activity) | `rewards:verify` sums `FeeCharged` from both contracts over the epoch's window with HyperSync and fails if the credited fees are more | `web/test/feeCheck.test.ts`: fails when the deal fees credited exceed what DeClubEscrow charged, and the signed-swap case |
 
 ### Accepted limitations
 
 - **The operator is trusted for correctness.** It decides who is paid; the contract only bounds the damage. On mainnet it is a Safe (`DeployRewards.s.sol` refuses an EOA there).
+- **The pre-signing check only proves the epoch holds together.** `web/scripts/rewards-verify.ts` (pure checks in `web/lib/server/rewardsVerify.ts`) rebuilds the root from the contract's own `leaf()` hashes with its own tree code, opens every proof, checks each leaf against its breakdown and the total against the leaves, checks every Club's pools against its fees, sponsors and what the earlier epoch carried over, checks what each Club pays and carries over against its pools, checks that every sponsor payment reached the operator on chain, and compares the root and value with the Safe transaction and with what's already on chain. It does not re-derive who earned what. A store whose activity, memberships, holdings or swap fees were tampered with still builds a self-consistent record that passes. With `ENVIO_API_TOKEN` set it does check that the Clubs weren't credited with more fees than the two contracts' `FeeCharged` logs show for the epoch's window ([ADR 0052](adr/0052-check-epoch-fees-against-fee-logs.md), `web/lib/server/feeCheck.ts`), but only as a ceiling padded by 15 minutes, and it is skipped without the token. The claim delay and the public epoch data are what's left against fees the Clubs were credited too little of, and against who earned what.
 - **Holdings are read when the epoch is built**, not at a fixed block. Borrowing NFTs around that moment is possible; the reward at stake is a fraction of fees.
 - **An account that refuses MON** can't be paid until it accepts it; its leaf stays claimable until the epoch is swept.
 - No external review yet.
@@ -229,3 +232,51 @@ contracts/test/rewards/
 
 `forge coverage`: 100% of lines, statements, branches and functions on `DeClubRewards.sol`. Slither is triaged [above](#static-analysis).
 
+
+## Fill watcher
+
+The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club activity that feed History and Momentum. It holds no keys and moves no assets. It may find transactions with Envio HyperSync ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)).
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **A wrong or hostile HyperSync answer** makes the watcher record a fill or event that didn't happen | HyperSync only names transactions. Each one is passed to `recordFills` and `recordActivity`, which read the receipt from the node and record only what its logs say | `fillWatcher.test.ts`: records nothing twice, keeps the cursor before a chunk it couldn't finish |
+| **HyperSync is behind or ahead of the node,** so the cursor passes blocks that weren't scanned or aren't final | `head()` is the lower of the node's finalized block and HyperSync's height | `hypersyncScan.test.ts`: only treats blocks as scanned when both the node and Envio have them |
+| **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height can't be read the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
+| **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
+| **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |
+
+## Server store backups
+
+The server store holds the sponsor ledger and the Club member lists ([ADR 0053](adr/0053-back-up-sponsors-and-members.md)), which nothing else can recreate, and the built epochs with the Holders' proofs ([ADR 0054](adr/0054-resumable-epoch-build-and-epoch-backup.md)). The first two keep a signature and the third a root the chain holds; a restore re-checks them. A full dump of the rest ([ADR 0055](adr/0055-full-store-dump.md), `npm run store:backup`) restores unchecked; a nightly workflow runs it, in a private repository only.
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **A restore adds a sponsor who didn't pay**, or under a name the payer didn't sign | Each entry goes through the checks of a new payment: sent to the operator, large enough, succeeded, and the payer's signature of the Club, transaction and name | `sponsor.test.ts`: adds nothing the chain and the signature don't back |
+| **A restore counts a payment twice** | A payment already in an epoch's ledger, or marked taken, is skipped | `sponsor.test.ts`: counts a payment once however often it is restored |
+| **A restore adds a member who didn't join** | Only a `Join` signed by the wallet, for this Club, whose wallet an account has linked | `joinRecords.test.ts`: adds nobody who didn't sign, whatever the file says |
+| **A signature is passed off as another member's** | `PUT` accepts only the wallet the caller's membership is shown under, so another user's signature names a wallet the caller doesn't have | `joinRecords.test.ts`: refuses what it can't stand behind |
+| **A backup brings back someone who left** | Leaving, a ban and an unlinked wallet delete the signature; a restore re-runs the Club's ban check | `joinRecords.test.ts`: drops the signature when a member leaves, still honours a ban that survived |
+| **The backup shows a second wallet of a member** | The signed wallet is the one the Members list already shows; the export drops a record that no longer matches it | `joinRecords.test.ts`: exports only signatures that still match |
+| **A build that stops part way wedges the rewards** (the record is saved, `last` and the carry are not) | The record is the commit point; `finishEpoch` derives the indexes, carry, streaks and `last` from it and the frozen closings, and the next `buildEpoch` runs it | `rewards.test.ts`: finishes a build that stopped before the epoch index, the carry, the streaks, the marker |
+| **The finish moves the streaks twice**, or rolls back an epoch that was built after | `nextStreaks` skips a member already counted for `n`; a record at or below `last` is never finished again | `rewards.test.ts`: finishes a stopped build once, never moves the streaks twice, and lets the next epoch follow |
+| **A crash before the record leaves a rebuild reading changed carry or streaks** | Nothing a rebuild reads is written before the record | `rewards.test.ts`: writes nothing a rebuild reads until the record is committed |
+| **A restored epoch pays the wrong people, or is for another chain or contract** | The root is recomputed from the leaves, every proof must open, the money must add up, and a published epoch's root and total must be the chain's | `rewards.test.ts`: refuses a record that doesn't hold together; checks a published epoch against the chain |
+| **A restore replaces a built epoch**, or is slotted out of order | A different epoch at the same `n` is refused; epochs go back in order from 0 unless a gap is asked for | `rewards.test.ts`: never replaces a different epoch; restores in order |
+| **A restore rolls back a store that has moved on** | A key already there is kept unless `--overwrite` is given; without `--confirm` it only counts | `storeBackup.test.ts`: keeps a key that is already there; replaces a key only when asked; writes nothing on a dry run |
+| **A restored lock or counter blocks the app** (a lock restored without its expiry never frees) | The dump leaves out every key with an expiry, the named locks and the cached standings, and the restore refuses them if a file has them | `storeBackup.test.ts`: leaves out what the app makes again; refuses what a dump never holds |
+| **A hand-edited dump writes outside the app's keys** or with the wrong shape | Only `declub:` keys of the three shapes the store uses are accepted; the rest are counted as refused | `storeBackup.test.ts`: refuses what a dump never holds |
+| **A dump is published**: a nightly job's artifact in a public repository is downloadable by anyone signed in to GitHub | The workflow runs only when `github.event.repository.private` is true; a read-only Upstash token is enough for it | none (a configuration rule; run it once by hand after the repo goes private) |
+| **A dump holds a key twice, or an empty one that expired mid-run** | A key repeated by `SCAN` is taken once; a string that vanished between the scan and the read is skipped, not saved empty | `storeBackup.test.ts`: reads past the first page and takes a repeated key once; skips a key that expired between the scan and the read |
+| **A sponsor signature or name leaks into public data** | The signature stays in the ledger; the epoch record and the Rewards tab are built from `PublishedSponsor`, which has none | `sponsor.test.ts`: keeps the sponsor's signature, and never publishes it |
+
+### Accepted limitations
+
+- **The backup file is only as safe as where it is kept,** and a stale one restores whoever was in then. It holds wallets and sponsor names.
+- **Members and sponsors who never signed are not in it.**
+- **A dump is unchecked and not a snapshot.** It is as fresh as its last run, can hold one key newer than another, and restores a tampered store as it was. The Upstash adapter in `scripts/store-backup.ts` has no automated test: try a restore into a scratch database. The file holds Privy ids, wallets and avatars and is written for its owner alone.
+- **The running epoch isn't in an epoch backup.** Its holdings samples, activity and likes are in the store until it closes.
+- **A restored epoch is as good as the checks above:** it holds together and matches the chain, but a record built from tampered inputs is still self-consistent (see the Rewards limitations).

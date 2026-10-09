@@ -44,13 +44,7 @@ type TxButtonProps = {
 export function TxButton({ state, onClick, disabled, variant = "primary", busyLabel, children }: TxButtonProps) {
   const busy = busyLabel ?? BUSY_LABEL[state.status];
   return (
-    <button
-      type="button"
-      className={`${VARIANT[variant]} min-w-40`}
-      disabled={disabled || !!busy}
-      aria-busy={!!busy}
-      onClick={onClick}
-    >
+    <button type="button" className={`${VARIANT[variant]} min-w-40`} disabled={disabled || !!busy} aria-busy={!!busy} onClick={onClick}>
       {busy && <Spinner />}
       {busy ?? children}
     </button>
@@ -61,12 +55,7 @@ export function TxStatus({ state, success }: { state: TxState; success?: ReactNo
   if (state.status === "error") {
     // The same failure also appears as a toast; this stays beside the button as the record.
     return (
-      <Alert
-        tone={toneOf(state)}
-        title={state.title}
-        details={state.details}
-        actions={state.hash && <TxLink hash={state.hash} />}
-      >
+      <Alert tone={toneOf(state)} title={state.title} details={state.details} actions={state.hash && <TxLink hash={state.hash} />}>
         {state.message}
       </Alert>
     );

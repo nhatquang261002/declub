@@ -4,7 +4,20 @@ import Link from "next/link";
 import { useState } from "react";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, BanIcon, ChatIcon, HeartIcon, ExternalIcon, EyeIcon, EyeOffIcon, FlagIcon, PinIcon, SwapIcon, TrashIcon, XLogoIcon } from "@/components/Icons";
+import {
+  BadgeCheckIcon,
+  BanIcon,
+  ChatIcon,
+  HeartIcon,
+  ExternalIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FlagIcon,
+  PinIcon,
+  SwapIcon,
+  TrashIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -20,14 +33,14 @@ import type { useFollows } from "@/hooks/useSocial";
 type AppLink = Exclude<PostLink, { kind: "x" }>;
 
 /** Where a linked deal or signed swap lives in the app. */
-const linkHref = (link: AppLink) => (link.kind === "deal" ? `/v2/deal/${link.id}` : `/intent/${link.hash}`);
-const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
+export const linkHref = (link: AppLink) => (link.kind === "deal" ? `/deal/${link.id}` : `/intent/${link.hash}`);
+export const linkLabel = (link: AppLink) => (link.kind === "deal" ? `Deal #${link.id}` : `Signed swap ${shortAddress(link.hash)}`);
 
 /**
  * A shared X post (ADR 0024), drawn from what the server read: no X script, and the text is plain
  * text like a post's. It opens on X.
  */
-function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: number }) {
+export function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: number }) {
   const href = card ? `https://x.com/${card.author}/status/${card.id}` : `https://x.com/i/status/${id}`;
   return (
     <div className="x-card mt-1">
@@ -66,21 +79,41 @@ function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; now: num
   );
 }
 
-export type PostActions = {
+type PostActions = {
   report: (id: string) => void;
   like: (id: string, like: boolean) => void;
   remove: (id: string) => void;
   hide: (id: string, hidden: boolean) => void;
   pin: (id: string, pinned: boolean) => void;
   ban: (id: string) => void;
-  /** The post whose like is on its way to the server, if any. */
-  liking?: string;
 };
 
+type ClubActions = ReturnType<typeof useClubActions>;
+
+/** A Club's mutations as the menu's actions. Replies can't be pinned, so they leave `pin` out and it does nothing. */
+export function postActions({
+  report,
+  like,
+  remove,
+  hide,
+  pin,
+  ban,
+}: Pick<ClubActions, "report" | "like" | "remove" | "hide" | "ban"> & Partial<Pick<ClubActions, "pin">>): PostActions {
+  return {
+    report: (id) => report.mutate(id),
+    like: (id, on) => like.mutate({ id, like: on }),
+    remove: (id) => remove.mutate(id),
+    hide: (id, hidden) => hide.mutate({ id, hidden }),
+    pin: (id, pinned) => pin?.mutate({ id, pinned }),
+    ban: (id) => ban.mutate({ post: id }),
+  };
+}
+
+// Reports no longer hide a post (ADR 0040); posts they hid before stay hidden until staff act.
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
 
 /** What a post needs to open its thread (ADR 0032): the Club, and the reader's Club wallet to sign replies with. */
-export type ThreadContext = { token: string; wallet?: string; canReply: boolean };
+type ThreadContext = { token: string; wallet?: string; canReply: boolean };
 
 /**
  * One post. The text is plain text: React escapes it and nothing here turns it into a link, so
@@ -111,10 +144,14 @@ export function PostItem({
 
   const own: MenuAction[] = [];
   if (role !== undefined && !post.mine && !post.hidden) {
-    own.push({ label: "Report", icon: <FlagIcon />, confirm: "Report this post?",
-      confirmNote: "The Club’s moderators will be asked to look at it. If enough members report it, it is hidden until they decide.",
+    own.push({
+      label: "Report",
+      icon: <FlagIcon />,
+      confirm: "Report this post?",
+      confirmNote: "The Club’s moderators will be asked to look at it. Nothing is hidden until one of them decides.",
       confirmLabel: "Report",
-      onSelect: () => actions.report(post.id) });
+      onSelect: () => actions.report(post.id),
+    });
   }
   if (role !== undefined && (post.mine || staff)) {
     own.push({
@@ -127,7 +164,7 @@ export function PostItem({
     });
   }
   const moderate: MenuAction[] = [];
-  // A post hidden by reports keeps its pin (a restore puts it back); the Owner may still take it off.
+  // A post an old report hid keeps its pin (a restore puts it back); the Owner may still take it off.
   if (owner && !post.parent && (!post.hidden || post.pinned)) {
     moderate.push({ label: post.pinned ? "Unpin" : "Pin to top", icon: <PinIcon />, onSelect: () => actions.pin(post.id, !post.pinned) });
   }
@@ -153,7 +190,7 @@ export function PostItem({
 
   return (
     <li className={`post ${post.parent ? "post-reply" : ""} ${post.pinned ? "post-pinned" : ""} ${post.hidden ? "post-hidden" : ""}`}>
-      <WalletAvatar seed={post.wallet} size={post.parent ? "2rem" : "2.5rem"} />
+      <WalletAvatar seed={post.wallet} size={post.parent ? "2rem" : "2.5rem"} link />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-start gap-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -208,8 +245,7 @@ export function PostItem({
               className={`post-like ${post.liked ? "post-like-on" : ""}`}
               aria-pressed={post.liked}
               aria-label={post.liked ? "Take back your like" : "Like this post"}
-              aria-busy={actions.liking === post.id}
-              disabled={post.mine || actions.liking === post.id}
+              disabled={post.mine}
               onClick={() => actions.like(post.id, !post.liked)}
             >
               <HeartIcon className="size-4" filled={post.liked} />
@@ -253,21 +289,13 @@ function ReplyToggle({ count, open, onToggle }: { count: number; open: boolean; 
 
 /**
  * A post's replies, one level deep (ADR 0032), and a box to add one. Replies use the same menu as
- * posts (like, report, delete, hide, ban) and are signed the same way. They earn nothing.
+ * posts (like, report, delete, hide, ban) and are signed the same way. They count toward Club Rewards as backing (ADR 0038).
  */
-function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
+export function Thread({ parent, context, role, now }: { parent: string; context: ThreadContext; role: ViewerRole | undefined; now: number }) {
   const { replies, isLoading } = useClubReplies(context.token, parent, true);
   const { reply, replyStage, report, like, remove, hide, ban } = useClubActions(context.token);
   const [text, setText] = useState("");
-  const actions: PostActions = {
-    report: (id) => report.mutate(id),
-    like: (id, on) => like.mutate({ id, like: on }),
-    remove: (id) => remove.mutate(id),
-    hide: (id, hidden) => hide.mutate({ id, hidden }),
-    pin: () => {},
-    ban: (id) => ban.mutate({ post: id }),
-    liking: like.isPending ? like.variables?.id : undefined,
-  };
+  const actions = postActions({ report, like, remove, hide, ban });
   const length = [...text].length;
 
   return (
@@ -304,9 +332,14 @@ function Thread({ parent, context, role, now }: { parent: string; context: Threa
             readOnly={reply.isPending}
             onChange={(event) => setText(event.target.value)}
           />
-          <button type="submit" className="btn-primary px-3 py-2 text-sm" aria-busy={reply.isPending} disabled={reply.isPending || length === 0 || length > POST_MAX}>
+          <button
+            type="submit"
+            className="btn-primary px-3 py-2 text-sm"
+            aria-busy={reply.isPending}
+            disabled={reply.isPending || length === 0 || length > POST_MAX}
+          >
             {reply.isPending && <Spinner />}
-            {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Sign in wallet…") : "Reply"}
+            {reply.isPending ? (replyStage === "sending" ? "Sending…" : "Confirm in wallet…") : "Reply"}
           </button>
         </form>
       )}

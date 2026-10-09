@@ -12,12 +12,7 @@ const SECP256K1_N_HALF = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92
  * a 65-byte, non-malleable ECDSA signature with v of 27 or 28. (viem's own verifier also accepts
  * ERC-6492 wrappers and high-s signatures, which the contract would reject.)
  */
-export async function verifyMakerSignature(
-  reader: Reader,
-  maker: Address,
-  digest: Hex,
-  signature: Hex,
-): Promise<boolean> {
+export async function verifyMakerSignature(reader: Reader, maker: Address, digest: Hex, signature: Hex): Promise<boolean> {
   const code = await reader.getCode({ address: maker });
   if (code && code !== "0x") {
     try {

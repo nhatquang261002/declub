@@ -5,7 +5,7 @@ import { isAddress, type Address } from "viem";
 import { NftPicker } from "@/components/NftPicker";
 import { TokenPicker } from "@/components/TokenPicker";
 import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
-import { CHOG_ADDRESS, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
+import { CHOG_ADDRESS, MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE, MOCK_ERC20_ADDRESS } from "@/lib/config";
 import { newRow, type DraftRow } from "@/lib/assetDraft";
 import type { TokenInfo } from "@/lib/assets";
 import { collectionLabel } from "@/lib/collections";
@@ -30,7 +30,7 @@ type Props = {
 };
 
 /**
- * One side of a V2 deal: a list of MON / token / NFT rows. A token's name always comes from the
+ * One side of a DeClubEscrow deal: a list of MON / token / NFT rows. A token's name always comes from the
  * token contract (`info`), never from the user, so a lookalike can't pass for a real one.
  */
 export function AssetEditor({ title, hint, rows, onChange, info, allowNative = true, amountIsMinimum = false, owner }: Props) {
@@ -39,17 +39,23 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
   // The ERC-20 row whose token is being searched for.
   const [tokenRow, setTokenRow] = useState<string | null>(null);
   const rememberCollection = useRememberCollection();
-  const update = (key: string, patch: Partial<DraftRow>) =>
-    onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const update = (key: string, patch: Partial<DraftRow>) => onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const full = rows.length >= MAX_TOKENS_PER_SIDE;
   const hasNative = rows.some((row) => row.kind === "native");
 
   // A row with no NFT chosen yet is a placeholder: the picker fills it instead of adding another.
   const isPlaceholder = (row: DraftRow) => row.kind === "erc721" && row.token.trim() === "" && row.value.trim() === "";
   const kept = rows.filter((row) => !isPlaceholder(row) && row.key !== picker?.replace);
-  const room = MAX_TOKENS_PER_SIDE - kept.length;
+  // NFTs are capped below the asset count: each one pays the protocol fee (ADR 0033).
+  const keptNfts = kept.filter((row) => row.kind === "erc721").length;
+  const room = Math.min(MAX_TOKENS_PER_SIDE - kept.length, MAX_NFTS_PER_SIDE - keptNfts);
+  const nftsFull = rows.filter((row) => row.kind === "erc721" && !isPlaceholder(row)).length >= MAX_NFTS_PER_SIDE;
   const taken = new Set(
-    kept.flatMap((row) => (row.kind === "erc721" && isAddress(row.token.trim()) && /^\d+$/.test(row.value.trim()) ? [`${row.token.trim().toLowerCase()}:${BigInt(row.value.trim())}`] : [])),
+    kept.flatMap((row) =>
+      row.kind === "erc721" && isAddress(row.token.trim()) && /^\d+$/.test(row.value.trim())
+        ? [`${row.token.trim().toLowerCase()}:${BigInt(row.value.trim())}`]
+        : [],
+    ),
   );
   const openPicker = (next: { replace?: string; collection?: Address }) => setPicker(next);
 
@@ -81,14 +87,9 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
           return (
             <li key={row.key} className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="chip chip-dark w-16 shrink-0 justify-center">
-                  {KIND_LABEL[row.kind]}
-                </span>
+                <span className="chip chip-dark w-16 shrink-0 justify-center">{KIND_LABEL[row.kind]}</span>
                 {row.kind === "erc721" ? (
-                  <NftSummary
-                    row={row}
-                    onChoose={() => openPicker({ replace: row.key, collection: isAddress(token) ? token : undefined })}
-                  />
+                  <NftSummary row={row} onChoose={() => openPicker({ replace: row.key, collection: isAddress(token) ? token : undefined })} />
                 ) : (
                   <>
                     {row.kind !== "native" && (
@@ -143,7 +144,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
         <button type="button" className="btn-secondary btn-sm" disabled={full} onClick={() => onChange([...rows, newRow("erc20")])}>
           + Token
         </button>
-        <button type="button" className="btn-secondary btn-sm" disabled={full && !rows.some(isPlaceholder)} onClick={() => openPicker({})}>
+        <button type="button" className="btn-secondary btn-sm" disabled={(full || nftsFull) && !rows.some(isPlaceholder)} onClick={() => openPicker({})}>
           + NFT
         </button>
         {MOCK_ERC20_ADDRESS && (
@@ -151,7 +152,12 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
             + Test token
           </button>
         )}
-        <button type="button" className="btn-secondary btn-sm" disabled={full && !rows.some(isPlaceholder)} onClick={() => openPicker({ collection: CHOG_ADDRESS })}>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          disabled={(full || nftsFull) && !rows.some(isPlaceholder)}
+          onClick={() => openPicker({ collection: CHOG_ADDRESS })}
+        >
           + Chog
         </button>
       </div>
@@ -167,16 +173,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
         />
       )}
 
-      {picker && (
-        <NftPicker
-          owner={owner}
-          collection={picker.collection}
-          room={room}
-          taken={taken}
-          onConfirm={addNfts}
-          onClose={() => setPicker(null)}
-        />
-      )}
+      {picker && <NftPicker owner={owner} collection={picker.collection} room={room} taken={taken} onConfirm={addNfts} onClose={() => setPicker(null)} />}
     </section>
   );
 }

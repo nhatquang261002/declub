@@ -107,14 +107,17 @@ export async function oembedLookup(id: string): Promise<XCard | null> {
   const image = await syndicationImage(id).catch(() => undefined);
   if (!image) return card;
   // The trailing link only points at the media we now draw.
-  const stripped = card.text.replace(/(?:\s*https?:\/\/t\.co\/\w+)?\s*pic\.(?:twitter|x)\.com\/\w+\s*$/i, "").replace(/\s*https?:\/\/t\.co\/\w+\s*$/i, "").trim();
+  const stripped = card.text
+    .replace(/(?:\s*https?:\/\/t\.co\/\w+)?\s*pic\.(?:twitter|x)\.com\/\w+\s*$/i, "")
+    .replace(/\s*https?:\/\/t\.co\/\w+\s*$/i, "")
+    .trim();
   return { ...card, text: stripped || card.text, image };
 }
 
 const SYNDICATION = "https://cdn.syndication.twimg.com/tweet-result";
 
 /** The first photo (or a video's poster) of a post, from X's keyless embed endpoint; best effort. */
-export async function syndicationImage(id: string): Promise<string | undefined> {
+async function syndicationImage(id: string): Promise<string | undefined> {
   const token = ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
   const res = await fetch(`${SYNDICATION}?id=${id}&token=${token}&lang=en`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), redirect: "error" });
   if (!res.ok) {
@@ -144,7 +147,7 @@ export async function privyXAccount(userId: string): Promise<{ username: string;
 // ─────────────────────────────────────────────────────────────── X shares
 
 /** One member's own X post about the Club, shared on its Board. */
-export type XShare = {
+type XShare = {
   tweet: string;
   club: string;
   userId: string;
@@ -157,24 +160,32 @@ export type XShare = {
   strength: SignalStrength;
   /** The Board post was hidden: it counts for nothing until restored. */
   hidden?: true;
+  /** The Board post is a challenge entry (ADR 0048): Momentum counts it, epoch points don't. */
+  entry?: string;
 };
 
 const base = `declub:xshare:${CHAIN_ID}`;
-export const xSharesKey = (club: string) => `declub:xshares:${CHAIN_ID}:${club.toLowerCase()}`;
-export const xShareKey = (club: string, tweet: string) => `${base}:${club.toLowerCase()}:${tweet}`;
+const xSharesKey = (club: string) => `declub:xshares:${CHAIN_ID}:${club.toLowerCase()}`;
+const xShareKey = (club: string, tweet: string) => `${base}:${club.toLowerCase()}:${tweet}`;
 const seenKey = (tweet: string) => `declub:xshare-seen:${CHAIN_ID}:${tweet}`;
 const xLinkKey = (club: string, handle: string) => `declub:xlink:${CHAIN_ID}:${club.toLowerCase()}:${handle.toLowerCase()}`;
 
 /** How old an X post may be when it's shared and still count. */
-export const X_SHARE_MAX_AGE_MS = 48 * 3_600_000;
+const X_SHARE_MAX_AGE_MS = 48 * 3_600_000;
+/** The rate limit that keeps a member to X_SHARES_PER_DAY in a Club on UTC day `day`. */
+const xShareDayLimit = (club: string, day: number) => `xshare-day:${club.toLowerCase()}:${day}`;
 /** How many of a member's X posts count per Club per UTC day. */
-export const X_SHARES_PER_DAY = 1;
+const X_SHARES_PER_DAY = 1;
 /** X shares kept per Club. A busy Club fills this in months, and Momentum reads 30 days. */
 const X_SHARES_KEPT = 5_000;
 /** An X post counts once ever; this is how long that is remembered. */
 const SEEN_SEC = 365 * 86_400;
 
-export type XShareVerdict = { own: boolean; counted: SignalStrength | null; reason?: "not_own" | "not_holder" | "too_old" | "no_signal" | "daily_limit" | "already_counted" };
+export type XShareVerdict = {
+  own: boolean;
+  counted: SignalStrength | null;
+  reason?: "not_own" | "not_holder" | "too_old" | "no_signal" | "daily_limit" | "already_counted";
+};
 
 /** A Club's signals: its assets' addresses and tickers, its linked accounts and its tags. */
 export const signalsOf = (entry: ClubEntry, profile: ClubProfile): ClubSignals => clubSignals(clubAssets(entry), profile.x);
@@ -201,12 +212,20 @@ export async function recordXShare(
   if (!strength) return { own, counted: null, reason: "no_signal" };
 
   const day = Math.floor(now / 86_400_000);
-  if (!(await withinLimit(store, `xshare-day:${token}:${day}`, input.userId, X_SHARES_PER_DAY, 2 * 86_400))) {
+  if (!(await withinLimit(store, xShareDayLimit(token, day), input.userId, X_SHARES_PER_DAY, 2 * 86_400))) {
     return { own, counted: null, reason: "daily_limit" };
   }
   if ((await store.hit(seenKey(input.card.id), SEEN_SEC)) > 1) return { own, counted: null, reason: "already_counted" };
 
-  const share: XShare = { tweet: input.card.id, club: token, userId: input.userId, wallet: input.row.displayWallet, postId: input.postId, at: Math.floor(now / 1000), strength };
+  const share: XShare = {
+    tweet: input.card.id,
+    club: token,
+    userId: input.userId,
+    wallet: input.row.displayWallet,
+    postId: input.postId,
+    at: Math.floor(now / 1000),
+    strength,
+  };
   await store.set(xShareKey(token, share.tweet), share);
   await store.rank(xSharesKey(token), [{ member: share.tweet, score: share.at }], X_SHARES_KEPT);
   return { own, counted: strength };
@@ -254,17 +273,43 @@ export function xShareEvents(shares: readonly XShare[]): ActivityEvent[] {
     parties: [s.wallet.toLowerCase()],
     tokens: [s.club],
     weight: strengthFactor(s.strength),
+    ...(s.entry ? { entry: true as const } : {}),
   }));
+}
+
+/**
+ * Marks the X share of Board post `postId` as a challenge entry (ADR 0048), or clears the mark with
+ * `challenge: null`. Marking gives the member back today's X-share slot: an entry earns through its
+ * challenge, so it shouldn't stop their next X post from counting.
+ */
+export async function setXShareEntry(store: Store, club: string, tweet: string, postId: string, challenge: string | null): Promise<void> {
+  const share = await store.get<XShare>(xShareKey(club, tweet));
+  if (!share || share.postId !== postId || (share.entry ?? null) === challenge) return;
+  const next: XShare = { ...share };
+  if (challenge) next.entry = challenge;
+  else delete next.entry;
+  await store.set(xShareKey(club, tweet), next);
+  // One X share counts a day (X_SHARES_PER_DAY), and this was it: clearing the day's count frees the slot.
+  if (challenge && !share.entry) await store.del(`declub:rl:${xShareDayLimit(club, Math.floor(share.at / 86_400))}:${share.userId}`);
 }
 
 // ─────────────────────────────────────────────────────────────── linking the project's account
 
-export type XLinkRefusal =
-  | "forbidden" | "archived" | "bad_handle" | "already_linked" | "too_many_accounts" | "rate_limited"
-  | "xlink_expired" | "xlink_mismatch" | "xlink_unavailable" | "invalid" | "not_found";
+type XLinkRefusal =
+  | "forbidden"
+  | "archived"
+  | "bad_handle"
+  | "already_linked"
+  | "too_many_accounts"
+  | "rate_limited"
+  | "xlink_expired"
+  | "xlink_mismatch"
+  | "xlink_unavailable"
+  | "invalid"
+  | "not_found";
 
 /** How long a proof code stays good. */
-export const X_LINK_TTL_MS = 24 * 3_600_000;
+const X_LINK_TTL_MS = 24 * 3_600_000;
 
 type Pending = { code: string; by: string; until: number };
 
@@ -275,7 +320,19 @@ async function mayManage(store: Store, token: string, userId: string, deps: XDep
 }
 
 /** The text the project account posts to prove the link. */
-export const proofText = (handle: string, club: string, code: string) => `Linking @${handle} to its DeClub Club ${club} · code ${code}`;
+const proofText = (handle: string, club: string, code: string) => `Linking @${handle} to its DeClub Club ${club} · code ${code}`;
+
+const handleOf = (value: unknown) => (typeof value === "string" ? value.trim().replace(/^@/, "") : "");
+
+/** What starting and finishing a link both need first: the caller may manage the Club, it isn't archived, and the handle looks like one. */
+async function linkGate(store: Store, entry: AssetEntry, userId: string, handle: unknown, deps: XDeps) {
+  const token = entry.address.toLowerCase();
+  if (!(await mayManage(store, token, userId, deps))) return { ok: false, reason: "forbidden" } as const;
+  if (entry.club === "archived") return { ok: false, reason: "archived" } as const;
+  const name = handleOf(handle);
+  if (!isXHandle(name)) return { ok: false, reason: "bad_handle" } as const;
+  return { ok: true, token, name } as const;
+}
 
 /**
  * Step 1: the Owner names the project's X account and gets a code to post from it. A typed handle
@@ -288,11 +345,9 @@ export async function startXLink(
   handle: unknown,
   deps: XDeps = {},
 ): Promise<{ ok: true; handle: string; code: string; text: string; until: number } | { ok: false; reason: XLinkRefusal }> {
-  const token = entry.address.toLowerCase();
-  if (!(await mayManage(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  if (entry.club === "archived") return { ok: false, reason: "archived" };
-  const name = typeof handle === "string" ? handle.trim().replace(/^@/, "") : "";
-  if (!isXHandle(name)) return { ok: false, reason: "bad_handle" };
+  const gate = await linkGate(store, entry, actor.userId, handle, deps);
+  if (!gate.ok) return gate;
+  const { token, name } = gate;
   const accounts = (await loadProfile(store, token)).x?.accounts ?? [];
   if (accounts.some((a) => a.handle.toLowerCase() === name.toLowerCase())) return { ok: false, reason: "already_linked" };
   if (accounts.length >= MAX_X_ACCOUNTS) return { ok: false, reason: "too_many_accounts" };
@@ -315,11 +370,9 @@ export async function verifyXLink(
   input: { handle: unknown; url: unknown },
   deps: XDeps = {},
 ): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: XLinkRefusal }> {
-  const token = entry.address.toLowerCase();
-  if (!(await mayManage(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  if (entry.club === "archived") return { ok: false, reason: "archived" };
-  const name = typeof input.handle === "string" ? input.handle.trim().replace(/^@/, "") : "";
-  if (!isXHandle(name)) return { ok: false, reason: "bad_handle" };
+  const gate = await linkGate(store, entry, actor.userId, input.handle, deps);
+  if (!gate.ok) return gate;
+  const { token, name } = gate;
   const id = parseXStatus(input.url);
   if (!id) return { ok: false, reason: "invalid" };
   if (!(await withinLimit(store, `xlink:${token}`, actor.userId, 10, 3600))) return { ok: false, reason: "rate_limited" };
@@ -362,7 +415,7 @@ export async function unlinkX(
 ): Promise<{ ok: true; profile: ClubProfile } | { ok: false; reason: XLinkRefusal }> {
   const token = entry.address.toLowerCase();
   if (!(await mayManage(store, token, actor.userId, deps))) return { ok: false, reason: "forbidden" };
-  const name = typeof handle === "string" ? handle.trim().replace(/^@/, "").toLowerCase() : "";
+  const name = handleOf(handle).toLowerCase();
   const profile = await loadProfile(store, token);
   const accounts = profile.x?.accounts ?? [];
   if (!accounts.some((a) => a.handle.toLowerCase() === name)) return { ok: false, reason: "not_found" };

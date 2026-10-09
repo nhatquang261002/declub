@@ -61,26 +61,48 @@ contract DeClubIntentsSettleTest is DeClubIntentsBase {
     }
 
     function test_multiAssetSwapAtTheMaximum() public {
-        chog.mint(alice, 5);
-        chog.mint(bob, 5); // alice: 1–5, 21–25; bob: 6–10, 26–30
-        IDeClubIntents.Asset[] memory aliceGives = new IDeClubIntents.Asset[](10);
-        IDeClubIntents.Asset[] memory bobGives = new IDeClubIntents.Asset[](10);
+        // Five NFTs a side is the cap, and an ERC-20 leg rides along.
+        IDeClubIntents.Asset[] memory aliceGives = new IDeClubIntents.Asset[](6);
+        IDeClubIntents.Asset[] memory bobGives = new IDeClubIntents.Asset[](6);
         for (uint256 i; i < 5; ++i) {
             aliceGives[i] = _chog(1 + i);
-            aliceGives[5 + i] = _chog(21 + i);
             bobGives[i] = _chog(6 + i);
-            bobGives[5 + i] = _chog(26 + i);
         }
+        aliceGives[5] = _erc20(address(weth), 1 ether);
+        bobGives[5] = _erc20(address(usdc), 2 ether);
         IDeClubIntents.Intent memory a = _intent(alice, aliceGives, bobGives, 0);
         IDeClubIntents.Intent memory b = _intent(bob, bobGives, aliceGives, 0);
 
         swap.settle(_cycle2(a, b), _sigs2(_sign(aliceKey, a), _sign(bobKey, b)));
 
         _assertOwner(1, bob);
-        _assertOwner(25, bob);
+        _assertOwner(5, bob);
         _assertOwner(6, alice);
-        _assertOwner(30, alice);
+        _assertOwner(10, alice);
         _assertHoldsNothing();
+    }
+
+    function test_revertsMoreThanFiveNfts() public {
+        chog.mint(alice, 5); // alice: 1–5, 21–25
+        IDeClubIntents.Asset[] memory six = new IDeClubIntents.Asset[](6);
+        for (uint256 i; i < 5; ++i) {
+            six[i] = _chog(1 + i);
+        }
+        six[5] = _chog(21);
+        IDeClubIntents.Intent memory a = _intent(alice, six, _list(_chog(B1)), 0);
+        IDeClubIntents.Intent memory b = _intent(bob, _list(_chog(B1)), six, 0);
+        // The want side is capped too.
+        IDeClubIntents.Intent memory c = _intent(bob, _list(_chog(B1)), six, 0);
+        IDeClubIntents.Intent memory d = _intent(alice, _list(_chog(A1)), _list(_chog(B1)), 0);
+        // Signed before `expectRevert`: signing reads the contract, which would use it up.
+        bytes[] memory ab = _sigs2(_sign(aliceKey, a), _sign(bobKey, b));
+        bytes[] memory cd = _sigs2(_sign(bobKey, c), _sign(aliceKey, d));
+
+        vm.expectRevert(abi.encodeWithSelector(IDeClubIntents.TooManyNfts.selector, 0, true, 6));
+        swap.settle(_cycle2(a, b), ab);
+
+        vm.expectRevert(abi.encodeWithSelector(IDeClubIntents.TooManyNfts.selector, 0, false, 6));
+        swap.settle(_cycle2(c, d), cd);
     }
 
     function test_mixedAssetsBothWays() public {

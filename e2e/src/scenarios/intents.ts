@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { type Abi, type Address, type Hex, encodeFunctionData, hashDomain, hashStruct, hashTypedData, parseEther } from "viem";
+import { type Abi, type Address, type Hex, encodeFunctionData, hashStruct, hashTypedData, parseEther } from "viem";
 import { WALLET_1271 } from "../lib/artifacts.ts";
+import { domainSeparator } from "../lib/eip712.ts";
 import type { Case } from "../lib/report.ts";
 import { INTENT_TYPES, type Asset, type Intent, type World } from "../lib/world.ts";
 
@@ -52,7 +53,11 @@ const wire = (i: Intent) => ({
 });
 
 async function pool(w: World, path: string, init?: RequestInit) {
-  const r = await fetch(`${w.poolUrl}${path}`, { signal: AbortSignal.timeout(15_000), ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  const r = await fetch(`${w.poolUrl}${path}`, {
+    signal: AbortSignal.timeout(15_000),
+    ...init,
+    headers: { "content-type": "application/json", ...init?.headers },
+  });
   const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: r.status, body };
 }
@@ -63,13 +68,11 @@ export const intentCases: Case<World>[] = [
     title: "EIP-712 domain, struct hash and digest agree with the contract",
     async run(w) {
       const onChain = await w.read<Hex>(w.intents, w.abi.intents, "DOMAIN_SEPARATOR");
-      assert.equal(onChain, hashDomain({
-        domain: { ...w.domain, chainId: BigInt(w.chainId) },
-        types: { EIP712Domain: [
-          { name: "name", type: "string" }, { name: "version", type: "string" },
-          { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" },
-        ] },
-      }), `domain separator isn't ("${w.domain.name}", "${w.domain.version}"): the app and matcher would sign for another contract`);
+      assert.equal(
+        onChain,
+        domainSeparator({ ...w.domain, chainId: BigInt(w.chainId) }),
+        `domain separator isn't ("${w.domain.name}", "${w.domain.version}"): the app and matcher would sign for another contract`,
+      );
       const i = await w.intent(w.alice.address, [w.nftAsset(1n)], [w.tokenAsset(w.usd, 1n)]);
       assert.equal(await w.read<Hex>(w.intents, w.abi.intents, "hashIntent", [i]), hashStruct({ data: i, types: INTENT_TYPES, primaryType: "Intent" }));
       assert.equal(
@@ -138,18 +141,28 @@ export const intentCases: Case<World>[] = [
         { who: w.dave, give: [w.tokenAsset(w.usd, USD(4))], want: [w.nftAsset(c!)] },
       ]);
       const estimate = await w.pub.estimateContractGas({
-        account: w.relayer.account, address: w.intents, abi: w.abi.intents, functionName: "settle", args: settleArgs(cycle),
+        account: w.relayer.account,
+        address: w.intents,
+        abi: w.abi.intents,
+        functionName: "settle",
+        args: settleArgs(cycle),
       });
       const receipt = await settle(w, cycle);
       note(`estimate ${estimate}, gas used ${receipt.gasUsed} (matcher cap ${MATCHER_GAS_CAP})`);
-      assert.ok(estimate * 11n / 10n < MATCHER_GAS_CAP, "the matcher would skip this ring as too expensive");
+      assert.ok((estimate * 11n) / 10n < MATCHER_GAS_CAP, "the matcher would skip this ring as too expensive");
       assert.equal(await w.ownerOf(a!), w.bob.address);
       assert.equal(await w.ownerOf(b!), w.carol.address);
       assert.equal(await w.ownerOf(c!), w.dave.address);
       checkFee(w, receipt, fee, 4);
       // A fifth maker is one too many.
-      await w.expectRevert(w.relayer, w.intents, w.abi.intents, "settle",
-        [[...cycle, cycle[0]!].map((x) => x.intent), [...cycle, cycle[0]!].map((x) => x.signature)], "BadCycleSize");
+      await w.expectRevert(
+        w.relayer,
+        w.intents,
+        w.abi.intents,
+        "settle",
+        [[...cycle, cycle[0]!].map((x) => x.intent), [...cycle, cycle[0]!].map((x) => x.signature)],
+        "BadCycleSize",
+      );
     },
   },
   {
@@ -187,8 +200,7 @@ export const intentCases: Case<World>[] = [
       ]);
       const [a, b] = base as [Signed, Signed];
       const resign = async (who: World["alice"], i: Intent): Promise<Signed> => ({ intent: i, signature: await w.sign(who, i) });
-      const tryCycle = (x: Signed, y: Signed, err: string) =>
-        w.expectRevert(w.relayer, w.intents, w.abi.intents, "settle", settleArgs([x, y]), err);
+      const tryCycle = (x: Signed, y: Signed, err: string) => w.expectRevert(w.relayer, w.intents, w.abi.intents, "settle", settleArgs([x, y]), err);
 
       await tryCycle(await resign(w.alice, { ...a.intent, deadline: (await w.now()) - 1n }), b, "IntentExpired");
       await tryCycle(await resign(w.alice, { ...a.intent, feeToken: w.usd }), b, "WrongFee");
@@ -206,7 +218,13 @@ export const intentCases: Case<World>[] = [
     title: "ERC-1271 contract wallet as a maker",
     async run(w, note) {
       const art = WALLET_1271();
-      const hash = await w.dave.wallet.deployContract({ abi: art.abi, bytecode: art.bytecode, args: [w.dave.address], account: w.dave.account, chain: w.chain });
+      const hash = await w.dave.wallet.deployContract({
+        abi: art.abi,
+        bytecode: art.bytecode,
+        args: [w.dave.address],
+        account: w.dave.account,
+        chain: w.chain,
+      });
       const wallet = (await w.confirm(hash, "deploy 1271 wallet")).contractAddress!;
       const exec = (target: Address, abi: Abi, functionName: string, args: unknown[]) =>
         w.send(w.dave, wallet, art.abi, "exec", [target, encodeFunctionData({ abi, functionName, args })]);
@@ -278,10 +296,16 @@ export const intentCases: Case<World>[] = [
       const posted = await pool(w, "/intents", { method: "POST", body: JSON.stringify({ intent: wire(lone!.intent), signature: lone!.signature }) });
       const h = String(posted.body.hash) as Hex;
       const cancelSig = await w.carol.account.signTypedData({
-        domain: w.domain, types: { CancelIntent: [{ name: "intentHash", type: "bytes32" }] }, primaryType: "CancelIntent", message: { intentHash: h },
+        domain: w.domain,
+        types: { CancelIntent: [{ name: "intentHash", type: "bytes32" }] },
+        primaryType: "CancelIntent",
+        message: { intentHash: h },
       });
       const wrong = await w.bob.account.signTypedData({
-        domain: w.domain, types: { CancelIntent: [{ name: "intentHash", type: "bytes32" }] }, primaryType: "CancelIntent", message: { intentHash: h },
+        domain: w.domain,
+        types: { CancelIntent: [{ name: "intentHash", type: "bytes32" }] },
+        primaryType: "CancelIntent",
+        message: { intentHash: h },
       });
       const denied = await pool(w, `/intents/${h}`, { method: "DELETE", body: JSON.stringify({ signature: wrong }) });
       assert.ok(denied.status >= 400, "someone else's signature cancelled the intent");
@@ -293,4 +317,3 @@ export const intentCases: Case<World>[] = [
     },
   },
 ];
-

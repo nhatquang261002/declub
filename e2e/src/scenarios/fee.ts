@@ -6,15 +6,15 @@ import type { Actor, World } from "../lib/world.ts";
 const RAISE_DELAY = 7 * 24 * 3600;
 
 /** Both contracts share FeeAdmin; each check runs against both. */
-const both = (w: World): [string, Address, World["abi"]["v2"]][] => [
-  ["DeClubEscrow", w.v2, w.abi.v2],
+const both = (w: World): [string, Address, World["abi"]["escrow"]][] => [
+  ["DeClubEscrow", w.escrow, w.abi.escrow],
   ["DeClubIntents", w.intents, w.abi.intents],
 ];
 
 const localOnly = (w: World) => (w.target === "local" ? null : "moves the live fee or its admin: local only");
 const needAdmin = (w: World) => (w.feeAdmin ? null : "no fee admin key (E2E_FEE_ADMIN_KEY)");
 
-async function setFee(w: World, address: Address, abi: World["abi"]["v2"], fee: bigint) {
+async function setFee(w: World, address: Address, abi: World["abi"]["escrow"], fee: bigint) {
   await w.send(w.feeAdmin!, address, abi, "setFee", [fee]);
 }
 
@@ -76,27 +76,27 @@ export const feeCases: Case<World>[] = [
     title: "A cut applies at once; an open deal keeps the fee it was listed with",
     skip: (w) => localOnly(w) ?? needAdmin(w),
     async run(w, note) {
-      const old = await w.v2Fee();
+      const old = await w.escrowFee();
       assert.ok(old > 0n, "the local deployment should start with a fee");
       const [before] = await w.mintNfts(w.alice, 1);
-      await w.approveAll(w.alice, w.v2);
+      await w.approveAll(w.alice, w.escrow);
       const ask = [w.monAsset(parseEther("0.001"))];
-      const r1 = await w.send(w.alice, w.v2, w.abi.v2, "createTrade", [[w.nftAsset(before!)], ask, zeroAddress, 0n], old);
-      const id1 = w.events<{ tradeId: bigint }>(r1, w.abi.v2, "TradeCreated", w.v2)[0]!.tradeId;
+      const r1 = await w.send(w.alice, w.escrow, w.abi.escrow, "createTrade", [[w.nftAsset(before!)], ask, zeroAddress, 0n], old);
+      const id1 = w.events<{ tradeId: bigint }>(r1, w.abi.escrow, "TradeCreated", w.escrow)[0]!.tradeId;
 
       const cut = old / 2n;
       for (const [, address, abi] of both(w)) await setFee(w, address, abi, cut);
-      assert.equal(await w.v2Fee(), cut);
+      assert.equal(await w.escrowFee(), cut);
       assert.equal(await w.intentsFee(), cut);
 
       // The old deal is filled at its own fee, not the new one.
-      await w.expectRevert(w.bob, w.v2, w.abi.v2, "fillTrade", [id1], "WrongNativeAmount", parseEther("0.001") + cut);
-      const filled = await w.send(w.bob, w.v2, w.abi.v2, "fillTrade", [id1], parseEther("0.001") + old);
-      assert.equal(w.events<{ amount: bigint }>(filled, w.abi.v2, "FeeCharged", w.v2)[0]!.amount, 2n * old);
+      await w.expectRevert(w.bob, w.escrow, w.abi.escrow, "fillTrade", [id1], "WrongNativeAmount", parseEther("0.001") + cut);
+      const filled = await w.send(w.bob, w.escrow, w.abi.escrow, "fillTrade", [id1], parseEther("0.001") + old);
+      assert.equal(w.events<{ amount: bigint }>(filled, w.abi.escrow, "FeeCharged", w.escrow)[0]!.amount, 2n * old);
 
       const [after] = await w.mintNfts(w.alice, 1);
-      const r2 = await w.send(w.alice, w.v2, w.abi.v2, "createTrade", [[w.nftAsset(after!)], ask, zeroAddress, 0n], cut);
-      const id2 = w.events<{ tradeId: bigint }>(r2, w.abi.v2, "TradeCreated", w.v2)[0]!.tradeId;
+      const r2 = await w.send(w.alice, w.escrow, w.abi.escrow, "createTrade", [[w.nftAsset(after!)], ask, zeroAddress, 0n], cut);
+      const id2 = w.events<{ tradeId: bigint }>(r2, w.abi.escrow, "TradeCreated", w.escrow)[0]!.tradeId;
       assert.equal((await w.trade(id2)).fee, cut);
       note(`fee ${w.fmt(old)} → ${w.fmt(cut)}; trade ${id1} kept ${w.fmt(old)}, trade ${id2} listed at ${w.fmt(cut)}`);
     },
@@ -117,7 +117,9 @@ export const feeCases: Case<World>[] = [
       for (const who of [w.alice, w.bob]) await w.ensureFeeToken(who, raised * 2n);
       await w.approveAll(w.alice, w.intents);
       await w.approveToken(w.bob, w.usd, w.intents);
-      const a = await w.intent(w.alice.address, [w.nftAsset(nftId!)], [w.tokenAsset(w.usd, parseEther("1"))], { deadline: (await w.now()) + 30n * 24n * 3600n });
+      const a = await w.intent(w.alice.address, [w.nftAsset(nftId!)], [w.tokenAsset(w.usd, parseEther("1"))], {
+        deadline: (await w.now()) + 30n * 24n * 3600n,
+      });
       const b = await w.intent(w.bob.address, [w.tokenAsset(w.usd, parseEther("1"))], [w.nftAsset(nftId!)], { deadline: a.deadline });
       const sigs: Hex[] = [await w.sign(w.alice, a), await w.sign(w.bob, b)];
 
@@ -127,7 +129,7 @@ export const feeCases: Case<World>[] = [
       await w.warp(120);
       for (const [, address, abi] of both(w)) await w.send(w.feeAdmin!, address, abi, "applyFee");
       assert.equal(await w.intentsFee(), raised);
-      assert.equal(await w.v2Fee(), raised);
+      assert.equal(await w.escrowFee(), raised);
 
       await w.expectRevert(w.relayer, w.intents, w.abi.intents, "settle", [[a, b], sigs], "WrongFee");
       note(`fee ${w.fmt(old)} → ${w.fmt(raised)} after 7 days; intents with maxFee ${w.fmt(old)} refused`);
@@ -139,7 +141,7 @@ export const feeCases: Case<World>[] = [
     skip: (w) => localOnly(w) ?? needAdmin(w),
     async run(w) {
       const admin = w.feeAdmin!;
-      const hand = async (address: Address, abi: World["abi"]["v2"], from: Actor, to: Actor) => {
+      const hand = async (address: Address, abi: World["abi"]["escrow"], from: Actor, to: Actor) => {
         await w.send(from, address, abi, "transferFeeAdmin", [to.address]);
         assert.equal(await w.read<Address>(address, abi, "feeAdmin"), from.address, "the role moved before it was accepted");
         await w.expectRevert(w.carol, address, abi, "acceptFeeAdmin", [], "NotPendingFeeAdmin");

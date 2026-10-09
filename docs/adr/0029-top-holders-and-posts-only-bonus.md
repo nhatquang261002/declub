@@ -1,6 +1,6 @@
 # ADR 0029: Top Holders get paid, and the bonus counts posts only
 
-**Status:** Accepted · 2026-10-06 · Web only: no contract change. Amends [ADR 0022](0022-club-rewards.md) (who shares the Holder pool) and [ADR 0024](0024-x-posts-and-the-holder-bonus.md) (what the Holder bonus counts). The spec is [09 · Clubs](../09-clubs.md#rewards).
+**Status:** Accepted · 2026-10-06 · The "posts only" half is amended by [ADR 0034](0034-swaps-count-in-the-holder-bonus.md) (swaps count, capped) and the "biggest" half by [ADR 0037](0037-most-active-holders-are-paid.md) (the most active Holders are paid). · Web only: no contract change. Amends [ADR 0022](0022-club-rewards.md) (who shares the Holder pool) and [ADR 0024](0024-x-posts-and-the-holder-bonus.md) (what the Holder bonus counts). The spec is [09 · Clubs](../09-clubs.md#rewards).
 
 ## Context
 

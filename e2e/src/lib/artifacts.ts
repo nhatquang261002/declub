@@ -32,7 +32,7 @@ export function artifact(file: string, name = file.replace(/\..*$/, "")): Artifa
   };
 }
 
-export const V2 = () => artifact("DeClubEscrow.sol");
+export const ESCROW = () => artifact("DeClubEscrow.sol");
 export const INTENTS = () => artifact("DeClubIntents.sol");
 export const REWARDS = () => artifact("DeClubRewards.sol");
 export const MOCK_CHOG = () => artifact("MockChog.sol");

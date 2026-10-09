@@ -1,6 +1,6 @@
 # ADR 0015: A small flat protocol fee, paid by every side of a completed deal
 
-**Status:** Accepted · 2026-10-01 · **Partly superseded by [ADR 0018](0018-adjustable-protocol-fee.md)** (2026-10-02): the amount is no longer fixed at deploy, the ceiling is set per deployment, an escrow deal records its own fee, and an intent signs a `maxFee`. Who pays, when, and in which token stand as below. · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `OnDealV2` and `OnDealIntents`; `OnDeal` (v1) is unchanged. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
+**Status:** Accepted · 2026-10-01 · **Partly superseded by [ADR 0018](0018-adjustable-protocol-fee.md)** (2026-10-02) **and [ADR 0033](0033-fee-per-nft.md)** (2026-10-07: the fee is paid per NFT a side moves, not flat per side): the amount is no longer fixed at deploy, the ceiling is set per deployment, an escrow deal records its own fee, and an intent signs a `maxFee`. Who pays, when, and in which token stand as below. · Built and tested (contracts, matcher, web), not deployed. The recipient address and the real WMON address are still to be filled in at mainnet deploy. Changes `OnDealV2` and `OnDealIntents`. Builds on [ADR 0005](0005-generic-asset-model.md), [0007](0007-open-offers.md), [0008](0008-trade-intents.md) and [0009](0009-ring-swaps.md).
 
 ## Context
 
@@ -54,7 +54,6 @@ Intents have no native leg and no escrow, and the contract holds nothing between
 - **No spam deterrent.** Escrow shares are refunded and intents charge only on settlement, so listing or signing junk costs only gas. A non-refundable listing fee would deter that, but it would charge deals that never complete. Not chosen.
 - **No discounts, tiers or exemptions.** In particular none by collection: the verified list ([ADR 0014](0014-verified-collections-list.md)) is off-chain and the contracts can't read it.
 - **No fee on price.** Value in a deal isn't measured.
-- **Doesn't touch v1.** `OnDeal` stays fee-free.
 
 ## Consequences
 

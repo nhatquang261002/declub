@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useModalFocus } from "@/hooks/useModalFocus";
 
 type Props = {
   title: string;
@@ -19,38 +19,7 @@ type Props = {
  * cancel button has focus first so Enter never confirms by accident, and Tab stays inside.
  */
 export function ConfirmDialog({ title, message, confirmLabel, danger, onConfirm, onCancel }: Props) {
-  const panel = useRef<HTMLDivElement>(null);
-  const cancel = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    const opener = document.activeElement as HTMLElement | null;
-    document.body.style.overflow = "hidden";
-    cancel.current?.focus();
-    return () => {
-      document.body.style.overflow = previous;
-      opener?.focus?.();
-    };
-  }, []);
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onCancel();
-    } else if (e.key === "Tab") {
-      const buttons = panel.current?.querySelectorAll<HTMLButtonElement>("button");
-      if (!buttons?.length) return;
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
+  const { panel, initial, onKeyDown } = useModalFocus(onCancel);
 
   return createPortal(
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
@@ -70,7 +39,7 @@ export function ConfirmDialog({ title, message, confirmLabel, danger, onConfirm,
           </p>
         )}
         <div className="mt-1 flex justify-end gap-2">
-          <button ref={cancel} type="button" className="btn-secondary btn-sm" onClick={onCancel}>
+          <button ref={initial} type="button" className="btn-secondary btn-sm" onClick={onCancel}>
             Cancel
           </button>
           <button type="button" className={`${danger ? "btn-danger" : "btn-primary"} btn-sm`} onClick={onConfirm}>

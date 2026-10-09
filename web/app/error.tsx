@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { ErrorPanel } from "@/components/ErrorPanel";
+import { useLogError, type ErrorBoundaryProps } from "@/hooks/useLogError";
 
 // Catches a crash while rendering a page, so one broken screen doesn't blank the whole app.
 // The header and wallet stay up because this sits inside the root layout.
-export default function RouteError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
+export default function RouteError({ error, retry }: ErrorBoundaryProps) {
+  useLogError(error);
 
   return (
     <ErrorPanel
       title="This page hit a problem"
-      message="Something broke while showing this page. Your assets and deals are safe: nothing moves without your signature."
+      message="Something broke while showing this page. Your assets and deals are safe: nothing moves without a transaction or signature from you."
       details={[error.message, error.digest && `Reference: ${error.digest}`].filter(Boolean).join("\n")}
       onRetry={retry}
     >

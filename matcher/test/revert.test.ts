@@ -24,7 +24,13 @@ const [A, B, C, D] = [addr(0xa1), addr(0xb1), addr(0xc1), addr(0xd1)];
 const nft = (id: bigint): Asset => ({ assetType: AssetType.ERC721, token: NFT, id, amount: 1n });
 const evil = (amount = 5n): Asset => ({ assetType: AssetType.ERC20, token: EVIL, id: 0n, amount });
 const intent = (maker: Address, give: Asset[], want: Asset[], nonce: bigint, deadline = 9_999_999_999n): Intent => ({
-  maker, give, want, feeToken: WMON, maxFee: 0n, deadline, nonce,
+  maker,
+  give,
+  want,
+  feeToken: WMON,
+  maxFee: 0n,
+  deadline,
+  nonce,
 });
 
 function world(poolOver: Partial<PoolConfig> = {}) {
@@ -51,7 +57,12 @@ function world(poolOver: Partial<PoolConfig> = {}) {
     },
   } as unknown as Sender;
   const pool = new Pool(store, reader, {
-    chainId: 31337, swap: SWAP, feeToken: WMON, minTtlSec: 60, maxTtlSec: 3600, ...poolOver,
+    chainId: 31337,
+    swap: SWAP,
+    feeToken: WMON,
+    minTtlSec: 60,
+    maxTtlSec: 3600,
+    ...poolOver,
   });
   const matcher = new Matcher(pool, sender, { ...defaultMatcherConfig(SWAP), maxStrikes: 2 });
   let n = 0;
@@ -94,10 +105,7 @@ describe("a settlement that reverts on-chain after a clean simulation", () => {
     w.pair();
     await w.matcher.runOnce();
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-    await assert.rejects(
-      w.pool.submit(w.body(intent(C, [evil()], [nft(77n)], 1n, deadline))),
-      (e) => e instanceof PoolError && e.code === "token_banned",
-    );
+    await assert.rejects(w.pool.submit(w.body(intent(C, [evil()], [nft(77n)], 1n, deadline))), (e) => e instanceof PoolError && e.code === "token_banned");
   });
 });
 
@@ -146,10 +154,7 @@ describe("the token allowlist", () => {
   it("refuses to take an intent naming an unlisted token", async () => {
     const w = world({ tokenAllowlist: new Set([NFT.toLowerCase()]) });
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-    await assert.rejects(
-      w.pool.submit(w.body(intent(C, [evil()], [nft(1n)], 1n, deadline))),
-      (e) => e instanceof PoolError && e.code === "token_not_allowed",
-    );
+    await assert.rejects(w.pool.submit(w.body(intent(C, [evil()], [nft(1n)], 1n, deadline))), (e) => e instanceof PoolError && e.code === "token_not_allowed");
     // A want in the fee token is fine without listing it; it still fails later (no real chain).
     await assert.rejects(
       w.pool.submit(w.body(intent(C, [nft(1n)], [{ ...evil(), token: WMON }], 2n, deadline))),

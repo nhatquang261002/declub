@@ -6,6 +6,7 @@ import { DECLUB_INTENTS_ADDRESS } from "../config";
 import { clubAssets, type ClubEntry } from "../verifiedAssets";
 import { readActivity } from "./activity";
 import { holderCount, memberCount } from "./members";
+import { momentumPostEvents } from "./postMomentum";
 import type { Store } from "./store";
 import { readXShares, xShareEvents } from "./xPosts";
 
@@ -47,13 +48,15 @@ async function poolEvents(token: Address, deps: Deps): Promise<ActivityEvent[]> 
 /**
  * Every event known for a Club, newest first. The log keeps one list per Club, under its own
  * asset, whichever of its assets a deal named; the pool is asked about each asset, and a swap
- * that names both counts once. Members' X shares (ADR 0024) are kept apart and join here.
+ * that names both counts once. Members' X shares (ADR 0024) and Board posts (ADR 0047) are kept
+ * apart and join here.
  */
 export async function clubEvents(store: Store | null, club: ClubEntry, deps: Deps = {}): Promise<ActivityEvent[]> {
   const logged = store ? await readActivity(store, club.address).catch(() => []) : [];
   const shared = store ? xShareEvents(await readXShares(store, club.address).catch(() => [])) : [];
+  const posted = store ? await momentumPostEvents(store, club.address).catch(() => []) : [];
   const pooled = await Promise.all(clubAssets(club).map((asset) => poolEvents(asset.address, deps)));
-  return mergeEvents(logged, shared, ...pooled);
+  return mergeEvents(logged, shared, posted, ...pooled);
 }
 
 export async function clubList(store: Store | null, entries: readonly ClubEntry[], deps: Deps = {}): Promise<ClubSummary[]> {
@@ -73,7 +76,7 @@ export async function clubList(store: Store | null, entries: readonly ClubEntry[
 }
 
 /** How many completed swaps the Market tab lists. */
-export const RECENT_LIMIT = 20;
+const RECENT_LIMIT = 20;
 
 export async function clubDetail(store: Store | null, entry: ClubEntry, deps: Deps = {}): Promise<ClubDetail> {
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);

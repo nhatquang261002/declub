@@ -9,8 +9,7 @@ import { clientId, getStore, withinLimit } from "./store";
  */
 const CACHE = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" };
 const NO_STORE = { "Cache-Control": "no-store" };
-const fail = (status: number, error: string, message: string) =>
-  Response.json({ error, message }, { status, headers: NO_STORE });
+const fail = (status: number, error: string, message: string) => Response.json({ error, message }, { status, headers: NO_STORE });
 
 /** GET /api/clubs: every Club with its Momentum and counts, busiest first. */
 export function listHandler(registry: Registry, deps: Deps = {}) {

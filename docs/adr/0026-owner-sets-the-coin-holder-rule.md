@@ -14,7 +14,7 @@ Since [ADR 0025](0025-clubs-are-for-nft-collections.md), a memecoin lives in its
 - **Until the Owner sets it,** the coin counts from `minHolding`, or any balance without one, as before. `assets.json` keeps `minHolding` as that default.
 - **Turning it off** means only the collection's NFTs earn the badge. The coin's balance isn't even read.
 - **A change re-checks badges:** a row checked before `at` is out of date, like one older than a day, and the Members list re-reads it (at most 50 per read). Saving the same rule again doesn't move `at`.
-- **Shown to everyone:** the profile serves `coin: { token, symbol, on, min, set }` (null without a coin). The Club's sidebar says which holdings earn the badge.
+- **Shown to everyone:** the profile serves `coin: { token, symbol, on, min, set }` (null without a coin). The Club's **Contract details** block says which holdings earn the badge.
 
 ## What it does not do
 

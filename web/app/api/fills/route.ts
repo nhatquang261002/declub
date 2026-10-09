@@ -1,5 +1,6 @@
-import { isAddress, isHash } from "viem";
+import { isAddress } from "viem";
 import { fillsKey, ingestFills, isFillContract, listFills } from "@/lib/server/fills";
+import { fail, gateReport, json } from "@/lib/server/gate";
 import { clientId, getStore, withinLimit } from "@/lib/server/store";
 
 /**
@@ -11,9 +12,6 @@ import { clientId, getStore, withinLimit } from "@/lib/server/store";
  * Both are public: the data is on-chain anyway, and a POST only ever records what the receipt shows.
  * With no store configured, `enabled` is false and the app keeps its per-browser record instead.
  */
-const NO_STORE = { "Cache-Control": "no-store" };
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: NO_STORE });
-
 export async function GET(request: Request) {
   const store = getStore();
   if (!store) return json({ enabled: false });
@@ -22,10 +20,10 @@ export async function GET(request: Request) {
   const account = params.get("account") ?? "";
   const contract = params.get("contract") ?? "";
   if (!isAddress(account, { strict: false }) || !isAddress(contract, { strict: false }) || !isFillContract(contract)) {
-    return json({ error: "bad_request", message: "Give a wallet and one of the swap contracts." }, 400);
+    return fail(400, "bad_request", "Give a wallet and one of the swap contracts.");
   }
   if (!(await withinLimit(store, "fills-read", clientId(request), 240, 60))) {
-    return json({ error: "rate_limited", message: "Too many requests." }, 429);
+    return fail(429, "rate_limited", "Too many requests.");
   }
   try {
     return json({ enabled: true, ids: await listFills(store, contract, account) });
@@ -37,23 +35,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const store = getStore();
-  if (!store) return json({ enabled: false });
-
-  const body = (await request.json().catch(() => ({}))) as { hash?: unknown };
-  if (typeof body.hash !== "string" || !isHash(body.hash)) {
-    return json({ error: "bad_request", message: "Give a transaction hash." }, 400);
-  }
-  // Each report costs an RPC call, so it is limited more tightly than reads.
-  if (!(await withinLimit(store, "fills-write", clientId(request), 60, 60))) {
-    return json({ error: "rate_limited", message: "Too many requests." }, 429);
-  }
+  const report = await gateReport(request, "fills-write");
+  if (report instanceof Response) return report;
+  const { store, hash } = report;
   try {
-    const result = await ingestFills(store, body.hash);
+    const result = await ingestFills(store, hash);
     if (result.status === "pending") return json({ enabled: true, pending: true }, 404);
     return json({ enabled: true, recorded: result.fills });
   } catch (error) {
-    console.error(`recording fills from ${body.hash} failed:`, error);
-    return json({ error: "unavailable", message: "Couldn't record this fill yet." }, 502);
+    console.error(`recording fills from ${hash} failed:`, error);
+    return fail(502, "unavailable", "Couldn't record this fill yet.");
   }
 }

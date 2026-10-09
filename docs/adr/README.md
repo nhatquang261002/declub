@@ -1,40 +1,96 @@
 # Architecture decision records
 
-One file per decision. The status line at the top of each record is the source of truth; this index repeats it in short.
+One file per decision, numbered in the order they were made. The **Status** line at the top of each record is the source of truth; this page is a map. For how things work *now*, read the specs in [docs/](../README.md): a record explains why, and a later record may have changed the details.
 
-The project was On Deal until [ADR 0021](0021-declub-pivot.md) renamed it DeClub: ADRs 0001–0020 keep the names they were written with (`OnDeal` is the deleted v1 escrow, `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents`).
+**Reading tips**
 
-| # | Decision | Status | Summary |
-|---|---|---|---|
-| 0001 | [Atomic fill instead of a two-sided deposit phase](0001-atomic-fill.md) | Accepted | The taker's one transaction pays and receives, so a trade never sits half deposited. |
-| 0002 | [Foundry for contracts](0002-foundry.md) | Accepted | forge, cast and anvil in `contracts/`, rather than Hardhat. |
-| 0003 | [No indexer in v1](0003-no-indexer-in-v1.md) | Accepted, amended by 0004 | No indexer or database; the chain is the source of truth. Later relaxed for fills (0012) and search (0020), still without an indexer. |
-| 0004 | [Read trades from storage, not event logs](0004-read-deals-from-storage.md) | Accepted | The public RPC caps `eth_getLogs` at 100 blocks, so deals are read with `tradeCount` and multicall `getTrade`. |
-| 0005 | [Generic asset model in a separate `OnDealV2`](0005-generic-asset-model.md) | Accepted | A new contract beside v1 trades any ERC-721, ERC-20 and MON, in any mix. |
-| 0006 | [Trait requests in OnDealV2 as a fourth asset type](0006-trait-requests-in-v2.md) | Accepted, implemented, deployed | `ERC721Trait` assets ask for any NFT with given traits, proven against a Merkle root, with an on-chain spec. |
-| 0007 | [Open offers ("make me an offer") with escrowed proposals](0007-open-offers.md) | Accepted | The maker lists assets with no ask; takers escrow proposals and the maker accepts one. |
-| 0008 | [Signed trade intents and an off-chain matcher](0008-trade-intents.md) | Accepted | EIP-712 intents lock nothing; a matcher finds fits and `OnDealIntents` settles them wallet to wallet. |
-| 0009 | [Multi-party ring swaps](0009-ring-swaps.md) | Accepted | Rings of up to four intents settle through the same `settle` call as pairs. |
-| 0010 | [Privy sign-in and linked accounts](0010-privy-sign-in.md) | Accepted | Optional, wallet-first Privy sign-in (Google, X, Discord, wallet), with the injected wallet as fallback. |
-| 0011 | [Verified profiles, and the first server-side store](0011-verified-profiles.md) | Accepted | Opt-in X or Discord handles beside a wallet, kept in Upstash Redis. |
-| 0012 | [Server-side saves: fill history, read markers, recent collections](0012-server-side-saves.md) | Accepted | Receipt-verified fills and per-user state move from one browser to the store. |
-| 0013 | [Privy webhooks keep verified profiles in step](0013-privy-webhooks.md) | Accepted | Svix-verified webhooks re-sync profiles when an account is unlinked, transferred or deleted. |
-| 0014 | [A curated list marks which collections and tokens are verified](0014-verified-collections-list.md) | Accepted (list built; UI badges to build) | `web/data/assets.json` marks assets verified or blocked; it changes only what the UI shows. |
-| 0015 | [A small flat protocol fee, paid by every side of a completed deal](0015-protocol-fee.md) | Accepted, partly superseded by 0018 | A flat fee per side when a deal completes: MON in `OnDealV2`, WMON in `OnDealIntents`. |
-| 0016 | [Clubs, a community per verified asset, and Momentum](0016-clubs-and-momentum.md) | Accepted | A Market, Board and Members per verified asset, with roles and an activity score. |
-| 0017 | [Make a deal for @handle](0017-deal-by-handle.md) | Accepted | "Who can accept" takes an X or Discord handle and finds the wallets that user shared. |
-| 0018 | [An adjustable protocol fee, capped at deploy, with raises on a delay](0018-adjustable-protocol-fee.md) | Accepted | A fee admin can cut the fee at once or raise it after 7 days, never above a ceiling fixed at deploy. |
-| 0019 | [Fill watcher: follow the chain for fills and Club activity](0019-fill-watcher.md) | Accepted | A cron route scans new blocks for fills and creations and records them through the receipt checks. |
-| 0020 | [Search and filter the whole deal book on the server](0020-server-side-deal-book.md) | Accepted | The server holds every deal in memory and answers searched, filtered pages; OnDeal v1 leaves the app. |
-| 0021 | [De(al) Club: Clubs are the product, swaps fund them](0021-declub-pivot.md) | Accepted | The project becomes De(al) Club; contracts and identifiers are renamed, and the v1 escrow is deleted. |
-| 0022 | [Club Rewards: a share of the fees goes back to the Club](0022-club-rewards.md) | Accepted | Each epoch, 50% of a Club's swap fees goes to its Holders by holdings and 25% to its Owner, claimed against a Merkle root on `DeClubRewards`. |
-| 0023 | [Signed posts, follows and feed lenses](0023-signed-posts-and-lenses.md) | Accepted | Posts and follows are signed by the member's wallet and exported; the reader picks how the Board is ordered. |
-| 0024 | [X posts, Momentum and the Holder bonus](0024-x-posts-and-the-holder-bonus.md) | Accepted | A Holder's own X post about the Club, shared on its Board, counts in Momentum and adds up to 50% to their Holder share, weighed by its reach once that is turned on (in development). |
-| 0025 | [Clubs are for NFT collections; a memecoin joins one](0025-clubs-are-for-nft-collections.md) | Accepted | Only a collection has a Club; a memecoin joins its collection's, makes Holders, and earns no Club Rewards shares. |
-| 0026 | [The Owner sets the coin-holder rule](0026-owner-sets-the-coin-holder-rule.md) | Accepted | A Club's Owner decides whether holding its memecoin earns the Holder badge, and from what minimum. |
-| 0027 | [On-chain asset search, with your holdings first](0027-on-chain-asset-search.md) | Accepted | One search over tokens and NFT collections: Moralis where it covers the chain, the chain itself elsewhere; holdings first, then verified. |
-| 0028 | [Account avatars: an NFT you hold, or a picture](0028-account-avatars.md) | Accepted | A signed-in user picks one avatar for all their linked wallets: an NFT the chain says they hold (shown only while they do) or an upload kept on the server. |
-| 0029 | [Top Holders get paid, and the bonus counts posts only](0029-top-holders-and-posts-only-bonus.md) | Accepted | Only a Club's 10 biggest Holders share the Holder pool, and the activity bonus counts a Holder's own X posts, not trading. |
-| 0030 | [Likes, the Club inbox and the weekly recap](0030-likes-club-inbox-and-recap.md) | Accepted | Members like Board posts (no reward attached, so nothing to farm); the bell tells authors about likes, pins and earned rewards; the Rewards tab offers a weekly recap to post on X. |
-| 0031 | [Share a deal on X](0031-share-a-deal-on-x.md) | Accepted | A deal page has a server-drawn preview card and a Share on X button for live offers and completed swaps; the post names the Club. |
-| 0032 | [Live standings, active days and streaks, and replies](0032-live-standings-active-days-and-replies.md) | Accepted | The Rewards tab shows the running epoch's race and your estimate; each day you post on the Board and each epoch in a row of posting add to the Holder bonus; Board posts take one level of signed replies, which earn nothing. |
+- "Amended by" means a later record changed part of this one. Read both, newest last.
+- ADRs 0001–0020 keep the names they were written with: `OnDealV2` is now `DeClubEscrow`, `OnDealIntents` is now `DeClubIntents` ([0021](0021-declub-pivot.md)).
+- To add one: copy the shape of a recent record, take the next number, add a row to the right table below, and link it from the spec it changes.
+
+## Contracts and trading
+
+| # | Decision | Status |
+|---|---|---|
+| [0001](0001-atomic-fill.md) | Atomic fill: the taker's one transaction pays and receives | Accepted |
+| [0002](0002-foundry.md) | Foundry for contracts | Accepted |
+| [0005](0005-generic-asset-model.md) | Any ERC-721, ERC-20 and MON in one escrow contract | Accepted |
+| [0006](0006-trait-requests-in-v2.md) | Trait requests: ask for any NFT with given traits | Accepted, deployed |
+| [0007](0007-open-offers.md) | Open offers with escrowed proposals | Accepted |
+| [0008](0008-trade-intents.md) | Signed intents and an off-chain matcher | Accepted |
+| [0009](0009-ring-swaps.md) | Ring swaps of up to four parties | Accepted |
+| [0015](0015-protocol-fee.md) | A small protocol fee on completed deals | Partly superseded by 0018, 0033 |
+| [0018](0018-adjustable-protocol-fee.md) | Adjustable fee: cut at once, raise after 7 days, never above a ceiling | Accepted |
+| [0033](0033-fee-per-nft.md) | The fee is paid per NFT moved; a side moves at most 5 | Accepted |
+
+## Reading the chain and the deal book
+
+| # | Decision | Status |
+|---|---|---|
+| [0003](0003-no-indexer-in-v1.md) | No indexer; the chain is the source of truth | Amended by 0004, relaxed by 0012, 0020 |
+| [0004](0004-read-deals-from-storage.md) | Read deals from storage, not event logs | Accepted |
+| [0019](0019-fill-watcher.md) | Fill watcher: a cron route records fills and Club activity | Amended by 0051 |
+| [0020](0020-server-side-deal-book.md) | The server searches and filters the whole deal book | Accepted |
+| [0051](0051-hypersync-for-the-fill-watcher.md) | The fill watcher finds transactions with Envio HyperSync | Accepted |
+| [0052](0052-check-epoch-fees-against-fee-logs.md) | `rewards:verify` checks the epoch's fees against `FeeCharged` logs | Accepted |
+| [0027](0027-on-chain-asset-search.md) | One on-chain search over tokens and collections | Accepted |
+
+## Identity and profiles
+
+| # | Decision | Status |
+|---|---|---|
+| [0010](0010-privy-sign-in.md) | Privy sign-in, wallet first | Accepted |
+| [0011](0011-verified-profiles.md) | Verified X/Discord profiles; the first server-side store | Accepted |
+| [0012](0012-server-side-saves.md) | Fill history, read markers and recents saved per user | Accepted |
+| [0013](0013-privy-webhooks.md) | Webhooks keep verified profiles in step | Accepted |
+| [0014](0014-verified-collections-list.md) | A curated list marks verified and blocked assets | Accepted |
+| [0017](0017-deal-by-handle.md) | Make a deal for an @handle | Accepted |
+| [0028](0028-account-avatars.md) | Avatars: an NFT you hold, or an upload | Accepted |
+| [0042](0042-profile-page.md) | A profile page for every wallet; `/account` becomes `/settings` | Accepted |
+
+## Clubs: the product
+
+| # | Decision | Status |
+|---|---|---|
+| [0016](0016-clubs-and-momentum.md) | Clubs and Momentum: a community per verified asset | Accepted, reports amended by 0040 |
+| [0021](0021-declub-pivot.md) | De(al) Club: Clubs are the product, swaps fund them | Accepted |
+| [0025](0025-clubs-are-for-nft-collections.md) | Only collections have Clubs; a memecoin joins one | Accepted |
+| [0026](0026-owner-sets-the-coin-holder-rule.md) | The Owner sets the coin-holder rule | Accepted |
+| [0023](0023-signed-posts-and-lenses.md) | Signed posts, follows and feed lenses | Accepted |
+| [0030](0030-likes-club-inbox-and-recap.md) | Likes, the Club inbox and the weekly recap | Accepted |
+| [0031](0031-share-a-deal-on-x.md) | Share a deal on X | Accepted |
+| [0041](0041-timeline.md) | A timeline of Board posts across Clubs | Accepted |
+| [0043](0043-system-messages.md) | System messages on the Board and timeline | Accepted |
+| [0047](0047-board-posts-in-momentum.md) | A Holder's first Board post of the day counts in Momentum | Accepted |
+
+## Club Rewards and points
+
+Read in this order: the money (0022), then how points work (0038, 0040, 0044), then the add-ons.
+
+| # | Decision | Status |
+|---|---|---|
+| [0022](0022-club-rewards.md) | Fees go back to the Club: Merkle claims on `DeClubRewards` | Amended by 0054 |
+| [0024](0024-x-posts-and-the-holder-bonus.md) | X posts and the Holder bonus | Amended by 0029, 0032, 0044 |
+| [0029](0029-top-holders-and-posts-only-bonus.md) | Top Holders are paid; the bonus counts posts only | Amended by 0034, 0037 |
+| [0032](0032-live-standings-active-days-and-replies.md) | Live standings, active days, streaks, replies | Accepted |
+| [0034](0034-swaps-count-in-the-holder-bonus.md) | Swaps count in the bonus, capped | Accepted |
+| [0035](0035-sponsored-epochs.md) | Sponsors add to a Club's Holder pool | Accepted |
+| [0036](0036-sponsor-from-the-app.md) | Sponsor from the app, payment checked on chain | Amended by 0053 |
+| [0037](0037-most-active-holders-are-paid.md) | The most active Holders are paid, not the biggest | Amended by 0040 |
+| [0038](0038-points-from-backing.md) | Points come from what other Holders back | Amended by 0039, 0040 |
+| [0039](0039-base-voice-for-verified-accounts.md) | Verified accounts get a small base voice | Accepted |
+| [0040](0040-points-floor-held-average-public-backing.md) | Holdings averaged over the week, public backing, moderator-only hides | Floor replaced by 0044 |
+| [0044](0044-owner-reward-settings.md) | Owners set how their Club pays; a ramp replaces the floor | Accepted |
+| [0046](0046-points-for-engaging.md) | Points for engaging with other members | Accepted |
+| [0053](0053-back-up-sponsors-and-members.md) | Back up sponsors and members: kept signatures, export and a checked restore | Accepted |
+| [0054](0054-resumable-epoch-build-and-epoch-backup.md) | A resumable epoch build, and a backup of built epochs | Accepted |
+| [0055](0055-full-store-dump.md) | A full dump of the server store | Accepted |
+
+## Challenges
+
+| # | Decision | Status |
+|---|---|---|
+| [0045](0045-club-challenges.md) | The Owner sets a task; winners earn points | Amended by 0048, 0049, 0050 |
+| [0048](0048-entries-earn-through-their-challenge.md) | An entry earns through its challenge, not the epoch | Accepted |
+| [0049](0049-more-ways-to-pick-challenge-winners.md) | Holder vote, raffle, first N, everyone who completes | Accepted |
+| [0050](0050-challenge-rewards-beyond-points.md) | Trophies, NFT/token prizes, pinned results | Accepted |

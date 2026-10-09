@@ -9,6 +9,7 @@ import { CreateDealButton } from "@/components/CreateDealButton";
 
 // Create is a button beside the wallet, not a tab: it starts an action rather than showing a list.
 const NAV = [
+  { href: "/timeline", label: "Timeline" },
   { href: "/clubs", label: "Clubs" },
   { href: "/deals", label: "Deals" },
   { href: "/history", label: "History" },
@@ -17,15 +18,11 @@ const NAV = [
 
 export function Header() {
   const pathname = usePathname();
-  // Signed swaps live in the deals list, so their pages belong to the Deals tab.
-  const active = (href: string) =>
-    href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/intent") : pathname.startsWith(href);
+  // Deal pages (/deal/<id>) and signed swaps (/intent/<hash>) are reached from the deals list, so they belong to the Deals tab.
+  const active = (href: string) => (href === "/deals" ? pathname.startsWith("/deal") || pathname.startsWith("/intent") : pathname.startsWith(href));
 
   return (
-    <header
-      className="sticky top-0 z-20 border-b border-line/70 backdrop-blur-xl"
-      style={{ background: "var(--surface-overlay)" }}
-    >
+    <header className="sticky top-0 z-20 border-b border-line/70 backdrop-blur-xl" style={{ background: "var(--surface-overlay)" }}>
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3 sm:px-6">
         <Link href="/" aria-label="De(al) Club home">
           <Logo />

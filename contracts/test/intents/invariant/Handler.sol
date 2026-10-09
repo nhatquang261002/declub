@@ -30,9 +30,9 @@ contract Handler is Test {
     mapping(address => mapping(uint256 => bool)) public invalidatedNonce;
 
     uint256 public settlements;
-    /// @dev Makers across all settled cycles: each paid one fee.
+    /// @dev Makers across all settled cycles: each paid the fee for every NFT they gave (once if none).
     uint256 public settledMakers;
-    /// @dev N6: the fee in force at each settlement, once per maker.
+    /// @dev N6: the fee in force at each settlement, per NFT each maker gave.
     uint256 public feesPaid;
     /// @dev What makers sign relative to the fee in force: 0 exact, 1 one wei below, 2 above.
     uint256 public maxFeeMode;
@@ -84,6 +84,35 @@ contract Handler is Test {
         cycle[0] = _intent(i, _one(_nft(id)), _one(_erc20(address(USDC), ask)), seed, deadline);
         cycle[1] =
             _intent(j, _one(_erc20(address(USDC), pay)), _one(_nft(id)), seed >> 64, deadline);
+        uint256[] memory who = new uint256[](2);
+        (who[0], who[1]) = (i, j);
+        _trySettle(cycle, who);
+    }
+
+    /// @dev i gives two to five of its Chogs for USDC, so a maker's fee is several times the
+    ///      per-NFT fee. j pays `ask + extra`.
+    function settleBundle(
+        uint256 iSeed,
+        uint256 jSeed,
+        uint256 countSeed,
+        uint256 ask,
+        uint256 seed
+    ) external {
+        uint256 i = bound(iSeed, 0, 3);
+        uint256 j = (i + bound(jSeed, 1, 3)) % 4;
+        uint256 count = bound(countSeed, 2, 5);
+        IDeClubIntents.Asset[] memory give = new IDeClubIntents.Asset[](count);
+        uint256 found;
+        for (uint256 id = 1; id <= 20 && found < count; ++id) {
+            if (CHOG.ownerOf(id) == actors[i]) give[found++] = _nft(id);
+        }
+        if (found < count) return;
+        ask = bound(ask, 2, 200 ether);
+        uint64 deadline = uint64(block.timestamp + bound(seed >> 128, 1, 2 days));
+
+        IDeClubIntents.Intent[] memory cycle = new IDeClubIntents.Intent[](2);
+        cycle[0] = _intent(i, give, _one(_erc20(address(USDC), ask)), seed, deadline);
+        cycle[1] = _intent(j, _one(_erc20(address(USDC), ask)), give, seed >> 64, deadline);
         uint256[] memory who = new uint256[](2);
         (who[0], who[1]) = (i, j);
         _trySettle(cycle, who);
@@ -191,8 +220,8 @@ contract Handler is Test {
         try SWAP.settle(cycle, sigs) {
             ++settlements;
             settledMakers += cycle.length;
-            feesPaid += fee * cycle.length;
             for (uint256 n; n < cycle.length; ++n) {
+                feesPaid += fee * _units(cycle[n].give);
                 if (cycle[n].maxFee < fee) settledBelowMaxFee = true;
                 address maker = cycle[n].maker;
                 uint256 nonce = cycle[n].nonce;
@@ -220,6 +249,14 @@ contract Handler is Test {
             deadline,
             bound(nonce, 0, NONCE_RANGE - 1)
         );
+    }
+
+    /// @dev What a maker's fee is multiplied by: the NFTs it gives, or 1 if none.
+    function _units(IDeClubIntents.Asset[] memory give) internal pure returns (uint256 nfts) {
+        for (uint256 n; n < give.length; ++n) {
+            if (give[n].assetType == IDeClubIntents.AssetType.ERC721) ++nfts;
+        }
+        if (nfts == 0) nfts = 1;
     }
 
     function _maxFee() internal view returns (uint256) {

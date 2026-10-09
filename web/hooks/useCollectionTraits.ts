@@ -15,10 +15,7 @@ export type CatalogStatus =
   | { state: "busy" };
 
 type Reply =
-  | { state: "scanning"; done: number; total: number }
-  | { state: "ready"; catalog: WireCatalog }
-  | { state: "unsupported"; reason: string }
-  | { state: "busy" };
+  { state: "scanning"; done: number; total: number } | { state: "ready"; catalog: WireCatalog } | { state: "unsupported"; reason: string } | { state: "busy" };
 
 const IDLE: CatalogStatus = { state: "idle" };
 
@@ -42,7 +39,17 @@ async function load(address: Address): Promise<Reply> {
  * collection once and caches it, so this just polls until the scan is `ready` or `unsupported`.
  */
 export function useCollectionCatalogs(addresses: readonly string[]): ReadonlyMap<string, CatalogStatus> {
-  const valid = useMemo(() => [...new Set(addresses.map((a) => a.trim()).filter((a) => isAddress(a)).map((a) => a.toLowerCase() as Address))], [addresses]);
+  const valid = useMemo(
+    () => [
+      ...new Set(
+        addresses
+          .map((a) => a.trim())
+          .filter((a) => isAddress(a))
+          .map((a) => a.toLowerCase() as Address),
+      ),
+    ],
+    [addresses],
+  );
   const queries = useQueries({
     queries: valid.map((address) => ({
       queryKey: ["collectionTraits", address],
@@ -64,7 +71,10 @@ export function useCollectionCatalogs(addresses: readonly string[]): ReadonlyMap
       const q = queries[i];
       const data = q.data;
       if (!data) {
-        return out.set(address, q.isError ? { state: "unsupported", reason: "Couldn't reach the trait scanner. Try again." } : { state: "scanning", done: 0, total: 0 });
+        return out.set(
+          address,
+          q.isError ? { state: "unsupported", reason: "Couldn't reach the trait scanner. Try again." } : { state: "scanning", done: 0, total: 0 },
+        );
       }
       out.set(address, data.state === "ready" ? { state: "ready", catalog: expand(data.catalog), failed: data.catalog.failed } : data);
     });
@@ -73,5 +83,4 @@ export function useCollectionCatalogs(addresses: readonly string[]): ReadonlyMap
   }, [valid, stamp]);
 }
 
-export const statusOf = (statuses: ReadonlyMap<string, CatalogStatus>, address: string): CatalogStatus =>
-  statuses.get(address.trim().toLowerCase()) ?? IDLE;
+export const statusOf = (statuses: ReadonlyMap<string, CatalogStatus>, address: string): CatalogStatus => statuses.get(address.trim().toLowerCase()) ?? IDLE;

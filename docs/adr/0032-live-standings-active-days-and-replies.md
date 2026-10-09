@@ -26,7 +26,7 @@ Club Rewards couldn't be seen until an epoch was built. Nobody knew they were #1
 ## What it does not do
 
 - **It doesn't stop a buy just before the snapshot.** The hold-time rule from ADR 0029 is still not built.
-- **An active day can be one short post.** It is capped at one a day and only moves the bonus for the top 10. Spam is still moderated as before: reports hide a post, and a hidden post loses its day.
+- **An active day can be one short post.** It is capped at one a day and only moves the bonus for the top 10. Spam is still moderated as before: a moderator hides a post, and a hidden post loses its day (reports alone no longer hide one: [ADR 0040](0040-points-floor-held-average-public-backing.md)).
 - **It doesn't pay for replies or likes**, so a thread can't be farmed.
 - **The estimate can differ from the epoch.** A swap's fee is split between the Clubs its tokens belong to, balances are a few minutes old, and the X reach is read only when the epoch is built.
 

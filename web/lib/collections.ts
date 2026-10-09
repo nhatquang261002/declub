@@ -43,12 +43,11 @@ export const featuredCollections = (): Address[] => {
   });
 };
 
-export const isFeatured = (address: string) =>
-  featuredCollections().some((a) => a.toLowerCase() === address.toLowerCase());
+export const isFeatured = (address: string) => featuredCollections().some((a) => a.toLowerCase() === address.toLowerCase());
 
 // ─────────────────────────────────────────────────────────────── Recently used
 
-export const RECENT_KEY = "declub:recent-collections";
+const RECENT_KEY = "declub:recent-collections";
 /** Fired on this tab after the list changes; other tabs get the browser's own `storage` event. */
 export const RECENT_EVENT = "declub:recents";
 const RECENT_MAX = 8;
@@ -72,14 +71,12 @@ export function parseRecent(raw: string): Address[] {
   }
 }
 
-export const recentCollections = (): Address[] => parseRecent(readRecentRaw());
+const recentCollections = (): Address[] => parseRecent(readRecentRaw());
 
 /** Puts `addresses` (newest first, no repeats) at the front of the saved list. */
 export function saveRecent(addresses: readonly Address[]): Address[] {
   const seen = new Set<string>();
-  const next = [...addresses, ...recentCollections()]
-    .filter((a) => !seen.has(a.toLowerCase()) && !!seen.add(a.toLowerCase()))
-    .slice(0, RECENT_MAX);
+  const next = [...addresses, ...recentCollections()].filter((a) => !seen.has(a.toLowerCase()) && !!seen.add(a.toLowerCase())).slice(0, RECENT_MAX);
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(next));
     window.dispatchEvent(new Event(RECENT_EVENT));

@@ -54,7 +54,7 @@ const KIND = new Set(["erc721", "erc20"]);
 const CATEGORY = new Set<string>(["memecoin", "stablecoin", "wrapped", "other"]);
 
 /** A collection or a memecoin: the assets that can be in a Club. Only a collection has one of its own. */
-export const isCommunityAsset = (e: Pick<AssetEntry, "kind" | "category">) => e.kind === "erc721" || e.category === "memecoin";
+const isCommunityAsset = (e: Pick<AssetEntry, "kind" | "category">) => e.kind === "erc721" || e.category === "memecoin";
 
 /** Throws on the first problem, so a bad edit to the file fails the build and the tests. */
 export function parseAssets(list: unknown): AssetEntry[] {
@@ -124,6 +124,8 @@ export type Registry = {
   clubFor(token: string, chainId?: number): ClubEntry | null;
   /** Every Club on the chain, archived ones included. An asset in another's Club isn't one. */
   clubs(chainId?: number): ClubEntry[];
+  /** Every verified asset on the chain, Club or not. */
+  verified(chainId?: number): AssetEntry[];
 };
 
 const keyOf = (chainId: number, token: string) => `${chainId}:${token.toLowerCase()}`;
@@ -166,6 +168,7 @@ export function makeRegistry(entries: AssetEntry[]): Registry {
       return clubs.get(joins(found) ? keyOf(found.chainId, found.club as string) : keyOf(found.chainId, found.address)) ?? null;
     },
     clubs: (chainId = CHAIN_ID) => [...clubs.values()].filter((e) => e.chainId === chainId),
+    verified: (chainId = CHAIN_ID) => entries.filter((e) => e.chainId === chainId && e.status === "verified"),
   };
 }
 

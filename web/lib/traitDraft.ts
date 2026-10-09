@@ -30,10 +30,7 @@ export function draftClause(draft: TraitDraft): TraitClause | null {
  * Each draft's set, or null while its collection isn't ready. Everything the contract call
  * needs (root, ids, proofs) is derived from this, never typed.
  */
-export function resolveDrafts(
-  drafts: readonly TraitDraft[],
-  status: (collection: string) => CatalogStatus,
-): (ResolvedClause | null)[] {
+export function resolveDrafts(drafts: readonly TraitDraft[], status: (collection: string) => CatalogStatus): (ResolvedClause | null)[] {
   return drafts.map((draft) => {
     const clause = draftClause(draft);
     const s = status(draft.collection);

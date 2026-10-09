@@ -18,7 +18,7 @@ import {
   parseEventLogs,
   zeroAddress,
 } from "viem";
-import { INTENTS, MOCK_CHOG, MOCK_ERC20, MOCK_WMON, V2 } from "./artifacts.ts";
+import { INTENTS, MOCK_CHOG, MOCK_ERC20, MOCK_WMON, ESCROW } from "./artifacts.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,7 +30,7 @@ export interface Actor {
 }
 
 export interface Addresses {
-  v2: Address;
+  escrow: Address;
   intents: Address;
   /** An ERC-721 with an open `mint(to, quantity)` (MockChog). */
   nft: Address;
@@ -75,6 +75,8 @@ export interface Intent {
   nonce: bigint;
 }
 
+// The EIP-712 types are written out in each package on purpose: the app and the matcher deploy on their own, and e2e checks both against a third copy (IN-01).
+// jscpd:ignore-start
 /** The EIP-712 types the app and the matcher sign with (web/lib/intents.ts, matcher/src/intent.ts). */
 export const INTENT_TYPES = {
   Asset: [
@@ -93,6 +95,7 @@ export const INTENT_TYPES = {
     { name: "nonce", type: "uint256" },
   ],
 } as const;
+// jscpd:ignore-end
 export const DOMAIN_NAME = "DeClubIntents";
 export const DOMAIN_VERSION = "1";
 
@@ -114,9 +117,13 @@ export async function makeWorld(cfg: WorldConfig) {
     wallet: createWalletClient({ account, chain, transport: transport() }),
   });
   if (cfg.actors.length < 5) throw new Error("need 5 accounts: alice, bob, carol, dave and a relayer");
-  const [alice, bob, carol, dave, relayer] = (["alice", "bob", "carol", "dave", "relayer"] as const).map((n, i) =>
-    actor(n, cfg.actors[i]!),
-  ) as [Actor, Actor, Actor, Actor, Actor];
+  const [alice, bob, carol, dave, relayer] = (["alice", "bob", "carol", "dave", "relayer"] as const).map((n, i) => actor(n, cfg.actors[i]!)) as [
+    Actor,
+    Actor,
+    Actor,
+    Actor,
+    Actor,
+  ];
   const feeAdmin = cfg.feeAdmin ? actor("feeAdmin", cfg.feeAdmin) : undefined;
 
   const nftAbi = MOCK_CHOG().abi;
@@ -124,25 +131,18 @@ export async function makeWorld(cfg: WorldConfig) {
   const wmonAbi = MOCK_WMON().abi;
   // Token errors bubble up through the deal contracts; with them in the ABI a revert names its cause.
   const tokenErrors = [...erc20Abi, ...nftAbi].filter((x) => x.type === "error");
-  const v2Abi = [...V2().abi, ...tokenErrors] as Abi;
+  const escrowAbi = [...ESCROW().abi, ...tokenErrors] as Abi;
   const intentsAbi = [...INTENTS().abi, ...tokenErrors] as Abi;
 
   const read = <T>(address: Address, abi: Abi, functionName: string, args: unknown[] = []) =>
     pub.readContract({ address, abi, functionName, args }) as Promise<T>;
 
   const feeToken = await read<Address>(cfg.intents, intentsAbi, "FEE_TOKEN");
-  const feeRecipient = await read<Address>(cfg.v2, v2Abi, "FEE_RECIPIENT");
+  const feeRecipient = await read<Address>(cfg.escrow, escrowAbi, "FEE_RECIPIENT");
   const intentsRecipient = await read<Address>(cfg.intents, intentsAbi, "FEE_RECIPIENT");
 
   /** Simulate (for a decoded revert), send, and wait for a successful receipt. */
-  async function send(
-    who: Actor,
-    address: Address,
-    abi: Abi,
-    functionName: string,
-    args: unknown[] = [],
-    value?: bigint,
-  ): Promise<TransactionReceipt> {
+  async function send(who: Actor, address: Address, abi: Abi, functionName: string, args: unknown[] = [], value?: bigint): Promise<TransactionReceipt> {
     const { request } = await pub.simulateContract({ account: who.account, address, abi, functionName, args, value });
     const nonce = await nextTxNonce(who);
     const hash = await who.wallet.writeContract({ ...request, account: who.account, chain, nonce } as Parameters<WalletClient["writeContract"]>[0]);
@@ -186,15 +186,7 @@ export async function makeWorld(cfg: WorldConfig) {
   }
 
   /** Asserts that the call reverts with the custom error `errorName` ("*" for any revert). */
-  async function expectRevert(
-    who: Actor,
-    address: Address,
-    abi: Abi,
-    functionName: string,
-    args: unknown[],
-    errorName: string,
-    value?: bigint,
-  ): Promise<void> {
+  async function expectRevert(who: Actor, address: Address, abi: Abi, functionName: string, args: unknown[], errorName: string, value?: bigint): Promise<void> {
     try {
       await pub.simulateContract({ account: who.account, address, abi, functionName, args, value });
     } catch (e) {
@@ -298,8 +290,7 @@ export async function makeWorld(cfg: WorldConfig) {
     };
   }
   /** `signer` signs for `intent.maker` (itself, or a 1271 wallet it owns). */
-  const sign = (signer: Actor, i: Intent): Promise<Hex> =>
-    signer.account.signTypedData({ domain, types: INTENT_TYPES, primaryType: "Intent", message: i });
+  const sign = (signer: Actor, i: Intent): Promise<Hex> => signer.account.signTypedData({ domain, types: INTENT_TYPES, primaryType: "Intent", message: i });
 
   const nftAsset = (id: bigint, nft = cfg.nft): Asset => ({ assetType: ERC721, token: nft, id, amount: 1n });
   const tokenAsset = (token: Address, amount: bigint): Asset => ({ assetType: ERC20, token, id: 0n, amount });
@@ -311,19 +302,44 @@ export async function makeWorld(cfg: WorldConfig) {
     ...cfg,
     chain,
     pub,
-    alice, bob, carol, dave, relayer, feeAdmin,
+    alice,
+    bob,
+    carol,
+    dave,
+    relayer,
+    feeAdmin,
     traders: [alice, bob, carol, dave],
-    abi: { v2: v2Abi, intents: intentsAbi, nft: nftAbi, erc20: erc20Abi, wmon: wmonAbi },
+    abi: { escrow: escrowAbi, intents: intentsAbi, nft: nftAbi, erc20: erc20Abi, wmon: wmonAbi },
     feeToken,
     feeRecipient,
     intentsRecipient,
-    read, send, confirm, expectRevert, events, now, warp,
-    monOf, balanceOf, ownerOf, mintNfts, mintUsd, approveAll, approveToken, ensureFeeToken, ensureMon,
-    intent, sign, domain, nextNonce,
-    nftAsset, tokenAsset, monAsset, fmt,
-    v2Fee: () => read<bigint>(cfg.v2, v2Abi, "fee"),
+    read,
+    send,
+    confirm,
+    expectRevert,
+    events,
+    now,
+    warp,
+    monOf,
+    balanceOf,
+    ownerOf,
+    mintNfts,
+    mintUsd,
+    approveAll,
+    approveToken,
+    ensureFeeToken,
+    ensureMon,
+    intent,
+    sign,
+    domain,
+    nextNonce,
+    nftAsset,
+    tokenAsset,
+    monAsset,
+    fmt,
+    escrowFee: () => read<bigint>(cfg.escrow, escrowAbi, "fee"),
     intentsFee: () => read<bigint>(cfg.intents, intentsAbi, "fee"),
-    trade: (id: bigint) => read<{ maker: Address; status: number; fee: bigint; taker: Address; expiry: bigint }>(cfg.v2, v2Abi, "getTrade", [id]),
+    trade: (id: bigint) => read<{ maker: Address; status: number; fee: bigint; taker: Address; expiry: bigint }>(cfg.escrow, escrowAbi, "getTrade", [id]),
     stop: () => cfg.stop?.(),
   };
 }

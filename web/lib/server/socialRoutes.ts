@@ -11,7 +11,7 @@ import { clientId, getStore, withinLimit, type Store } from "./store";
  * the route that records a follow. Reads are public and keyed by wallet, so they work for anyone,
  * signed in or not, in this app or another.
  */
-export type SocialDeps = FollowDeps & {
+type SocialDeps = FollowDeps & {
   store?: () => Store | null;
   gate?: (request: Request, name: string, limit: number) => Promise<UserGate>;
 };

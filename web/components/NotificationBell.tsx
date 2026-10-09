@@ -2,7 +2,24 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellIcon, ChatIcon, CheckIcon, ClockIcon, CoinIcon, CrossIcon, FlameIcon, HeartIcon, InboxIcon, PauseIcon, PinIcon, SwapIcon, TrendUpIcon, XLogoIcon } from "@/components/Icons";
+import {
+  BellIcon,
+  ChatIcon,
+  CheckIcon,
+  ClockIcon,
+  CoinIcon,
+  CrossIcon,
+  CrownIcon,
+  FlameIcon,
+  HeartIcon,
+  InboxIcon,
+  PauseIcon,
+  PinIcon,
+  SwapIcon,
+  TrendUpIcon,
+  TrophyIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { usePopover } from "@/components/Popover";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification, NotificationKind } from "@/lib/notifications";
@@ -10,7 +27,7 @@ import type { AppNotification, NotificationKind } from "@/lib/notifications";
 const KIND_LABEL: Record<NotificationKind, string> = {
   request: "For you",
   filled: "Accepted",
-  expiring: "Ending soon",
+  expiring: "Deal ending",
   expired: "Expired",
   "intent-settled": "Settled",
   "intent-paused": "Paused",
@@ -19,9 +36,17 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   "club-pinned": "Pinned",
   "club-reward": "Rewards",
   "club-reply": "Replied",
-  "club-xshare": "Counted",
-  "club-rank": "This epoch",
-  "club-closing": "Ending soon",
+  "club-xshare": "X post counted",
+  "club-rank": "Your rank",
+  "club-closing": "Epoch ending",
+  "challenge-new": "Challenge",
+  "challenge-ending": "Challenge ending",
+  "challenge-won": "You won",
+  "challenge-results": "Results",
+  "challenge-pick": "Pick winners",
+  "challenge-pick-soon": "Pick soon",
+  "challenge-prize-sent": "Prize sent",
+  "challenge-prize-owed": "Send the prize",
 };
 
 // One icon and tint per kind: the colour says good news, needs you, or gone.
@@ -40,6 +65,14 @@ const KIND_LOOK: Record<NotificationKind, { icon: ReactNode; tone: string }> = {
   "club-xshare": { icon: <XLogoIcon />, tone: "bg-mint/15 text-mint" },
   "club-rank": { icon: <TrendUpIcon />, tone: "bg-mint/15 text-mint" },
   "club-closing": { icon: <FlameIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-new": { icon: <TrophyIcon />, tone: "bg-peach/20 text-peach" },
+  "challenge-ending": { icon: <ClockIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-won": { icon: <TrophyIcon />, tone: "bg-mint/15 text-mint" },
+  "challenge-results": { icon: <TrophyIcon />, tone: "bg-white/10 text-white/80" },
+  "challenge-pick": { icon: <CrownIcon />, tone: "bg-peach/20 text-peach" },
+  "challenge-pick-soon": { icon: <CrownIcon />, tone: "bg-warn/15 text-warn" },
+  "challenge-prize-sent": { icon: <TrophyIcon />, tone: "bg-mint/15 text-mint" },
+  "challenge-prize-owed": { icon: <TrophyIcon />, tone: "bg-warn/15 text-warn" },
 };
 
 const MAX_SHOWN = 20;
@@ -63,7 +96,7 @@ export function NotificationBell() {
 }
 
 /** The bell and its panel, split from the data so the layout can be built and checked on its own. */
-export function NotificationBellView({
+function NotificationBellView({
   notifications,
   unreadCount,
   isRead,
@@ -98,10 +131,8 @@ export function NotificationBellView({
           <span className={`hdr-pop-icon !size-9 !rounded-full ${look.tone}`}>{look.icon}</span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline justify-between gap-2">
-              <span className={`truncate text-sm ${isNew ? "font-bold text-white" : "font-semibold text-white/75"}`}>
-                {n.title}
-              </span>
-              {isNew && <span className="size-2 shrink-0 rounded-full bg-accent" aria-label="Unread" />}
+              <span className={`truncate text-sm ${isNew ? "font-bold text-white" : "font-semibold text-white/75"}`}>{n.title}</span>
+              {isNew && <span className="size-2 shrink-0 rounded-full bg-accent" role="img" aria-label="Unread" />}
             </span>
             <span className="text-xs leading-5 text-white/60">{n.body}</span>
             <span className="mt-0.5 flex items-center gap-1.5 text-[0.65rem] font-bold tracking-wide text-white/45 uppercase">
@@ -144,10 +175,13 @@ export function NotificationBellView({
 
           {shown.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
-              <span className="hdr-pop-icon !size-11 !rounded-full text-white/70"><BellIcon className="size-5" /></span>
+              <span className="hdr-pop-icon !size-11 !rounded-full text-white/70">
+                <BellIcon className="size-5" />
+              </span>
               <p className="text-sm font-bold text-white">You&apos;re all caught up</p>
               <p className="text-xs leading-5 text-white/55">
-                Direct offers, accepted deals, settled swaps and expiries show up here.
+                Offers for you, accepted deals, settled swaps, expiries and Club news (replies, likes, pins, X posts counted, rewards, your rank and challenges)
+                show up here.
               </p>
             </div>
           ) : (
@@ -174,9 +208,7 @@ export function NotificationBellView({
                 <span className="flex flex-col">
                   <span className="text-xs font-bold text-white">Browser alerts</span>
                   <span className="text-xs leading-5 text-white/55">
-                    {alerts.denied
-                      ? "Blocked in your browser settings."
-                      : "While this tab is open in the background."}
+                    {alerts.denied ? "Blocked in your browser settings." : "While this tab is open in the background."}
                   </span>
                 </span>
                 {!alerts.denied && (

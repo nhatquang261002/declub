@@ -43,16 +43,12 @@ async function waitFor(what: string, probe: () => Promise<unknown>, tries = 150)
 
 /** Run a deploy script with `forge script --broadcast` and read the addresses it prints. */
 function forgeScript(script: string, rpcUrl: string, env: Record<string, string>): Record<string, Address> {
-  const r = spawnSync(
-    "forge",
-    ["script", `script/${script}`, "--rpc-url", rpcUrl, "--broadcast", "--private-key", keyOf(0)],
-    {
-      cwd: CONTRACTS,
-      encoding: "utf8",
-      // Only what the script needs: a developer's shell or .env can't change the deployment.
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1", ...env },
-    },
-  );
+  const r = spawnSync("forge", ["script", `script/${script}`, "--rpc-url", rpcUrl, "--broadcast", "--private-key", keyOf(0)], {
+    cwd: CONTRACTS,
+    encoding: "utf8",
+    // Only what the script needs: a developer's shell or .env can't change the deployment.
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1", ...env },
+  });
   if (r.status !== 0) throw new Error(`forge script ${script} failed:\n${r.stdout}\n${r.stderr}`);
   const out: Record<string, Address> = {};
   for (const m of r.stdout.matchAll(/([A-Z0-9_]+)=(0x[0-9a-fA-F]{40})\b/g)) out[m[1]!] = getAddress(m[2]!);
@@ -88,7 +84,7 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       FEE_RECIPIENT: feeRecipient,
       FEE_ADMIN: feeAdmin.address,
     };
-    const v2Out = forgeScript("DeployEscrow.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
+    const escrowOut = forgeScript("DeployEscrow.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_ERC20: "true" });
     const intentsOut = forgeScript("DeployIntents.s.sol", rpcUrl, { ...feeEnv, DEPLOY_MOCK_WMON: "true" });
     // The relayer (account 5) runs reward epochs; a short delay and the shortest window, so the
     // scenarios can warp past both.
@@ -104,11 +100,11 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
     const hash = await deployer.deployContract({ abi: chog.abi, bytecode: chog.bytecode, args: [] });
     const nft = getAddress((await pub.waitForTransactionReceipt({ hash })).contractAddress!);
 
-    const v2 = v2Out.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS;
-    const usd = v2Out.NEXT_PUBLIC_MOCK_ERC20_ADDRESS;
+    const escrow = escrowOut.NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS;
+    const usd = escrowOut.NEXT_PUBLIC_MOCK_ERC20_ADDRESS;
     const intents = intentsOut.NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS;
     const rewards = rewardsOut.NEXT_PUBLIC_DECLUB_REWARDS_ADDRESS;
-    if (!v2 || !usd || !intents || !rewards) throw new Error("a deploy script didn't print the expected addresses");
+    if (!escrow || !usd || !intents || !rewards) throw new Error("a deploy script didn't print the expected addresses");
 
     let poolUrl: string | undefined;
     if (opts.matcher) {
@@ -140,13 +136,17 @@ export async function startLocal(opts: { matcher: boolean }): Promise<WorldConfi
       target: "local",
       chainId: 31337,
       rpcUrl,
-      v2, intents, nft, usd, rewards,
+      escrow,
+      intents,
+      nft,
+      usd,
+      rewards,
       actors: [1, 2, 3, 4, 5].map(account),
       feeAdmin,
       poolUrl,
       canWarp: true,
       stop,
-      deployed: { ...v2Out, ...intentsOut, ...rewardsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
+      deployed: { ...escrowOut, ...intentsOut, ...rewardsOut, NFT: nft, FEE_RECIPIENT: feeRecipient, FEE_ADMIN: feeAdmin.address },
     };
   } catch (e) {
     stop();

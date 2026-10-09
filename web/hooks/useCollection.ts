@@ -18,13 +18,16 @@ const read = (address: Address) => ({ address, abi: nftReadAbi, chainId: CHAIN_I
  */
 export function useCollectionInfos(addresses: readonly Address[]) {
   const result = useReadContracts({
-    contracts: addresses.flatMap((a) => [
-      { ...read(a), functionName: "name" },
-      { ...read(a), functionName: "symbol" },
-      { ...read(a), functionName: "supportsInterface", args: [ERC721_INTERFACE] },
-      { ...read(a), functionName: "supportsInterface", args: [ENUMERABLE_INTERFACE] },
-      { ...read(a), functionName: "totalSupply" },
-    ] as const),
+    contracts: addresses.flatMap(
+      (a) =>
+        [
+          { ...read(a), functionName: "name" },
+          { ...read(a), functionName: "symbol" },
+          { ...read(a), functionName: "supportsInterface", args: [ERC721_INTERFACE] },
+          { ...read(a), functionName: "supportsInterface", args: [ENUMERABLE_INTERFACE] },
+          { ...read(a), functionName: "totalSupply" },
+        ] as const,
+    ),
     query: { enabled: addresses.length > 0, staleTime: 60_000 },
   });
 
@@ -66,14 +69,14 @@ export function useOwnedTokenIds(collection: Address | undefined, owner: Address
   const total = Number(balance.data ?? 0n);
   const count = Math.min(total, OWNED_CAP);
   const listed = useReadContracts({
-    contracts: Array.from({ length: on ? count : 0 }, (_, i) => ({ ...read(collection!), functionName: "tokenOfOwnerByIndex", args: [owner!, BigInt(i)] }) as const),
+    contracts: Array.from(
+      { length: on ? count : 0 },
+      (_, i) => ({ ...read(collection!), functionName: "tokenOfOwnerByIndex", args: [owner!, BigInt(i)] }) as const,
+    ),
     query: { enabled: on && count > 0 },
   });
   const ids = useMemo(
-    () =>
-      (listed.data ?? [])
-        .flatMap((r) => (r.status === "success" ? [r.result as bigint] : []))
-        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    () => (listed.data ?? []).flatMap((r) => (r.status === "success" ? [r.result as bigint] : [])).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     [listed.data],
   );
   return { ids: count === 0 ? [] : ids, total, isLoading: on && (balance.isLoading || (count > 0 && listed.isLoading)) };
@@ -92,7 +95,7 @@ export function useBrowseTokenIds(collection: Address | undefined, enumerable: b
   return { ids: on ? ids : [], isLoading: on && listed.isLoading };
 }
 
-export type TokenView = { name: string | null; image: string | null };
+type TokenView = { name: string | null; image: string | null };
 
 /** Name and art for each token, from its `tokenURI`, plus who owns it when `withOwners` is set. */
 export function useTokenViews(collection: Address | undefined, ids: readonly bigint[], withOwners = false) {

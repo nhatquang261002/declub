@@ -24,11 +24,12 @@ type Props = {
 const NOUN = { erc20: "token", erc721: "collection" } as const;
 
 /** A holding as a person reads it: "1,250 mUSD" or "3 owned". */
-export function holdingLabel(hit: SearchHit): string | null {
+function holdingLabel(hit: SearchHit): string | null {
   if (!hit.held) return null;
   if (hit.kind === "erc721") return `${hit.count ?? 1} owned`;
   if (hit.balance === undefined) return "You hold some";
-  const amount = hit.decimals === undefined ? hit.balance : Number(formatUnits(BigInt(hit.balance), hit.decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const amount =
+    hit.decimals === undefined ? hit.balance : Number(formatUnits(BigInt(hit.balance), hit.decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 });
   return `${amount} ${hit.symbol}`.trim();
 }
 
@@ -58,7 +59,9 @@ export function AssetSearch({ kind, owner, extra = [], onSelect, renderPasted, p
     <div className="space-y-4">
       <div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <label className="label !mb-0" htmlFor={`asset-search-${kind}`}>{label}</label>
+          <label className="label !mb-0" htmlFor={`asset-search-${kind}`}>
+            {label}
+          </label>
           {owner && (
             <div role="group" aria-label="What to search" className="flex gap-1">
               {(["holdings", "all"] as const).map((value) => (

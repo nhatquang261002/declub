@@ -1,13 +1,12 @@
 import { IPFS_GATEWAY } from "./config";
 
-export type ChogMetadata = {
+type ChogMetadata = {
   name: string;
   image: string | null;
   attributes: { trait_type: string; value: string }[];
 };
 
-const resolveUri = (uri: string) =>
-  uri.startsWith("ipfs://") ? IPFS_GATEWAY + uri.slice("ipfs://".length) : uri;
+const resolveUri = (uri: string) => (uri.startsWith("ipfs://") ? IPFS_GATEWAY + uri.slice("ipfs://".length) : uri);
 
 function decodeBase64Utf8(b64: string): string {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));

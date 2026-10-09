@@ -12,12 +12,14 @@ contract CollectionMirrorTest is Test {
 
     /// Mainnet Chog Genesis: #1 → 1462.json, #508 → 1969.json, #509 → 1.json, #1969 → 1461.json.
     function test_revealOffsetMatchesMainnetChog() public {
-        CollectionMirror chog = new CollectionMirror("Chog Genesis", "CHOG", 1969, CHOG_BASE, ".json", 1461);
+        CollectionMirror chog =
+            new CollectionMirror("Chog Genesis", "CHOG", 1969, CHOG_BASE, ".json", 1461);
         chog.mintBatch(address(this), 20);
         assertEq(chog.tokenURI(1), string.concat(CHOG_BASE, "1462.json"));
         assertEq(chog.tokenURI(2), string.concat(CHOG_BASE, "1463.json"));
 
-        CollectionMirror full = new CollectionMirror("Chog Genesis", "CHOG", 1969, CHOG_BASE, ".json", 1461);
+        CollectionMirror full =
+            new CollectionMirror("Chog Genesis", "CHOG", 1969, CHOG_BASE, ".json", 1461);
         full.mintBatch(address(this), 1969);
         assertEq(full.tokenURI(508), string.concat(CHOG_BASE, "1969.json"));
         assertEq(full.tokenURI(509), string.concat(CHOG_BASE, "1.json"));
@@ -25,7 +27,8 @@ contract CollectionMirrorTest is Test {
     }
 
     function test_noOffsetNoSuffix() public {
-        CollectionMirror m = new CollectionMirror("r3tards", "R3TARDS", 1033, "https://example.com/m/", "", 0);
+        CollectionMirror m =
+            new CollectionMirror("r3tards", "R3TARDS", 1033, "https://example.com/m/", "", 0);
         m.mintBatch(address(this), 3);
         assertEq(m.tokenURI(3), "https://example.com/m/3");
         assertEq(m.totalSupply(), 3);
@@ -41,7 +44,11 @@ contract CollectionMirrorTest is Test {
         m.mintBatch(address(this), 1);
 
         vm.prank(makeAddr("stranger"));
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, makeAddr("stranger")));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector, makeAddr("stranger")
+            )
+        );
         m.mintBatch(address(this), 1);
     }
 

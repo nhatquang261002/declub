@@ -1,6 +1,6 @@
 # ADR 0022: Club Rewards — a share of the fees goes back to the Club
 
-**Status:** Accepted · 2026-10-05 · New contract `DeClubRewards`, an epoch builder in the web server, and Rewards screens. Part of [ADR 0021](0021-declub-pivot.md). The spec is [09 · Clubs](../09-clubs.md#rewards). Amended by [ADR 0024](0024-x-posts-and-the-holder-bonus.md): Holders' shares now count up to 50% more for their activity in the epoch, including their X posts. Amended by [ADR 0025](0025-clubs-are-for-nft-collections.md): shares are one per NFT only; a Club's memecoin earns no shares.
+**Status:** Accepted · 2026-10-05 · New contract `DeClubRewards`, an epoch builder in the web server, and Rewards screens. Part of [ADR 0021](0021-declub-pivot.md). The spec is [09 · Clubs](../09-clubs.md#rewards). Amended by [ADR 0029](0029-top-holders-and-posts-only-bonus.md) (only the top 10 Holders are paid). Amended by [ADR 0024](0024-x-posts-and-the-holder-bonus.md): Holders' shares now count up to 50% more for their activity in the epoch, including their X posts. Amended by [ADR 0035](0035-sponsored-epochs.md): sponsors can add to a Club's Holder pool for an epoch. Amended by [ADR 0025](0025-clubs-are-for-nft-collections.md): shares are one per NFT only; a Club's memecoin earns no shares. Amended by [ADR 0054](0054-resumable-epoch-build-and-epoch-backup.md) (the build is resumable and the epochs can be backed up).
 
 ## Context
 
@@ -24,7 +24,7 @@ Constraints:
 - **The fee of each swap** comes from its receipt: `FeeCharged` beside an escrow fill, recorded with the Club's activity; for a signed swap, the settlement's `FeeCharged`, read when the epoch is built.
 - **One Merkle leaf per account per epoch,** summing every Club it earned in, bound to the chain and the contract and hashed twice: `keccak256(bytes.concat(keccak256(abi.encode(chainid, rewards, epoch, account, amount))))`.
 - **`DeClubRewards`:** the operator `publish`es a root with the MON it covers; claims open after `CLAIM_DELAY` (a day on mainnet), during which the operator can `revoke` a wrong root and take the MON back; anyone can `claim` a leaf for its account; after `CLAIM_WINDOW` (90 days) the operator can `sweep` what's left to roll it forward. Each epoch keeps its own books: it can never pay out more than it was funded with, and no leaf is paid twice.
-- **Funding is manual:** the operator (the fee recipient's side) sends each epoch's total with `publish`. Fees from signed swaps are WMON and are unwrapped first; rewards are paid in MON.
+- **Funding is manual:** the operator (the fee recipient's side) sends each epoch's total with `publish`. Fees from signed swaps are WMON and are unwrapped first; rewards are paid in MON. `rewards:epoch` works out what the operator's MON is short of and unwraps that much of its WMON (`withdraw`) before `publish`, or prints both calls as one Safe batch. The contracts never unwrap: `DeClubIntents` holds nothing and takes no MON, and one unwrap a week costs less than one per swap. Each Club's epoch line keeps `signedFees`, the part of its fees paid in WMON, and the Rewards tab shows it under the fees.
 - **Everything is public:** `GET /api/rewards/epochs/<n>` serves the epoch with every leaf and proof, so anyone can rebuild the root.
 
 ## What it does not do

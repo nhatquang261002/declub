@@ -4,19 +4,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain } from "wagmi";
-import {
-  CheckIcon,
-  ChevronIcon,
-  CopyIcon,
-  ExternalIcon,
-  PlusIcon,
-  SignOutIcon,
-  UserIcon,
-  WalletIcon,
-} from "@/components/Icons";
+import { CheckIcon, ChevronIcon, CopyIcon, ExternalIcon, PlusIcon, SettingsIcon, ShieldIcon, SignOutIcon, UserIcon, WalletIcon } from "@/components/Icons";
 import { usePopover } from "@/components/Popover";
 import { useToast } from "@/components/Toast";
 import { WalletAvatar } from "@/components/WalletAvatar";
+import { profilePath } from "@/lib/about";
 import { linkedRows, signedInAs } from "@/lib/accounts";
 import { explorerAddress, PRIVY_APP_ID, PRIVY_EMBEDDED_WALLETS } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
@@ -64,8 +56,32 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** The top of a menu: who is signed in, then whatever `children` say about the wallet. */
+function MenuHead({ who, children }: { who?: string | null; children: ReactNode }) {
+  return (
+    <div className="hdr-pop-head">
+      {who && <span className="text-sm font-bold text-white">{who}</span>}
+      {children}
+    </div>
+  );
+}
+
+/** The header button that opens a wallet menu: avatar, who is signed in (when known), a label, and a chevron. */
+function MenuTrigger({ open, onToggle, avatar, who, children }: { open: boolean; onToggle: () => void; avatar: ReactNode; who?: string; children: ReactNode }) {
+  return (
+    <button className="hdr-btn" aria-expanded={open} aria-haspopup="menu" onClick={onToggle}>
+      {avatar}
+      <span className="hdr-btn-text">
+        {who && <span className="hdr-btn-sub hidden sm:block">{who}</span>}
+        {children}
+      </span>
+      <ChevronIcon className="hdr-chevron size-4" />
+    </button>
+  );
+}
+
 /** The connected state both modes share: the network switch, the address menu and sign out. */
-export function ConnectedWallet({
+function ConnectedWallet({
   address,
   chainId,
   onDisconnect,
@@ -79,7 +95,7 @@ export function ConnectedWallet({
   disconnectLabel: string;
   /** Privy mode: the email or handle the user signed in with. */
   signedInAs?: string;
-  /** Privy mode: show the link to the account screen. */
+  /** Privy mode: show the link to the account settings. */
   accountLink?: boolean;
 }) {
   const switchChain = useSwitchChain();
@@ -94,14 +110,15 @@ export function ConnectedWallet({
 
   if (chainId !== chain.id) {
     return (
-      <button
-        className="hdr-btn hdr-btn-warn !pl-3"
-        disabled={switchChain.isPending}
-        onClick={() => switchChain.mutate({ chainId: chain.id })}
-      >
+      <button className="hdr-btn hdr-btn-warn !pl-3" disabled={switchChain.isPending} onClick={() => switchChain.mutate({ chainId: chain.id })}>
         <span>
-          {switchChain.isPending ? "Switching…" : (
-            <>Switch<span className="hidden sm:inline"> to {chain.name}</span><span className="sm:hidden"> network</span></>
+          {switchChain.isPending ? (
+            "Switching…"
+          ) : (
+            <>
+              Switch<span className="hidden sm:inline"> to {chain.name}</span>
+              <span className="sm:hidden"> network</span>
+            </>
           )}
         </span>
       </button>
@@ -110,48 +127,55 @@ export function ConnectedWallet({
 
   return (
     <div className="hdr-anchor" ref={ref}>
-      <button
-        className="hdr-btn"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
+      <MenuTrigger
+        open={open}
+        onToggle={() => setOpen((value) => !value)}
+        avatar={
+          <WalletAvatar seed={address}>
+            <span className="avatar-dot" />
+          </WalletAvatar>
+        }
+        who={who}
       >
-        <WalletAvatar seed={address}>
-          <span className="avatar-dot" />
-        </WalletAvatar>
-        <span className="hdr-btn-text">
-          {who && <span className="hdr-btn-sub hidden sm:block">{who}</span>}
-          <span className="font-mono">{shortAddress(address)}</span>
-        </span>
-        <ChevronIcon className="hdr-chevron size-4" />
-      </button>
+        <span className="font-mono">{shortAddress(address)}</span>
+      </MenuTrigger>
 
       {open && (
         <div className="hdr-pop" role="menu">
-          <div className="hdr-pop-head">
-            {who && <span className="text-sm font-bold text-white">{who}</span>}
+          <MenuHead who={who}>
             <span className="hdr-pop-label mt-1">Wallet</span>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate font-mono text-sm text-white" title={address}>{shortAddress(address)}</span>
+              <span className="truncate font-mono text-sm text-white" title={address}>
+                {shortAddress(address)}
+              </span>
               <CopyButton text={address} />
             </div>
             <span className="hdr-chip mt-2.5">{chain.name}</span>
-          </div>
+          </MenuHead>
+          <Link href={profilePath(address)} className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+            <span className="hdr-pop-icon">
+              <UserIcon />
+            </span>
+            <span className="flex-1">Your profile</span>
+          </Link>
+          <Link href="/approvals" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+            <span className="hdr-pop-icon">
+              <ShieldIcon />
+            </span>
+            <span className="flex-1">Your approvals</span>
+          </Link>
           {accountLink && (
-            <Link href="/account" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
-              <span className="hdr-pop-icon"><UserIcon /></span>
-              <span className="flex-1">Account &amp; linked accounts</span>
+            <Link href="/settings" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+              <span className="hdr-pop-icon">
+                <SettingsIcon />
+              </span>
+              <span className="flex-1">Account settings</span>
             </Link>
           )}
-          <a
-            href={explorerAddress(address)}
-            target="_blank"
-            rel="noreferrer"
-            className="hdr-pop-item"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-          >
-            <span className="hdr-pop-icon"><ExternalIcon /></span>
+          <a href={explorerAddress(address)} target="_blank" rel="noreferrer" className="hdr-pop-item" role="menuitem" onClick={() => setOpen(false)}>
+            <span className="hdr-pop-icon">
+              <ExternalIcon />
+            </span>
             <span className="flex-1">View on explorer</span>
           </a>
           <div className="hdr-pop-sep" />
@@ -177,7 +201,7 @@ export function ConnectedWallet({
  * it has none. Either way the header needs a way forward and a way out, so this menu offers
  * connecting or linking a wallet, and always sign out.
  */
-export function NoWalletMenu({
+function NoWalletMenu({
   who,
   settingUp,
   linkedWallets,
@@ -205,20 +229,21 @@ export function NoWalletMenu({
   const hasLinked = linkedWallets.length > 0;
   return (
     <div className="hdr-anchor" ref={ref}>
-      <button className="hdr-btn" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
-        <WalletAvatar>
-          <UserIcon className="size-3.5 text-white/80" />
-        </WalletAvatar>
-        <span className="hdr-btn-text">
-          {who && <span className="hdr-btn-sub hidden sm:block">{who}</span>}
-          <span>{settingUp ? "Setting up…" : hasLinked ? "Connect wallet" : "Link a wallet"}</span>
-        </span>
-        <ChevronIcon className="hdr-chevron size-4" />
-      </button>
+      <MenuTrigger
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        avatar={
+          <WalletAvatar>
+            <UserIcon className="size-3.5 text-white/80" />
+          </WalletAvatar>
+        }
+        who={who}
+      >
+        <span>{settingUp ? "Setting up…" : hasLinked ? "Connect wallet" : "Link a wallet"}</span>
+      </MenuTrigger>
       {open && (
         <div className="hdr-pop" role="menu">
-          <div className="hdr-pop-head">
-            {who && <span className="text-sm font-bold text-white">{who}</span>}
+          <MenuHead who={who}>
             <p className="mt-1 text-xs leading-5 text-white/65">
               {settingUp
                 ? "Loading your wallets. This takes a moment."
@@ -226,7 +251,7 @@ export function NoWalletMenu({
                   ? "You're signed in. Connect the wallet linked to your account to trade."
                   : "You're signed in, but no wallet is linked to this account yet. Link the wallet you trade with."}
             </p>
-          </div>
+          </MenuHead>
           {linkedWallets.map((address) => (
             <MenuItem key={address} icon={<WalletIcon />} onClick={onConnect}>
               Connect <span className="font-mono">{shortAddress(address as `0x${string}`)}</span>
@@ -241,7 +266,9 @@ export function NoWalletMenu({
             </MenuItem>
           )}
           <div className="hdr-pop-sep" />
-          <MenuItem danger icon={<SignOutIcon />} onClick={onSignOut}>Sign out</MenuItem>
+          <MenuItem danger icon={<SignOutIcon />} onClick={onSignOut}>
+            Sign out
+          </MenuItem>
         </div>
       )}
     </div>
@@ -271,16 +298,7 @@ function PrivyConnect() {
   };
 
   if (status === "connected" && address) {
-    return (
-      <ConnectedWallet
-        address={address}
-        chainId={chainId}
-        onDisconnect={signOut}
-        disconnectLabel="Sign out"
-        signedInAs={signedInAs(user)}
-        accountLink
-      />
-    );
+    return <ConnectedWallet address={address} chainId={chainId} onDisconnect={signOut} disconnectLabel="Sign out" signedInAs={signedInAs(user)} accountLink />;
   }
 
   if (authenticated) {
@@ -288,7 +306,9 @@ function PrivyConnect() {
       <NoWalletMenu
         who={signedInAs(user)}
         settingUp={!wallets.ready || status === "connecting" || status === "reconnecting"}
-        linkedWallets={linkedRows(user).filter((row) => row.kind === "wallet" && !row.embedded).map((row) => row.id)}
+        linkedWallets={linkedRows(user)
+          .filter((row) => row.kind === "wallet" && !row.embedded)
+          .map((row) => row.id)}
         canCreate={PRIVY_EMBEDDED_WALLETS}
         creating={creating}
         onConnect={() => connectWallet()}
@@ -329,14 +349,7 @@ function InjectedConnect() {
   }, [connectError, toast]);
 
   if (status === "connected" && address) {
-    return (
-      <ConnectedWallet
-        address={address}
-        chainId={chainId}
-        onDisconnect={() => disconnect.mutate({})}
-        disconnectLabel="Disconnect wallet"
-      />
-    );
+    return <ConnectedWallet address={address} chainId={chainId} onDisconnect={() => disconnect.mutate({})} disconnectLabel="Disconnect wallet" />;
   }
 
   // EIP-6963 lists every installed wallet; the generic "Injected" one is a fallback.
@@ -349,9 +362,7 @@ function InjectedConnect() {
         className="btn-secondary"
         aria-expanded={wallets.length > 1 ? open : undefined}
         disabled={connecting}
-        onClick={() =>
-          wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o)
-        }
+        onClick={() => (wallets.length === 1 ? connect.mutate({ connector: wallets[0] }) : setOpen((o) => !o))}
       >
         <WalletIcon />
         <span>{connecting ? "Connecting…" : "Connect wallet"}</span>
@@ -378,7 +389,9 @@ function InjectedConnect() {
                 {connector.icon ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={connector.icon} alt="" className="size-5 rounded" />
-                ) : <WalletIcon />}
+                ) : (
+                  <WalletIcon />
+                )}
               </span>
               <span className="flex-1">{connector.name}</span>
             </button>

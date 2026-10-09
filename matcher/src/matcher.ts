@@ -24,7 +24,7 @@ export interface MatcherConfig {
   gasBufferPct: bigint;
   /**
    * Refuse to send a cycle that needs more gas than this. The matcher pays for settlements that
-   * succeed too, and a token can burn gas on purpose. The contract's worst case is 3.4M (with the fee).
+   * succeed too, and a token can burn gas on purpose. The contract's worst case is 1.8M (with the fee): four makers, five NFTs each way.
    */
   maxGas: bigint;
   /** Edges the cycle search may look at per pass (`MAX_SEARCH_STEPS`). */
@@ -112,12 +112,7 @@ export class Matcher {
   private timer: NodeJS.Timeout | null = null;
   private stopped = true;
 
-  constructor(
-    pool: Pool,
-    sender: Sender,
-    cfg: MatcherConfig,
-    log: (msg: string) => void = () => {},
-  ) {
+  constructor(pool: Pool, sender: Sender, cfg: MatcherConfig, log: (msg: string) => void = () => {}) {
     this.pool = pool;
     this.reader = pool.reader;
     this.sender = sender;
@@ -128,7 +123,11 @@ export class Matcher {
   /** One matching pass: settle what can be settled, drop what can't, repeat until nothing changes. */
   async runOnce(): Promise<MatchReport> {
     const report: MatchReport = {
-      settled: [], dropped: [], cooledDown: 0, reverted: [], searchTruncated: false,
+      settled: [],
+      dropped: [],
+      cooledDown: 0,
+      reverted: [],
+      searchTruncated: false,
     };
     const start = Date.now();
     for (const [k, until] of this.cooldown) if (until <= start) this.cooldown.delete(k);
@@ -244,8 +243,7 @@ export class Matcher {
     const offenders = new Map<Hex, Dropped>();
     // Intents dropped for something the maker didn't do (a fee raise), so not held against them.
     const excused = new Set<Hex>();
-    const blame = (r: Row, status: Status, reason: string) =>
-      offenders.set(r.hash, { hash: r.hash, status, reason });
+    const blame = (r: Row, status: Status, reason: string) => offenders.set(r.hash, { hash: r.hash, status, reason });
 
     const revert = decodeRevert(err);
     if (revert) {
@@ -337,9 +335,7 @@ export class Matcher {
         }
       }),
     );
-    let struck = cycle.filter(
-      (r, i) => isContract[i] || r.intent.give.some((a) => suspect.has(a.token.toLowerCase())),
-    );
+    let struck = cycle.filter((r, i) => isContract[i] || r.intent.give.some((a) => suspect.has(a.token.toLowerCase())));
     if (struck.length === 0) struck = cycle;
     const makers = [...new Map(struck.map((r) => [r.maker.toLowerCase(), r.maker])).values()];
     for (const m of makers) store.recordStrike(m, txHash, now);
@@ -397,4 +393,3 @@ const cycleKey = (cycle: Row[]) =>
     .map((r) => r.hash)
     .sort()
     .join();
-

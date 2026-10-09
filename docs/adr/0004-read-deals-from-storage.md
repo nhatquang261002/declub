@@ -16,7 +16,7 @@ The frontend reads trades from contract storage:
 2. `getTrade(id)` for the newest N ids, batched into one multicall (viem splits it into several `eth_call`s when it's large). It returns the full terms and the live status.
 3. Poll `tradeCount` every 5s and the trade batch every 8s. There's no log subscription.
 
-This needs no contract change: `getTrade` already returns every field, including closed trades' id arrays ([03 · Contract Design](../03-contract-design.md#gas-bounds)).
+This needs no contract change: `getTrade` already returns every field, including closed trades' id arrays ([03 · Contract Design](../03-contract-design.md#gas-worst-case-10-nfts-each-way)).
 
 ## Consequences
 

@@ -1,0 +1,60 @@
+# A nightly dump of the server store (ADR 0055) as a workflow artifact, kept 30 days.
+#
+# The dump holds Privy user ids, wallets and avatars, and artifacts of a public repo can be
+# downloaded by anyone signed in to GitHub. So the job runs only while the repository is private;
+# on a public one it is skipped, and nothing is read from the store.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   UPSTASH_REDIS_REST_URL    the store the app uses
+#   UPSTASH_REDIS_REST_TOKEN  its token (read access is enough)
+# Repository variable (optional): BACKUP_MIN_KEYS, the fewest keys a good dump has (default 1).
+#
+# A failed run emails the repository's admins. To restore, download the artifact and run
+#   cd web && npm run store:backup -- --restore <file>.jsonl.gz          (counts)
+#   cd web && npm run store:backup -- --restore <file>.jsonl.gz --confirm
+# Anyone with write access can download it, and the run's logs show key counts, not contents.
+name: store-backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    # Skipped unless the repository is private; if GitHub doesn't say, it is skipped too.
+    if: github.event.repository.private == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Dump the store
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          MIN_KEYS: ${{ vars.BACKUP_MIN_KEYS || '1' }}
+        run: |
+          if [ -z "$UPSTASH_REDIS_REST_URL" ] || [ -z "$UPSTASH_REDIS_REST_TOKEN" ]; then
+            echo "::error::UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not set."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/backup"
+          npm run store:backup -- --out "$RUNNER_TEMP/backup/declub-store-$(date -u +%F).jsonl.gz" --min-keys "$MIN_KEYS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: declub-store-${{ github.run_id }}
+          path: ${{ runner.temp }}/backup/
+          retention-days: 30
+          if-no-files-found: error

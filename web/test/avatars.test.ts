@@ -3,8 +3,17 @@ import { describe, it } from "node:test";
 import { getAddress, type Address } from "viem";
 import { avatarImageKey, avatarKey, avatarWalletsKey, type StoredAvatar, type StoredImage } from "../lib/avatars";
 import {
-  clearAvatar, keptImage, ownedAvatar, parseImage, readAvatars, setNftAvatar, setUploadAvatar, stillHeld, syncAvatar,
-  type AvatarChain, type AvatarDeps,
+  clearAvatar,
+  keptImage,
+  ownedAvatar,
+  parseImage,
+  readAvatars,
+  setNftAvatar,
+  setUploadAvatar,
+  stillHeld,
+  syncAvatar,
+  type AvatarChain,
+  type AvatarDeps,
 } from "../lib/server/avatars";
 import { handlePrivyEvent } from "../lib/server/privyWebhook";
 import { memoryStore } from "../lib/server/store";

@@ -1,6 +1,6 @@
 # ADR 0007: Open offers ("make me an offer") with escrowed proposals
 
-**Status:** Accepted · 2026-09-30 · Phase 4. Implemented in `OnDealV2` (contract, unit and invariant tests; 100% coverage of the contract). Frontend built ([05](../05-frontend.md#ondealv2-in-the-frontend-phase-4)). Deployed with ADR 0006 (`OnDealV2` `0x7359…E1bB`, block 67163690, Sourcify full match).
+**Status:** Accepted · 2026-09-30 · Phase 4. Implemented in `OnDealV2` (contract, unit and invariant tests; 100% coverage of the contract). Frontend built ([05](../05-frontend.md#declubescrow-in-the-frontend-phase-4)). Deployed with ADR 0006 (`OnDealV2` `0x7359…E1bB`, block 67163690, Sourcify full match).
 
 ## Context
 

@@ -15,10 +15,14 @@ const MAX_ADDRESSES = 50;
  */
 export async function GET(request: Request) {
   const raw = new URL(request.url).searchParams.get("addresses") ?? "";
-  const addresses = [...new Set(raw.split(",").map((a) => a.trim().toLowerCase()).filter((a) => isAddress(a, { strict: false })))].slice(
-    0,
-    MAX_ADDRESSES,
-  );
+  const addresses = [
+    ...new Set(
+      raw
+        .split(",")
+        .map((a) => a.trim().toLowerCase())
+        .filter((a) => isAddress(a, { strict: false })),
+    ),
+  ].slice(0, MAX_ADDRESSES);
 
   const profiles: Record<string, Profile> = {};
   let avatars: Record<string, AvatarView> = {};

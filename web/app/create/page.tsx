@@ -8,12 +8,12 @@ import { SignedFlow } from "@/components/create/SignedFlow";
 import { StepHeading } from "@/components/create/parts";
 import { Stepper } from "@/components/create/Stepper";
 import { PageHeader, RequireWallet } from "@/components/Page";
-import { swapIntents, swapV2 } from "@/lib/contracts";
+import { swapIntents, swapEscrow } from "@/lib/contracts";
 import { DEFAULT_TERMS, type Step, type Terms, type DealKind, type Settlement } from "@/lib/createFlow";
 
 // Open offers, exact requests and trait requests all live on DeClubEscrow (ADR 0005–0007).
 const UNAVAILABLE = { scope: "", unavailable: "Not available on this deployment yet" };
-const AVAILABILITY: KindAvailability = swapV2
+const AVAILABILITY: KindAvailability = swapEscrow
   ? {
       open: { scope: "Any tokens, NFTs and MON" },
       exact: { scope: "Any tokens, NFTs and MON" },
@@ -63,10 +63,20 @@ function CreateWizard() {
         </section>
       )}
 
-      {signed && <SignedFlow key="signed" step={step} onStep={setStep} onUseEscrow={() => { setSettlement("escrow"); setStep(1); }} />}
+      {signed && (
+        <SignedFlow
+          key="signed"
+          step={step}
+          onStep={setStep}
+          onUseEscrow={() => {
+            setSettlement("escrow");
+            setStep(1);
+          }}
+        />
+      )}
 
       {/* Same key across kinds that share a contract, so switching between them keeps what you typed. */}
-      {!signed && swapV2 && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
+      {!signed && swapEscrow && kind && <MultiFlow key="multi" kind={kind} {...flow} />}
     </div>
   );
 }

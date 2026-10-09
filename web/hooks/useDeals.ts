@@ -1,0 +1,55 @@
+"use client";
+
+import { useMemo } from "react";
+import { useReadContract, useReadContracts } from "wagmi";
+import { swapEscrow } from "@/lib/contracts";
+import { toDeal, type Deal } from "@/lib/deals";
+
+/**
+ * The newest `limit` DeClubEscrow deals, newest first. Same approach as the original deal list
+ * (ADR 0004): `tradeCount` then one multicall of `getTrade`, because the public RPC can't scan logs.
+ * Returns nothing while DeClubEscrow isn't configured.
+ */
+export function useDeals({ limit = 200, enabled = true }: { limit?: number; enabled?: boolean } = {}) {
+  const active = enabled && !!swapEscrow;
+  const count = useReadContract({
+    ...swapEscrow!,
+    functionName: "tradeCount",
+    query: { enabled: active, refetchInterval: 5_000 },
+  });
+  const total = count.data ?? 0n;
+
+  const ids = useMemo(() => {
+    const out: bigint[] = [];
+    for (let id = total; id >= 1n && out.length < limit; id--) out.push(id);
+    return out;
+  }, [total, limit]);
+
+  const results = useReadContracts({
+    contracts: ids.map((id) => ({ ...swapEscrow!, functionName: "getTrade", args: [id] }) as const),
+    query: {
+      enabled: active && ids.length > 0,
+      refetchInterval: 8_000,
+      placeholderData: (previous) => previous,
+    },
+  });
+
+  const deals = useMemo(() => {
+    const out: Deal[] = [];
+    results.data?.forEach((r, i) => {
+      if (r.status !== "success" || ids[i] === undefined) return;
+      const deal = toDeal(ids[i], r.result);
+      if (deal) out.push(deal);
+    });
+    return out;
+  }, [results.data, ids]);
+
+  return {
+    enabled: active,
+    deals,
+    total,
+    hasMore: BigInt(deals.length) < total,
+    isLoading: active && (count.isLoading || (ids.length > 0 && results.isLoading)),
+    error: count.error ?? results.error,
+  };
+}

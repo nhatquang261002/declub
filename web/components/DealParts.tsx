@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { formatMon } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
-import type { DealV2 } from "@/lib/dealsV2";
+import type { Deal } from "@/lib/deals";
 import { ClockIcon, LockIcon, SwapIcon } from "./Icons";
 import { Who } from "./Who";
 
@@ -24,7 +24,7 @@ export const STATUS_TEXT: Record<DisplayStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export function StatusBadge({ status }: { status: DisplayStatus }) {
+function StatusBadge({ status }: { status: DisplayStatus }) {
   return (
     <span className={`chip ${BADGE[status]} uppercase tracking-wide ${status === "open" ? "rotate-[-2deg]" : ""}`}>
       {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
@@ -52,7 +52,7 @@ export function SettlementTag({ signed }: { signed: boolean }) {
 
 export function MonPill({ wei }: { wei: bigint }) {
   return (
-    <span className="inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-[#836ef9] bg-[#eeeaff] px-1.5 text-center font-semibold leading-tight text-[#111318] shadow-[0.18rem_0.18rem_0_#111318]">
+    <span className="inline-flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-[#836ef9] bg-[#eeeaff] px-1.5 text-center font-semibold leading-tight text-[#111318]">
       <Image src="/brand/mon.svg" alt="" width={22} height={22} className="size-[22px]" />
       <span className="text-[11px]">
         <span className="text-[#836ef9]">+ </span>
@@ -94,11 +94,11 @@ export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: 
 }
 
 /** The gives / wants pair every deal-like card shows. */
-export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
+function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
   return (
     <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
       <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-        <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase shadow-sm">
+        <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase">
           gives
         </span>
         {gives}
@@ -107,7 +107,7 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
         <SwapIcon />
       </span>
       <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
-        <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase shadow-sm">
+        <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase">
           wants
         </span>
         {wants}
@@ -116,7 +116,35 @@ export function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNod
   );
 }
 
-/** The card chrome shared by deals and signed swaps: header row, gives / wants panels, maker line. */
+/** The chrome every swap card shares: a link, a header row ending in the countdown, the gives / wants panels and a maker line. */
+export function SwapCardShell({
+  href,
+  head,
+  countdown,
+  gives,
+  wants,
+  foot,
+}: {
+  href: string;
+  head: ReactNode;
+  countdown: ReactNode;
+  gives: ReactNode;
+  wants: ReactNode;
+  foot: ReactNode;
+}) {
+  return (
+    <Link href={href} className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {head}
+        <span className="ml-auto">{countdown}</span>
+      </div>
+      <SwapPanels gives={gives} wants={wants} />
+      <div className="mt-4 text-xs text-muted">{foot}</div>
+    </Link>
+  );
+}
+
+/** A deal's card: its id, status and expiry, the gives / wants panels and who made it. */
 export function DealCardFrame({
   href,
   deal,
@@ -127,7 +155,7 @@ export function DealCardFrame({
   tag,
 }: {
   href: string;
-  deal: Pick<DealV2, "id" | "maker" | "taker" | "expiry" | "status">;
+  deal: Pick<Deal, "id" | "maker" | "taker" | "expiry" | "status">;
   now: number;
   me?: string;
   gives: ReactNode;
@@ -140,34 +168,35 @@ export function DealCardFrame({
   const mine = sameAddress(deal.maker, me);
 
   return (
-    <Link
+    <SwapCardShell
       href={href}
-      className="deal-card group relative block overflow-hidden p-4 transition-colors duration-200"
-    >
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-black tracking-tight">
-          <span className="text-accent">#</span>
-          {deal.id.toString()}
-        </span>
-        <StatusBadge status={status} />
-        {tag}
-        {forMe && <span className="chip chip-peach">★ For you</span>}
-        {mine && <span className="chip chip-dark">Yours</span>}
-        {deal.taker && !forMe && <span className="chip">Private</span>}
-        <span className="ml-auto"><ExpiryCountdown expiry={deal.expiry} now={now} status={status} /></span>
-      </div>
-
-      <SwapPanels gives={gives} wants={wants} />
-
-      <div className="mt-4 text-xs text-muted">
-        by <Who address={deal.maker} mine={mine} plain />
-        {deal.taker && !forMe && (
-          <>
-            {" "}
-            · only <Who address={deal.taker} plain /> can accept
-          </>
-        )}
-      </div>
-    </Link>
+      head={
+        <>
+          <span className="font-black tracking-tight">
+            <span className="text-accent">#</span>
+            {deal.id.toString()}
+          </span>
+          <StatusBadge status={status} />
+          {tag}
+          {forMe && <span className="chip chip-peach">★ For you</span>}
+          {mine && <span className="chip chip-dark">Yours</span>}
+          {deal.taker && !forMe && <span className="chip">Private</span>}
+        </>
+      }
+      countdown={<ExpiryCountdown expiry={deal.expiry} now={now} status={status} />}
+      gives={gives}
+      wants={wants}
+      foot={
+        <>
+          by <Who address={deal.maker} mine={mine} plain />
+          {deal.taker && !forMe && (
+            <>
+              {" "}
+              · only <Who address={deal.taker} plain /> can accept
+            </>
+          )}
+        </>
+      }
+    />
   );
 }

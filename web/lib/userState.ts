@@ -1,21 +1,18 @@
 import type { GetAccessToken } from "@/hooks/useAccessToken";
+import { bearerInit } from "./bearer";
 
 /**
  * The browser side of /api/state (ADR 0012). Both calls are best-effort: saved state is a
  * convenience, so a server that is off, slow or failing means the app keeps using what the
  * browser has, and nothing here throws.
  */
-export type RemoteState = { enabled: false } | { enabled: true; seen: string[]; initialized: boolean; recents: string[] };
+type RemoteState = { enabled: false } | { enabled: true; seen: string[]; initialized: boolean; recents: string[] };
 
 async function call(getToken: GetAccessToken, method: "GET" | "POST", path: string, body?: unknown): Promise<Response | undefined> {
   try {
     const token = await getToken();
     if (!token) return undefined;
-    return await fetch(path, {
-      method,
-      headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    return await fetch(path, bearerInit(token, method, body));
   } catch {
     return undefined;
   }
@@ -28,7 +25,7 @@ export async function loadState(getToken: GetAccessToken, account?: string): Pro
   return (await response.json()) as RemoteState;
 }
 
-export type StatePatch = { account?: string; seen?: string[]; initialized?: true; recents?: string[] };
+type StatePatch = { account?: string; seen?: string[]; initialized?: true; recents?: string[] };
 
 // The server takes this many read markers per request (lib/state.ts).
 const SEEN_PER_REQUEST = 500;
