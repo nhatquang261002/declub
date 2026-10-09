@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 // Services the app runs on; Envio only when the fill watcher has a HyperSync token (ADR 0051).
 const PARTNERS = [
@@ -10,8 +13,9 @@ const PARTNERS = [
 // Three partners are narrower than a wide screen, so each half repeats them until it overfills.
 const SET = [...PARTNERS, ...PARTNERS, ...PARTNERS];
 
-/** Footer strip that scrolls the partner logos sideways; pauses on hover and stands still for reduced motion. */
+/** Footer strip that scrolls the partner logos sideways; home page only. Pauses on hover and stands still for reduced motion. */
 export function PoweredBy() {
+  if (usePathname() !== "/") return null;
   return (
     <div className="powered-by">
       <span className="powered-by-tag">Powered by</span>

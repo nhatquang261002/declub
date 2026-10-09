@@ -11,7 +11,7 @@ tracked in [06 · Roadmap](06-roadmap.md).
 ```text
 web/
 ├── app/
-│   ├── layout.tsx              ✓ providers, header, a one-line footer (network, contract link, the no-admin note)
+│   ├── layout.tsx              ✓ providers, header, footer: PoweredBy strip (home page only), then network, contract link, the no-admin note
 │   ├── globals.css             ✓ Tailwind theme tokens + card/btn/input utilities
 │   ├── page.tsx                ✓ Home: hero, how it works, ClubsIntro (#clubs), a Guide link, and its own footer (links, the contract, a testnet warning)
 │   ├── deals/page.tsx         ✓ Open Deals → Deals: tabs, search + filters, one page at a time from /api/deals
@@ -31,6 +31,7 @@ web/
 ├── components/
 │   ├── Providers.tsx           ✓ PrivyProvider + @privy-io/wagmi's WagmiProvider when Privy is on, else wagmi's; QueryClientProvider; ToastProvider
 │   ├── Header.tsx              ✓ nav (Deals, Clubs, History, Guide), Create button, NotificationBell, ConnectButton
+│   ├── PoweredBy.tsx           ✓ home-page footer strip of partner logos (Monad, Privy, Envio) scrolling sideways; pauses on hover, still for reduced motion
 │   ├── ConnectButton.tsx       ✓ Privy sign-in or injected wallets (EIP-6963 list); wallet menu and network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb
 │   ├── DealParts.tsx          ✓ StatusBadge · SettlementTag · MonPill · SwapPanels · DealCardFrame
