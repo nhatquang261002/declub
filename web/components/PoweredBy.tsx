@@ -8,9 +8,10 @@ const PARTNERS = [
   { name: "Monad", logo: "/brand/mon.svg", href: "https://monad.xyz" },
   { name: "Privy", logo: "/brand/partners/privy.png", href: "https://privy.io" },
   { name: "Envio", logo: "/brand/partners/envio.png", href: "https://envio.dev" },
+  { name: "Alchemy", logo: "/brand/partners/alchemy.svg", href: "https://www.alchemy.com" },
 ];
 
-// Three partners are narrower than a wide screen, so each half repeats them until it overfills.
+// A few partners are narrower than a wide screen, so each half repeats them until it overfills.
 const SET = [...PARTNERS, ...PARTNERS, ...PARTNERS];
 
 /** Footer strip that scrolls the partner logos sideways; home page only. Pauses on hover and stands still for reduced motion. */

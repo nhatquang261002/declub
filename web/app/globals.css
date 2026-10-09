@@ -844,7 +844,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .powered-by-track { animation: none; margin-inline: auto; }
   .powered-by-set[aria-hidden],
-  .powered-by-set li:nth-child(n + 4) { display: none; }
+  .powered-by-set li:nth-child(n + 5) { display: none; }
   .powered-by-viewport { display: flex; mask-image: none; }
 }
 

@@ -161,7 +161,7 @@ declub/
 | | Testnet | Mainnet |
 |---|---|---|
 | Chain id | 10143 (confirmed against the live RPC, 2026-09-28) | 143 (unverified) |
-| RPC | `https://testnet-rpc.monad.xyz` | TBD |
+| RPC | Alchemy (`monad-testnet.g.alchemy.com`) in the app; the public `https://testnet-rpc.monad.xyz` has timed out | TBD |
 | Explorers | [MonadVision](https://testnet.monadvision.com/), [Monadscan](https://testnet.monadscan.com/) | |
 | Verification | Sourcify: `https://sourcify-api-monad.blockvision.org/` | |
 

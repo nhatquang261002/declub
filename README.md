@@ -151,7 +151,7 @@ model in [docs/04-security.md](docs/04-security.md).
 | --- | --- |
 | Contracts | Solidity 0.8.28 (EVM `prague`), Foundry, OpenZeppelin; fuzz tests, Slither and Halmos checks |
 | Web | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
-| Chain access | wagmi 3, viem 2, TanStack Query; Envio HyperSync for log scans on the server |
+| Chain access | wagmi 3, viem 2, TanStack Query; Alchemy RPC; Envio HyperSync for log scans on the server |
 | Identity | Privy (sign-in, linked X and Discord handles, webhooks via svix), EIP-712 signatures |
 | Data | Upstash Redis for Clubs, posts, follows and profiles; the chain for deals and holdings |
 | Matcher | Node.js 24 with built-in SQLite, viem |
