@@ -23,19 +23,23 @@ export function useChallenges(token: string) {
 
 /**
  * The challenges still running in the reader's Clubs (`joined`, which needs them signed in) or in
- * every live Club (`all`), each with its Club, pinned on top of the timeline. A failure is quiet:
- * the feed still shows each challenge's start among the posts.
+ * every live Club (`all`), each with its Club, pinned on top of the timeline; with `past`, the
+ * settled ones too, for the timeline's Challenges filter.
  */
-export function useTimelineChallenges(scope: "joined" | "all") {
+export function useTimelineChallenges(scope: "joined" | "all", { past = false }: { past?: boolean } = {}) {
   const getToken = useAccessToken();
   const query = useQuery({
-    queryKey: ["timeline-challenges", scope, !!getToken],
+    queryKey: ["timeline-challenges", scope, past, !!getToken],
     enabled: scope === "all" || !!getToken,
-    queryFn: () => read<{ enabled: boolean; challenges: { club: string; challenge: PublicChallenge }[] }>(`/api/timeline/challenges?scope=${scope}`, getToken),
+    queryFn: () =>
+      read<{ enabled: boolean; challenges: { club: string; challenge: PublicChallenge }[] }>(
+        `/api/timeline/challenges?scope=${scope}${past ? "&past=1" : ""}`,
+        getToken,
+      ),
     refetchInterval: REFRESH_MS,
     retry: 1,
   });
-  return query.data?.challenges ?? [];
+  return { enabled: query.data?.enabled !== false, challenges: query.data?.challenges ?? [], isLoading: query.isLoading, error: query.error };
 }
 
 /** One challenge with its entries (public; a signed-in reader also sees which are theirs and which they liked). */

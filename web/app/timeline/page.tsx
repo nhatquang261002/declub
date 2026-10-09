@@ -20,7 +20,8 @@ import { useSignIn } from "@/hooks/useSignIn";
 import { useSystemMessages } from "@/hooks/useSystemMessages";
 import { useTimeline } from "@/hooks/useTimeline";
 import { toClubInfo, type ClubInfo } from "@/lib/clubs";
-import { weave, withoutPinned, type FeedItem } from "@/lib/systemFeed";
+import type { PublicChallenge } from "@/lib/challenges";
+import { weave, type FeedItem } from "@/lib/systemFeed";
 import { estimateHeight, systemHeight, type TimelinePost } from "@/lib/timeline";
 import { registry } from "@/lib/verifiedAssets";
 
@@ -32,46 +33,72 @@ const heightOf = (item: FeedItem<TimelinePost>) =>
 const clubOf = (token: string) => CLUBS.get(token);
 /** About how tall a challenge's card is, for laying the masonry out before it has loaded. */
 const CHALLENGE_HEIGHT = 480;
+/** How many running challenges are pinned above the posts; the rest are under the Challenges filter. */
+const PINNED_SHOWN = 3;
 
-/** Which Clubs the timeline shows: every Club, or only the ones the reader has joined. It lives in the URL (`?show=joined`). */
-type Show = "all" | "joined";
+/**
+ * What the timeline shows: every Club's posts, only the reader's Clubs' posts, or every Club's
+ * challenges. It lives in the URL (`?show=joined`, `?show=challenges`).
+ */
+type Show = "all" | "joined" | "challenges";
+
+const headingOf = (c: PublicChallenge) => (c.phase === "open" ? "Challenge" : c.phase === "settled" ? "Challenge results" : "Challenge ended");
 
 /**
  * Posts as cards, endlessly (the next page loads as the end nears), with what happened in those
- * Clubs set among them as system messages (ADR 0043), the challenges still running pinned on top
- * (ADR 0045), and what to say when there is nothing. A card is read-only in a Club the reader hasn't joined.
+ * Clubs set among them as system messages (ADR 0043), the first few challenges still running pinned
+ * on top (ADR 0045), and what to say when there is nothing. A card is read-only in a Club the reader hasn't joined.
  */
-function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<string>; now: number; empty: React.ReactNode }) {
+function Feed({
+  show,
+  joined,
+  now,
+  empty,
+  onAllChallenges,
+}: {
+  show: "all" | "joined";
+  joined: ReadonlySet<string>;
+  now: number;
+  empty: React.ReactNode;
+  onAllChallenges: () => void;
+}) {
   const feed = useTimeline(show);
   const system = useSystemMessages(show === "joined" ? "timeline" : "everywhere");
-  // Challenges still running are pinned on top, as on a Board (ADR 0045), so the feed leaves out their start.
-  const pinned = useTimelineChallenges(show);
-  // Messages are set among the posts by time, down as far as the posts have loaded.
-  const items = useMemo(() => {
-    const events = withoutPinned(system.events, new Set(pinned.map((p) => p.challenge.id)));
-    return weave(feed.posts, events, { since: system.since, complete: !feed.hasMore });
-  }, [feed.posts, feed.hasMore, system.events, system.since, pinned]);
+  const { challenges: running } = useTimelineChallenges(show);
+  const pinned = running.slice(0, PINNED_SHOWN);
+  // Messages are set among the posts by time, down as far as the posts have loaded. A challenge's
+  // start is left out: while it runs it is pinned or under the Challenges filter, and once it is
+  // done its result card shows the same challenge, so across many Clubs the starts only crowd the posts.
+  const items = useMemo(
+    () =>
+      weave(
+        feed.posts,
+        system.events.filter((e) => e.kind !== "challenge"),
+        { since: system.since, complete: !feed.hasMore },
+      ),
+    [feed.posts, feed.hasMore, system.events, system.since],
+  );
   if (feed.error && feed.posts.length === 0) return <LoadError title="Couldn’t load the timeline" error={feed.error} />;
   if (!feed.enabled) return <Empty title="No timeline on this server">This server isn’t keeping Club boards.</Empty>;
 
   return (
     <>
       {pinned.length > 0 && (
-        <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
-          {pinned.map(({ club, challenge: c }) => (
-            <li key={`${club}:${c.id}`}>
-              <ChallengeSummary
-                c={c}
-                token={club}
-                now={now}
-                club={clubOf(club)}
-                heading={c.phase === "open" ? "Challenge" : "Challenge ended"}
-                pinned
-                compact={pinned.length > 1}
-              />
-            </li>
-          ))}
-        </ul>
+        <div className="mb-4 flex flex-col gap-3">
+          <ul className="flex flex-col gap-3" aria-label="Pinned challenges">
+            {pinned.map(({ club, challenge: c }) => (
+              <li key={`${club}:${c.id}`}>
+                <ChallengeSummary c={c} token={club} now={now} club={clubOf(club)} heading={headingOf(c)} pinned compact={running.length > 1} />
+              </li>
+            ))}
+          </ul>
+          {running.length > pinned.length && (
+            <button type="button" className="btn-secondary btn-sm self-start" onClick={onAllChallenges}>
+              {/* The filter lists every Club's, so under Joined Clubs the count here would undersell it. */}
+              {show === "all" ? `See all ${running.length.toLocaleString()} running challenges` : "See every Club’s challenges"}
+            </button>
+          )}
+        </div>
       )}
       {feed.isLoading ? (
         <Loading label="Loading the timeline" rows={3} />
@@ -107,9 +134,46 @@ function Feed({ show, joined, now, empty }: { show: Show; joined: ReadonlySet<st
   );
 }
 
-const SHOWS: { value: Show; label: string }[] = [
+/**
+ * Every live Club's challenges (ADR 0045): the running ones, soonest end first, then the newest
+ * results. A cancelled challenge isn't listed; it stays on its Club's Challenges tab.
+ */
+function Challenges({ now }: { now: number }) {
+  const { enabled, challenges, isLoading, error } = useTimelineChallenges("all", { past: true });
+  if (error && challenges.length === 0) return <LoadError title="Couldn’t load the challenges" error={error} />;
+  if (!enabled) return <Empty title="No challenges on this server">This server isn’t keeping Club boards.</Empty>;
+  if (isLoading) return <Loading label="Loading the challenges" rows={3} />;
+  if (challenges.length === 0) return <Empty title="No challenges yet">When a Club’s Owner sets a challenge, it shows up here.</Empty>;
+  const running = challenges.filter((p) => p.challenge.phase !== "settled");
+  const done = challenges.filter((p) => p.challenge.phase === "settled");
+  const section = (title: string, list: typeof challenges) =>
+    list.length > 0 && (
+      <section className="flex flex-col gap-3">
+        <h2 className="kicker">{title}</h2>
+        <Masonry
+          as="ul"
+          items={list}
+          height={() => CHALLENGE_HEIGHT}
+          render={({ club, challenge: c }) => (
+            <li key={`${club}:${c.id}`}>
+              <ChallengeSummary c={c} token={club} now={now} club={clubOf(club)} heading={headingOf(c)} results={c.phase === "settled"} />
+            </li>
+          )}
+        />
+      </section>
+    );
+  return (
+    <div className="flex flex-col gap-8">
+      {section("Running", running)}
+      {section("Ended", done)}
+    </div>
+  );
+}
+
+const SHOWS: { value: Show; label: string; accounts?: true }[] = [
   { value: "all", label: "All Clubs" },
-  { value: "joined", label: "Joined Clubs" },
+  { value: "joined", label: "Joined Clubs", accounts: true },
+  { value: "challenges", label: "Challenges" },
 ];
 
 /**
@@ -139,7 +203,8 @@ function Timeline() {
   const postable = useMemo(() => mineClubs.filter((club) => !club.archived), [mineClubs]);
   // Without Privy the app has no members, so there is no "your Clubs" to filter to.
   const hasAccounts = signedIn || !!signIn;
-  const show: Show = hasAccounts && search.get("show") === "joined" ? "joined" : "all";
+  const asked = search.get("show");
+  const show: Show = asked === "challenges" ? "challenges" : hasAccounts && asked === "joined" ? "joined" : "all";
   const setShow = (next: Show) => {
     const params = new URLSearchParams(search);
     if (next === "all") params.delete("show");
@@ -155,22 +220,20 @@ function Timeline() {
         <p className="mt-1 max-w-xl text-sm text-muted">What members are saying on the Clubs’ Boards, and what is happening in them, newest first.</p>
       </div>
 
-      {hasAccounts && (
-        <div className="tabbar mb-4 flex w-full sm:inline-flex sm:w-auto" role="group" aria-label="Which Clubs to show">
-          {SHOWS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              className="tab inline-flex flex-1 items-center justify-center gap-1.5 sm:flex-none"
-              aria-pressed={show === s.value}
-              onClick={() => setShow(s.value)}
-            >
-              {s.label}
-              {s.value === "joined" && signedIn && <span className="tab-count">{mineClubs.length.toLocaleString()}</span>}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="tabbar mb-4 flex w-full sm:inline-flex sm:w-auto" role="group" aria-label="What to show">
+        {SHOWS.filter((s) => hasAccounts || !s.accounts).map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            className="tab inline-flex flex-1 items-center justify-center gap-1.5 sm:flex-none"
+            aria-pressed={show === s.value}
+            onClick={() => setShow(s.value)}
+          >
+            {s.label}
+            {s.value === "joined" && signedIn && <span className="tab-count">{mineClubs.length.toLocaleString()}</span>}
+          </button>
+        ))}
+      </div>
 
       {show === "joined" && mineClubs.length > 0 && (
         <ul className="mb-6 flex flex-wrap gap-2" aria-label="Your Clubs">
@@ -185,13 +248,15 @@ function Timeline() {
         </ul>
       )}
 
-      {signedIn && postable.length > 0 && (
+      {signedIn && postable.length > 0 && show !== "challenges" && (
         <div className="mt-2 mb-6">
           <TimelineComposer clubs={postable} />
         </div>
       )}
 
-      {show === "joined" && !signedIn ? (
+      {show === "challenges" ? (
+        <Challenges now={now} />
+      ) : show === "joined" && !signedIn ? (
         <Empty
           title="Sign in to see your Clubs here"
           action={
@@ -211,6 +276,7 @@ function Timeline() {
           show={show}
           joined={joined}
           now={now}
+          onAllChallenges={() => setShow("challenges")}
           empty={
             show === "all" ? (
               <Empty title="Nothing posted yet">When members post on their Clubs’ Boards, it shows up here.</Empty>
