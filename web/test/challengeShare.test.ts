@@ -115,10 +115,10 @@ describe("challengeShareText", () => {
 describe("challengeShareUrl", () => {
   it("links X's compose box with the text and the challenge's page", () => {
     const c = challenge();
-    const url = new URL(challengeShareUrl(c, { club: "Chog", token: TOKEN, origin: "https://declub.example/" }));
+    const url = new URL(challengeShareUrl(c, { club: "Chog", token: TOKEN, origin: "https://declub.vercel.app/" }));
     assert.equal(url.origin + url.pathname, "https://x.com/intent/post");
     assert.equal(url.searchParams.get("text"), challengeShareText(c, { club: "Chog" }));
-    assert.equal(url.searchParams.get("url"), `https://declub.example/clubs/${TOKEN.toLowerCase()}/challenges/${c.id}`);
+    assert.equal(url.searchParams.get("url"), `https://declub.vercel.app/clubs/${TOKEN.toLowerCase()}/challenges/${c.id}`);
   });
 
   it("defaults to where the app is served", () => {

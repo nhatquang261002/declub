@@ -2,7 +2,7 @@
 # so GitHub calls the route instead, every 5 minutes (GitHub's shortest interval, and it can run late).
 #
 # Repository secrets (Settings > Secrets and variables > Actions):
-#   SITE_URL     https://<project>.vercel.app, no trailing slash
+#   SITE_URL     https://declub.vercel.app, no trailing slash
 #   CRON_SECRET  the same value as the CRON_SECRET set in Vercel
 name: fill-watcher
 

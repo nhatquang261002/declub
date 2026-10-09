@@ -57,9 +57,9 @@ describe("the deal's post", () => {
     assert.equal(dealTitle(facts({ openOffer: true })), "Offering Chog #12, open to offers");
     assert.equal(dealTitle(facts({ status: "filled" })), "Swapped: Chog #12 for 3 MON");
     assert.equal(dealTitle(facts({ status: "filled", openOffer: true, want: "assets" })), "Swapped: Chog #12 for an accepted offer");
-    const link = new URL(dealPostLink(facts(), "https://declub.app/deal/12", "Chog"));
+    const link = new URL(dealPostLink(facts(), "https://declub.vercel.app/deal/12", "Chog"));
     assert.equal(link.origin + link.pathname, "https://x.com/intent/post");
-    assert.equal(link.searchParams.get("url"), "https://declub.app/deal/12");
+    assert.equal(link.searchParams.get("url"), "https://declub.vercel.app/deal/12");
     assert.match(link.searchParams.get("text")!, /Chog Club/);
   });
 });

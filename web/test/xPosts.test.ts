@@ -98,7 +98,7 @@ describe("Club signals", () => {
 
   it("is strong for the Club's address, a link to it, a mention, quote or reply of its account", () => {
     assert.equal(matchSignals(signals, { text: `look at ${NFT}` }), "strong");
-    assert.equal(matchSignals(signals, { text: "the club", urls: [`https://declub.app/clubs/${token}`] }), "strong");
+    assert.equal(matchSignals(signals, { text: "the club", urls: [`https://declub.vercel.app/clubs/${token}`] }), "strong");
     assert.equal(matchSignals(signals, { text: "gm @chognft" }), "strong");
     assert.equal(matchSignals(signals, { text: "so true", referenced: [{ id: "777" }] }), "strong", "a quote, by X's id");
     assert.equal(matchSignals(signals, { text: "so true", referenced: [{ username: "ChogNFT" }] }), "strong", "a reply, by handle");
@@ -158,7 +158,7 @@ describe("reading X", () => {
           author_id: "555",
           text: "gm",
           public_metrics: { like_count: 5, retweet_count: 2, quote_count: 1, reply_count: 3, impression_count: 9999 },
-          entities: { mentions: [{ username: "ChogNFT" }], urls: [{ expanded_url: "https://declub.app/clubs/x" }] },
+          entities: { mentions: [{ username: "ChogNFT" }], urls: [{ expanded_url: "https://declub.vercel.app/clubs/x" }] },
           referenced_tweets: [{ type: "quoted", id: "20" }],
         },
       ],
@@ -167,7 +167,7 @@ describe("reading X", () => {
     const post = posts.get("10")!;
     assert.equal(post.engagement, 11, "impressions don't count");
     assert.deepEqual(post.facts.referenced, [{ id: "777", username: "ChogNFT" }]);
-    assert.deepEqual(post.facts.urls, ["https://declub.app/clubs/x"]);
+    assert.deepEqual(post.facts.urls, ["https://declub.vercel.app/clubs/x"]);
   });
 });
 
@@ -465,7 +465,7 @@ describe("the reach read", () => {
       configured: true,
       xAccountOf: async (userId) => accounts[userId] ?? null,
       posts: api([
-        { id: a, authorId: "111", engagement: 31, facts: { text: "edited away", urls: [`https://declub.app/clubs/${token}`] } },
+        { id: a, authorId: "111", engagement: 31, facts: { text: "edited away", urls: [`https://declub.vercel.app/clubs/${token}`] } },
         { id: b, authorId: "999", engagement: 500, facts: { text: "$MCHOG" } },
       ]),
     });
