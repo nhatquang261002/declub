@@ -486,9 +486,9 @@ describe("the weekly recap", () => {
     assert.ok(!recapText({ ...recap, paidHolders: 0n, holderCount: 0 }).includes("most active"));
     assert.match(recapText({ ...recap, paidHolders: 0n, holderCount: 0 }), /^CHOG Club made 12 MON in swap fees/);
     assert.match(recapText({ ...recap, fees: 0n, paidHolders: 0n, holderCount: 0 }), /^A quiet week for the CHOG Club/);
-    const link = new URL(recapLink(recap, "https://declub.vercel.app/clubs/0xabc"));
+    const link = new URL(recapLink(recap, "https://declub.fun/clubs/0xabc"));
     assert.equal(link.origin + link.pathname, "https://x.com/intent/post");
-    assert.equal(link.searchParams.get("url"), "https://declub.vercel.app/clubs/0xabc");
+    assert.equal(link.searchParams.get("url"), "https://declub.fun/clubs/0xabc");
   });
 });
 
