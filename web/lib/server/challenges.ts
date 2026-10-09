@@ -20,6 +20,7 @@ import {
   xEntryProblem,
   type Candidate,
   type Draw,
+  type Phase,
   type PublicChallenge,
   type PublicEntry,
   type Settlement,
@@ -751,31 +752,38 @@ const rank = (p: PublicChallenge) => (p.phase === "open" ? 0 : p.phase === "judg
 /** Open ones first (soonest end first), then those being judged or settled, newest first. */
 const byStanding = (a: PublicChallenge, b: PublicChallenge) => rank(a) - rank(b) || (a.phase === "open" ? a.endsAt - b.endsAt : b.startsAt - a.startsAt);
 
+/** The most challenges the timeline's Challenges filter lists: every running one, then the newest that ended. */
+export const TIMELINE_CHALLENGES_MAX = 60;
+
 /**
- * The challenges still running or waiting on their result in `clubs`, each with its Club, for the
- * timeline to pin on top. Only a Club with one that has ended is settled first, so reading every
- * Club stays cheap.
+ * The challenges in `clubs`, each with its Club, in standing order: those still running or waiting
+ * on their result, pinned on top of the timeline, or with `past` also the settled ones (not the
+ * cancelled), for the timeline's Challenges filter, up to `TIMELINE_CHALLENGES_MAX`. Only a Club with
+ * one that has ended is settled first, so reading every Club stays cheap.
  */
-export async function liveChallenges(
+export async function timelineChallenges(
   store: Store,
   clubs: readonly AssetEntry[],
   viewer: { userId?: string },
   deps: ChallengeDeps = {},
+  { past = false }: { past?: boolean } = {},
 ): Promise<{ club: string; challenge: PublicChallenge }[]> {
   const now = nowOf(deps);
+  const shown = (phase: Phase) => isLive(phase) || (past && phase === "settled");
   const lists = await Promise.all(
     clubs.map(async (entry) => {
       const token = entry.address.toLowerCase();
       const read = async () => {
         const ids = await store.ranked(challengesKey(token), 30);
         return (await store.getMany<StoredChallenge>(ids.map((id) => challengeKey(token, id)))).filter(
-          (c): c is StoredChallenge => !!c && isLive(phaseOf(c, now)),
+          (c): c is StoredChallenge => !!c && shown(phaseOf(c, now)),
         );
       };
-      let live = await read();
-      if (live.some((c) => now >= c.endsAt) && (await settleDue(store, entry, deps)) > 0) live = await read();
-      return Promise.all(live.map(async (c) => ({ club: token, challenge: await viewOf(store, token, c, viewer, now) })));
+      let list = await read();
+      if (list.some((c) => c.state === "live" && now >= c.endsAt) && (await settleDue(store, entry, deps)) > 0) list = await read();
+      return Promise.all(list.map(async (c) => ({ club: token, challenge: await viewOf(store, token, c, viewer, now) })));
     }),
   );
-  return lists.flat().sort((a, b) => byStanding(a.challenge, b.challenge));
+  const sorted = lists.flat().sort((a, b) => byStanding(a.challenge, b.challenge));
+  return past ? sorted.slice(0, TIMELINE_CHALLENGES_MAX) : sorted;
 }

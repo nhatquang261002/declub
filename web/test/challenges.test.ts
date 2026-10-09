@@ -26,7 +26,7 @@ import {
   enterChallenge,
   getChallenge,
   listChallenges,
-  liveChallenges,
+  timelineChallenges,
   pickWinners,
   settleDue,
   withdrawEntry,
@@ -778,7 +778,7 @@ describe("challenges pinned on the timeline", () => {
     assert.ok((await enterChallenge(store, club, "g", soon, g, at(61))).ok);
     assert.ok((await likePost(store, club, "a", g, true, at(62))).ok);
 
-    const open = await liveChallenges(store, [club], { userId: "g" }, at(100));
+    const open = await timelineChallenges(store, [club], { userId: "g" }, at(100));
     assert.ok(open.every((p) => p.club === token));
     // Soonest end first: the two ending with this epoch, then the one that runs on.
     assert.deepEqual(
@@ -792,7 +792,7 @@ describe("challenges pinned on the timeline", () => {
     assert.equal(open.find((p) => p.challenge.id === soon)!.challenge.mine, g);
 
     // Past the end, the likes-judged one is settled and drops off; the Owner's waits on their pick.
-    const after = await liveChallenges(store, [club], {}, at(END + 5));
+    const after = await timelineChallenges(store, [club], {}, at(END + 5));
     assert.deepEqual(
       after.map((p) => [p.challenge.id, p.challenge.phase]),
       [
@@ -801,6 +801,18 @@ describe("challenges pinned on the timeline", () => {
       ],
     );
     assert.equal((await getChallenge(store, club, soon, {}, at(END + 6)))!.phase, "settled");
+
+    // The Challenges filter adds the settled ones after the running ones, never the cancelled.
+    const all = await timelineChallenges(store, [club], {}, at(END + 7), { past: true });
+    assert.deepEqual(
+      all.map((p) => [p.challenge.id, p.challenge.phase]),
+      [
+        [later, "open"],
+        [owner, "judging"],
+        [soon, "settled"],
+      ],
+    );
+    assert.ok(!all.some((p) => p.challenge.id === gone));
   });
 });
 

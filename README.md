@@ -9,7 +9,7 @@
 
 > **Your community's home and market, owned by its members.**
 
-Live: **[declub.vercel.app](https://declub.vercel.app)**
+Live: **[declub.fun](https://declub.fun)**
 
 Docs: [index](docs/README.md) · [product spec](docs/01-product-spec.md) · [user guide](docs/07-user-guide.md) · [Clubs](docs/09-clubs.md) · [roadmap](docs/06-roadmap.md)
 

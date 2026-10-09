@@ -38,7 +38,7 @@ export const SITE_URL = (
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.NODE_ENV === "production"
-      ? "https://declub.vercel.app"
+      ? "https://declub.fun"
       : "http://localhost:3000")
 ).replace(/\/+$/, "");
 /** The project's docs on GitHub. The Guide stays short; the full rules, with every number, are linked from here. */

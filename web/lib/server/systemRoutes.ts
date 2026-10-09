@@ -1,6 +1,6 @@
 import type { Registry } from "../verifiedAssets";
 import { softViewer, type RouteDeps } from "./boardRoutes";
-import { liveChallenges } from "./challenges";
+import { timelineChallenges } from "./challenges";
 import { fail } from "./gate";
 import { publicRead, type Ctx } from "./memberRoutes";
 import { clubsOf } from "./members";
@@ -64,12 +64,15 @@ export function timelineSystemHandler(registry: Registry, deps: Pick<RouteDeps, 
 }
 
 /**
- * GET /api/timeline/challenges?scope=joined|all   { enabled, challenges: [{ club, challenge }] }: the
- * challenges still running or waiting on their result, in the Clubs the reader has joined or in
- * every live Club, pinned on top of the timeline as they are on a Board (ADR 0045).
+ * GET /api/timeline/challenges?scope=joined|all[&past=1]   { enabled, challenges: [{ club, challenge }] }:
+ * the challenges still running or waiting on their result, in the Clubs the reader has joined or in
+ * every live Club, pinned on top of the timeline as they are on a Board (ADR 0045). With `past=1`,
+ * the settled ones too, for the timeline's Challenges filter.
  */
 export function timelineChallengesHandler(registry: Registry, deps: RouteDeps = {}) {
   return async function GET(request: Request) {
+    const past = new URL(request.url).searchParams.get("past");
+    if (past !== null && past !== "1") return fail(400, "bad_request", "past is 1 or left out.");
     const read = await timelineRead(request, { enabled: false, challenges: [] });
     if (read instanceof Response) return read;
     const { scope, store } = read;
@@ -80,7 +83,7 @@ export function timelineChallengesHandler(registry: Registry, deps: RouteDeps = 
         : viewer
           ? (await clubsOf(store, viewer.id)).flatMap((token) => registry.clubFor(token) ?? [])
           : [];
-    const challenges = await liveChallenges(store, clubs, { userId: viewer?.id }, deps);
+    const challenges = await timelineChallenges(store, clubs, { userId: viewer?.id }, deps, { past: past === "1" });
     // A signed-in reader sees which entries are theirs, so theirs is not shared.
     return Response.json({ enabled: true, challenges }, { headers: viewer ? { "Cache-Control": "private, no-store" } : { "Cache-Control": SHARED } });
   };
