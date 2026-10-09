@@ -1,0 +1,10 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# One instance only: the pool is a single sqlite file.
+numReplicas = 1
+healthcheckPath = "/intents?limit=1"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

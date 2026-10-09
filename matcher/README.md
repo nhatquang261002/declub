@@ -42,6 +42,23 @@ The contract charges a protocol fee ([ADR 0015](../docs/adr/0015-protocol-fee.md
 | `MATCHER_TOKEN_BAN_MS` | `86400000` (24 h) | how long a token in a settlement that reverted on-chain is suspended |
 | `MATCHER_MAX_STRIKES` | `3` | on-chain reverts (within 30 days) after which a maker is left out of matching |
 
+## Host it on Railway
+
+The web app runs on Vercel, which can't host this: the matcher is a long-lived process with a sqlite file. `Dockerfile` and `railway.toml` run it as one Railway service.
+
+1. New project, deploy from the GitHub repo. In the service settings set **Root Directory** to `matcher`.
+2. Add a **Volume** mounted at `/data` (the image sets `MATCHER_DB_PATH=/data/pool.sqlite`). Keep one replica: the pool is a single file.
+3. Set the variables, with the key as a secret:
+   - `NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`, `NEXT_PUBLIC_CHAIN_ID`, `MATCHER_RPC_URL`
+   - `MATCHER_PRIVATE_KEY`: a testnet-only key with a little MON
+   - `MATCHER_TOKEN_ALLOWLIST`: the tokens you accept, WMON included
+   - `MATCHER_TRUST_PROXY=true`: Railway's proxy sets `X-Forwarded-For`; without this every client shares one rate-limit bucket
+   - `MATCHER_PORT=8787`
+4. **Settings > Networking > Generate Domain**, pointing at port `8787`. Check `https://<domain>/info` returns the contract and the fee.
+5. Set that URL as `NEXT_PUBLIC_POOL_URL` in the web app's environment and redeploy it; the value is read at build time.
+
+Railway checks `GET /intents?limit=1`, which only touches the sqlite file, so an RPC outage doesn't restart the service.
+
 ## HTTP API
 
 Bigints are decimal strings. Errors are `{ "error": code, "message": … }`. CORS is open: the book is public and nothing uses cookies.
