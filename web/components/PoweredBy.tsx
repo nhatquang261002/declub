@@ -9,6 +9,7 @@ const PARTNERS = [
   { name: "Privy", logo: "/brand/partners/privy.png", href: "https://privy.io" },
   { name: "Envio", logo: "/brand/partners/envio.png", href: "https://envio.dev" },
   { name: "Alchemy", logo: "/brand/partners/alchemy.svg", href: "https://www.alchemy.com" },
+  { name: "Railway", logo: "/brand/partners/railway.svg", href: "https://railway.com" },
 ];
 
 // A few partners are narrower than a wide screen, so each half repeats them until it overfills.

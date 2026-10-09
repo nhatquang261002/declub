@@ -154,7 +154,7 @@ model in [docs/04-security.md](docs/04-security.md).
 | Chain access | wagmi 3, viem 2, TanStack Query; Alchemy RPC; Envio HyperSync for log scans on the server |
 | Identity | Privy (sign-in, linked X and Discord handles, webhooks via svix), EIP-712 signatures |
 | Data | Upstash Redis for Clubs, posts, follows and profiles; the chain for deals and holdings |
-| Matcher | Node.js 24 with built-in SQLite, viem |
+| Matcher | Node.js 24 with built-in SQLite, viem; hosted on Railway |
 | Rewards | Merkle distributor, weekly epochs built by `npm run rewards:epoch` |
 | Tests | Foundry, Node test runner, end-to-end checks on a local Anvil chain |
 

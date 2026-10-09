@@ -86,7 +86,7 @@ Next.js + wagmi + viem + Tailwind, with Privy for sign-in and linked accounts ([
 
 ### Intent pool and matcher (`matcher/`)
 
-A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `DeClubIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key, and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
+A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swaps.md)). The **pool** is an HTTP API that verifies and stores EIP-712 intents and keeps them honest against the chain. The **matcher** finds pairs and rings of up to four, runs `settle` as an `eth_call`, and only then sends it. Neither is trusted for safety: `DeClubIntents` re-checks every signature, nonce and transfer. It runs locally with a funded testnet key or as one [Railway](https://railway.com) service (the web app runs on Vercel, which can't host a long-lived process with a sqlite file), and anyone can run their own. Details in [`matcher/README.md`](../matcher/README.md).
 
 ### Indexer (deferred)
 

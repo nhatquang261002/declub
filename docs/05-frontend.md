@@ -31,7 +31,7 @@ web/
 ├── components/
 │   ├── Providers.tsx           ✓ PrivyProvider + @privy-io/wagmi's WagmiProvider when Privy is on, else wagmi's; QueryClientProvider; ToastProvider
 │   ├── Header.tsx              ✓ nav (Deals, Clubs, History, Guide), Create button, NotificationBell, ConnectButton
-│   ├── PoweredBy.tsx           ✓ home-page footer strip of partner logos (Monad, Privy, Envio, Alchemy) scrolling sideways; pauses on hover, still for reduced motion
+│   ├── PoweredBy.tsx           ✓ home-page footer strip of partner logos (Monad, Privy, Envio, Alchemy, Railway) scrolling sideways; pauses on hover, still for reduced motion
 │   ├── ConnectButton.tsx       ✓ Privy sign-in or injected wallets (EIP-6963 list); wallet menu and network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb
 │   ├── DealParts.tsx          ✓ StatusBadge · SettlementTag · MonPill · SwapPanels · DealCardFrame
