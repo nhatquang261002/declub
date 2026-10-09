@@ -779,6 +779,75 @@ body {
   .hdr-pop { animation: none; }
 }
 
+/* Footer marquee: the track is two identical halves, so sliding by -50% loops without a seam. */
+.powered-by {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0 0.6rem 1rem;
+  background: var(--chog-purple-950);
+  color: var(--chog-cream-500);
+}
+
+.powered-by-tag {
+  @apply shrink-0 rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.16em] uppercase;
+  background: var(--chog-peach-500);
+  color: var(--chog-purple-950);
+}
+
+.powered-by-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent);
+}
+
+.powered-by-track {
+  display: flex;
+  width: max-content;
+  animation: powered-by-scroll 50s linear infinite;
+}
+
+.powered-by:hover .powered-by-track,
+.powered-by:focus-within .powered-by-track { animation-play-state: paused; }
+
+.powered-by-set { display: flex; }
+
+.powered-by-set li { display: flex; align-items: center; }
+
+.powered-by-set li::after {
+  content: "✦";
+  margin: 0 1.75rem;
+  color: var(--chog-peach-500);
+}
+
+.powered-by-set a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.powered-by-set img { @apply size-6 rounded-md object-contain; }
+
+.powered-by-name {
+  @apply text-sm font-extrabold;
+  transition: color 160ms ease;
+}
+
+.powered-by-set a:hover .powered-by-name { color: var(--chog-peach-500); }
+
+@keyframes powered-by-scroll {
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .powered-by-track { animation: none; margin-inline: auto; }
+  .powered-by-set[aria-hidden],
+  .powered-by-set li:nth-child(n + 4) { display: none; }
+  .powered-by-viewport { display: flex; mask-image: none; }
+}
+
 .hdr-pop-head {
   display: flex;
   flex-direction: column;
