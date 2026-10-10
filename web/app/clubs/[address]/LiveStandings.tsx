@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment } from "react";
-import { FlameIcon } from "@/components/Icons";
+import { BanIcon, CoinIcon, FlameIcon, GridIcon, HourglassIcon, TrendUpIcon, WalletIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubStandings } from "@/hooks/useRewards";
@@ -217,15 +217,30 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
   else hint = "Every day this epoch counted. Keep it up.";
 
   const status = excluded ? (
-    <span className="chip chip-danger">Banned from rewards</span>
+    <span className="chip chip-danger">
+      <BanIcon />
+      Banned from rewards
+    </span>
   ) : !ranked ? (
-    <span className="chip">Not a Holder</span>
+    <span className="chip">
+      <WalletIcon />
+      Not a Holder
+    </span>
   ) : paid ? (
-    <span className="chip chip-mint">{holder ? "Paid" : "Paid · member slice"}</span>
+    <span className="chip chip-mint">
+      <CoinIcon />
+      {holder ? "Paid" : "Paid · member slice"}
+    </span>
   ) : me.points === 0 ? (
-    <span className="chip">No points yet</span>
+    <span className="chip">
+      <HourglassIcon />
+      No points yet
+    </span>
   ) : (
-    <span className="chip chip-warn">Outside the paid places</span>
+    <span className="chip chip-warn">
+      <TrendUpIcon />
+      Outside the paid places
+    </span>
   );
 
   return (
@@ -244,7 +259,12 @@ function MyCard({ s, symbol, rules }: { s: StandingsView; symbol: string; rules:
             </div>
           )}
           <div className="mt-auto flex flex-wrap gap-1.5">
-            {holder && <span className="chip">{plural(BigInt(me.shares), "NFT")}</span>}
+            {holder && (
+              <span className="chip">
+                <GridIcon />
+                {plural(BigInt(me.shares), "NFT")}
+              </span>
+            )}
             {holder && differs(me) && (
               <span className="chip" title="Your voice and your share of the pool count the NFTs you held on average over the week">
                 avg {me.held} this week

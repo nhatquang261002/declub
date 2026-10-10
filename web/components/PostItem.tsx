@@ -13,9 +13,12 @@ import {
   EyeIcon,
   EyeOffIcon,
   FlagIcon,
+  LinkIcon,
   PinIcon,
+  SearchIcon,
   SwapIcon,
   TrashIcon,
+  TrendUpIcon,
   XLogoIcon,
 } from "@/components/Icons";
 import { Tooltip } from "@/components/Tooltip";
@@ -50,7 +53,10 @@ export function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; n
         {card?.postedAt && <span className="text-muted">· {ago(Math.floor(card.postedAt / 1000), now)}</span>}
         {card?.own && (
           <Tooltip content="Posted from the X account this member linked to their profile.">
-            <span className="chip">Their own post</span>
+            <span className="chip">
+              <LinkIcon />
+              Their own post
+            </span>
           </Tooltip>
         )}
         {card?.counted && (
@@ -61,7 +67,10 @@ export function XPostCard({ id, card, now }: { id: string; card?: StoredXCard; n
                 : "A Holder’s own post that only matched one of the Club’s tags: it counts half."
             }
           >
-            <span className="chip chip-peach">Counts{card.counted === "weak" ? " · half" : ""}</span>
+            <span className="chip chip-peach">
+              <TrendUpIcon />
+              Counts{card.counted === "weak" ? " · half" : ""}
+            </span>
           </Tooltip>
         )}
       </span>
@@ -211,7 +220,12 @@ export function PostItem({
                 Pinned
               </span>
             )}
-            {post.kind === "looking" && <span className="chip chip-peach">Looking for</span>}
+            {post.kind === "looking" && (
+              <span className="chip chip-peach">
+                <SearchIcon />
+                Looking for
+              </span>
+            )}
           </div>
           <div className="-my-1 -mr-1">
             <ActionMenu label="Post actions" groups={[own, moderate]} />

@@ -5,9 +5,10 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { Alert } from "@/components/Alert";
 import { ClubAvatar } from "@/components/ClubArt";
 import { ClubCard } from "@/components/ClubCard";
-import { FlameIcon, GridIcon, ListIcon, SearchIcon, SwapIcon, TrendUpIcon } from "@/components/Icons";
+import { FlameIcon, GridIcon, ListIcon, SwapIcon, TrendUpIcon } from "@/components/Icons";
 import { HeatMeter } from "@/components/MomentumBadge";
 import { Pills } from "@/components/Pills";
+import { SearchInput } from "@/components/SearchInput";
 import { Select } from "@/components/Select";
 import { useClubs } from "@/hooks/useClubs";
 import { useMyClubs } from "@/hooks/useClubMembership";
@@ -282,17 +283,7 @@ export default function ClubsPage() {
         </div>
 
         <div className="mb-5 flex flex-wrap items-center gap-3">
-          <label className="relative w-full sm:w-72">
-            <span className="sr-only">Search Clubs</span>
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
-            <input
-              type="search"
-              className="input border-2 border-[#111318] bg-white pl-9 focus:border-[#111318]"
-              value={query}
-              placeholder="Name, symbol or address"
-              onChange={(e) => search(e.target.value)}
-            />
-          </label>
+          <SearchInput className="w-full sm:w-72" label="Search Clubs" placeholder="Name, symbol or address" value={query} onChange={search} />
           <Pills value={kind} options={KINDS} onChange={filter} label="Kind of Club" />
           <div className="flex items-center gap-2 sm:ml-auto">
             <span className="text-xs font-bold text-muted">Sort</span>

@@ -64,7 +64,13 @@ node --import ./test/register.mjs scripts/demo.ts chain     # mint, fund the per
 node --import ./test/register.mjs scripts/demo.ts trades    # the ten swaps, into each Club's activity
 node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
 node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
+node --import ./test/register.mjs scripts/demo.ts market    # open deals for testers: singles and bundles
+node --import ./test/register.mjs scripts/demo.ts signed    # signed deals and rings in the intent pool
 ```
+
+**Market.** `market` lists 20 deals with random asks (a MON price or an NFT from another Club), 20 for 0.01 to 0.05 MON so a fresh wallet straight from the faucet can buy one, and 8 bundles of several items a side (`MARKET` in `content.ts`). Bundles go first. The personas list tokens they still hold, in a seeded shuffle; each pays the fee, and the bank tops a persona up when its balance is short. It stops when the bank runs low and continues on a rerun (`DEMO_GAS_PCT=200` keeps the gas limit, which Monad bills, down).
+
+**Signed deals.** `signed` posts DeClubIntents intents to the pool (`NEXT_PUBLIC_POOL_URL`): rings first (`RINGS`), then single and multi-item deals priced in WMON (`SIGNED`). Each maker approves its NFTs and WMON once and wraps enough MON to cover the fee on every live deal; the signatures cost nothing. One ring is complete, so the matcher settles it within seconds. The others leave their last leg to the presenter: the step prints which of their NFTs to give for which, and signing that swap in the app closes the ring. Signed deals last the pool's longest deadline, 7 days, and NFTs in a live signed deal are left out of `market`.
 
 **Challenges** (`CHALLENGES` in `content.ts`): open ones start in the running epoch through the app's own functions, with signed entries sharing invented X posts (`dcdemo…` handles) and likes. "Ended" ones ran over the four days before it: they are written to the store as the app would have kept them, then the app settles them, so their points count in the epoch they ended in (or the running one, if that epoch is closed). The Chog Club, the presenter's, has one waiting for the Owner's pick and one with a Chog prize to send. A Club allows three open at once, so the step stops if a Club already has more open than it leaves room for.
 

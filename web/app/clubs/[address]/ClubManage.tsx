@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatUnits, parseUnits, type Address } from "viem";
 import { Alert } from "@/components/Alert";
 import { Spinner } from "@/components/Spinner";
-import { ExternalIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
+import { BanIcon, ChatIcon, ExternalIcon, EyeOffIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubActions, useClubPage, useClubStaff, type ClubCoin } from "@/hooks/useClubBoard";
@@ -382,8 +382,18 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <WalletAvatar seed={post.wallet} size="1.5rem" />
                   <Who address={post.wallet} />
-                  {post.parent && <span className="chip">Reply</span>}
-                  {post.hidden && <span className="chip chip-warn">Hidden</span>}
+                  {post.parent && (
+                    <span className="chip">
+                      <ChatIcon />
+                      Reply
+                    </span>
+                  )}
+                  {post.hidden && (
+                    <span className="chip chip-warn">
+                      <EyeOffIcon />
+                      Hidden
+                    </span>
+                  )}
                   <span className="text-xs text-muted">
                     {reports} {reports === 1 ? "report" : "reports"}
                     {holderReports > 0 && ` · ${holderReports} from Holders or staff`} · {ago(Math.floor(post.at / 1000), now)}
@@ -420,7 +430,12 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
                 <span className="min-w-0 flex-1">
                   <Who address={b.wallet} />
                 </span>
-                {b.everywhere && <span className="chip chip-danger">Everywhere</span>}
+                {b.everywhere && (
+                  <span className="chip chip-danger">
+                    <BanIcon />
+                    Everywhere
+                  </span>
+                )}
                 <span className="text-xs text-muted">{ago(Math.floor(b.at / 1000), now)}</span>
                 <button type="button" className="btn-secondary btn-sm" onClick={() => unban.mutate({ wallet: b.wallet, everywhere: b.everywhere })}>
                   Lift ban

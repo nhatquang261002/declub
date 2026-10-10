@@ -4,6 +4,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { formatUnits, isAddress, getAddress, type Address } from "viem";
 import { useAccount } from "wagmi";
 import { CopyAddress } from "@/components/CopyAddress";
+import { AlertIcon, BadgeCheckIcon } from "@/components/Icons";
+import { SearchInput } from "@/components/SearchInput";
 import { useAssetSearch, useDebounced } from "@/hooks/useAssetSearch";
 import { safeImage } from "@/lib/collections";
 import { mergeHits, rankHits, type SearchHit, type SearchKind } from "@/lib/search";
@@ -78,14 +80,7 @@ export function AssetSearch({ kind, owner, extra = [], onSelect, renderPasted, p
             </div>
           )}
         </div>
-        <input
-          id={`asset-search-${kind}`}
-          autoFocus
-          className="input"
-          placeholder={placeholder ?? "Name, symbol or 0x…"}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <SearchInput id={`asset-search-${kind}`} autoFocus placeholder={placeholder ?? "Name, symbol or 0x…"} value={text} onChange={setText} />
       </div>
 
       {pasted ? (
@@ -145,9 +140,19 @@ function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
         <span className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted">
           {holding && <span className="font-semibold text-[#111318]">{holding}</span>}
           <span className="flex flex-wrap justify-end gap-1">
-            {hit.tier === "verified" && <span className="rounded-full border border-line px-2 py-0.5">Verified</span>}
+            {hit.tier === "verified" && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5">
+                <BadgeCheckIcon className="size-3" />
+                Verified
+              </span>
+            )}
             {hit.tag && <span className="rounded-full border border-line px-2 py-0.5">{hit.tag}</span>}
-            {hit.spam && <span className="rounded-full border border-line px-2 py-0.5 text-warn">Possible spam</span>}
+            {hit.spam && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-warn">
+                <AlertIcon className="size-3" />
+                Possible spam
+              </span>
+            )}
           </span>
         </span>
       </button>

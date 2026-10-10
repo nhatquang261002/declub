@@ -317,8 +317,8 @@ export function EntryRank({ e, c, rank }: { e: PublicEntry; c: PublicChallenge; 
 /**
  * A challenge as a card of its own (ADR 0045): not a line among the Club's system messages. A band
  * with the trophy and where it stands, the title and brief, the prizes as medal tiles, the time left,
- * the entries leading, and the way into its page. Used on the Challenges tab, the Board (pinned on
- * top while it runs) and the timeline. `compact` leaves the entries out, for several pinned at once.
+ * the entries leading, and the way into its page. Used on the Challenges tab, for pinned results on
+ * the Board, and in the timeline's feed and Challenges filter; running ones pinned over a feed are `ChallengeTiles`.
  */
 export function ChallengeSummary({
   c,
@@ -327,7 +327,6 @@ export function ChallengeSummary({
   club,
   heading = "Challenge",
   pinned = false,
-  compact = false,
   results = false,
 }: {
   c: PublicChallenge;
@@ -336,13 +335,12 @@ export function ChallengeSummary({
   club?: ClubInfo;
   heading?: string;
   pinned?: boolean;
-  compact?: boolean;
   /** Pinned results (ADR 0050): the winning entry, or the winners of a flat prize, drawn out in full. */
   results?: boolean;
 }) {
   const href = challengePath(token, c.id);
   const winning = results ? c.entries.filter((e) => e.place !== undefined && (isFlat(c.judging) || e.place === 1)) : [];
-  const leading = compact || winning.length > 0 ? [] : c.entries.slice(0, 3);
+  const leading = winning.length > 0 ? [] : c.entries.slice(0, 3);
   const none = noWinnerText(c);
   const unsent = prizeOverdue(c, now * 1000);
   return (
@@ -409,6 +407,70 @@ export function ChallengeSummary({
         </Link>
       </footer>
     </article>
+  );
+}
+
+/** What a challenge pays at the top, in a line: the 1st prize or the flat prize, and any asset with it. */
+function topPrizeText(c: PublicChallenge): string {
+  const asset = c.rewards?.asset;
+  const extra = asset && asset.amounts[0] && asset.amounts[0] !== "0" ? ` + ${assetShort(asset, asset.amounts[0])}` : "";
+  if (isFlat(c.judging)) return flatPrizeText(c) + extra;
+  const top = c.prizes[0] ?? 0;
+  return (top > 0 ? `1st: +${top} pts` : "1st: trophy") + extra;
+}
+
+/**
+ * A running challenge as a small tile: its Club (where that isn't obvious), title, top prize and time
+ * left, and the way in. The full card, with every prize, is one click away.
+ */
+function ChallengeTile({ c, token, now, club, heading }: { c: PublicChallenge; token: string; now: number; club?: ClubInfo; heading: string }) {
+  const href = challengePath(token, c.id);
+  return (
+    <article className="club-panel challenge-card flex h-full flex-col" aria-label={`Challenge: ${c.title}`}>
+      <ChallengeBand c={c} heading={heading} club={club?.name} pinned />
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <h3 className="challenge-title line-clamp-2 text-base">
+          <Link href={href} className="challenge-link">
+            {c.title}
+          </Link>
+        </h3>
+        <p className="mt-auto inline-flex items-center gap-1.5 text-sm font-extrabold">
+          <TrophyIcon className="size-4 shrink-0 text-[var(--challenge)]" />
+          <span className="truncate">{topPrizeText(c)}</span>
+        </p>
+        <ChallengeClock c={c} now={now} />
+      </div>
+      <footer className="challenge-foot">
+        <span className="inline-flex min-w-0 items-center gap-1 text-xs font-bold text-muted">
+          <JudgingIcon judging={c.judging} className="size-3.5 shrink-0" />
+          <span className="truncate">{judgingText(c)}</span>
+        </span>
+        <Link href={href} className={`${c.phase === "open" && !c.mine ? "btn-primary" : "btn-secondary"} btn-sm shrink-0`}>
+          {c.phase === "open" ? (c.mine ? "Your entry" : "Enter") : "See entries"}
+        </Link>
+      </footer>
+    </article>
+  );
+}
+
+export type PinnedChallenge = { token: string; c: PublicChallenge; heading: string; club?: ClubInfo };
+
+/**
+ * The running challenges pinned over a feed (the Board, the timeline) as small tiles in one row, a
+ * swipeable strip on phones, so the posts still start on the first screen.
+ */
+export function ChallengeTiles({ items, now }: { items: readonly PinnedChallenge[]; now: number }) {
+  return (
+    <ul
+      className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
+      aria-label="Pinned challenges"
+    >
+      {items.map(({ token, c, heading, club }) => (
+        <li key={`${token}:${c.id}`} className={`shrink-0 snap-start sm:w-auto ${items.length > 1 ? "w-[85%]" : "w-full"}`}>
+          <ChallengeTile c={c} token={token} now={now} club={club} heading={heading} />
+        </li>
+      ))}
+    </ul>
   );
 }
 

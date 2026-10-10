@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address } from "viem";
-import { toAsset, type Asset, type TokenInfo } from "./assets";
+import { toAsset, type Asset, type TokenLabel } from "./assets";
 import { DEFAULT_FILTERS, type DealFilters, type DealSort, type MonFilter } from "./dealFilters";
 import { applyDealFilters, involvesToken } from "./dealFilters";
 import { isExpired, sameAddress, type DealStatus } from "./deals";
@@ -25,6 +25,8 @@ export type BookQuery = {
   viewer?: Address;
   /** Only listings that give or ask for one of these tokens (a Club's market). */
   tokens: Address[];
+  /** Only this wallet's own listings (a profile's deals). */
+  maker?: Address;
   /** 1-based. */
   page: number;
   size: number;
@@ -50,6 +52,7 @@ export function bookParams(q: BookQuery): URLSearchParams {
   if (q.kind !== "any") p.set("kind", q.kind);
   if (q.viewer) p.set("viewer", q.viewer.toLowerCase());
   for (const token of q.tokens) p.append("token", token.toLowerCase());
+  if (q.maker) p.set("maker", q.maker.toLowerCase());
   if (q.page !== 1) p.set("page", String(q.page));
   p.set("size", String(q.size));
   return p;
@@ -72,6 +75,8 @@ export function parseBookQuery(p: URLSearchParams): BookQuery | string {
   if (query.length > MAX_QUERY) return `Search for at most ${MAX_QUERY} characters.`;
   const viewer = p.get("viewer");
   if (viewer !== null && !isAddress(viewer, { strict: false })) return "viewer isn't an address.";
+  const maker = p.get("maker");
+  if (maker !== null && !isAddress(maker, { strict: false })) return "maker isn't an address.";
   const tokens = p.getAll("token");
   if (tokens.length > MAX_TOKENS || !tokens.every((t) => isAddress(t, { strict: false }))) {
     return `Give at most ${MAX_TOKENS} token addresses.`;
@@ -85,6 +90,7 @@ export function parseBookQuery(p: URLSearchParams): BookQuery | string {
     filters: { query, mon, sort },
     viewer: viewer === null ? undefined : getAddress(viewer),
     tokens: tokens.map((t) => getAddress(t)),
+    maker: maker === null ? undefined : getAddress(maker),
     page,
     size,
   };
@@ -97,8 +103,8 @@ export type BookSource = {
   openSigned: readonly SignedListing[];
   /** Signed swaps of every status, for the "all" tab. */
   allSigned: readonly SignedListing[];
-  /** Token symbols, so a search for "USDC" finds the deals that hold it. */
-  info: ReadonlyMap<string, TokenInfo>;
+  /** Token and collection symbols and names, so a search for "USDC" or "Chog" finds the deals that hold it. */
+  info: ReadonlyMap<string, TokenLabel>;
 };
 
 type BookResult = {
@@ -116,7 +122,8 @@ export function pageBook(source: BookSource, q: BookQuery, now: number): BookRes
   const locked = q.kind !== "signed" ? source.deals : [];
   const signed = (list: readonly SignedListing[]) => (q.kind !== "locked" ? list : []);
   const forToken = (t: Listing) => q.tokens.length === 0 || q.tokens.some((token) => involvesToken(t, token));
-  const filter = (list: Listing[]) => applyDealFilters(list.filter(forToken), q.filters, now, source.info);
+  const byMaker = (t: Listing) => !q.maker || sameAddress(t.maker, q.maker);
+  const filter = (list: Listing[]) => applyDealFilters(list.filter(forToken).filter(byMaker), q.filters, now, source.info);
 
   // Signed swaps first: they carry no timestamp or id to order them against deals by, and
   // "Ending soon" re-sorts the two together anyway.

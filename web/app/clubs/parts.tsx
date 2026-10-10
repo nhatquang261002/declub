@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ClubAvatar } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
 import { formatMomentum, HeatMeter, MomentumChange } from "@/components/MomentumBadge";
+import { ArchiveIcon, BadgeCheckIcon, CheckIcon } from "@/components/Icons";
 import type { ClubInfo, ClubStats } from "@/lib/clubs";
 import { ago } from "@/lib/format";
 
@@ -40,8 +41,20 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
           <span className="flex min-w-0 flex-col">
             <span className="flex items-center gap-1.5">
               <span className="truncate font-extrabold group-hover:underline">{info.name}</span>
-              {joined && <span className="chip chip-peach py-0 text-[0.62rem]">Joined</span>}
-              {info.archived && <span className="chip py-0 text-[0.62rem]">Archived</span>}
+              <BadgeCheckIcon className="size-[1.1rem] shrink-0 text-[#315ea8]" />
+              <span className="sr-only">(verified)</span>
+              {/* The name truncates before the chips do. */}
+              {joined && (
+                <span className="chip chip-peach shrink-0">
+                  <CheckIcon />
+                  Joined
+                </span>
+              )}
+              {info.archived && (
+                <span className="chip shrink-0 p-0.5" role="img" aria-label="Archived" title="Archived: not taking new members">
+                  <ArchiveIcon />
+                </span>
+              )}
             </span>
             <span className="truncate text-xs text-muted">{clubLabel(info)}</span>
             {stats && (
@@ -56,7 +69,7 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
           <span className="font-black tabular-nums">{stats ? formatMomentum(stats.momentum) : "—"}</span>
           {stats && (
             <span className="block text-right">
-              <MomentumChange change={stats.change} />
+              <MomentumChange change={stats.change} momentum={stats.momentum} />
             </span>
           )}
         </span>

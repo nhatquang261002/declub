@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 import { AssetSide, DealCard } from "@/components/DealCard";
 import { ExpiryCountdown, SettlementTag, SwapCardShell } from "@/components/DealParts";
+import { SwapIcon } from "@/components/Icons";
 import { Masonry } from "@/components/Masonry";
+import { StatusChip, type StatusLook } from "@/components/StatusChip";
 import { useTokenInfo } from "@/hooks/useTokenInfo";
 import { erc20Tokens, type TokenInfo } from "@/lib/assets";
 import { explorerTx } from "@/lib/config";
@@ -17,14 +19,14 @@ import { isLive, isSignedListing, reasonText, ringLegs, STATUS_LABEL, type Inten
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
-const BADGE: Record<IntentStatus, string> = {
-  open: "chip-mint",
-  stale: "chip-warn",
-  settled: "chip-blue",
-  cancelled: "",
-  expired: "chip-warn",
-  consumed: "",
-  rejected: "chip-danger",
+const LOOK: Record<IntentStatus, StatusLook> = {
+  open: "live",
+  stale: "paused",
+  settled: "done",
+  cancelled: "ended",
+  expired: "timeout",
+  consumed: "moved",
+  rejected: "refused",
 };
 
 /** The deal page's stamp for an intent status (components/DealSheet.tsx). */
@@ -37,15 +39,6 @@ export const INTENT_STAMP: Record<IntentStatus, StampStatus> = {
   consumed: "cancelled",
   rejected: "rejected",
 };
-
-function IntentStatusBadge({ status }: { status: IntentStatus }) {
-  return (
-    <span className={`chip uppercase tracking-wide ${BADGE[status]}`}>
-      {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
-      {STATUS_LABEL[status]}
-    </span>
-  );
-}
 
 /** Symbols and decimals for every token in a set of intents or settlements. */
 export function useIntentsTokenInfo(rows: readonly PoolIntent[]) {
@@ -70,10 +63,7 @@ function IntentCard({ row, now, me, info }: { row: PoolIntent; now: number; me?:
       href={`/intent/${row.hash}`}
       head={
         <>
-          <span className="font-black tracking-tight">
-            Swap <span className="font-mono text-accent">{row.hash.slice(0, 8)}…</span>
-          </span>
-          <IntentStatusBadge status={status} />
+          <StatusChip look={LOOK[status]} label={STATUS_LABEL[status]} />
           <SettlementTag signed />
         </>
       }
@@ -132,7 +122,10 @@ export function CycleView({ settlement, me, info, footer }: { settlement: Settle
   return (
     <section className="deal-panel space-y-4 p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="chip chip-blue uppercase tracking-wide">{ring ? `Ring of ${legs.length}` : "Swap"}</span>
+        <span className="chip chip-blue uppercase tracking-wide">
+          <SwapIcon />
+          {ring ? `Ring of ${legs.length}` : "Swap"}
+        </span>
         <h3 className="font-black">{ring ? `Matched across ${legs.length} wallets` : "Matched and swapped"}</h3>
         {settlement.at > 0 && <span className="ml-auto text-xs text-muted">{new Date(settlement.at * 1000).toLocaleString()}</span>}
       </div>

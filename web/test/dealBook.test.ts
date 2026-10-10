@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getAddress } from "viem";
-import { erc20Asset, nativeAsset, nftAsset, type TokenInfo } from "../lib/assets";
+import { erc20Asset, nativeAsset, nftAsset, type TokenLabel } from "../lib/assets";
 import { bookParams, fromWireListings, pageBook, parseBookQuery, toWireListing, type BookQuery, type BookResponse, type BookSource } from "../lib/dealBook";
 import { DEFAULT_FILTERS } from "../lib/dealFilters";
 import { displayStatus } from "../lib/deals";
@@ -40,7 +40,7 @@ const query = (over: Partial<BookQuery> = {}): BookQuery => ({
   ...over,
 });
 
-const source = (deals: Deal[], signed: PoolIntent[] = [], info: Map<string, TokenInfo> = new Map()): BookSource => ({
+const source = (deals: Deal[], signed: PoolIntent[] = [], info: Map<string, TokenLabel> = new Map()): BookSource => ({
   deals,
   openSigned: signed.map(intentAsListing),
   allSigned: signed.map(intentAsListing),
@@ -71,6 +71,7 @@ describe("parseBookQuery", () => {
       kind: "locked",
       viewer: ME,
       tokens: [NFT, USD],
+      maker: ANA,
       page: 3,
       size: 4,
     });
@@ -78,11 +79,11 @@ describe("parseBookQuery", () => {
   });
 
   it("fills in the defaults", () => {
-    assert.deepEqual(parseBookQuery(new URLSearchParams()), query({ viewer: undefined }));
+    assert.deepEqual(parseBookQuery(new URLSearchParams()), query({ viewer: undefined, maker: undefined }));
   });
 
   it("refuses what it can't use", () => {
-    for (const bad of ["tab=mine", "mon=lots", "viewer=0x12", "page=0", "size=51", "token=0x1", `q=${"x".repeat(101)}`]) {
+    for (const bad of ["tab=mine", "mon=lots", "viewer=0x12", "maker=0x12", "page=0", "size=51", "token=0x1", `q=${"x".repeat(101)}`]) {
       assert.equal(typeof parseBookQuery(new URLSearchParams(bad)), "string", bad);
     }
     const three = new URLSearchParams([
@@ -115,15 +116,49 @@ describe("pageBook", () => {
 
   it("searches the whole book, by id and by token symbol", () => {
     const old = [...Array.from({ length: 500 }, (_, i) => deal(1_000 - i)), deal(7, { offered: [erc20Asset(USD, 5n)] })];
-    const info = new Map([[USD.toLowerCase(), { symbol: "mUSD", decimals: 6 }]]);
+    const info = new Map([[USD.toLowerCase(), { symbol: "mUSD", name: "Mock USD" }]]);
     const found = (q: string) => ids(pageBook(source(old, [], info), query({ filters: { ...DEFAULT_FILTERS, query: q } }), NOW).items);
     assert.deepEqual(found("musd"), [7]);
     assert.deepEqual(found("#7"), [7]);
   });
 
+  it("finds a deal by the name or symbol of an NFT collection on either side", () => {
+    const deals = [
+      deal(3, { offered: [erc20Asset(USD, 1n)], requested: [nftAsset(TOADS, 9n)] }),
+      deal(2, { offered: [nftAsset(NFT, 1n)] }),
+      deal(1, { offered: [erc20Asset(USD, 1n)] }),
+    ];
+    const info = new Map([
+      [NFT.toLowerCase(), { symbol: "CHOG", name: "Chog Genesis" }],
+      [TOADS.toLowerCase(), { symbol: "", name: "Skrumpeys" }],
+    ]);
+    const found = (q: string) => ids(pageBook(source(deals, [], info), query({ filters: { ...DEFAULT_FILTERS, query: q } }), NOW).items);
+    assert.deepEqual(found("chog"), [2]);
+    assert.deepEqual(found("genesis"), [2]);
+    assert.deepEqual(found("skrump"), [3]);
+  });
+
+  it("finds a deal with MON on either side by searching mon", () => {
+    const deals = [
+      deal(3, { offered: [nativeAsset(5n)], requested: [erc20Asset(USD, 1n)] }),
+      deal(2, { requested: [nativeAsset(7n)] }),
+      deal(1, { requested: [erc20Asset(USD, 1n)] }),
+    ];
+    const found = (q: string) => ids(pageBook(source(deals), query({ filters: { ...DEFAULT_FILTERS, query: q } }), NOW).items);
+    assert.deepEqual(found("MON"), [3, 2]);
+  });
+
   it("filters by token, on either side", () => {
     const withToads = [deal(3, { requested: [nftAsset(TOADS, 9n)] }), deal(2, { offered: [nftAsset(TOADS, 1n)] }), deal(1, { offered: [erc20Asset(USD, 1n)] })];
     assert.deepEqual(ids(pageBook(source(withToads), query({ tokens: [TOADS] }), NOW).items), [3, 2]);
+  });
+
+  it("shows only one maker's listings, signed swaps included", () => {
+    const deals = [deal(3, { maker: BO }), deal(2), deal(1, { maker: BO })];
+    const q = query({ maker: BO });
+    assert.deepEqual(ids(pageBook(source(deals), q, NOW).items), [3, 1]);
+    const mixed = pageBook(source(deals, [signedRow(7, BO), signedRow(8)]), query({ maker: ANA }), NOW);
+    assert.equal(mixed.total, 2);
   });
 
   it("puts signed swaps first, and drops either kind on request", () => {
@@ -180,7 +215,11 @@ function fakeReader(deals: Deal[]) {
     },
     async tokenInfo(tokens) {
       state.tokenReads.push(...tokens);
-      return new Map(tokens.filter((t) => t === USD.toLowerCase()).map((t) => [t, { symbol: "mUSD", decimals: 6 }]));
+      return new Map(
+        tokens
+          .filter((t) => t === USD.toLowerCase() || t === NFT.toLowerCase())
+          .map((t) => [t, t === USD.toLowerCase() ? { symbol: "mUSD", name: "Mock USD" } : { symbol: "CHOG", name: "Chog Genesis" }]),
+      );
     },
   };
   return { reader, state };
@@ -230,13 +269,23 @@ describe("createBook", () => {
     const { reader, state } = fakeReader([deal(1, { offered: [erc20Asset(USD, 1n)], requested: [erc20Asset(silent, 1n)] })]);
     const book = createBook(reader, null, { ttlMs: 0, tokenRetryMs: 60_000, now: () => clock });
     const first = await book.source("open");
-    assert.deepEqual(first.info.get(USD.toLowerCase()), { symbol: "mUSD", decimals: 6 });
+    assert.deepEqual(first.info.get(USD.toLowerCase()), { symbol: "mUSD", name: "Mock USD" });
     clock = 1_000;
     await book.source("open");
     assert.deepEqual(state.tokenReads, [USD.toLowerCase(), silent.toLowerCase()]);
     clock = 120_000;
     await book.source("open");
     assert.deepEqual(state.tokenReads.slice(2), [silent.toLowerCase()]);
+  });
+
+  it("reads the NFT collections of locked deals and the tokens of signed swaps", async () => {
+    const { reader, state } = fakeReader([deal(1, { offered: [nftAsset(NFT, 1n)] })]);
+    const pool = async () => [signedRow(2)];
+    const book = createBook(reader, pool, { ttlMs: 0 });
+    const read = await book.source("open");
+    assert.deepEqual(read.info.get(NFT.toLowerCase()), { symbol: "CHOG", name: "Chog Genesis" });
+    assert.deepEqual(read.info.get(USD.toLowerCase()), { symbol: "mUSD", name: "Mock USD" });
+    assert.deepEqual([...state.tokenReads].sort(), [NFT.toLowerCase(), USD.toLowerCase()].sort());
   });
 
   it("keeps the deals when the pool is down, and says so", async () => {

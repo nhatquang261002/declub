@@ -3,7 +3,7 @@
 import { ActionMenu } from "@/components/ActionMenu";
 import { HolderBadge } from "@/components/HolderBadge";
 import { Spinner } from "@/components/Spinner";
-import { CheckIcon, SignOutIcon } from "@/components/Icons";
+import { ArchiveIcon, CheckIcon, SignOutIcon } from "@/components/Icons";
 import { useClubMembership } from "@/hooks/useClubMembership";
 import { useSignIn } from "@/hooks/useSignIn";
 
@@ -84,7 +84,13 @@ export function JoinClubButton({
       </div>
     );
   }
-  if (archived) return <span className="chip">Not taking new members</span>;
+  if (archived)
+    return (
+      <span className="chip">
+        <ArchiveIcon />
+        Not taking new members
+      </span>
+    );
   return (
     <div className="flex flex-col items-start gap-1.5 sm:items-end">
       <button type="button" className="btn-primary px-6" aria-busy={m.pending} disabled={m.pending} onClick={m.join}>

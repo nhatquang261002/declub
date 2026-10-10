@@ -7,6 +7,7 @@ import { AssetEditor } from "@/components/AssetEditor";
 import { AssetList } from "@/components/AssetList";
 import { Alert } from "@/components/Alert";
 import { FeeNote } from "@/components/FeeNote";
+import { StatusChip, type StatusLook } from "@/components/StatusChip";
 import { TrustCheck } from "@/components/TrustCheck";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { useAssetApprovals } from "@/hooks/useAssetApprovals";
@@ -23,11 +24,11 @@ import { Who } from "@/components/Who";
 
 type Info = ReadonlyMap<string, TokenInfo>;
 
-const BADGE: Record<ProposalStatus, string> = {
-  active: "chip-mint",
-  accepted: "chip-blue",
-  withdrawn: "",
-  rejected: "chip-danger",
+const LOOK: Record<ProposalStatus, StatusLook> = {
+  active: "live",
+  accepted: "done",
+  withdrawn: "ended",
+  rejected: "refused",
 };
 
 /** The maker's note, as plain text. It is not verified and binds nobody. */
@@ -123,7 +124,7 @@ function ProposalRow({ proposal, info, dealId, canDecide }: { proposal: Proposal
           Offer <span className="text-accent">#</span>
           {proposal.id.toString()}
         </span>
-        <span className={`chip uppercase tracking-wide ${BADGE[proposal.status]}`}>{proposal.status}</span>
+        <StatusChip look={LOOK[proposal.status]} label={proposal.status} />
         {mine && <span className="chip chip-dark">Yours</span>}
         <span className="ml-auto text-xs text-muted">
           from <Who address={proposal.proposer} mine={mine} />

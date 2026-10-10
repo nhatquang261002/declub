@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ClubInfo, ClubStats } from "@/lib/clubs";
 import { ago } from "@/lib/format";
 import { ClubAvatar, ClubCover } from "./ClubArt";
-import { BadgeCheckIcon } from "./Icons";
+import { ArchiveIcon, BadgeCheckIcon, CheckIcon } from "./Icons";
 import { formatMomentum, HeatMeter, MomentumChange } from "./MomentumBadge";
 
 export const KIND_LABEL = { erc721: "NFT collection", erc20: "Memecoin" } as const;
@@ -47,8 +47,18 @@ export function ClubCard({
         <div className="relative z-10 flex items-start justify-between gap-2 p-3">
           {ranked ? <span className="chip chip-dark">#{rank}</span> : <span />}
           <span className="flex gap-1.5">
-            {joined && <span className="chip chip-peach">Joined</span>}
-            {club.archived && <span className="chip">Archived</span>}
+            {joined && (
+              <span className="chip chip-peach">
+                <CheckIcon />
+                Joined
+              </span>
+            )}
+            {club.archived && (
+              <span className="chip">
+                <ArchiveIcon />
+                Archived
+              </span>
+            )}
           </span>
         </div>
       </ClubCover>
@@ -70,7 +80,7 @@ export function ClubCard({
           <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-[#111318]/12 pt-3">
             <Figure label="Momentum">
               {formatMomentum(stats.momentum)}
-              <MomentumChange change={stats.change} />
+              <MomentumChange change={stats.change} momentum={stats.momentum} />
             </Figure>
             <Figure label="Members">{members !== undefined ? members.toLocaleString() : "—"}</Figure>
             <Figure label="Swaps · 7d">{stats.completed7d.toLocaleString()}</Figure>

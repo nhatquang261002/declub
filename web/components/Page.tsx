@@ -13,8 +13,8 @@ export function PageHeader({ title, children }: { title: string; children?: Reac
   );
 }
 
-/** Renders children only when a wallet is connected. */
-export function RequireWallet({ children, reason }: { children: ReactNode; reason: string }) {
+/** Renders children only when a wallet is connected; until then `preview` (what the page is for) and a way to connect. */
+export function RequireWallet({ children, reason, preview }: { children: ReactNode; reason: string; preview?: ReactNode }) {
   const { status } = useConnection();
   if (status === "connected") return <>{children}</>;
   if (status === "reconnecting" || status === "connecting") {
@@ -22,6 +22,7 @@ export function RequireWallet({ children, reason }: { children: ReactNode; reaso
   }
   return (
     <div className="page-section flex flex-col items-center gap-4 px-6 py-12 text-center">
+      {preview}
       <p className="text-muted">{reason}</p>
       <ConnectButton />
     </div>

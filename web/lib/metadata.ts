@@ -14,10 +14,27 @@ function decodeBase64Utf8(b64: string): string {
 }
 
 /**
+ * Straight from the host, or, when the browser can't (no CORS header: scatter.art), through our
+ * server, which asks the chain for the URI itself. Only collections we know the address of can fall back.
+ */
+async function fetchJson(url: string, tokenId: bigint, source?: { collection: string }) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`metadata ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    if (!source) throw e;
+    const res = await fetch(`/api/token-metadata?collection=${source.collection}&id=${tokenId}`);
+    if (!res.ok) throw new Error(`metadata ${res.status}`);
+    return await res.json();
+  }
+}
+
+/**
  * Reads a `tokenURI`. MockChog returns on-chain `data:application/json;base64,...`;
  * the real collection will likely point at IPFS or HTTP JSON instead.
  */
-export async function loadMetadata(tokenUri: string, tokenId: bigint): Promise<ChogMetadata> {
+export async function loadMetadata(tokenUri: string, tokenId: bigint, source?: { collection: string }): Promise<ChogMetadata> {
   let json: Partial<ChogMetadata> & { image?: string };
   const base64Prefix = "data:application/json;base64,";
   const utf8Prefix = "data:application/json;utf8,";
@@ -27,9 +44,7 @@ export async function loadMetadata(tokenUri: string, tokenId: bigint): Promise<C
   } else if (tokenUri.startsWith(utf8Prefix)) {
     json = JSON.parse(decodeURIComponent(tokenUri.slice(utf8Prefix.length)));
   } else {
-    const res = await fetch(resolveUri(tokenUri));
-    if (!res.ok) throw new Error(`metadata ${res.status}`);
-    json = await res.json();
+    json = await fetchJson(resolveUri(tokenUri), tokenId, source);
   }
 
   return {

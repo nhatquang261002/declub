@@ -7,6 +7,8 @@
  *   node --import ./test/register.mjs scripts/demo.ts wallets   # make the demo keys (web/.demo/, git-ignored)
  *   node --import ./test/register.mjs scripts/demo.ts chain     # mint the holdings, fund the personas, hand over the mirrors
  *   node --import ./test/register.mjs scripts/demo.ts trades    # the swaps, recorded to each Club's activity
+ *   node --import ./test/register.mjs scripts/demo.ts market    # open deals for testers: 20 random, 20 cheap, a few bundles
+ *   node --import ./test/register.mjs scripts/demo.ts signed    # signed deals (DeClubIntents) in the pool
  *   node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
  *   node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
  *   node --import ./test/register.mjs scripts/demo.ts art       # each Club's tile art, into public/art/clubs/ (convert
@@ -34,7 +36,10 @@ import {
   EXTRA_MEMBERS,
   FOLLOWS,
   HOLDINGS,
+  MARKET,
   PERSONAS,
+  RINGS,
+  SIGNED,
   POSTS,
   TRADES,
   type ClubKey,
@@ -56,6 +61,12 @@ type State = {
   trades: Record<string, { tradeId: string; created: Hex; filled?: Hex }>;
   /** What the challenges step made: each challenge's id, by its key in CHALLENGES. */
   challenges?: Record<string, string>;
+  /** What the market step listed, by its position in the run. */
+  market?: Record<string, { tradeId: string; created: Hex; kind: "random" | "cheap" | "bundle" }>;
+  /** What the signed step put in the pool, by its index in SIGNED. */
+  signed?: Record<string, { hash: Hex }>;
+  /** The rings the signed step posted, by index in RINGS: their legs, and the presenter's NFT that closes it if it waits on them. */
+  rings?: Record<string, { hashes: Hex[]; closes?: string }>;
 };
 
 const personaKeys = Object.keys(PERSONAS) as PersonaKey[];
@@ -373,6 +384,313 @@ async function main() {
       await save();
       console.log(`#${tradeId} filled by ${t.taker}`);
     }
+    return;
+  }
+
+  if (step === "market" || step === "signed") {
+    // Escrow deals (`market`) and signed deals (`signed`) draw on the same free tokens and the same bank.
+    if (!DECLUB_ESCROW_ADDRESS) throw new Error("Set NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS.");
+    const escrow = DECLUB_ESCROW_ADDRESS;
+    const { listIntents } = await import("../lib/pool");
+    const { isLive } = await import("../lib/intents");
+    const state = (await readJson<State>(STATE)) ?? { trades: {} };
+    const save = () => writeFile(STATE, JSON.stringify(state, null, 2) + "\n");
+
+    // mulberry32: small, seeded and good enough to shuffle a demo.
+    let seed = MARKET.seed;
+    const random = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const pick = <T>(list: T[]): T => list[Math.floor(random() * list.length)]!;
+    const shuffle = <T>(list: T[]): T[] => {
+      const out = [...list];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [out[i], out[j]] = [out[j]!, out[i]!];
+      }
+      return out;
+    };
+
+    // Every token a persona still holds (the presenter's stay theirs) and no live signed deal gives. Escrowed ones aren't theirs any more.
+    const signedAway = new Set<string>();
+    for (const row of await listIntents({ status: "all", limit: 500 })) {
+      if (!isLive(row.status) || !personaKeys.some((k) => persona(k).address.toLowerCase() === row.intent.maker.toLowerCase())) continue;
+      for (const a of row.intent.give) signedAway.add(`${a.token.toLowerCase()}:${a.id}`);
+    }
+    const minted = new Map<ClubKey, bigint>();
+    const forSale: { maker: PersonaKey; club: ClubKey; id: bigint }[] = [];
+    for (const c of clubKeys) {
+      const token = clubAddress(c);
+      minted.set(c, (await pub.readContract({ address: token, abi: mirrorAbi, functionName: "nextTokenId" })) - 1n);
+      for (const k of personaKeys) {
+        const count = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "balanceOf", args: [persona(k).address] });
+        for (let n = 0n; n < count; n++) {
+          const id = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "tokenOfOwnerByIndex", args: [persona(k).address, n] });
+          if (!signedAway.has(`${token.toLowerCase()}:${id}`)) forSale.push({ maker: k, club: c, id });
+        }
+      }
+    }
+    const lots = shuffle(forSale);
+
+    type Raw = { assetType: number; token: Address; id: bigint; amount: bigint };
+    const nft = (club: ClubKey, id: bigint): Raw => ({ assetType: 2, token: clubAddress(club), id, amount: 1n });
+    /** `count` lots of one maker: the first free lot's maker, if they hold enough, else the next one's. */
+    const takeLots = (count: number) => {
+      const first = lots.findIndex((lot) => lots.filter((l) => l.maker === lot.maker).length >= count);
+      if (first < 0) return null;
+      const maker = lots[first]!.maker;
+      const taken = lots.filter((l) => l.maker === maker).slice(0, count);
+      for (const lot of taken) lots.splice(lots.indexOf(lot), 1);
+      return taken;
+    };
+    /** `count` different tokens of Clubs other than `avoid`, none of them `maker`'s. */
+    const askFor = async (count: number, avoid: ClubKey, maker: PersonaKey) => {
+      const asks: Raw[] = [];
+      while (asks.length < count) {
+        const club = pick(clubKeys.filter((c) => c !== avoid));
+        const id = BigInt(1 + Math.floor(random() * Number(minted.get(club)!)));
+        if (asks.some((a) => a.token === clubAddress(club) && a.id === id)) continue;
+        const owner = await pub.readContract({ address: clubAddress(club), abi: mirrorAbi, functionName: "ownerOf", args: [id] });
+        if (owner.toLowerCase() === persona(maker).address.toLowerCase()) continue;
+        asks.push(nft(club, id));
+      }
+      return asks;
+    };
+    /** The NFT contracts among `given` that `maker` hasn't approved `operator` for. */
+    const unapprovedFor = async (maker: PersonaKey, given: { club: ClubKey }[], operator: Address) => {
+      const out: Address[] = [];
+      for (const token of new Set(given.map((lot) => clubAddress(lot.club)))) {
+        const ok = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "isApprovedForAll", args: [persona(maker).address, operator] });
+        if (!ok) out.push(token);
+      }
+      return out;
+    };
+    /** Tops `maker` up from the bank to `need`; false when the bank can't spare it. */
+    const topUp = async (maker: PersonaKey, need: bigint) => {
+      const balance = await pub.getBalance({ address: persona(maker).address });
+      if (balance >= need) return true;
+      const gift = need - balance;
+      if ((await pub.getBalance({ address: bank.address })) < gift + parseEther("0.1")) return false;
+      await spaced(bank.address);
+      await transfer(wallets.bank, persona(maker).address, gift);
+      lastSent.set(bank.address, Date.now());
+      return true;
+    };
+    const clubOf = (token: Address) => clubKeys.find((c) => clubAddress(c).toLowerCase() === token.toLowerCase());
+    const describe = (side: Raw[], money: string) =>
+      side.map((a) => (a.assetType === 2 ? `${clubOf(a.token)} #${a.id}` : `${formatEther(a.amount)} ${money}`)).join(" + ");
+    const approvalCost = parseEther("0.04");
+
+    if (step === "signed") {
+      const { DECLUB_INTENTS_ADDRESS } = await import("../lib/config");
+      if (!DECLUB_INTENTS_ADDRESS) throw new Error("Set NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS.");
+      const intents = DECLUB_INTENTS_ADDRESS;
+      const { deClubIntentsAbi } = await import("../lib/abi");
+      const { wmonAbi } = await import("../lib/contracts");
+      const { toAsset } = await import("../lib/assets");
+      const { intentTypedData } = await import("../lib/intents");
+      const { submitIntent } = await import("../lib/pool");
+      const signed = (state.signed ??= {});
+      const fee = await pub.readContract({ address: intents, abi: deClubIntentsAbi, functionName: "fee" });
+      const wmon = await pub.readContract({ address: intents, abi: deClubIntentsAbi, functionName: "FEE_TOKEN" });
+      const wrapped = (amount: string): Raw => ({ assetType: 1, token: wmon, id: 0n, amount: parseEther(amount) });
+      // The fee each maker's live signed deals have committed, which their WMON must cover all at once.
+      const committed = new Map<PersonaKey, bigint>();
+      for (const row of await listIntents({ status: "all", limit: 500 })) {
+        const k = personaKeys.find((p) => persona(p).address.toLowerCase() === row.intent.maker.toLowerCase());
+        if (!k || !isLive(row.status)) continue;
+        const nfts = row.intent.give.filter((a) => a.kind === "erc721").length;
+        committed.set(k, (committed.get(k) ?? 0n) + fee * BigInt(Math.max(nfts, 1)));
+      }
+
+      /** Approvals for `given` and WMON, and enough MON wrapped that the maker's WMON covers every live deal's fee. False when the bank is low. */
+      const prepare = async (maker: PersonaKey, given: { club: ClubKey }[]) => {
+        const feeNeed = (committed.get(maker) ?? 0n) + fee * BigInt(given.length);
+        const address = persona(maker).address;
+        const held = await pub.readContract({ address: wmon, abi: wmonAbi, functionName: "balanceOf", args: [address] });
+        const wrap = feeNeed > held ? feeNeed - held : 0n;
+        const allowed = await pub.readContract({ address: wmon, abi: wmonAbi, functionName: "allowance", args: [address, intents] });
+        const unapproved = await unapprovedFor(maker, given, intents);
+        const txs = unapproved.length + (wrap ? 1 : 0) + (allowed < feeNeed ? 1 : 0);
+        if (!(await topUp(maker, wrap + approvalCost * BigInt(txs)))) return false;
+        for (const token of unapproved)
+          await send(wallets.personas[maker], { address: token, abi: mirrorAbi, functionName: "setApprovalForAll", args: [intents, true] });
+        if (wrap) await send(wallets.personas[maker], { address: wmon, abi: wmonAbi, functionName: "deposit", value: wrap });
+        if (allowed < feeNeed) await send(wallets.personas[maker], { address: wmon, abi: wmonAbi, functionName: "approve", args: [intents, 2n ** 256n - 1n] });
+        return true;
+      };
+      /** Signs and posts one intent; the maker must be prepared. */
+      const post = async (maker: PersonaKey, give: Raw[], want: Raw[]) => {
+        const intent = {
+          maker: persona(maker).address,
+          give: give.map((a) => toAsset(a)!),
+          want: want.map((a) => toAsset(a)!),
+          feeToken: wmon,
+          maxFee: fee,
+          // The pool takes deadlines up to 7 days away.
+          deadline: BigInt(Math.floor(Date.now() / 1000) + 7 * 86_400 - 600),
+          nonce: BigInt(`0x${Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("hex")}`),
+        };
+        const signature = await persona(maker).signTypedData(intentTypedData(intents, intent));
+        const posted = await submitIntent(intent, signature);
+        committed.set(maker, (committed.get(maker) ?? 0n) + fee * BigInt(give.length));
+        return posted;
+      };
+      const bankLow = (done: number, total: number) =>
+        console.log(`the bank is low: stopping after ${done} of ${total}. Fund ${bank.address} and run this step again.`);
+
+      // Rings: leg k gives token k and wants token k-1, so the legs close into one cycle the matcher settles. Rings go first. A ring with
+      // `closer` leaves its last leg, giving one of the presenter's NFTs, for the presenter to sign in the app.
+      const rings = (state.rings ??= {});
+      const presenterTokens: Raw[] = [];
+      if (presenter) {
+        for (const c of clubKeys) {
+          const token = clubAddress(c);
+          const count = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "balanceOf", args: [presenter] });
+          for (let n = 0n; n < count; n++)
+            presenterTokens.push(nft(c, await pub.readContract({ address: token, abi: mirrorAbi, functionName: "tokenOfOwnerByIndex", args: [presenter, n] })));
+        }
+      }
+      const closersUsed = new Set(Object.values(rings).flatMap((r) => (r.closes ? [r.closes] : [])));
+      for (const [r, ring] of RINGS.entries()) {
+        if (rings[r]) continue;
+        let closing: Raw | undefined;
+        if (ring.closer) {
+          closing = presenterTokens.find((t) => !closersUsed.has(`${t.token.toLowerCase()}:${t.id}`));
+          if (!closing) {
+            console.log(`ring ${r + 1}: the presenter has no NFT left to close it with (set DEMO_PRESENTER_WALLET): skipped.`);
+            continue;
+          }
+        }
+        // One free token from each of `count` different personas.
+        const count = ring.legs - (closing ? 1 : 0);
+        const legs: { maker: PersonaKey; club: ClubKey; id: bigint }[] = [];
+        for (const lot of [...lots]) {
+          if (legs.length === count) break;
+          if (legs.some((l) => l.maker === lot.maker)) continue;
+          legs.push(lot);
+          lots.splice(lots.indexOf(lot), 1);
+        }
+        if (legs.length < count) {
+          console.log(`ring ${r + 1}: fewer than ${count} personas hold a free token: skipped.`);
+          continue;
+        }
+        for (const leg of legs) if (!(await prepare(leg.maker, [leg]))) return bankLow(Object.keys(rings).length, RINGS.length);
+        const tokens = [...legs.map((l) => nft(l.club, l.id)), ...(closing ? [closing] : [])];
+        const hashes: Hex[] = [];
+        for (const [k, leg] of legs.entries()) {
+          const { hash } = await post(leg.maker, [tokens[k]!], [tokens[(k - 1 + tokens.length) % tokens.length]!]);
+          hashes.push(hash);
+          console.log(
+            `ring ${r + 1} leg ${k + 1}/${ring.legs}: ${leg.maker} signs ${describe([tokens[k]!], "WMON")} for ${describe([tokens[(k - 1 + tokens.length) % tokens.length]!], "WMON")}`,
+          );
+        }
+        const closes = closing ? `${closing.token.toLowerCase()}:${closing.id}` : undefined;
+        if (closes) closersUsed.add(closes);
+        rings[r] = { hashes, ...(closes ? { closes } : {}) };
+        await save();
+        if (closing)
+          console.log(
+            `ring ${r + 1}: to close it, the presenter signs a swap giving ${describe([closing], "WMON")} for ${describe([tokens[tokens.length - 2]!], "WMON")}`,
+          );
+        else console.log(`ring ${r + 1}: complete, the matcher should settle it within a few seconds`);
+      }
+      for (const [i, shape] of SIGNED.entries()) {
+        if (signed[i]) continue;
+        const given = takeLots(shape.gives);
+        if (!given) {
+          console.log(`no persona holds ${shape.gives} free tokens: skipping ${i + 1}/${SIGNED.length}.`);
+          continue;
+        }
+        const maker = given[0]!.maker;
+        const give = given.map((lot) => nft(lot.club, lot.id));
+        const want = await askFor(shape.wantsNfts ?? 0, given[0]!.club, maker);
+        if (shape.wantsMon) want.push(wrapped(pick(shape.wantsMon === "cheap" ? MARKET.cheap.prices : MARKET.random.prices)));
+        if (!(await prepare(maker, given))) return bankLow(Object.keys(signed).length, SIGNED.length);
+        const { hash, status } = await post(maker, give, want);
+        signed[i] = { hash };
+        await save();
+        console.log(`${i + 1}/${SIGNED.length} ${hash.slice(0, 10)} ${maker} signs ${describe(give, "WMON")} for ${describe(want, "WMON")} (${status})`);
+      }
+
+      console.log(`bank left with ${formatEther(await pub.getBalance({ address: bank.address }))} MON`);
+      return;
+    }
+
+    const { ingestTx } = await import("../lib/server/activity");
+    const market = (state.market ??= {});
+    const fee = await pub.readContract({ address: escrow, abi: deClubEscrowAbi, functionName: "fee" });
+    // Indices below the singles' count are singles, the rest bundles. The kinds still to list are shuffled over the singles
+    // not yet listed, so the split holds across reruns.
+    const singleCount = MARKET.random.count + MARKET.cheap.count;
+    const listed = (kind: string) => Object.values(market).filter((m) => m.kind === kind).length;
+    const left = shuffle([...Array(MARKET.random.count - listed("random")).fill("random"), ...Array(MARKET.cheap.count - listed("cheap")).fill("cheap")] as (
+      "random" | "cheap"
+    )[]);
+    const singles = Array.from({ length: singleCount }, (_, i) => market[i]?.kind ?? left.shift()!) as ("random" | "cheap")[];
+    const total = singles.length + MARKET.bundles.length;
+    // Deals already listed hold their tokens in escrow, so only the unlisted deals draw from `lots`. Bundles go first.
+    const todo = Array.from({ length: total }, (_, i) => i)
+      .filter((i) => !market[i])
+      .sort((a, b) => Number(b >= singles.length) - Number(a >= singles.length));
+    const mon = (amount: string): Raw => ({ assetType: 0, token: zeroAddress, id: 0n, amount: parseEther(amount) });
+
+    // Gas for a create with one NFT a side, plus a share for each NFT beyond the first.
+    const callCost = parseEther("0.16");
+    const extraNftCost = parseEther("0.06");
+    for (const i of todo) {
+      const shape = i < singles.length ? null : MARKET.bundles[i - singles.length]!;
+      const kind = shape ? "bundle" : singles[i]!;
+      const given = takeLots(shape?.gives ?? 1);
+      if (!given) {
+        console.log(`no persona holds ${shape?.gives ?? 1} free tokens: skipping ${i + 1}/${total}.`);
+        continue;
+      }
+      const maker = given[0]!.maker;
+      const offered = given.map((lot) => nft(lot.club, lot.id));
+      if (shape?.addMon) offered.push(mon(shape.addMon));
+      // A single's random ask is half the time a MON price, half the time an NFT of another Club.
+      const wantsNfts = shape ? (shape.wantsNfts ?? 0) : kind === "random" && random() >= 0.5 ? 1 : 0;
+      const priced = shape ? shape.wantsMon : wantsNfts ? undefined : kind;
+      const requested = await askFor(wantsNfts, given[0]!.club, maker);
+      if (priced) requested.push(mon(pick(priced === "cheap" ? MARKET.cheap.prices : MARKET.random.prices)));
+
+      const value = fee * BigInt(given.length) + (shape?.addMon ? parseEther(shape.addMon) : 0n);
+      const unapproved = await unapprovedFor(maker, given, escrow);
+      const need = value + callCost + extraNftCost * BigInt(given.length + wantsNfts - 1) + approvalCost * BigInt(unapproved.length);
+      if (!(await topUp(maker, need))) {
+        console.log(`the bank is low: stopping after ${Object.keys(market).length} of ${total}. Fund ${bank.address} and run this step again.`);
+        return;
+      }
+      for (const token of unapproved)
+        await send(wallets.personas[maker], { address: token, abi: mirrorAbi, functionName: "setApprovalForAll", args: [escrow, true] });
+      const receipt = await send(wallets.personas[maker], {
+        address: escrow,
+        abi: deClubEscrowAbi,
+        functionName: "createTrade",
+        args: [offered, requested, zeroAddress, BigInt(Math.floor(Date.now() / 1000) + 30 * 86_400)],
+        value,
+      });
+      const created = receipt.logs
+        .filter((log) => log.address.toLowerCase() === escrow.toLowerCase())
+        .map((log) => {
+          try {
+            return decodeEventLog({ abi: deClubEscrowAbi, data: log.data, topics: log.topics });
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e?.eventName === "TradeCreated");
+      const result = await ingestTx(store, receipt.transactionHash);
+      if (result.status !== "recorded") throw new Error(`no receipt yet for ${receipt.transactionHash}`);
+      market[i] = { tradeId: (created!.args as { tradeId: bigint }).tradeId.toString(), created: receipt.transactionHash, kind };
+      await save();
+      console.log(`${i + 1}/${total} #${market[i]!.tradeId} ${maker} lists ${describe(offered, "MON")} for ${describe(requested, "MON")} (${kind})`);
+    }
+    console.log(`bank left with ${formatEther(await pub.getBalance({ address: bank.address }))} MON`);
     return;
   }
 
