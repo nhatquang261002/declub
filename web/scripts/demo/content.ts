@@ -133,15 +133,58 @@ export const TRADES: Trade[] = [
 ];
 
 /**
- * The `market` step lists more open deals for testers to take: half with random asks (an NFT from
- * another Club, or a MON price), half for a few cents so a fresh wallet straight from the faucet can
- * buy one. Which NFTs go on sale, and the order, come from a seeded shuffle, so the same seed lists the same kind of mix (a rerun after a stop may order what is left differently).
+ * The `market` step lists more open deals for testers to take: singles, half with random asks (an
+ * NFT from another Club, or a MON price) and half for a few cents so a fresh wallet straight from the
+ * faucet can buy one, and a few bundles of several items a side. Which NFTs go on sale, and the order, come from a seeded shuffle, so the same seed lists the same kind of mix (a rerun after a stop may order what is left differently).
  */
 export const MARKET = {
   seed: 20260410,
   random: { count: 20, prices: ["0.1", "0.25", "0.4", "0.75", "1.2", "2"] },
   cheap: { count: 20, prices: ["0.01", "0.02", "0.03", "0.05"] },
+  /**
+   * Multi-item deals, listed before the singles: `gives` NFTs from one persona (any of its Clubs),
+   * plus `addMon` from them, for `wantsNfts` NFTs and a cheap or random MON price.
+   */
+  bundles: [
+    { gives: 2, wantsMon: "cheap" },
+    { gives: 3, wantsMon: "random" },
+    { gives: 2, wantsNfts: 1 },
+    { gives: 1, wantsNfts: 2 },
+    { gives: 1, addMon: "0.02", wantsNfts: 1 },
+    { gives: 2, wantsNfts: 1, wantsMon: "cheap" },
+    { gives: 3, wantsMon: "cheap" },
+    { gives: 2, wantsNfts: 2 },
+  ] as { gives: number; addMon?: string; wantsNfts?: number; wantsMon?: "cheap" | "random" }[],
 };
+
+/**
+ * The `signed` step's deals: DeClubIntents intents in the pool, priced in WMON, with the same shapes
+ * as the bundles (`gives` NFTs for `wantsNfts` NFTs and a cheap or random price). They last the
+ * pool's longest deadline, 7 days, so the step needs rerunning for a demo after that.
+ */
+export const SIGNED: { gives: number; wantsNfts?: number; wantsMon?: "cheap" | "random" }[] = [
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsNfts: 1 },
+  { gives: 2, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "random" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsNfts: 2 },
+  { gives: 2, wantsNfts: 1 },
+  { gives: 1, wantsNfts: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "random" },
+];
+
+/**
+ * Signed rings for the matcher to settle (ADR 0009): each leg gives one NFT and wants the one
+ * before it. A ring with `closer` posts all but its last leg, which gives one of the presenter's NFTs:
+ * the step prints the swap to sign in the app, and the matcher settles the ring once it is in.
+ */
+export const RINGS: { legs: 2 | 3 | 4; closer: boolean }[] = [
+  { legs: 3, closer: false },
+  { legs: 3, closer: true },
+  { legs: 4, closer: true },
+];
 
 /**
  * Board posts. `ago` is how long before the social step ran, in hours; the ones that talk about
