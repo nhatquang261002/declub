@@ -1675,7 +1675,7 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 
 /* A challenge (ADR 0045) is a card of its own, not a system message: a striped band with the trophy
    and its state, the title and brief, the prizes as medal tiles, a clock, the entries leading. */
-.challenge-card { --challenge: #6d4fb3; overflow: hidden; box-shadow: 4px 4px 0 #111318; }
+.challenge-card { --challenge: #6d4fb3; overflow: hidden; }
 .challenge-band {
   display: flex;
   align-items: center;
@@ -1778,10 +1778,10 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 /* A flat prize (ADR 0049) is one wider tile: how many win and what each gets. */
 .challenge-prizes:has(> .challenge-prize-flat) { grid-template-columns: minmax(0, 16rem); }
 
-/* The Owner's choice of how winners are picked: a card per way, the chosen one raised. */
-.challenge-mode { display: flex; cursor: pointer; flex-direction: column; gap: 0.3rem; border: 2px solid rgb(17 19 24 / 0.2); border-radius: 0.75rem; background: white; padding: 0.6rem 0.7rem; transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease; }
+/* The Owner's choice of how winners are picked: a card per way, the chosen one tinted. */
+.challenge-mode { display: flex; cursor: pointer; flex-direction: column; gap: 0.3rem; border: 2px solid rgb(17 19 24 / 0.2); border-radius: 0.75rem; background: white; padding: 0.6rem 0.7rem; transition: border-color 140ms ease, background-color 140ms ease; }
 .challenge-mode:hover { border-color: #111318; }
-.challenge-mode:has(input:checked) { border-color: #111318; background: color-mix(in srgb, #6d4fb3 9%, white); box-shadow: 3px 3px 0 #111318; }
+.challenge-mode:has(input:checked) { border-color: #111318; background: color-mix(in srgb, #6d4fb3 9%, white); }
 .challenge-mode:has(input:focus-visible) { outline: 2px solid #6d4fb3; outline-offset: 2px; }
 
 /* An asset prize under a tile's points (ADR 0050): what the Owner sends, a check once it was. */
@@ -1790,7 +1790,7 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 /* "Prize not sent", said plainly. */
 .challenge-unsent { border: 2px solid #a9282f; border-radius: 0.75rem; background: #fbeaea; padding: 0.45rem 0.7rem; color: #7c1d22; font-size: 0.8rem; font-weight: 700; }
 /* Pinned results: the winning entry, on a gold ground. */
-.challenge-winning { display: flex; align-items: flex-start; gap: 0.6rem; border: 2px solid #111318; border-radius: 0.75rem; background: color-mix(in srgb, #f0b735 16%, white); padding: 0.55rem 0.7rem; box-shadow: 2px 2px 0 #111318; }
+.challenge-winning { display: flex; align-items: flex-start; gap: 0.6rem; border: 2px solid #111318; border-radius: 0.75rem; background: color-mix(in srgb, #f0b735 16%, white); padding: 0.55rem 0.7rem; }
 /* The prizes of a settled challenge, one row per winner, with the Owner's "mark as sent". */
 .challenge-prize-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.7rem 1.25rem; }
 .challenge-prize-row + .challenge-prize-row { border-top: 1px solid rgb(17 19 24 / 0.1); }
@@ -1804,8 +1804,8 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
 .trophy { display: flex; min-width: 0; align-items: center; gap: 0.6rem; border: 2px solid #111318; border-radius: 0.75rem; background: color-mix(in srgb, var(--medal, #f0b735) 16%, white); padding: 0.5rem 0.65rem; }
 .trophy[data-place="2"] { --medal: #c3ccd8; }
 .trophy[data-place="3"] { --medal: #dd9a66; }
-:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip) { color: #111318; transition: box-shadow 140ms ease; }
-:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover { color: #111318; box-shadow: 2px 2px 0 #111318; }
+:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip),
+:is(.club-panel) a.trophy:not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.chip):hover { color: #111318; }
 .trophy-count { display: inline-flex; align-items: center; gap: 0.2rem; border: 1.5px solid #111318; border-radius: 9999px; background: color-mix(in srgb, #f0b735 45%, white); padding: 0 0.4rem; font-size: 0.68rem; font-weight: 900; font-variant-numeric: tabular-nums; }
 .trophy-count svg { width: 0.75rem; height: 0.75rem; }
 
@@ -1848,10 +1848,15 @@ button.post-like:disabled { cursor: default; opacity: 0.7; }
   border-radius: 1rem;
   background: var(--chog-cream-500);
   color: #111318;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
-.tl-card:hover { box-shadow: 0 4px 0 #111318; transform: translateY(-2px); }
-.tl-card:focus-within { box-shadow: 0 4px 0 #111318; }
+/* Lifts like a deal card. */
+.tl-card:hover { border-color: #315ea8; background: #fff9e3; transform: translateY(-3px); }
+.tl-card:focus-within { border-color: #315ea8; }
+@media (prefers-reduced-motion: reduce) {
+  .tl-card { transition: none; }
+  .tl-card:hover { transform: none; }
+}
 .tl-club { display: block; border-radius: calc(1rem - 2px) calc(1rem - 2px) 0 0; color: var(--club-ink); }
 .tl-club:focus-visible { outline: 3px solid var(--action-primary); outline-offset: -3px; }
 .tl-cover { border-radius: calc(1rem - 2px) calc(1rem - 2px) 0 0; color: var(--club-ink); }
