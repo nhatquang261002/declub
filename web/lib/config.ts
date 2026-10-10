@@ -41,10 +41,6 @@ export const SITE_URL = (
       ? "https://declub.fun"
       : "http://localhost:3000")
 ).replace(/\/+$/, "");
-/** The project's docs on GitHub. The Guide stays short; the full rules, with every number, are linked from here. */
-const DOCS_URL = "https://github.com/nhatquang261002/declub/blob/main/docs";
-/** The full rules for Club Rewards: how points are counted and how a payout is split. */
-export const REWARDS_RULES_URL = `${DOCS_URL}/09-clubs.md#rewards`;
 export const RPC_URL = env.rpcUrl?.trim() || "https://testnet-rpc.monad.xyz";
 export const EXPLORER_URL = CHAIN_ID === 143 ? "https://monadvision.com" : "https://testnet.monadvision.com";
 

@@ -6,7 +6,6 @@ import {
   CoinIcon,
   CrossIcon,
   CrownIcon,
-  ExternalIcon,
   FlagIcon,
   FlameIcon,
   HeartIcon,
@@ -23,7 +22,7 @@ import { JudgingIcon } from "@/components/ChallengeCard";
 import { CHALLENGE_RULES, JUDGING, type Judging } from "@/lib/challenges";
 import { MAX_MODERATORS } from "@/lib/clubRoles";
 import { MAX_LINKS, MAX_PINNED, POST_COOLDOWN_SEC, POST_MAX, POSTS_PER_HOUR } from "@/lib/clubPosts";
-import { PRIVY_APP_ID, REWARDS_RULES_URL } from "@/lib/config";
+import { PRIVY_APP_ID } from "@/lib/config";
 import { swapIntents } from "@/lib/contracts";
 import { LENSES } from "@/lib/lenses";
 import { MOMENTUM } from "@/lib/momentum";
@@ -672,15 +671,10 @@ export default function GuidePage() {
           <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-dashed border-[#111318]/30 p-4 text-sm leading-6">
             <ListIcon className="mt-0.5 size-5 shrink-0" />
             <span>
-              Want every detail? The full rules, with each weight, limit and formula, are in our docs:{" "}
-              <a
-                href={REWARDS_RULES_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"
-              >
-                Club Rewards, fully explained <ExternalIcon className="size-3.5" />
-              </a>
+              Want the rules in one place?{" "}
+              <Link href="#rewards" className="font-semibold underline underline-offset-2">
+                Read how points, limits and payouts work in this Rewards section.
+              </Link>
             </span>
           </p>
         </Section>
