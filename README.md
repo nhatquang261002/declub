@@ -11,7 +11,38 @@
 
 Live: **[declub.fun](https://declub.fun)**
 
-Docs: [index](docs/README.md) · [product spec](docs/01-product-spec.md) · [user guide](docs/07-user-guide.md) · [Clubs](docs/09-clubs.md) · [roadmap](docs/06-roadmap.md)
+Documentation: **[docs index](docs/README.md)** · [product spec](docs/01-product-spec.md) · [user guide](docs/07-user-guide.md) · [architecture](docs/02-architecture.md) · [contract design](docs/03-contract-design.md) · [security](docs/04-security.md) · [frontend](docs/05-frontend.md) · [Clubs](docs/09-clubs.md) · [roadmap](docs/06-roadmap.md) · [test plan](docs/11-test-plan.md) · [demo](docs/12-demo.md) · [ADRs](docs/adr/README.md)
+
+### Current testnet fees
+
+The current testnet deployment charges **0.05 MON per NFT a side moves** (with the
+contract's minimum of one fee unit per side). This fee is intentionally kept low
+because testnet MON costs little; it is the fixed fee used by the current demo
+deployment, not a promise about the eventual mainnet fee. See the
+[contract fee rules](docs/03-contract-design.md#protocol-fee-declubescrow) and
+[testnet deployment details](docs/12-demo.md#demo-contracts). For practical
+testnet costs, the [demo budget notes](docs/12-demo.md#things-to-know) estimate
+another **0.05–0.1 MON in gas per persona trade**, with about **1.2 MON** in
+additional top-ups when rebuilding the demo.
+
+### Estimated mainnet fee
+
+For planning against real demand, the working mainnet estimate is **$5 per fee
+unit per side**. The contracts charge per NFT a side moves, with a minimum of
+one fee unit per side. Of the completed swap's collected fees, **75% goes into
+the Club** (50% to active Holders and 25% to the Club fund):
+
+| Trade size | NFTs moved by one side | Estimated into the Club |
+|---|---:|---:|
+| 10-NFT swap | 10 | $75 |
+| 50-NFT swap | 50 | $375 |
+| 100-NFT swap | 100 | $750 |
+
+These are planning estimates, not a live mainnet price. The fee admin can lower
+the fee immediately or raise it only after the contract's delay, and the
+eventual amount will depend on demand and the value of MON. See the
+[fee rules](docs/03-contract-design.md#protocol-fee-declubescrow) for the
+on-chain limits and fee-change behavior.
 
 ## The problem
 
@@ -32,6 +63,9 @@ The question behind DeClub: when a community creates the value, who captures it?
 DeClub gives every verified Monad NFT collection a Club: an open Board signed by its members, a ranking of who the community backs, weekly rewards in MON, and its own swap market whose fees pay for those rewards.
 
 DeClub is a home for an NFT community first. The market is what pays for it.
+
+See the [product spec](docs/01-product-spec.md) for the complete product definition
+and the [user guide](docs/07-user-guide.md) for the current app experience.
 
 ### 1. An open social graph the members own
 
@@ -55,6 +89,9 @@ Each Club's Owner programs its incentives within protocol limits: pay every acti
 
 Swap fees are one source of rewards. An Owner or a sponsor can put more in any week, run challenges with incentives, and grow the community.
 
+The [Clubs spec](docs/09-clubs.md) describes Momentum, points, epochs, rewards,
+sponsorships and challenge rules in detail.
+
 ### 4. A real stake, funded by the community's own trades
 
 Each completed swap in the Club pays a small fee per NFT moved. Every week:
@@ -74,6 +111,10 @@ Members swap NFT for NFT, add MON on either side, or ask for any NFT with the tr
 - **Locked swaps (DeClubEscrow):** the maker locks their side and the taker completes it in one transaction.
 - **Signed swaps (DeClubIntents):** wallets sign what they want to give and get, and a matcher settles pairs, or rings of up to four people, in one transaction.
 
+See the [contract design](docs/03-contract-design.md) for settlement, fee,
+asset and gas details, and the [matcher guide](matcher/README.md) for signed-swap
+pooling and settlement.
+
 ### 6. Challenges
 
 The Owner can set the Club a task, like "post your best fan art on X", and a sponsor can back the week it runs in. Members enter with their own X post, and winners are picked by likes, a Holder vote, the Owner, a verifiable on-chain raffle, first in, or everyone who qualifies. Prizes can be points, trophies, NFT or token prizes, or a pinned post.
@@ -85,6 +126,9 @@ An Owner claims their Club by proving on chain that they own the collection's co
 ### 8. Safety built in
 
 Trust badges and lookalike checks flag fake or copycat collections. Users confirm the contract addresses before accepting a swap, can see and revoke their token approvals on one page, and get a warning on long-lived signatures. Before a payout is signed, a verification script checks it.
+
+The [security model](docs/04-security.md) documents the trust boundaries,
+invariants, threats and verification checks.
 
 ### Why Monad
 
@@ -188,6 +232,10 @@ cd ../e2e && npm install
 
 Copy `.env.example` to `.env` and set the required addresses and secrets.
 
+For the repeatable testnet demo, including seeded collections, wallets, trades
+and rewards, see the [demo guide](docs/12-demo.md). For sign-in and Privy
+configuration, see the [Privy guide](docs/10-privy.md).
+
 ### Flavors: testnet and mainnet
 
 One codebase, two flavors. Each has its own chain, env file, build folder, port and storage, so
@@ -208,6 +256,9 @@ RPC, a missing Chog address or an Upstash database shared with testnet. The page
 they're on (`web/lib/network.ts`).
 
 ### Run checks
+
+The [test plan](docs/11-test-plan.md) covers the full local, testnet and
+mainnet-canary validation process.
 
 ```bash
 ./scripts/test-all.sh
