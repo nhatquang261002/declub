@@ -113,7 +113,7 @@ export function useTokenViews(collection: Address | undefined, ids: readonly big
       const uri = uris.data?.[i];
       return {
         queryKey: ["nftMetadata", collection?.toLowerCase(), id.toString(), uri?.status === "success" ? uri.result : null],
-        queryFn: () => loadMetadata(uri!.result as string, id),
+        queryFn: () => loadMetadata(uri!.result as string, id, { collection: collection! }),
         enabled: uri?.status === "success",
         staleTime: Infinity,
         retry: 1,
