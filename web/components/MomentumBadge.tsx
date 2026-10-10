@@ -29,19 +29,12 @@ export function HeatMeter({ value, showLabel = true }: { value: number; showLabe
 }
 
 /**
- * How Momentum moved over the week: ▲ 12 or ▼ 3, nothing when flat, and "New" when all of it is
- * this week's, where "220 ▲ 220" would only say the same number twice (as the Club page does).
+ * How Momentum moved over the week: ▲ 12 or ▼ 3. Nothing when flat, or when all of it is this week's:
+ * "220 ▲ 220" would only say the same number twice, and the Rising list already shows the gain.
  */
 export function MomentumChange({ change, momentum }: { change: number; momentum: number }) {
   const moved = Math.round(change);
-  if (moved === 0) return null;
-  if (moved > 0 && moved >= Math.round(momentum)) {
-    return (
-      <span className="text-xs font-bold text-mint">
-        New<span className="sr-only"> this week</span>
-      </span>
-    );
-  }
+  if (moved === 0 || moved >= Math.round(momentum)) return null;
   return (
     <span className={`text-xs font-bold tabular-nums ${moved > 0 ? "text-mint" : "text-danger"}`}>
       {moved > 0 ? "▲" : "▼"} {Math.abs(moved).toLocaleString()}
