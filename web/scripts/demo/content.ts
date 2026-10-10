@@ -133,6 +133,17 @@ export const TRADES: Trade[] = [
 ];
 
 /**
+ * The `market` step lists more open deals for testers to take: half with random asks (an NFT from
+ * another Club, or a MON price), half for a few cents so a fresh wallet straight from the faucet can
+ * buy one. Which NFTs go on sale, and the order, come from a seeded shuffle, so the same seed lists the same kind of mix (a rerun after a stop may order what is left differently).
+ */
+export const MARKET = {
+  seed: 20260410,
+  random: { count: 20, prices: ["0.1", "0.25", "0.4", "0.75", "1.2", "2"] },
+  cheap: { count: 20, prices: ["0.01", "0.02", "0.03", "0.05"] },
+};
+
+/**
  * Board posts. `ago` is how long before the social step ran, in hours; the ones that talk about
  * this run's swaps are minutes old, so they come after them. A post with `ref` is a "looking" post
  * linking the open trade of that name. `pin` pins it (the Owner's posts).

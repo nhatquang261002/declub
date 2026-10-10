@@ -7,6 +7,7 @@
  *   node --import ./test/register.mjs scripts/demo.ts wallets   # make the demo keys (web/.demo/, git-ignored)
  *   node --import ./test/register.mjs scripts/demo.ts chain     # mint the holdings, fund the personas, hand over the mirrors
  *   node --import ./test/register.mjs scripts/demo.ts trades    # the swaps, recorded to each Club's activity
+ *   node --import ./test/register.mjs scripts/demo.ts market    # 20 random and 20 cheap open deals for testers
  *   node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
  *   node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
  *   node --import ./test/register.mjs scripts/demo.ts art       # each Club's tile art, into public/art/clubs/ (convert
@@ -34,6 +35,7 @@ import {
   EXTRA_MEMBERS,
   FOLLOWS,
   HOLDINGS,
+  MARKET,
   PERSONAS,
   POSTS,
   TRADES,
@@ -56,6 +58,8 @@ type State = {
   trades: Record<string, { tradeId: string; created: Hex; filled?: Hex }>;
   /** What the challenges step made: each challenge's id, by its key in CHALLENGES. */
   challenges?: Record<string, string>;
+  /** What the market step listed, by its position in the run. */
+  market?: Record<string, { tradeId: string; created: Hex }>;
 };
 
 const personaKeys = Object.keys(PERSONAS) as PersonaKey[];
@@ -373,6 +377,115 @@ async function main() {
       await save();
       console.log(`#${tradeId} filled by ${t.taker}`);
     }
+    return;
+  }
+
+  if (step === "market") {
+    if (!DECLUB_ESCROW_ADDRESS) throw new Error("Set NEXT_PUBLIC_DECLUB_ESCROW_ADDRESS.");
+    const escrow = DECLUB_ESCROW_ADDRESS;
+    const { ingestTx } = await import("../lib/server/activity");
+    const state = (await readJson<State>(STATE)) ?? { trades: {} };
+    const market = (state.market ??= {});
+    const save = () => writeFile(STATE, JSON.stringify(state, null, 2) + "\n");
+    const fee = await pub.readContract({ address: escrow, abi: deClubEscrowAbi, functionName: "fee" });
+
+    // mulberry32: small, seeded and good enough to shuffle a demo.
+    let seed = MARKET.seed;
+    const random = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const pick = <T>(list: T[]): T => list[Math.floor(random() * list.length)]!;
+    const shuffle = <T>(list: T[]): T[] => {
+      const out = [...list];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [out[i], out[j]] = [out[j]!, out[i]!];
+      }
+      return out;
+    };
+
+    // Every token a persona still holds (the presenter's stay theirs), in escrow or not: the ones in escrow aren't theirs any more.
+    const minted = new Map<ClubKey, bigint>();
+    const forSale: { maker: PersonaKey; club: ClubKey; id: bigint }[] = [];
+    for (const c of clubKeys) {
+      const token = clubAddress(c);
+      minted.set(c, (await pub.readContract({ address: token, abi: mirrorAbi, functionName: "nextTokenId" })) - 1n);
+      for (const k of personaKeys) {
+        const count = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "balanceOf", args: [persona(k).address] });
+        for (let n = 0n; n < count; n++) {
+          const id = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "tokenOfOwnerByIndex", args: [persona(k).address, n] });
+          forSale.push({ maker: k, club: c, id });
+        }
+      }
+    }
+    const total = MARKET.random.count + MARKET.cheap.count;
+    const lots = shuffle(forSale);
+    // Deals already listed hold their token in escrow, so only the unlisted deals draw from `lots`.
+    const todo = Array.from({ length: total }, (_, i) => i).filter((i) => !market[i]);
+    if (lots.length < todo.length) throw new Error(`Only ${lots.length} tokens are free to list; ${todo.length} deals to go.`);
+    const kinds = shuffle([...Array(MARKET.random.count).fill("random"), ...Array(MARKET.cheap.count).fill("cheap")] as ("random" | "cheap")[]);
+
+    const approvalCost = parseEther("0.04");
+    const callCost = parseEther("0.16");
+    for (const i of todo) {
+      const lot = lots.shift()!;
+      const kind = kinds[i]!;
+      // A random ask is half the time a MON price, half the time an NFT of another Club that someone holds.
+      let wanted: { assetType: number; token: Address; id: bigint; amount: bigint };
+      let label: string;
+      if (kind === "cheap" || random() < 0.5) {
+        const price = pick(kind === "cheap" ? MARKET.cheap.prices : MARKET.random.prices);
+        wanted = { assetType: 0, token: zeroAddress, id: 0n, amount: parseEther(price) };
+        label = `${price} MON`;
+      } else {
+        const club = pick(clubKeys.filter((c) => c !== lot.club));
+        const id = BigInt(1 + Math.floor(random() * Number(minted.get(club)!)));
+        wanted = { assetType: 2, token: clubAddress(club), id, amount: 1n };
+        label = `${club} #${id}`;
+      }
+
+      const token = clubAddress(lot.club);
+      const approved = await pub.readContract({ address: token, abi: mirrorAbi, functionName: "isApprovedForAll", args: [persona(lot.maker).address, escrow] });
+      const need = fee + callCost + (approved ? 0n : approvalCost);
+      const balance = await pub.getBalance({ address: persona(lot.maker).address });
+      if (balance < need) {
+        const gift = need - balance;
+        if ((await pub.getBalance({ address: bank.address })) < gift + parseEther("0.1")) {
+          console.log(`the bank is low: stopping after ${Object.keys(market).length} of ${total}. Fund ${bank.address} and run this step again.`);
+          return;
+        }
+        await spaced(bank.address);
+        await transfer(wallets.bank, persona(lot.maker).address, gift);
+        lastSent.set(bank.address, Date.now());
+      }
+      if (!approved) await send(wallets.personas[lot.maker], { address: token, abi: mirrorAbi, functionName: "setApprovalForAll", args: [escrow, true] });
+      const receipt = await send(wallets.personas[lot.maker], {
+        address: escrow,
+        abi: deClubEscrowAbi,
+        functionName: "createTrade",
+        args: [[{ assetType: 2, token, id: lot.id, amount: 1n }], [wanted], zeroAddress, BigInt(Math.floor(Date.now() / 1000) + 30 * 86_400)],
+        value: fee,
+      });
+      const created = receipt.logs
+        .filter((log) => log.address.toLowerCase() === escrow.toLowerCase())
+        .map((log) => {
+          try {
+            return decodeEventLog({ abi: deClubEscrowAbi, data: log.data, topics: log.topics });
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e?.eventName === "TradeCreated");
+      const result = await ingestTx(store, receipt.transactionHash);
+      if (result.status !== "recorded") throw new Error(`no receipt yet for ${receipt.transactionHash}`);
+      market[i] = { tradeId: (created!.args as { tradeId: bigint }).tradeId.toString(), created: receipt.transactionHash };
+      await save();
+      console.log(`${i + 1}/${total} #${market[i]!.tradeId} ${lot.maker} lists ${lot.club} #${lot.id} for ${label} (${kind})`);
+    }
+    console.log(`bank left with ${formatEther(await pub.getBalance({ address: bank.address }))} MON`);
     return;
   }
 

@@ -64,7 +64,10 @@ node --import ./test/register.mjs scripts/demo.ts chain     # mint, fund the per
 node --import ./test/register.mjs scripts/demo.ts trades    # the ten swaps, into each Club's activity
 node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
 node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
+node --import ./test/register.mjs scripts/demo.ts market    # 40 more open deals for testers to take
 ```
+
+**Market.** `market` lists 20 deals with random asks (a MON price or an NFT from another Club) and 20 for 0.01 to 0.05 MON, so a fresh wallet straight from the faucet can buy one. The personas list tokens they still hold, in a seeded shuffle; each pays the fee, and the bank tops a persona up when its balance is short. It stops when the bank runs low and continues on a rerun (`DEMO_GAS_PCT=200` keeps the gas limit, which Monad bills, down).
 
 **Challenges** (`CHALLENGES` in `content.ts`): open ones start in the running epoch through the app's own functions, with signed entries sharing invented X posts (`dcdemo…` handles) and likes. "Ended" ones ran over the four days before it: they are written to the store as the app would have kept them, then the app settles them, so their points count in the epoch they ended in (or the running one, if that epoch is closed). The Chog Club, the presenter's, has one waiting for the Owner's pick and one with a Chog prize to send. A Club allows three open at once, so the step stops if a Club already has more open than it leaves room for.
 
