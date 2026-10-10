@@ -6,7 +6,7 @@ import { BanIcon, CoinIcon, FlameIcon, GridIcon, HourglassIcon, TrendUpIcon, Wal
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubStandings } from "@/hooks/useRewards";
-import { REWARDS_EPOCH_SECONDS, REWARDS_RULES_URL } from "@/lib/config";
+import { REWARDS_EPOCH_SECONDS } from "@/lib/config";
 import { countdown, formatMon } from "@/lib/format";
 import { DEFAULT_CLUB_RULES, PROTOCOL, percent, seatsFor, whoIsPaid, type ClubRules } from "@/lib/rewards";
 import type { StandingRow, StandingsView } from "@/lib/server/standings";
@@ -143,10 +143,6 @@ export function LiveStandings({
         <Link href="/guide#rewards" className="font-semibold underline underline-offset-2">
           How points work
         </Link>
-        {" · "}
-        <a href={REWARDS_RULES_URL} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2">
-          Full rules
-        </a>
       </p>
     </Panel>
   );
