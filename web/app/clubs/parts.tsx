@@ -69,7 +69,7 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
           <span className="font-black tabular-nums">{stats ? formatMomentum(stats.momentum) : "—"}</span>
           {stats && (
             <span className="block text-right">
-              <MomentumChange change={stats.change} />
+              <MomentumChange change={stats.change} momentum={stats.momentum} />
             </span>
           )}
         </span>

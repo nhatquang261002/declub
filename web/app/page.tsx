@@ -71,10 +71,10 @@ export default function HomePage() {
               <Link href="/clubs" className="btn-primary">
                 Explore Clubs <span aria-hidden>→</span>
               </Link>
+              {/* One main action here: Create deal is in the header and under the market section. */}
               <Link href="/deals" className="btn-secondary">
                 Browse deals
               </Link>
-              <CreateDealButton />
             </div>
           </div>
           <DeClubArt />

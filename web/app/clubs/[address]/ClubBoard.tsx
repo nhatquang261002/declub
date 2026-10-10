@@ -9,7 +9,7 @@ import { PostComposer } from "@/components/PostComposer";
 import { PostItem, postActions } from "@/components/PostItem";
 import { Select } from "@/components/Select";
 import { Spinner } from "@/components/Spinner";
-import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
+import { ChallengeFeedCard, ChallengeSummary, ChallengeTiles } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useClubActions, useClubPage, useClubPosts } from "@/hooks/useClubBoard";
@@ -21,6 +21,9 @@ import { isStaff } from "@/lib/clubRoles";
 import { LENSES, type LensId } from "@/lib/lenses";
 import { weave, withoutPinned } from "@/lib/systemFeed";
 import { Empty, Loading } from "./parts";
+
+/** How many running challenges are pinned in the row; the rest are on the Challenges tab. */
+const PINNED_SHOWN = 3;
 
 const FILTERS = [
   { value: "all", label: "All posts" },
@@ -61,6 +64,8 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
   // so are results the Owner chose to pin, for a few days after they settle (ADR 0050).
   const { challenges } = useChallenges(token);
   const live = useMemo(() => challenges.filter((c) => isPinned(c, now * 1000)), [challenges, now]);
+  const running = live.filter((c) => isLive(c.phase));
+  const results = live.filter((c) => !isLive(c.phase));
   // System messages (ADR 0043) go among the posts in time order, so only where the list is by time
   // and holds everything: another lens or "Looking for" is a question about posts.
   const byTime = active.id === "newest";
@@ -113,22 +118,25 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
         )}
       </div>
 
-      {live.length > 0 && (
-        <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned challenges">
-          {live.map((c) => (
+      {/* Running ones as small tiles in a row; results the Owner pinned stay full cards, since showing the winner is why they're pinned. */}
+      {running.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3">
+          <ChallengeTiles
+            items={running.slice(0, PINNED_SHOWN).map((c) => ({ token, c, heading: c.phase === "open" ? "Challenge" : "Challenge ended" }))}
+            now={now}
+          />
+          {running.length > PINNED_SHOWN && (
+            <Link href={`/clubs/${token}?tab=challenges`} className="btn-secondary btn-sm self-start">
+              See all {running.length} running challenges
+            </Link>
+          )}
+        </div>
+      )}
+      {results.length > 0 && (
+        <ul className="mb-4 flex flex-col gap-3" aria-label="Pinned results">
+          {results.map((c) => (
             <li key={c.id}>
-              {isLive(c.phase) ? (
-                <ChallengeSummary
-                  c={c}
-                  token={token}
-                  now={now}
-                  heading={c.phase === "open" ? "Challenge" : "Challenge ended"}
-                  pinned
-                  compact={live.length > 1}
-                />
-              ) : (
-                <ChallengeSummary c={c} token={token} now={now} heading="Challenge results" pinned results />
-              )}
+              <ChallengeSummary c={c} token={token} now={now} heading="Challenge results" pinned results />
             </li>
           ))}
         </ul>

@@ -86,7 +86,7 @@ function CardThread({ post, archived, now }: { post: TimelinePost; archived: boo
 /**
  * One post on the timeline (ADR 0041): the Club it was made in on a cover of its own colours, then
  * the author and the post, set larger and with more room than a row of the Board. A reader who
- * belongs to the Club can like and reply here; anyone else reads, and is pointed at the Club to join.
+ * belongs to the Club can like and reply here; anyone else reads, and the cover takes them to the Club to join.
  * Moderation stays on the Board, where the Club's tools are.
  */
 export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; club: ClubInfo; joined: boolean; now: number }) {
@@ -97,7 +97,7 @@ export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; 
   return (
     <li className="tl-card">
       <Link href={boardHref(club)} className="tl-club group" aria-label={`${club.name}: open its Board`}>
-        <ClubCover club={club} className="tl-cover" markClassName="text-[4.5rem]">
+        <ClubCover club={club} className="tl-cover" markClassName="text-[3rem]">
           <span className="relative z-10 flex items-center gap-2.5 px-4 py-2.5">
             <ClubAvatar club={club} className="size-8 text-xs" sizes="32px" />
             <span className="min-w-0 flex-1 truncate text-sm font-black group-hover:underline">{club.name}</span>
@@ -139,29 +139,29 @@ export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; 
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-[#111318]/10 px-4 py-2.5 sm:px-5">
-        {joined ? (
-          <JoinedActions post={post} club={club} open={open} onToggle={() => setOpen(!open)} />
-        ) : (
-          <>
-            {post.likes > 0 && (
-              <span className="post-like">
-                <HeartIcon className="size-4" />
-                {post.likes}
-              </span>
-            )}
-            {replies > 0 && (
-              <span className="post-like">
-                <ChatIcon className="size-4" />
-                {replies}
-              </span>
-            )}
-            <Link href={boardHref(club)} className="ml-auto text-xs font-extrabold text-muted underline-offset-2 hover:text-[#111318] hover:underline">
-              Join {club.symbol} to like and reply <span aria-hidden>→</span>
-            </Link>
-          </>
-        )}
-      </div>
+      {/* Outside the reader's Clubs the counts are all there is to show; how to join is said once, above the feed. */}
+      {(joined || post.likes > 0 || replies > 0) && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-[#111318]/10 px-4 py-2.5 sm:px-5">
+          {joined ? (
+            <JoinedActions post={post} club={club} open={open} onToggle={() => setOpen(!open)} />
+          ) : (
+            <>
+              {post.likes > 0 && (
+                <span className="post-like">
+                  <HeartIcon className="size-4" />
+                  {post.likes}
+                </span>
+              )}
+              {replies > 0 && (
+                <span className="post-like">
+                  <ChatIcon className="size-4" />
+                  {replies}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {open && joined && (
         <div className="px-4 pb-4 sm:px-5">
           <CardThread post={post} archived={club.archived} now={now} />

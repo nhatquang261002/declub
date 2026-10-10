@@ -80,7 +80,7 @@ export function ClubCard({
           <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-[#111318]/12 pt-3">
             <Figure label="Momentum">
               {formatMomentum(stats.momentum)}
-              <MomentumChange change={stats.change} />
+              <MomentumChange change={stats.change} momentum={stats.momentum} />
             </Figure>
             <Figure label="Members">{members !== undefined ? members.toLocaleString() : "—"}</Figure>
             <Figure label="Swaps · 7d">{stats.completed7d.toLocaleString()}</Figure>

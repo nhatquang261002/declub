@@ -3,9 +3,7 @@
 import { useMemo, type ReactNode } from "react";
 import { formatUnits } from "viem";
 import { formatAsset, type Asset, type TokenInfo } from "@/lib/assets";
-import { CHOG_ADDRESS } from "@/lib/config";
 import { isOpenOffer, type Deal } from "@/lib/deals";
-import { ChogThumb } from "./Chog";
 import { MonPill, DealCardFrame } from "./DealParts";
 import { CopyAddress } from "@/components/CopyAddress";
 import { useCollectionInfo, useTokenViews } from "@/hooks/useCollection";
@@ -25,7 +23,7 @@ function NftTile({ asset }: { asset: Asset }) {
   const { info } = useCollectionInfo(asset.token as `0x${string}`);
   const collection = info?.name || info?.symbol;
   return (
-    <div className="flex w-32 shrink-0 flex-col items-center gap-1.5 text-center">
+    <div className="flex w-full max-w-32 flex-col items-center gap-1.5 text-center">
       <div className="relative grid size-20 place-items-center overflow-hidden rounded-lg border-2 border-[#111318] bg-white">
         {view?.image ? (
           // Arbitrary hosts from token metadata, so next/image's domain list doesn't apply.
@@ -48,11 +46,8 @@ function NftTile({ asset }: { asset: Asset }) {
 
 function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
   if (asset.kind === "native") return <MonPill wei={asset.amount} />;
-  if (asset.kind === "erc721") {
-    // Chog art is bundled with the app; any other NFT's comes from its own metadata.
-    if (asset.token.toLowerCase() === CHOG_ADDRESS.toLowerCase()) return <ChogThumb id={asset.id} large />;
-    return <NftTile asset={asset} />;
-  }
+  // Every NFT, Chogs included, is the same straight tile with its name and collection.
+  if (asset.kind === "erc721") return <NftTile asset={asset} />;
   if (asset.kind === "trait") {
     // Which traits is in the deal's description, which a list of cards doesn't load.
     return (
@@ -74,7 +69,7 @@ function AssetTile({ asset, info }: { asset: Asset; info: Info }) {
   );
 }
 
-/** One side of a DeClubEscrow deal as tiles: Chog art, plain NFT tiles, token amounts and a MON pill. */
+/** One side of a DeClubEscrow deal as tiles: NFTs, token amounts and a MON pill. */
 export function AssetSide({ assets, info }: { assets: readonly Asset[]; info: Info }) {
   if (assets.length === 0) return <span className="text-sm text-muted">Nothing</span>;
   return (

@@ -137,7 +137,8 @@ function ConnectedWallet({
         }
         who={who}
       >
-        <span className="font-mono">{shortAddress(address)}</span>
+        {/* The menu shows the address; on a phone the avatar alone leaves the header room for one row. */}
+        <span className="hidden font-mono sm:inline">{shortAddress(address)}</span>
       </MenuTrigger>
 
       {open && (

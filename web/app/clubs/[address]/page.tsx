@@ -233,10 +233,11 @@ function Club({ entry }: { entry: ClubEntry }) {
                 </li>
               ))}
               {page!.links.map((href) => (
-                <li key={href}>
-                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="chip py-1">
+                // A long link is cut short rather than widening the page on a phone; the full address is in its title.
+                <li key={href} className="max-w-full min-w-0">
+                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="chip max-w-full py-1" title={href}>
                     <LinkIcon />
-                    {linkText(href)}
+                    <span className="truncate">{linkText(href)}</span>
                   </a>
                 </li>
               ))}

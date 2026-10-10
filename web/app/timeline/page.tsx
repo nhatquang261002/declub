@@ -8,7 +8,7 @@ import { ClubAvatar } from "@/components/ClubArt";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
 import { Masonry } from "@/components/Masonry";
-import { ChallengeFeedCard, ChallengeSummary } from "@/components/ChallengeCard";
+import { ChallengeFeedCard, ChallengeSummary, ChallengeTiles } from "@/components/ChallengeCard";
 import { SystemGroup } from "@/components/SystemMessage";
 import { TimelineCard } from "@/components/TimelineCard";
 import { TimelineComposer } from "@/components/TimelineComposer";
@@ -84,14 +84,8 @@ function Feed({
   return (
     <>
       {pinned.length > 0 && (
-        <div className="mb-4 flex flex-col gap-3">
-          <ul className="flex flex-col gap-3" aria-label="Pinned challenges">
-            {pinned.map(({ club, challenge: c }) => (
-              <li key={`${club}:${c.id}`}>
-                <ChallengeSummary c={c} token={club} now={now} club={clubOf(club)} heading={headingOf(c)} pinned compact={running.length > 1} />
-              </li>
-            ))}
-          </ul>
+        <div className="mb-6 flex flex-col gap-3">
+          <ChallengeTiles items={pinned.map(({ club, challenge: c }) => ({ token: club, c, heading: headingOf(c), club: clubOf(club) }))} now={now} />
           {running.length > pinned.length && (
             <button type="button" className="btn-secondary btn-sm self-start" onClick={onAllChallenges}>
               {/* The filter lists every Club's, so under Joined Clubs the count here would undersell it. */}
@@ -234,6 +228,10 @@ function Timeline() {
           </button>
         ))}
       </div>
+
+      {show === "all" && hasAccounts && joined.size < CLUBS.size && (
+        <p className="mb-4 text-sm text-muted">You can like and reply in the Clubs you’ve joined. Tap a Club’s banner to open it and join.</p>
+      )}
 
       {show === "joined" && mineClubs.length > 0 && (
         <ul className="mb-6 flex flex-wrap gap-2" aria-label="Your Clubs">

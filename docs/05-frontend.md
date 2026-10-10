@@ -30,7 +30,7 @@ web/
 │       └── clubs/page.tsx      ✓ Clubs: tabs, joining, badges + Momentum, posts, roles, safety, FAQ
 ├── components/
 │   ├── Providers.tsx           ✓ PrivyProvider + @privy-io/wagmi's WagmiProvider when Privy is on, else wagmi's; QueryClientProvider; ToastProvider
-│   ├── Header.tsx              ✓ nav (Deals, Clubs, History, Guide), Create button, NotificationBell, ConnectButton
+│   ├── Header.tsx              ✓ one row: nav (Timeline, Clubs, Deals, History, Guide; a menu button below desktop width), Create button ("+" on phones), NotificationBell, ConnectButton
 │   ├── PoweredBy.tsx           ✓ home-page footer strip of partner logos (Monad, Privy, Envio, Alchemy, Railway) scrolling sideways; pauses on hover, still for reduced motion
 │   ├── ConnectButton.tsx       ✓ Privy sign-in or injected wallets (EIP-6963 list); wallet menu and network switch
 │   ├── Chog.tsx                ✓ ChogImage · ChogThumb
@@ -169,7 +169,7 @@ Choices worth knowing:
 - **Token names come from the token.** The editor shows the symbol and decimals read on-chain under each address, and amounts are parsed with those decimals. A row with more decimals than the token has is rejected instead of rounded.
 - **Held payouts:** the deal page reads `claimable` for every asset in the deal and offers a Claim button for what the connected wallet is owed.
 - **Lists:** `/deals` renders `Deals`, a page at a time from `/api/deals`. History reads `useDeals` and the wallet's signed swaps.
-- **Deal cards:** `DealCard` uses `DealCardFrame` (the chrome signed-swap cards also use) and fills the two sides with `AssetSide`: Chog art for the Chog collection, a plain tile for any other NFT, a token tile with the on-chain symbol, and the MON pill.
+- **Deal cards:** `DealCard` uses `DealCardFrame` (the chrome signed-swap cards also use) and fills the two sides with `AssetSide`: one straight tile for every NFT (Chogs included) with its art, name and collection, a token tile with the on-chain symbol, and the MON pill. The card leads with its status and settlement chips; the two sides are tinted panels, not outlined boxes; a locked deal's number ("Deal #id") trails the maker line. The Deals page shows 12 per page.
 - **Search:** see *Open Deals search*: on the server, over the whole book.
 - **Fills are per contract:** `useFills(account, contract)` and `useLocalFills` key the record by swap contract, so a redeploy's deal #3 doesn't collide with the old one's. With the server store on, the fill's receipt is what records it (`reportTx` from `useTxFlow`) and the fill watcher catches the rest; without it, the detail page records the fill in this browser after Accept confirms.
 - **Open offers ([ADR 0007](adr/0007-open-offers.md)):** a deal with an empty ask (`isOpenOffer`). The card's "wants" side reads *Open to offers*. On the detail page the right-hand panel shows the maker's note as plain text (never linked or rendered as markup) with a "not verified" line, and below the actions come the offers, newest first. The maker sees **Accept & swap** and **Reject** on each active one; whoever made an offer sees **Withdraw my offer** while it is active, even after the deal settled or was cancelled. Anyone else who is allowed to (not the maker, and the private-offer wallet if one is set) gets the **Send offer** form: an `AssetEditor` whose assets are locked in escrow, with the same one-at-a-time approvals. Closed offers sit in a collapsed list. The Accept button and the direct `fillTrade` path are never shown together: `canFill` is false for an open offer.
@@ -411,7 +411,7 @@ The ERC-721 and ERC-20 errors are raised by the token contracts and bubble up th
 
 ## Create wizard
 
-The header has no Create tab, but a Create button sits beside the wallet. `/create` is also reached from the Create buttons on Home, Deals, History and the Guide, and is one flow with three steps. The stepper only lets you go back; each step has to pass its own checks to Continue, and going back keeps what you typed.
+The header has no Create tab, but a Create button sits beside the wallet. `/create` is also reached from the Create buttons on Home, Deals, History and the Guide, and is one flow with three steps. Signed out, it shows those three steps beside the sign-in button. The stepper only lets you go back; each step has to pass its own checks to Continue, and going back keeps what you typed.
 
 1. **Deal type, and what you want.** Open offer (a note, no ask), request exact assets, or request by trait. The fields below the choice depend on it: a note, an asset list, or a trait picker.
 2. **Your assets.** What you give, plus the optional "only this wallet" address and the expiry (1h / 24h / 7d / never, default 24h).

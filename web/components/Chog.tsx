@@ -25,18 +25,3 @@ export function ChogImage({ id, className = "", preferLocal = false }: { id: big
     </div>
   );
 }
-
-/** Small tile used inside deal summaries. `xl` is the deal page's stage. */
-export function ChogThumb({ id, large = false, xl = false }: { id: bigint; large?: boolean; xl?: boolean }) {
-  return (
-    <div className={`${xl ? "w-24 sm:w-28" : large ? "w-20" : "w-14"} group/chog shrink-0 text-center`}>
-      <ChogImage
-        id={id}
-        className={`rounded-lg border-2 border-[#111318] transition-transform duration-200 ${
-          large || xl ? "rotate-[-2deg] group-hover/chog:rotate-0 group-hover/chog:scale-105" : ""
-        }`}
-      />
-      <div className={`mt-1.5 font-mono font-semibold text-muted ${xl ? "text-xs" : "text-[11px]"}`}>#{id.toString()}</div>
-    </div>
-  );
-}

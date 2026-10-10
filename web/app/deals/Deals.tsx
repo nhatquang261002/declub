@@ -17,7 +17,7 @@ import type { BookKind, DealTab } from "@/lib/dealBook";
 import { DEFAULT_FILTERS, isFiltering, type DealFilters } from "@/lib/dealFilters";
 import { CreateDealButton } from "@/components/CreateDealButton";
 
-const PAGE = 4;
+const PAGE = 12;
 /** Typing waits this long before it asks the server, so a search isn't sent per keystroke. */
 const SEARCH_DELAY_MS = 250;
 

@@ -89,11 +89,11 @@ export function ExpiryCountdown({ expiry, now, status }: { expiry: bigint; now: 
   );
 }
 
-/** The gives / wants pair every deal-like card shows. */
+/** The gives / wants pair every deal-like card shows: tinted, not outlined, so the card keeps the only border. */
 function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
   return (
     <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-stretch gap-2">
-      <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+      <div className="relative flex min-w-0 items-center justify-center rounded-xl bg-[#111318]/[0.05] p-3 pt-5 text-[#111318]">
         <span className="absolute -top-2 left-3 rotate-[-3deg] rounded-sm bg-[var(--chog-cream-500)] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-[var(--content-inverse)] uppercase">
           gives
         </span>
@@ -102,7 +102,7 @@ function SwapPanels({ gives, wants }: { gives: ReactNode; wants: ReactNode }) {
       <span className="deal-card-seal" aria-hidden>
         <SwapIcon />
       </span>
-      <div className="relative flex items-center justify-center rounded-xl border border-[#111318] bg-[#fff4cf] p-3 pt-5 text-[#111318]">
+      <div className="relative flex min-w-0 items-center justify-center rounded-xl bg-[#111318]/[0.05] p-3 pt-5 text-[#111318]">
         <span className="absolute -top-2 right-3 rotate-[3deg] rounded-sm bg-[#d83b45] px-2 py-0.5 text-[10px] font-black tracking-[0.14em] text-white uppercase">
           wants
         </span>
@@ -140,7 +140,7 @@ export function SwapCardShell({
   );
 }
 
-/** A deal's card: its id, status and expiry, the gives / wants panels and who made it. */
+/** A deal's card: its status and expiry, the gives / wants panels, then who made it and its number. */
 export function DealCardFrame({
   href,
   deal,
@@ -168,10 +168,6 @@ export function DealCardFrame({
       href={href}
       head={
         <>
-          <span className="font-black tracking-tight">
-            <span className="text-accent">#</span>
-            {deal.id.toString()}
-          </span>
           <StatusBadge status={status} />
           {tag}
           {forMe && <span className="chip chip-peach">★ For you</span>}
@@ -201,6 +197,8 @@ export function DealCardFrame({
               · only <Who address={deal.taker} plain /> can accept
             </>
           )}
+          {/* The number is for quoting a deal, not for picking one, so it trails rather than leads. */}
+          <span className="tabular-nums"> · Deal #{deal.id.toString()}</span>
         </>
       }
     />

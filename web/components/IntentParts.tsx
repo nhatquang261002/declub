@@ -63,9 +63,6 @@ function IntentCard({ row, now, me, info }: { row: PoolIntent; now: number; me?:
       href={`/intent/${row.hash}`}
       head={
         <>
-          <span className="font-black tracking-tight">
-            Swap <span className="font-mono text-accent">{row.hash.slice(0, 8)}…</span>
-          </span>
           <StatusChip look={LOOK[status]} label={STATUS_LABEL[status]} />
           <SettlementTag signed />
         </>

@@ -28,22 +28,12 @@ const WORDMARK: CSSProperties = {
 
 /**
  * "De(al) Club" in the brand face, one cream colour like the mark: a smaller, dimmed "(al)" reads it
- * as "Deal". Screen readers get the plain name from `Logo`.
+ * as "Deal". Screen readers get the plain name from the link around it.
  */
 export function Wordmark({ className = "text-[1.7rem]" }: { className?: string }) {
   return (
     <span aria-hidden="true" className={`font-extrabold leading-none text-[#fff4cf] ${className}`} style={WORDMARK}>
       De<span className="mx-[0.04em] text-[0.8em] opacity-60">(al)</span> Club
-    </span>
-  );
-}
-
-export function Logo() {
-  return (
-    <span className="flex items-center gap-2.5">
-      <LogoMark />
-      <Wordmark />
-      <span className="sr-only">De(al) Club</span>
     </span>
   );
 }
