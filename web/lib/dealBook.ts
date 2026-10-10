@@ -1,5 +1,5 @@
 import { getAddress, isAddress, type Address } from "viem";
-import { toAsset, type Asset, type TokenInfo } from "./assets";
+import { toAsset, type Asset, type TokenLabel } from "./assets";
 import { DEFAULT_FILTERS, type DealFilters, type DealSort, type MonFilter } from "./dealFilters";
 import { applyDealFilters, involvesToken } from "./dealFilters";
 import { isExpired, sameAddress, type DealStatus } from "./deals";
@@ -97,8 +97,8 @@ export type BookSource = {
   openSigned: readonly SignedListing[];
   /** Signed swaps of every status, for the "all" tab. */
   allSigned: readonly SignedListing[];
-  /** Token symbols, so a search for "USDC" finds the deals that hold it. */
-  info: ReadonlyMap<string, TokenInfo>;
+  /** Token and collection symbols and names, so a search for "USDC" or "Chog" finds the deals that hold it. */
+  info: ReadonlyMap<string, TokenLabel>;
 };
 
 type BookResult = {

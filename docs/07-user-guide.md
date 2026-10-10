@@ -18,7 +18,7 @@ Press **Create deal**. The form has three steps: **Deal type**, **Your assets**,
 1. **Deal type.** If signed swaps are on, you first choose how the deal settles (see [Locked deals or signed swaps](#locked-deals-or-signed-swaps)). Then you choose one of three kinds:
    - **Open offer:** post what you give, with an optional note of up to 280 bytes (plain text, so about 280 characters), and let people send you offers. You pick the one you like.
    - **Request exact assets:** name what you want back. Whoever holds it can accept in one transaction.
-   - **Request by trait:** ask for NFTs with a trait, like "any 2 Chogs with a Crown hat". Paste a collection's address (or tap **Chog**), pick up to five trait values, choose *any of* or *all of*, and set how many. You can add several trait requests, and exact assets beside them.
+   - **Request by trait:** ask for NFTs with a trait, like "any 2 Chogs with a Crown hat". Paste a collection's address (or tap **Chog**), pick up to five trait values, choose _any of_ or _all of_, and set how many. You can add several trait requests, and exact assets beside them.
 2. **Your assets.** Add what you give with **+ MON**, **+ Token** or **+ NFT**. The NFT picker shows what your wallet holds, or you can paste a collection address and an id. Then decide who can take it (anyone, or **Only this wallet can accept**) and when it expires: 1 hour, 24 hours (the default), 7 days or Never. A side holds up to 10 assets, and at most 5 of them NFTs.
 3. **Confirm.** Check the summary, then approve and create:
    - **Approve** each asset you offer, one at a time ("1 of 3"). An NFT collection is approved once for all its NFTs. A token is approved for the exact amount in this deal.
@@ -57,14 +57,14 @@ If a payout to you was refused, for example by a token or a contract wallet, the
 
 When signed swaps are on, step 1 of Create asks how the deal settles. Both kinds appear in the same list, tagged **Locked** or **Signed**.
 
-| | Lock assets now | Sign only |
-|---|---|---|
-| Can it fail? | No. Once someone accepts, both sides move together | Yes, if you move the asset or revoke the approval before a match |
-| Cost | Gas to create, and again to cancel; approvals too | Free to post and remove; approvals only |
-| Your assets | Held by the contract | Stay in your wallet |
-| Can use | MON, NFTs, tokens, trait requests, open offers | NFTs and tokens (MON as WMON); no traits |
-| Who can take it | Anyone, one named wallet, or one of the offers you get | Anyone that meets your terms; a matcher finds pairs and rings of up to 4 |
-| Ends | Accepted, cancelled, or expired and reclaimed | Settled, removed from the pool, or its deadline passes (10 minutes to 7 days) |
+|                 | Lock assets now                                        | Sign only                                                                     |
+| --------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Can it fail?    | No. Once someone accepts, both sides move together     | Yes, if you move the asset or revoke the approval before a match              |
+| Cost            | Gas to create, and again to cancel; approvals too      | Free to post and remove; approvals only                                       |
+| Your assets     | Held by the contract                                   | Stay in your wallet                                                           |
+| Can use         | MON, NFTs, tokens, trait requests, open offers         | NFTs and tokens (MON as WMON); no traits                                      |
+| Who can take it | Anyone, one named wallet, or one of the offers you get | Anyone that meets your terms; a matcher finds pairs and rings of up to 4      |
+| Ends            | Accepted, cancelled, or expired and reclaimed          | Settled, removed from the pool, or its deadline passes (10 minutes to 7 days) |
 
 **Lock** when the other side must be certain it will go through: a specific buyer, a high-value trade, anything with MON or a trait. **Sign** for quick NFT and token swaps where you'd rather not lock anything.
 
@@ -87,7 +87,7 @@ Each NFT can be in only one of your open signed swaps at a time, and your open s
 
 ## Finding deals and keeping track
 
-- **Deals** lists everything open. Tabs: **Open**, **For you** (deals made for your wallet) and **All**. Search by NFT id, token symbol or address, or the maker's wallet; filter by MON or by type (**Locked** or **Signed**); sort by **Newest first** or **Ending soon**. Type a page number to jump to it.
+- **Deals** lists everything open. Tabs: **Open**, **For you** (deals made for your wallet) and **All**. Search by NFT id, collection or token name, symbol or address, or the maker's wallet; filter by MON or by type (**Locked** or **Signed**); sort by **Newest first** or **Ending soon**. Type a page number to jump to it.
 - **History** shows the deals your wallet made, took or filled, signed swaps included, with counts of active, completed and expired deals.
 - **The bell** tells you about a deal made for you, a deal of yours that was accepted, is about to expire or has expired, and a signed swap that settled, paused or was dropped. When signed in it also carries Club news: replies and likes on your posts, your pins, X posts that counted, rewards you earned, your rank in a running epoch and a nudge when an epoch is about to close. It tells you about a new challenge in your Clubs and its last day if you haven't entered, whether you won one you entered, and when a prize you won was sent; if you're an Owner, when a challenge is waiting for you to pick its winners (with a reminder before the 14 days run out) and when a prize is waiting for you to send it. What you've read syncs across devices. You can also turn on browser alerts.
 - **Share on X.** On a live deal, or one that went through, press **Share on X** (or **Share the swap on X**). The app first shows a preview of the card; the button there opens X with the text and the deal's link.
@@ -120,15 +120,15 @@ A **Club** is the community for one verified NFT collection, such as Chog. A mem
 - **Challenges:** tasks the Owner sets the Club. Answer one with your own X post; winners get points toward the week's rewards, a trophy, and sometimes an NFT or token (see below).
 - **Members:** a leaderboard of the people in the Club. **Follow** the ones you trust.
 - **Rewards:** what the Club's swaps paid in fees, what sponsors added, what went to its Holders and its Owner, and your share to claim.
-- **Manage:** only for the Club's staff (see *Roles*).
+- **Manage:** only for the Club's staff (see _Roles_).
 
 **Joining.** Sign in, link a wallet, and press **Join Club**. Anyone signed in can join. **Joining shows your wallet on the Members list**, so join with an account whose wallet you are happy to show. To leave, open the **⋯** menu next to it and choose **Leave this Club**.
 
-**Holder badge.** A member gets a *Holder* badge when their linked wallets hold the asset (any NFT of the collection; in a Club with a memecoin, also the coin, if the Owner lets it count, from the minimum they set). It is what they held **at the last check**, which the app repeats about once a day for the Members list. Your own badge is checked again (at most once a minute) when you open the Club without it, and when you enter a Holders-only challenge, so an NFT you just bought counts right away: on a challenge's page, **Check my wallets** asks again. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
+**Holder badge.** A member gets a _Holder_ badge when their linked wallets hold the asset (any NFT of the collection; in a Club with a memecoin, also the coin, if the Owner lets it count, from the minimum they set). It is what they held **at the last check**, which the app repeats about once a day for the Members list. Your own badge is checked again (at most once a minute) when you open the Club without it, and when you enter a Holders-only challenge, so an NFT you just bought counts right away: on a challenge's page, **Check my wallets** asks again. It is not a guarantee that they hold it now, and the badge gives no extra powers, except when a Club's Owner limits posting to Holders.
 
 **Momentum.** A score for how busy an asset's market has been over the last 30 days, newest activity counting most (it halves every week). Completed swaps count the most; new deals count a little, and at most three a day per wallet; so does a Holder's first Board post of the day in the Club, a little more than an X post, and a Holder's own X post about the Club shared on its Board (see below), one a day. Replies, posts by members without the NFT, and posts a moderator hides or the author deletes count for nothing. A Club's Momentum ranks Clubs on `/clubs`, with an arrow for the change since last week. A member's Momentum ranks them inside their Club. It says "this market has been busy", not that the asset is good or safe, or that a member is honest. Only activity the app has recorded counts; with the fill watcher running, that includes swaps made outside the app.
 
-**Posting.** You need to be a member and to have linked an X or Discord account and turned on “Show my X or Discord handle” (Profile page; linking alone isn’t enough). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A *Looking for* post can also link one of the Club's own deals or signed swaps. A *Note* can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
+**Posting.** You need to be a member and to have linked an X or Discord account and turned on “Show my X or Discord handle” (Profile page; linking alone isn’t enough). A post is plain text of up to 280 characters, with no formatting, and links in it are not clickable. A _Looking for_ post can also link one of the Club's own deals or signed swaps. A _Note_ can share one X post, shown as a card. You can post once every 30 seconds and five times an hour in each Club, and delete your own posts.
 
 **Sharing your X posts.** Any public X post can be shared as a card. Your **own** post (from the X account linked to your profile) counts for the Club, adding to your Momentum and your Holder bonus, when:
 
@@ -157,7 +157,7 @@ One X post a day counts per Club, and each X post counts once. If yours didn't c
 
 Winners earn the points as ordinary activity points for that week, so they raise your bonus and your place on the ramp; at most 20 challenge points count for you in a week, however many you win. The Owner can't enter their own challenge; Moderators can, but can't hide or ban someone in the same challenge while it runs. Every win is published with the week's points. **An entry earns through its prize only:** it still counts toward the Club's Momentum, but it doesn't give you an active day, an X share or backing from its likes, even after you withdraw it (unless the Owner cancels the challenge, which gives your post back). Entering doesn't use up your X share for the day. Liking and replying to entries still counts as engaging.
 
-**Replies and likes.** Reply to a post once, one level deep (you can't reply to a reply), and like posts you value (not your own). Replies are signed with your Club wallet; likes aren't. Both count toward Club Rewards, for you and, if you hold an NFT, for the author (see *Rewards*). The author sees them in the bell.
+**Replies and likes.** Reply to a post once, one level deep (you can't reply to a reply), and like posts you value (not your own). Replies are signed with your Club wallet; likes aren't. Both count toward Club Rewards, for you and, if you hold an NFT, for the author (see _Rewards_). The author sees them in the bell.
 
 **Following.** Press **Follow** beside a member's name, on a post or in the Members list. Your connected wallet signs the follow, which must be one of the wallets linked to your account. Press again to unfollow. Your follows are public at `/api/wallets/<your wallet>/follows`.
 
@@ -167,7 +167,7 @@ Winners earn the points as ordinary activity points for that week, so they raise
 
 ### Rewards
 
-Every completed swap pays a small protocol fee. Each week (an *epoch*), for every Club whose asset was traded:
+Every completed swap pays a small protocol fee. Each week (an _epoch_), for every Club whose asset was traded:
 
 - **50%** of those fees goes to the Club's **active Holders**, paid to your Club wallet.
   - **Hold an NFT.** Each NFT of the collection is one share, summed over your linked wallets. Holdings are read every day and again when the week closes, and the average counts, so NFTs bought on the last day count for little. Holding the Club's memecoin can earn the Holder badge, if the Owner allows it, but no share. Without an NFT you're paid only if the Owner turned on a slice for members without NFTs.
@@ -199,12 +199,12 @@ Every week's numbers, and the proof for every payout, are public at `/api/reward
 
 ### Roles
 
-| Role | Who | Can |
-|---|---|---|
-| **Owner** | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page (that claims the Club; the Club fund is collected under **Rewards**). Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders. Collects the Club fund each week |
-| **Moderator** | Appointed by the Owner | Hide, restore and delete posts, ban and unban members of this Club (but not lift a ban the Owner made). Can't act on the Owner or other moderators |
-| **Member** | Anyone who joined | Post, report, appear on the leaderboard |
-| **Visitor** | Not signed in or not joined | Read only |
+| Role          | Who                                                                                                                                                                                                             | Can                                                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Owner**     | The one wallet that the token contract names as its `owner()`, after it presses **Claim** on the Club page (that claims the Club; the Club fund is collected under **Rewards**). Or someone an app admin picked | Edit the description and up to three `https://` links, pin up to three posts, appoint up to ten moderators, hand the Club to another member, limit posting to Holders. Collects the Club fund each week |
+| **Moderator** | Appointed by the Owner                                                                                                                                                                                          | Hide, restore and delete posts, ban and unban members of this Club (but not lift a ban the Owner made). Can't act on the Owner or other moderators                                                      |
+| **Member**    | Anyone who joined                                                                                                                                                                                               | Post, report, appear on the leaderboard                                                                                                                                                                 |
+| **Visitor**   | Not signed in or not joined                                                                                                                                                                                     | Read only                                                                                                                                                                                               |
 
 The app's admins can do all of this in every Club and ban someone from all of them. A banned person leaves the Club, loses any role and can't rejoin or post. Staff actions are written to a log that only staff can read.
 
@@ -222,5 +222,5 @@ A deal settles the same whether or not you're in a Club: nothing in a deal or it
 
 ## For maintainers
 
-- The Guide page's comparison and the create screen's six settlement chips (*Can't fail*, *Costs gas*, *Assets locked*, *Free*, *Nothing locked*, *Can fail*) read the same words from `web/lib/settlementTerms.ts`. Each chip's tooltip links to its entry on the Deals guide (`/guide/deals#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), so change a reason there and both follow.
+- The Guide page's comparison and the create screen's six settlement chips (_Can't fail_, _Costs gas_, _Assets locked_, _Free_, _Nothing locked_, _Can fail_) read the same words from `web/lib/settlementTerms.ts`. Each chip's tooltip links to its entry on the Deals guide (`/guide/deals#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), so change a reason there and both follow.
 - The settlement section only appears when signed swaps are configured (`NEXT_PUBLIC_DECLUB_INTENTS_ADDRESS`). The reasoning behind the two paths is in [ADR 0008](adr/0008-trade-intents.md) and [ADR 0009](adr/0009-ring-swaps.md).

@@ -1,6 +1,6 @@
 import { createPublicClient, erc20Abi, http, type Address, type PublicClient } from "viem";
 import { deClubEscrowAbi } from "../abi";
-import type { TokenInfo } from "../assets";
+import type { TokenLabel } from "../assets";
 import { chain } from "../chain";
 import { DECLUB_INTENTS_ADDRESS, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import type { BookSource } from "../dealBook";
@@ -17,8 +17,8 @@ import { listIntents } from "../pool";
  * - Open deals (expired ones included, until reclaimed) are read again on each refresh, along with
  *   `tradeCount` for the new ones. A refresh happens at most every `ttlMs`, and requests that arrive
  *   during one share it.
- * - Token symbols never change either, so each token is read once (a token that doesn't answer is
- *   tried again after a while).
+ * - Symbols and names never change either, so each token or NFT collection is read once (one that
+ *   doesn't answer is tried again after a while). Signed swaps are read the same way as locked deals.
  *
  * All of it lives in this server instance's memory: a cold start reads the book again. The chain
  * stays the source of truth, and every action re-reads the deal before sending.
@@ -29,8 +29,8 @@ export type BookReader = {
   tradeCount(): Promise<bigint>;
   /** Same order as `ids`. null where a deal can't be read or uses an asset type this build doesn't know. */
   trades(ids: readonly bigint[]): Promise<(Deal | null)[]>;
-  /** Symbol and decimals of each token that answers. */
-  tokenInfo(tokens: readonly Address[]): Promise<Map<string, TokenInfo>>;
+  /** Symbol and name of each token or NFT collection that answers. */
+  tokenInfo(tokens: readonly Address[]): Promise<Map<string, TokenLabel>>;
 };
 
 /** The pool's book (matcher/). null when the intents contract isn't configured. */
@@ -54,6 +54,7 @@ export type Book = {
 };
 
 const SYMBOL_CHARS = 12;
+const NAME_CHARS = 48;
 
 export function createBook(reader: BookReader, intents: IntentReader, options: BookOptions = {}): Book {
   const ttlMs = options.ttlMs ?? 5_000;
@@ -63,7 +64,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
   const now = options.now ?? Date.now;
 
   const closed = new Map<bigint, Deal>();
-  const tokens = new Map<string, TokenInfo>();
+  const tokens = new Map<string, TokenLabel>();
   const tokenMisses = new Map<string, number>();
   let deals: { at: number; list: Deal[] } | null = null;
   let refreshing: Promise<Deal[]> | null = null;
@@ -100,12 +101,12 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     return list;
   }
 
-  async function readTokens(list: readonly Deal[]) {
+  async function readTokens(list: readonly Pick<Deal, "offered" | "requested">[]) {
     const wanted = new Set<string>();
     for (const deal of list) {
       for (const a of [...deal.offered, ...deal.requested]) {
         const key = a.token.toLowerCase();
-        if (a.kind !== "erc20" || tokens.has(key)) continue;
+        if (a.kind === "native" || tokens.has(key)) continue;
         const missed = tokenMisses.get(key);
         if (missed === undefined || now() - missed > tokenRetryMs) wanted.add(key);
       }
@@ -113,11 +114,11 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
     if (wanted.size === 0) return;
     const asked = [...wanted] as Address[];
     // A token list that can't be read costs the search its symbols, not the book.
-    const found = await reader.tokenInfo(asked).catch(() => new Map<string, TokenInfo>());
+    const found = await reader.tokenInfo(asked).catch(() => new Map<string, TokenLabel>());
     for (const token of asked) {
       const info = found.get(token);
       if (info) {
-        tokens.set(token, { symbol: info.symbol.slice(0, SYMBOL_CHARS), decimals: info.decimals });
+        tokens.set(token, { symbol: info.symbol.slice(0, SYMBOL_CHARS), name: info.name.slice(0, NAME_CHARS) });
         tokenMisses.delete(token);
       } else {
         tokenMisses.set(token, now());
@@ -177,10 +178,13 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
           : Promise.resolve(null),
       ]);
       const failed = open.error ?? all?.error;
+      const openSigned = open.rows.map(intentAsListing);
+      const allSigned = all ? all.rows.map(intentAsListing) : openSigned;
+      await readTokens(allSigned);
       return {
         deals: list,
-        openSigned: open.rows.map(intentAsListing),
-        allSigned: (all ?? open).rows.map(intentAsListing),
+        openSigned,
+        allSigned,
         info: tokens,
         signedError: failed ? (failed instanceof Error ? failed.message : "The intent pool couldn't be read.") : null,
       };
@@ -207,17 +211,21 @@ function viemBookReader(contract: Address): BookReader {
           (address) =>
             [
               { address, abi: erc20Abi, functionName: "symbol" },
-              { address, abi: erc20Abi, functionName: "decimals" },
+              { address, abi: erc20Abi, functionName: "name" },
             ] as const,
         ),
         allowFailure: true,
       });
-      const out = new Map<string, TokenInfo>();
+      const out = new Map<string, TokenLabel>();
       list.forEach((token, i) => {
         const symbol = results[i * 2];
-        const decimals = results[i * 2 + 1];
-        if (symbol?.status === "success" && decimals?.status === "success") {
-          out.set(token.toLowerCase(), { symbol: String(symbol.result), decimals: Number(decimals.result) });
+        const name = results[i * 2 + 1];
+        // ERC-721 metadata is optional, so a collection may give one of the two. The same selectors serve ERC-20 and ERC-721.
+        if (symbol?.status === "success" || name?.status === "success") {
+          out.set(token.toLowerCase(), {
+            symbol: symbol?.status === "success" ? String(symbol.result) : "",
+            name: name?.status === "success" ? String(name.result) : "",
+          });
         }
       });
       return out;

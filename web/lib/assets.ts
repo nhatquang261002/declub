@@ -68,6 +68,9 @@ export const traitRoot = (asset: Asset): Hex => toHex(asset.id, { size: 32 });
 /** On-chain token facts. Never use a name the maker typed: read these from the token. */
 export type TokenInfo = { symbol: string; decimals: number };
 
+/** What a search matches a token or NFT collection by. Either may be empty when the contract doesn't answer. */
+export type TokenLabel = { symbol: string; name: string };
+
 /** "12.5 mUSD", "3 MON", "#421". Falls back to a short address while token info is unknown. */
 export function formatAsset(asset: Asset, info?: TokenInfo): string {
   if (asset.kind === "native") return formatMon(asset.amount);
