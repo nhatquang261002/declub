@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ClubAvatar } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
 import { formatMomentum, HeatMeter, MomentumChange } from "@/components/MomentumBadge";
-import { ArchiveIcon, CheckIcon } from "@/components/Icons";
+import { ArchiveIcon, BadgeCheckIcon, CheckIcon } from "@/components/Icons";
 import type { ClubInfo, ClubStats } from "@/lib/clubs";
 import { ago } from "@/lib/format";
 
@@ -41,10 +41,13 @@ export function ClubRow({ row, place, now, joined }: { row: Row; place?: number;
           <span className="flex min-w-0 flex-col">
             <span className="flex items-center gap-1.5">
               <span className="truncate font-extrabold group-hover:underline">{info.name}</span>
-              {/* Icons only: the row is tight and the name gets the room. */}
+              <BadgeCheckIcon className="size-[1.1rem] shrink-0 text-[#315ea8]" />
+              <span className="sr-only">(verified)</span>
+              {/* The name truncates before the chips do. */}
               {joined && (
-                <span className="chip chip-peach shrink-0 p-0.5" role="img" aria-label="Joined" title="Joined">
+                <span className="chip chip-peach shrink-0">
                   <CheckIcon />
+                  Joined
                 </span>
               )}
               {info.archived && (
