@@ -1037,6 +1037,23 @@ body {
   &:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 3px; }
   &:disabled { cursor: not-allowed; opacity: 0.5; }
 }
+/* A search box as a sibling of select-trigger: same ink border, white face and height, with room for the magnifier. */
+@utility search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  border: 2px solid var(--chog-purple-950);
+  border-radius: var(--radius-control);
+  background: var(--chog-white);
+  color: var(--chog-purple-950);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  outline: none;
+  transition: background-color 160ms ease;
+  &::placeholder { color: #4e5968; font-weight: 500; opacity: 0.75; }
+  &:hover { background: #fffdf5; }
+  &:focus-visible { outline: 3px solid var(--chog-pink-500); outline-offset: 3px; }
+}
 @utility select-menu {
   position: absolute;
   top: calc(100% + 0.5rem);

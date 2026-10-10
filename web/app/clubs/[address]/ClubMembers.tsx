@@ -7,6 +7,7 @@ import { Pagination } from "@/components/Pagination";
 import { HolderBadge } from "@/components/HolderBadge";
 import { BanIcon, CrownIcon, FlameIcon, ShieldIcon, TrophyIcon } from "@/components/Icons";
 import { formatMomentum } from "@/components/MomentumBadge";
+import { SearchInput } from "@/components/SearchInput";
 import { Select } from "@/components/Select";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -194,15 +195,14 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
             setPage(1);
           }}
         />
-        <input
-          type="search"
-          className="input min-w-52 flex-1 sm:max-w-xs"
+        <SearchInput
+          className="min-w-52 flex-1 sm:max-w-xs"
+          label="Search members"
           placeholder="Search by wallet or @handle"
-          aria-label="Search members"
           maxLength={MEMBERS_QUERY_MAX}
           value={text}
-          onChange={(e) => {
-            setText(e.target.value);
+          onChange={(next) => {
+            setText(next);
             setPage(1);
           }}
         />

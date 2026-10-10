@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { SearchInput } from "@/components/SearchInput";
 import { Select, type SelectOption } from "@/components/Select";
 import { Tabs, type TabOption } from "@/components/Tabs";
 import { DEFAULT_FILTERS, isFiltering, type MonFilter, type DealFilters, type DealSort } from "@/lib/dealFilters";
@@ -42,13 +43,12 @@ export function DealFilterBar({
 }) {
   return (
     <div className="mb-5 flex flex-wrap items-center gap-2">
-      <input
-        type="search"
-        className="input min-w-52 flex-1"
+      <SearchInput
+        className="w-full sm:w-auto sm:min-w-52 sm:flex-1"
+        label="Search deals"
         placeholder={placeholder}
-        aria-label="Search deals"
         value={filters.query}
-        onChange={(e) => onChange({ query: e.target.value })}
+        onChange={(query) => onChange({ query })}
       />
       <Select className="w-auto" aria-label="Filter by MON" value={filters.mon} options={MON_OPTIONS} onChange={(mon) => onChange({ mon })} />
       <Select className="w-auto" aria-label="Sort deals" value={filters.sort} options={SORT_OPTIONS} onChange={(sort) => onChange({ sort })} />

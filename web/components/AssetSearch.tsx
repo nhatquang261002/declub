@@ -5,6 +5,7 @@ import { formatUnits, isAddress, getAddress, type Address } from "viem";
 import { useAccount } from "wagmi";
 import { CopyAddress } from "@/components/CopyAddress";
 import { AlertIcon, BadgeCheckIcon } from "@/components/Icons";
+import { SearchInput } from "@/components/SearchInput";
 import { useAssetSearch, useDebounced } from "@/hooks/useAssetSearch";
 import { safeImage } from "@/lib/collections";
 import { mergeHits, rankHits, type SearchHit, type SearchKind } from "@/lib/search";
@@ -79,14 +80,7 @@ export function AssetSearch({ kind, owner, extra = [], onSelect, renderPasted, p
             </div>
           )}
         </div>
-        <input
-          id={`asset-search-${kind}`}
-          autoFocus
-          className="input"
-          placeholder={placeholder ?? "Name, symbol or 0x…"}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <SearchInput id={`asset-search-${kind}`} autoFocus placeholder={placeholder ?? "Name, symbol or 0x…"} value={text} onChange={setText} />
       </div>
 
       {pasted ? (

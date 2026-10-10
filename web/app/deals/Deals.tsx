@@ -80,7 +80,7 @@ export function Deals() {
       <DealFilterBar
         filters={filters}
         onChange={updateFilters}
-        placeholder="Search NFT ID, collection or token name, symbol or address, or maker 0x…"
+        placeholder="Collection, token, NFT ID or maker 0x…"
         extra={
           SHOW_INTENTS && (
             <Select
