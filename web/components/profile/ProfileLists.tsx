@@ -2,23 +2,32 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { getAddress } from "viem";
+import { useConnection } from "wagmi";
 import { Empty, Loading } from "@/app/clubs/[address]/parts";
 import { ClubCard } from "@/components/ClubCard";
 import { LoadError } from "@/components/ErrorPanel";
 import { InfiniteSentinel } from "@/components/InfiniteSentinel";
+import { ListingGrid } from "@/components/IntentParts";
 import { Masonry } from "@/components/Masonry";
+import { Pagination } from "@/components/Pagination";
 import { TimelineCard } from "@/components/TimelineCard";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
 import { useClubs } from "@/hooks/useClubs";
 import { useMyClubs } from "@/hooks/useClubMembership";
+import { useDealBook } from "@/hooks/useDealBook";
+import { useDealsTokenInfo } from "@/hooks/useTokenInfo";
 import { useFollowGraph, useWalletBoard, useWalletClubs } from "@/hooks/useWalletProfile";
 import { profilePath } from "@/lib/about";
 import { toClubInfo, type ClubInfo } from "@/lib/clubs";
+import { SHOW_INTENTS } from "@/lib/config";
+import { DEFAULT_FILTERS } from "@/lib/dealFilters";
 import { estimateHeight } from "@/lib/timeline";
 import { registry } from "@/lib/verifiedAssets";
 
 const FOLLOWING_SHOWN = 24;
+const DEALS_PAGE = 6;
 
 /**
  * The Clubs whose Members list shows this wallet (ADR 0042), as cards, the ones the Clubs page
@@ -76,6 +85,38 @@ export function ProfilePosts({ address, now }: { address: string; now: number })
         }}
       />
       <InfiniteSentinel hasMore={!!feed.hasMore} loading={feed.loadingMore} count={feed.posts.length} failed={feed.loadMoreFailed} onLoadMore={feed.loadMore} />
+    </>
+  );
+}
+
+/**
+ * The deals this wallet has open right now, locked and signed (ADR 0020), as the deals page draws
+ * them. The reader sees the same actions they would there: accept, or cancel for the maker.
+ */
+export function ProfileDeals({ address, now }: { address: string; now: number }) {
+  const { address: me } = useConnection();
+  const [page, setPage] = useState(1);
+  const book = useDealBook({
+    tab: "open",
+    filters: DEFAULT_FILTERS,
+    kind: SHOW_INTENTS ? "any" : "locked",
+    viewer: me,
+    tokens: [],
+    maker: getAddress(address),
+    page,
+    size: DEALS_PAGE,
+  });
+  const { info } = useDealsTokenInfo(book.items);
+  const totalPages = Math.max(1, Math.ceil(book.total / DEALS_PAGE));
+  if (book.error && book.items.length === 0) return <LoadError title="Couldn’t load the deals" error={book.error} />;
+  if (!book.enabled) return <Empty title="No deals here">Deals aren’t enabled on this deployment yet.</Empty>;
+  if (book.isLoading) return <Loading label="Loading deals" rows={2} />;
+  if (book.items.length === 0) return <Empty title="No open deals">Deals this wallet has open show here.</Empty>;
+
+  return (
+    <>
+      <ListingGrid listings={book.items} now={now} me={me} info={info} />
+      {book.total > DEALS_PAGE && <Pagination page={page} totalPages={totalPages} onPage={setPage} loading={book.isFetching} />}
     </>
   );
 }

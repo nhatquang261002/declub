@@ -10,7 +10,7 @@ import { BadgeCheckIcon, ExternalIcon, UserIcon, XLogoIcon } from "@/components/
 import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { EditProfile } from "@/components/profile/EditProfile";
-import { ProfileClubs, ProfileFollowing, ProfilePosts } from "@/components/profile/ProfileLists";
+import { ProfileClubs, ProfileDeals, ProfileFollowing, ProfilePosts } from "@/components/profile/ProfileLists";
 import { ProfileTrophies } from "@/components/profile/ProfileTrophies";
 import { useNow } from "@/hooks/useNow";
 import { useFollows } from "@/hooks/useSocial";
@@ -19,11 +19,11 @@ import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { PROFILE_LABEL, handleLabel, profileUrl } from "@/lib/profiles";
 
-type Section = "clubs" | "posts" | "following";
+type Section = "clubs" | "deals" | "posts" | "following";
 
 /**
  * A wallet's profile (ADR 0042): what its owner chose to show (avatar, name, bio, and the X or
- * Discord handle they linked), then the Clubs it is in, the signed posts it wrote and the wallets it follows. Anyone can
+ * Discord handle they linked), then the Clubs it is in, the deals it has open, the signed posts it wrote and the wallets it follows. Anyone can
  * open it; the owner also gets the controls to change it.
  */
 export default function ProfilePage() {
@@ -153,12 +153,14 @@ function Profile({ address }: { address: string }) {
           onChange={setSection}
           options={[
             { value: "clubs", label: "Clubs" },
+            { value: "deals", label: "Deals" },
             { value: "posts", label: "Posts" },
             { value: "following", label: "Following" },
           ]}
           className="mb-4"
         />
         {section === "clubs" && <ProfileClubs address={address} fresh={mine} now={now} />}
+        {section === "deals" && <ProfileDeals address={address} now={now} />}
         {section === "posts" && <ProfilePosts address={address} now={now} />}
         {section === "following" && <ProfileFollowing address={address} />}
       </section>

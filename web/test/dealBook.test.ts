@@ -71,6 +71,7 @@ describe("parseBookQuery", () => {
       kind: "locked",
       viewer: ME,
       tokens: [NFT, USD],
+      maker: ANA,
       page: 3,
       size: 4,
     });
@@ -78,11 +79,11 @@ describe("parseBookQuery", () => {
   });
 
   it("fills in the defaults", () => {
-    assert.deepEqual(parseBookQuery(new URLSearchParams()), query({ viewer: undefined }));
+    assert.deepEqual(parseBookQuery(new URLSearchParams()), query({ viewer: undefined, maker: undefined }));
   });
 
   it("refuses what it can't use", () => {
-    for (const bad of ["tab=mine", "mon=lots", "viewer=0x12", "page=0", "size=51", "token=0x1", `q=${"x".repeat(101)}`]) {
+    for (const bad of ["tab=mine", "mon=lots", "viewer=0x12", "maker=0x12", "page=0", "size=51", "token=0x1", `q=${"x".repeat(101)}`]) {
       assert.equal(typeof parseBookQuery(new URLSearchParams(bad)), "string", bad);
     }
     const three = new URLSearchParams([
@@ -150,6 +151,14 @@ describe("pageBook", () => {
   it("filters by token, on either side", () => {
     const withToads = [deal(3, { requested: [nftAsset(TOADS, 9n)] }), deal(2, { offered: [nftAsset(TOADS, 1n)] }), deal(1, { offered: [erc20Asset(USD, 1n)] })];
     assert.deepEqual(ids(pageBook(source(withToads), query({ tokens: [TOADS] }), NOW).items), [3, 2]);
+  });
+
+  it("shows only one maker's listings, signed swaps included", () => {
+    const deals = [deal(3, { maker: BO }), deal(2), deal(1, { maker: BO })];
+    const q = query({ maker: BO });
+    assert.deepEqual(ids(pageBook(source(deals), q, NOW).items), [3, 1]);
+    const mixed = pageBook(source(deals, [signedRow(7, BO), signedRow(8)]), query({ maker: ANA }), NOW);
+    assert.equal(mixed.total, 2);
   });
 
   it("puts signed swaps first, and drops either kind on request", () => {

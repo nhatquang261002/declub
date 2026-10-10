@@ -46,7 +46,7 @@ One file per decision, numbered in the order they were made. The **Status** line
 | [0014](0014-verified-collections-list.md) | A curated list marks verified and blocked assets | Accepted |
 | [0017](0017-deal-by-handle.md) | Make a deal for an @handle | Accepted |
 | [0028](0028-account-avatars.md) | Avatars: an NFT you hold, or an upload | Accepted |
-| [0042](0042-profile-page.md) | A profile page for every wallet; `/account` becomes `/settings` | Accepted |
+| [0042](0042-profile-page.md) | A profile page for every wallet; `/account` becomes `/settings` | Accepted, amended (Deals view) |
 
 ## Clubs: the product
 

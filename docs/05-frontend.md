@@ -98,7 +98,7 @@ scattering hex values through JSX or utility definitions.
 |---|---|---|---|
 | **Open Deals** `/deals` | `/api/deals` (the server reads `tradeCount` + multicall `getTrade`, and the pool) | — | ✓ |
 | **Account settings** `/settings` | Privy user, linked accounts, linked wallets, Club rewards | link/unlink accounts, connect/switch wallet, claim rewards | ✓ when Privy is configured |
-| **Profile** `/profile/[address]` | `/api/wallets/[address]/profile`, `/clubs`, `/board` and `/follows`; the owner also reads `/api/about`, `/api/avatar`, `/api/profile` | owner: save name and bio, set avatar, share/stop sharing the handle; anyone: follow (signed) | ✓ |
+| **Profile** `/profile/[address]` | `/api/wallets/[address]/profile`, `/clubs`, `/board` and `/follows`, and `/api/deals?maker=` for the Deals tab; the owner also reads `/api/about`, `/api/avatar`, `/api/profile` | owner: save name and bio, set avatar, share/stop sharing the handle; anyone: follow (signed) | ✓ |
 | **Create** `/create` | one wizard, DeClubEscrow or a signed intent (see *Create wizard*) | approvals, `createTrade` / `createTraitTrade` / `createOpenOffer` | ✓ |
 | **History** `/history` | the newest 200 escrow deals, server-verified fills (or browser fallback), and the connected wallet's signed swaps | — | ✓ |
 
