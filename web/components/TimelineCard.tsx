@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ActionMenu } from "@/components/ActionMenu";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
-import { BadgeCheckIcon, ChatIcon, FlagIcon, HeartIcon, SwapIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ChatIcon, FlagIcon, HeartIcon, SearchIcon, SwapIcon } from "@/components/Icons";
 import { linkHref, linkLabel, Thread, XPostCard } from "@/components/PostItem";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
@@ -101,7 +101,12 @@ export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; 
           <span className="relative z-10 flex items-center gap-2.5 px-4 py-2.5">
             <ClubAvatar club={club} className="size-8 text-xs" sizes="32px" />
             <span className="min-w-0 flex-1 truncate text-sm font-black group-hover:underline">{club.name}</span>
-            {post.kind === "looking" && <span className="chip chip-dark">Looking for</span>}
+            {post.kind === "looking" && (
+              <span className="chip chip-dark">
+                <SearchIcon />
+                Looking for
+              </span>
+            )}
           </span>
         </ClubCover>
       </Link>

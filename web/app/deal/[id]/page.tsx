@@ -30,7 +30,7 @@ import {
   stepsOf,
   type Party,
 } from "@/components/DealSheet";
-import { ExternalIcon, LockIcon } from "@/components/Icons";
+import { ChatIcon, ExternalIcon, InboxIcon, LockIcon, TagIcon, UserIcon } from "@/components/Icons";
 import { TxButton, TxStatus } from "@/components/Tx";
 import { TrustCheck } from "@/components/TrustCheck";
 import { ApprovalList } from "@/components/ApprovalList";
@@ -178,8 +178,18 @@ function DealDetail({ id }: { id: bigint }) {
               <>
                 <SettlementTag signed={false} />
                 {forMe && <span className="chip chip-peach">★ For you</span>}
-                {isMaker && <span className="chip chip-dark">Your deal</span>}
-                {kind && <span className="chip">{kind}</span>}
+                {isMaker && (
+                  <span className="chip chip-dark">
+                    <UserIcon />
+                    Your deal
+                  </span>
+                )}
+                {kind && (
+                  <span className="chip">
+                    {openOffer ? <ChatIcon /> : <TagIcon />}
+                    {kind}
+                  </span>
+                )}
               </>
             }
             title={<DealTitle id={id.toString()} />}
@@ -323,7 +333,10 @@ function DealDetail({ id }: { id: bigint }) {
         {credits.length > 0 && (
           <section className="deal-panel space-y-3 p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="chip chip-mint">Held for you</span>
+              <span className="chip chip-mint">
+                <InboxIcon />
+                Held for you
+              </span>
               <h2 className="font-black">Waiting for you to collect</h2>
             </div>
             <p className="text-sm text-muted">

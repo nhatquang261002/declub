@@ -264,3 +264,33 @@ export const LockIcon = (p: P) => (
     <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
   </Icon>
 );
+export const HourglassIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M7 3.5h10M7 20.5h10" />
+    <path d="M8 3.5c0 4.5 4 5.5 4 8.5s-4 4-4 8.5M16 3.5c0 4.5-4 5.5-4 8.5s4 4 4 8.5" />
+  </Icon>
+);
+export const ArchiveIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="4.5" rx="1" />
+    <path d="M5 9v9.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" />
+  </Icon>
+);
+export const KeyIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="m11 12 8.5-8.5M16.5 6.5l2.5 2.5M14 9l2 2" />
+  </Icon>
+);
+export const AlertIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M10.3 4.2 2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+    <path d="M12 9.5v4M12 17h.01" />
+  </Icon>
+);
+export const HelpIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.2-2.4 3.7M12 16.8h.01" />
+  </Icon>
+);

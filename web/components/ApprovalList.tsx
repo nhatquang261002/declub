@@ -8,6 +8,7 @@ import { useCollectionInfos } from "@/hooks/useCollection";
 import { revokeCall, type LiveApproval, type Spender } from "@/hooks/useApprovals";
 import { useTxFlow } from "@/hooks/useTxFlow";
 import { trustOf } from "@/lib/assetTrust";
+import { LockIcon, SwapIcon } from "@/components/Icons";
 import { erc20Asset, formatAsset, type TokenInfo } from "@/lib/assets";
 import { collectionLabel, type CollectionInfo } from "@/lib/collections";
 import { registry } from "@/lib/verifiedAssets";
@@ -71,7 +72,10 @@ function ApprovalRow({
           <p className="flex flex-wrap items-center gap-1.5 font-bold">
             <span className="truncate">{name}</span>
             <TrustChip trust={trust} />
-            <span className="chip">{SPENDER_TEXT[a.spender]}</span>
+            <span className="chip">
+              {a.spender === "escrow" ? <LockIcon /> : <SwapIcon />}
+              {SPENDER_TEXT[a.spender]}
+            </span>
           </p>
           <p className="text-xs text-muted">
             {scope} · <CopyAddress address={a.token} className="font-mono" />

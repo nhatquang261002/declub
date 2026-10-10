@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { isAddress } from "viem";
-import { XLogoIcon } from "@/components/Icons";
+import { EyeIcon, XLogoIcon } from "@/components/Icons";
 import { Select } from "@/components/Select";
 import { DealSheet, DealStage } from "@/components/DealSheet";
 import { Who } from "@/components/Who";
@@ -196,7 +196,10 @@ export function ReviewStage({ give, want }: { give: ReactNode; want: ReactNode }
   return (
     <DealSheet>
       <div className="flex flex-wrap items-center gap-2 px-6 pt-5 sm:px-9">
-        <span className="chip chip-peach">Preview</span>
+        <span className="chip chip-peach">
+          <EyeIcon />
+          Preview
+        </span>
         <span className="text-xs text-muted">How your deal will look to everyone else</span>
       </div>
       <DealStage status="open" live gives={give} wants={want} />

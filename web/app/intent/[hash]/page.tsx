@@ -24,6 +24,7 @@ import { erc20Asset, feeUnits, formatAsset } from "@/lib/assets";
 import { formatDate } from "@/lib/format";
 import { isLive, nonceBit, reasonText, ringLegs, STATUS_HELP, STATUS_LABEL, type IntentStatus, type PoolIntent } from "@/lib/intents";
 import { CopyAddress } from "@/components/CopyAddress";
+import { CheckIcon, UserIcon } from "@/components/Icons";
 
 export default function IntentPage() {
   const params = useParams<{ hash: string }>();
@@ -80,7 +81,12 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
           chips={
             <>
               <SettlementTag signed />
-              {mine && <span className="chip chip-dark">Your swap</span>}
+              {mine && (
+                <span className="chip chip-dark">
+                  <UserIcon />
+                  Your swap
+                </span>
+              )}
             </>
           }
           title={<DealTitle prefix="Swap" id={<span className="font-mono text-[0.7em] tracking-tight">{row.hash.slice(2, 10)}</span>} />}
@@ -156,7 +162,10 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
           {mine && received && (
             <section className="deal-panel space-y-3 p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="chip chip-mint">Delivered</span>
+                <span className="chip chip-mint">
+                  <CheckIcon />
+                  Delivered
+                </span>
                 <h2 className="font-black">You received</h2>
               </div>
               <AssetList assets={received} info={info} />

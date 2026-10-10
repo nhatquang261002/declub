@@ -7,7 +7,19 @@ import { isAddress } from "viem";
 import { Alert } from "@/components/Alert";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { clubLabel } from "@/components/ClubCard";
-import { ArrowLeftIcon, BadgeCheckIcon, ChatIcon, CoinIcon, LinkIcon, ShieldIcon, TagIcon, TrophyIcon, UsersIcon, XLogoIcon } from "@/components/Icons";
+import {
+  ArchiveIcon,
+  ArrowLeftIcon,
+  BadgeCheckIcon,
+  ChatIcon,
+  CoinIcon,
+  LinkIcon,
+  ShieldIcon,
+  TagIcon,
+  TrophyIcon,
+  UsersIcon,
+  XLogoIcon,
+} from "@/components/Icons";
 import { JoinClubButton } from "@/components/JoinClubButton";
 import { formatMomentum, HeatMeter, MOMENTUM_EXPLAINED } from "@/components/MomentumBadge";
 import { Tooltip } from "@/components/Tooltip";
@@ -168,7 +180,10 @@ function Club({ entry }: { entry: ClubEntry }) {
         <ClubCover club={info} className="h-28 sm:h-40">
           {info.archived && (
             <div className="relative z-10 flex justify-end p-3">
-              <span className="chip">Archived</span>
+              <span className="chip">
+                <ArchiveIcon />
+                Archived
+              </span>
             </div>
           )}
         </ClubCover>

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { isAddress } from "viem";
 import { CopyAddress } from "@/components/CopyAddress";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, ExternalIcon, XLogoIcon } from "@/components/Icons";
+import { BadgeCheckIcon, ExternalIcon, UserIcon, XLogoIcon } from "@/components/Icons";
 import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { EditProfile } from "@/components/profile/EditProfile";
@@ -70,7 +70,12 @@ function Profile({ address }: { address: string }) {
               >
                 {title}
               </h1>
-              {mine && <span className="chip chip-mint">This is you</span>}
+              {mine && (
+                <span className="chip chip-mint">
+                  <UserIcon />
+                  This is you
+                </span>
+              )}
             </div>
             {profile && (
               <p className="flex flex-wrap items-center gap-x-2 text-sm">

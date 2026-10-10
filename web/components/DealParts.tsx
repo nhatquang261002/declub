@@ -6,14 +6,15 @@ import type { ReactNode } from "react";
 import { formatMon } from "@/lib/format";
 import { displayStatus, sameAddress, type DisplayStatus } from "@/lib/deals";
 import type { Deal } from "@/lib/deals";
-import { ClockIcon, LockIcon, SwapIcon } from "./Icons";
+import { ClockIcon, KeyIcon, LockIcon, SwapIcon, UserIcon } from "./Icons";
+import { StatusChip, type StatusLook } from "./StatusChip";
 import { Who } from "./Who";
 
-const BADGE: Record<DisplayStatus, string> = {
-  open: "chip-mint",
-  expired: "chip-warn",
-  filled: "chip-blue",
-  cancelled: "",
+const LOOK: Record<DisplayStatus, StatusLook> = {
+  open: "live",
+  expired: "timeout",
+  filled: "done",
+  cancelled: "ended",
 };
 
 /** What a status is called wherever people read it. "filled" is the contract's word, not theirs. */
@@ -25,12 +26,7 @@ export const STATUS_TEXT: Record<DisplayStatus, string> = {
 };
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
-  return (
-    <span className={`chip ${BADGE[status]} uppercase tracking-wide ${status === "open" ? "rotate-[-2deg]" : ""}`}>
-      {status === "open" && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
-      {STATUS_TEXT[status]}
-    </span>
-  );
+  return <StatusChip look={LOOK[status]} label={STATUS_TEXT[status]} className={status === "open" ? "rotate-[-2deg]" : ""} />;
 }
 
 /** Which settlement a card is, where locked deals and signed swaps share one list. */
@@ -179,8 +175,18 @@ export function DealCardFrame({
           <StatusBadge status={status} />
           {tag}
           {forMe && <span className="chip chip-peach">★ For you</span>}
-          {mine && <span className="chip chip-dark">Yours</span>}
-          {deal.taker && !forMe && <span className="chip">Private</span>}
+          {mine && (
+            <span className="chip chip-dark">
+              <UserIcon />
+              Yours
+            </span>
+          )}
+          {deal.taker && !forMe && (
+            <span className="chip" title="Made for one wallet: only it can accept">
+              <KeyIcon />
+              Private
+            </span>
+          )}
         </>
       }
       countdown={<ExpiryCountdown expiry={deal.expiry} now={now} status={status} />}
