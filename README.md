@@ -13,36 +13,8 @@ Live: **[declub.fun](https://declub.fun)**
 
 Documentation: **[docs index](docs/README.md)** · [product spec](docs/01-product-spec.md) · [user guide](docs/07-user-guide.md) · [architecture](docs/02-architecture.md) · [contract design](docs/03-contract-design.md) · [security](docs/04-security.md) · [frontend](docs/05-frontend.md) · [Clubs](docs/09-clubs.md) · [roadmap](docs/06-roadmap.md) · [test plan](docs/11-test-plan.md) · [demo](docs/12-demo.md) · [ADRs](docs/adr/README.md)
 
-### Current testnet fees
-
-The current testnet deployment charges **0.05 MON per NFT a side moves** (with the
-contract's minimum of one fee unit per side). This fee is intentionally kept low
-because testnet MON costs little; it is the fixed fee used by the current demo
-deployment, not a promise about the eventual mainnet fee. See the
-[contract fee rules](docs/03-contract-design.md#protocol-fee-declubescrow) and
-[testnet deployment details](docs/12-demo.md#demo-contracts). For practical
-testnet costs, the [demo budget notes](docs/12-demo.md#things-to-know) estimate
-another **0.05–0.1 MON in gas per persona trade**, with about **1.2 MON** in
-additional top-ups when rebuilding the demo.
-
-### Estimated mainnet fee
-
-For planning against real demand, the working mainnet estimate is **$5 per fee
-unit per side**. The contracts charge per NFT a side moves, with a minimum of
-one fee unit per side. Of the completed swap's collected fees, **75% goes into
-the Club** (50% to active Holders and 25% to the Club fund):
-
-| Trade size | NFTs moved by one side | Estimated into the Club |
-|---|---:|---:|
-| 10-NFT swap | 10 | $75 |
-| 50-NFT swap | 50 | $375 |
-| 100-NFT swap | 100 | $750 |
-
-These are planning estimates, not a live mainnet price. The fee admin can lower
-the fee immediately or raise it only after the contract's delay, and the
-eventual amount will depend on demand and the value of MON. See the
-[fee rules](docs/03-contract-design.md#protocol-fee-declubescrow) for the
-on-chain limits and fee-change behavior.
+Fee estimates: [testnet demo costs](docs/12-demo.md#testnet-fee-and-cost-estimates)
+and [mainnet Club income](docs/03-contract-design.md#mainnet-fee-and-club-income-estimates).
 
 ## The problem
 

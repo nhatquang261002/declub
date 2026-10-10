@@ -130,6 +130,23 @@ The fee amount is the one thing that can change ([`FeeAdmin`](#feeadmin), shared
 
 A completed deal sends `t.fee × (units(offered) + units(requested or the accepted proposal))` to the recipient in one payout (`FeeCharged.amount`). A refund returns that side's own share. Fee payouts and refunds go through `_payout`'s never-reverting path, so a recipient or a refund target that rejects MON gets a credit for `claim` and the deal still completes. Accounting: native balance = open native escrow + `t.fee × units` per open trade and per active proposal + unclaimed credits.
 
+### Mainnet fee and Club income estimates
+
+For planning against real demand, the working mainnet estimate is **$5 per fee
+unit per side**. The contracts charge per NFT a side moves, with a minimum of
+one fee unit per side. Of the completed swap's collected fees, **75% goes into
+the Club** (50% to active Holders and 25% to the Club fund):
+
+| Trade size | NFTs moved by one side | Estimated into the Club |
+|---|---:|---:|
+| 10-NFT swap | 10 | $75 |
+| 50-NFT swap | 50 | $375 |
+| 100-NFT swap | 100 | $750 |
+
+These are planning estimates, not a live mainnet price. The fee admin can lower
+the fee immediately or raise it only after the contract's delay, and the
+eventual amount will depend on demand and the value of MON.
+
 ### Gas (worst case: 5 NFTs each way)
 
 Create **1.24M**, fill **0.58M** (`test_worstCaseGas`; the cap was 10 NFTs, 2.2M and 0.9M, before [ADR 0033](adr/0033-fee-per-nft.md)). A trade with one asset per side costs roughly 0.2–0.35M to create and 0.09–0.13M to fill.

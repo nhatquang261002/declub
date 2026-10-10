@@ -34,6 +34,16 @@ The demo has its own DeClubEscrow, DeClubIntents and DeClubRewards, deployed by 
 - **DeClubIntents:** the same fee, paid in a `MockWMON` the same script deploys (`DEPLOY_MOCK_WMON`), since testnet has no canonical WMON. The mock only wraps 1:1 (`deposit`), so a wallet gets WMON by wrapping MON. The matcher (`matcher/README.md`) needs it.
 - **DeClubRewards:** the bank is the operator, with no claim delay. Fees come back to the bank and fund the epochs.
 
+### Testnet fee and cost estimates
+
+The current testnet deployment charges **0.05 MON per NFT a side moves** (with
+the contract's minimum of one fee unit per side). This fee is intentionally kept
+low because testnet MON costs little; it is the fixed fee used by the current
+demo deployment, not a promise about the eventual mainnet fee. For practical
+testnet costs, a persona trade needs another **0.05–0.1 MON in gas**, and
+rebuilding the demo took about **1.2 MON** in additional top-ups. About **0.5
+MON** was lost to failed transactions before transaction spacing was added.
+
 Epoch 0 was a day long (`NEXT_PUBLIC_REWARDS_EPOCH_SECONDS=86400`), with the genesis set so that it closed just after the seeded swaps and could be built, published and claimed during the demo. From epoch 1 epochs are a week (`604800`): the genesis moved back to `1790666999` so epoch 1 starts where epoch 0 ended, Tuesday 2026-10-06 07:30 UTC, and each epoch closes Tuesday 07:30 UTC.
 
 ## Build it
@@ -88,5 +98,4 @@ REWARDS_OPERATOR_KEY=$(jq -r .bank .demo/wallets.json) npm run rewards:epoch -- 
 - **X.** No persona shares X posts, so the X lines on Club pages stay empty until someone shares a real post. Momentum comes from the swaps and from Holder personas' Board posts ([ADR 0047](adr/0047-board-posts-in-momentum.md)): one a day per persona per Club, from a social step run after this change.
 - **Starting over.** A rerun of `trades` on new contracts needs `web/.demo/state.json` reset to `{ "trades": {} }` first. Old store rows are keyed by token address, so new mirrors start clean. The step names tokens by the order they were minted, so on the *same* mirrors it only works while every NFT is back with its first holder: cancel the open trades on the old escrow and return the swapped NFTs first, or deploy fresh mirrors. Activity recorded from the old escrow stays in the store beside the new.
 - **Monad's reserve balance.** A wallet holding under 10 MON can only run a transaction that dips below the reserve if it sent no other in the last few blocks (about 1.2 s). Otherwise the transaction reverts and still pays for gas, even though a simulation succeeds. `demo.ts` waits 3 s between a wallet's transactions (the approval, then the trade). Gas is billed on the limit, so the script also caps the limit at what the wallet can afford at the max fee (`DEMO_GAS_PCT`, default 300, is the ceiling as a percentage of the estimate).
-- **Budget.** A persona's trade costs its 0.05 fee plus about 0.05 to 0.1 MON of gas, so the personas need more than the fees alone; the bank's fees come back as swaps fill. Rebuilding on a new escrow took about 1.2 MON of top-ups beyond what the personas held, and about 0.5 MON was lost to failed transactions before the spacing was added.
 - **RPC.** If `testnet-rpc.monad.xyz` times out, pass another RPC for the run, e.g. `NEXT_PUBLIC_RPC_URL=https://rpc.ankr.com/monad_testnet` (`--rpc-url` for Foundry). A value set in the shell wins over `.env`.
