@@ -110,8 +110,10 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
   const offerError =
     offered.errors[0] ?? blockedProblem(offered.assets) ?? (isOpen ? null : overlapError(offered.assets, plain.assets)) ?? takerError(terms.taker, address);
 
-  const { steps } = useAssetApprovals(address, offered.assets, info);
+  const nativeRequired = (offered.assets.find((a) => a.kind === "native")?.amount ?? 0n) + (fee === undefined ? 0n : sideFee(fee, offered.assets));
+  const { steps, problems: assetProblems, isLoading: assetsLoading } = useAssetApprovals(address, offered.assets, info, nativeRequired);
   const nextApproval = askError || offerError ? undefined : steps[0];
+  const assetProblem = assetProblems[0];
 
   async function create() {
     if (!address || !swapEscrow || askError || offerError || fee === undefined) return;
@@ -163,7 +165,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
             </div>
             <textarea
               id="note"
-              className="input min-h-24 resize-y"
+              className="input input-sticker min-h-24 resize-y"
               placeholder="e.g. any Chog with a crown, or 500 mUSD"
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -269,9 +271,10 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
       <ConfirmCard
         onBack={() => onStep(2)}
         note={
-          fee === undefined && !feeLoading
+          assetProblem ??
+          (fee === undefined && !feeLoading
             ? "Couldn't read the protocol fee from the contract, so the deal can't be created right now."
-            : "DeClub locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused."
+            : "DeClub locks what you offer in escrow. Tokens that take a fee on transfer, or change balances on their own, aren't supported and the deal will be refused.")
         }
         status={
           <>
@@ -290,7 +293,7 @@ export function MultiFlow({ kind, step, onStep, terms, onTerms }: Props) {
             state={tx.state}
             // Confirmed means the deal exists and its page is opening, so don't offer to create another.
             busyLabel={tx.state.status === "confirmed" ? "Opening your deal…" : undefined}
-            disabled={!!askError || !!offerError || fee === undefined}
+            disabled={!!askError || !!offerError || fee === undefined || assetsLoading || !!assetProblem}
             onClick={create}
           >
             {isOpen ? "Post open offer" : "Create deal"}

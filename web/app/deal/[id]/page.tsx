@@ -104,7 +104,23 @@ function DealDetail({ id }: { id: bigint }) {
   const traitFill = useTraitFill(deal?.requested ?? NO_ASSETS, traitClauses);
 
   // What the taker must approve before filling. Only asked for once they could actually fill.
-  const { steps } = useAssetApprovals(canFill ? address : undefined, deal?.requested ?? [], info);
+  const readinessAssets = useMemo(
+    () =>
+      (deal?.requested ?? []).flatMap((asset) =>
+        asset.kind === "trait"
+          ? (traitFill.slots.find((slot) => slot.asset === asset)?.chosen ?? []).map((id) => ({ ...asset, kind: "erc721" as const, id, amount: 1n }))
+          : [asset],
+      ),
+    [deal?.requested, traitFill.slots],
+  );
+  const nativeRequired =
+    (deal?.requested.find((asset) => asset.kind === "native")?.amount ?? 0n) + (fee === undefined ? 0n : sideFee(fee, deal?.requested ?? []));
+  const { steps, problems: assetProblems, isLoading: assetsLoading } = useAssetApprovals(
+    canFill ? address : undefined,
+    readinessAssets,
+    info,
+    nativeRequired,
+  );
 
   // A rejected payout can come from the deal itself, or from the offer that settled it or that
   // this wallet made. Reading claimable() for every other wallet's offers would be wasted calls.
@@ -314,7 +330,11 @@ function DealDetail({ id }: { id: bigint }) {
                 </TxButton>
               )}
               {canFill && !steps[0] && (
-                <TxButton state={action.state} disabled={traitFillBlocked || trustBlocked || fee === undefined} onClick={accept}>
+                <TxButton
+                  state={action.state}
+                  disabled={traitFillBlocked || trustBlocked || fee === undefined || assetsLoading || assetProblems.length > 0}
+                  onClick={accept}
+                >
                   Accept &amp; swap
                 </TxButton>
               )}
@@ -324,6 +344,9 @@ function DealDetail({ id }: { id: bigint }) {
                 </a>
               )}
               {canFill && traitFillBlocked && !steps[0] && <p className="text-sm text-muted">Pick the NFTs you&apos;ll send, above.</p>}
+              {canFill && !traitFillBlocked && !steps[0] && assetProblems.length > 0 && (
+                <p className="text-sm text-danger">{assetProblems[0]}</p>
+              )}
             </div>
           ) : null}
           <TxStatus state={action.state} success={status === "filled" ? "Swapped. The assets are in your wallet." : undefined} />

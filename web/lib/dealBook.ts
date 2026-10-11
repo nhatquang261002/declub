@@ -124,15 +124,27 @@ export function pageBook(source: BookSource, q: BookQuery, now: number): BookRes
   const forToken = (t: Listing) => q.tokens.length === 0 || q.tokens.some((token) => involvesToken(t, token));
   const byMaker = (t: Listing) => !q.maker || sameAddress(t.maker, q.maker);
   const filter = (list: Listing[]) => applyDealFilters(list.filter(forToken).filter(byMaker), q.filters, now, source.info);
+  const newestSigned = (list: readonly SignedListing[]) =>
+    [...list].sort(
+      (a, b) =>
+        b.signed.createdAt - a.signed.createdAt ||
+        (a.signed.hash.toLowerCase() < b.signed.hash.toLowerCase() ? -1 : a.signed.hash.toLowerCase() > b.signed.hash.toLowerCase() ? 1 : 0),
+    );
+  const signedOpen = newestSigned(signed(source.openSigned));
+  const signedAll = newestSigned(signed(source.allSigned));
 
-  // Signed swaps first: they carry no timestamp or id to order them against deals by, and
-  // "Ending soon" re-sorts the two together anyway.
-  const live = filter([...signed(source.openSigned), ...locked]).filter((t) => isLive(t, now));
+  // Locked deals arrive newest-first by trade id. Keep them ahead of signed rows for the default
+  // sort so a newly created escrow deal reaches the front of the book instead of sitting behind
+  // every signed listing. Ending-soon applies its own ordering across both kinds below.
+  const combined = q.filters.sort === "newest" ? [...locked, ...signedOpen] : [...signedOpen, ...locked];
+  const live = filter(combined).filter((t) => isLive(t, now));
   // Public offers plus private ones addressed to the viewer. A signed swap is open to anyone.
   const open = live.filter((t) => !t.taker || sameAddress(t.taker, q.viewer));
   // Only a locked deal can be addressed to one wallet.
   const forYou = q.viewer ? live.filter((t) => sameAddress(t.taker, q.viewer)) : [];
-  const list = q.tab === "open" ? open : q.tab === "for-you" ? forYou : filter([...signed(source.allSigned), ...locked]);
+  const allCombined =
+    q.filters.sort === "newest" ? [...locked, ...signedAll] : [...signedAll, ...locked];
+  const list = q.tab === "open" ? open : q.tab === "for-you" ? forYou : filter(allCombined);
 
   const start = (q.page - 1) * q.size;
   return { items: list.slice(start, start + q.size), total: list.length, counts: { open: open.length, forYou: forYou.length } };
