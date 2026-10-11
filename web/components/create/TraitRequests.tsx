@@ -1,9 +1,10 @@
 "use client";
 
 import { isAddress } from "viem";
+import { AssetSearch } from "@/components/AssetSearch";
 import { Tabs } from "@/components/Tabs";
 import { statusOf, type CatalogStatus } from "@/hooks/useCollectionTraits";
-import { CHOG_ADDRESS, MAX_NFTS_PER_SIDE } from "@/lib/config";
+import { MAX_NFTS_PER_SIDE } from "@/lib/config";
 import { newTraitDraft, type TraitDraft } from "@/lib/traitDraft";
 import { describePicks, MAX_TRAIT_PICKS, pickLabel, samePick, traitOptions, type ResolvedClause, type TraitMode, type TraitPick } from "@/lib/traitSpec";
 
@@ -83,19 +84,22 @@ function TraitRequestRow({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          aria-label={`Trait request ${index + 1} collection address`}
-          className="input min-w-0 flex-1 basis-64 font-mono"
-          placeholder="Collection address 0x…"
-          value={draft.collection}
-          onChange={(e) => onChange({ collection: e.target.value, picks: [] })}
-        />
-        <button type="button" className="btn-secondary btn-sm" onClick={() => onChange({ collection: CHOG_ADDRESS, picks: [] })}>
-          Chog
-        </button>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <AssetSearch
+            kind="erc721"
+            label={`Trait request ${index + 1} collection`}
+            placeholder="Search collections, or paste a contract address"
+            onSelect={(hit) => onChange({ collection: hit.address, picks: [] })}
+            renderPasted={(address) => (
+              <button type="button" className="btn-secondary btn-sm" onClick={() => onChange({ collection: address, picks: [] })}>
+                Use this collection
+              </button>
+            )}
+          />
+        </div>
         {onRemove && (
-          <button type="button" className="btn-danger btn-sm" aria-label={`Remove trait request ${index + 1}`} onClick={onRemove}>
+          <button type="button" className="btn-danger btn-sm mt-6" aria-label={`Remove trait request ${index + 1}`} onClick={onRemove}>
             ✕
           </button>
         )}
