@@ -96,7 +96,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
                       <>
                         <input
                           aria-label={`Row ${i + 1} token address`}
-                          className="input min-w-0 flex-1 basis-56 font-mono"
+                          className="input input-sticker min-w-0 flex-1 basis-56 font-mono"
                           placeholder="Token address 0x…"
                           value={row.token}
                           onChange={(e) => update(row.key, { token: e.target.value })}
@@ -108,7 +108,7 @@ export function AssetEditor({ title, hint, rows, onChange, info, allowNative = t
                     )}
                     <input
                       aria-label={`Row ${i + 1} amount`}
-                      className="input w-32 shrink-0"
+                      className="input input-sticker w-32 shrink-0"
                       inputMode="decimal"
                       placeholder={amountIsMinimum ? "At least" : "Amount"}
                       value={row.value}

@@ -100,7 +100,7 @@ export function AssetSearch({ kind, owner, extra = [], onSelect, renderPasted, p
                     : `Nothing to suggest yet. Paste a contract address.`}
             </p>
           ) : (
-            <ul className={`space-y-2 ${search.isStale ? "opacity-60" : ""}`}>
+            <ul className={`max-h-80 space-y-2 overflow-y-auto pr-1 ${search.isStale ? "opacity-60" : ""}`}>
               {hits.map((hit) => (
                 <HitRow key={hit.address} hit={hit} onSelect={() => onSelect(hit)} />
               ))}

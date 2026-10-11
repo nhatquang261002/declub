@@ -136,7 +136,7 @@ function TakerField({ label, value, onChange }: { label: string; value: string; 
       <div className="flex gap-2">
         <input
           id="taker"
-          className="input font-mono"
+          className="input input-sticker font-mono"
           placeholder={PRIVY_APP_ID ? "0x… or @handle" : "0x…"}
           value={value}
           onChange={(e) => onChange(e.target.value)}

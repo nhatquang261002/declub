@@ -161,10 +161,14 @@ describe("pageBook", () => {
     assert.equal(mixed.total, 2);
   });
 
-  it("puts signed swaps first, and drops either kind on request", () => {
-    const rows = [signedRow(1), signedRow(2, ME), signedRow(3, BO)];
+  it("puts newest locked deals first, and drops either kind on request", () => {
+    const rows = [signedRow(1), signedRow(2, ME), signedRow(3, BO)].reverse();
     const both = pageBook(source(book, rows), query(), NOW);
-    assert.ok("signed" in both.items[0]);
+    assert.equal(ids(both.items.filter((item): item is Deal => !("signed" in item)).slice(0, 2)).join(","), "2,1");
+    assert.deepEqual(
+      both.items.filter((item) => "signed" in item).map((item) => Number(item.signed.createdAt)),
+      [NOW - 600, NOW - 1_200, NOW - 1_800],
+    );
     assert.equal(both.total, rows.length + 2);
     assert.equal(pageBook(source(book, rows), query({ kind: "locked" }), NOW).total, 2);
     assert.equal(pageBook(source(book, rows), query({ kind: "signed" }), NOW).total, rows.length);
