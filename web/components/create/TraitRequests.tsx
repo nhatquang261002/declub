@@ -183,7 +183,7 @@ function TraitRequestRow({
                 </label>
                 <input
                   id={`amount-${draft.key}`}
-                  className="input w-24"
+                  className="input input-sticker w-24"
                   type="number"
                   min={1}
                   max={maxAmount}

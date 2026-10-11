@@ -979,6 +979,9 @@ body {
   @apply w-full border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-muted/60 focus:border-accent;
   border-radius: var(--radius-control);
 }
+@utility input-sticker {
+  @apply border-2 border-[#111318]/25 bg-white outline-none placeholder:text-muted/60 focus:border-[#111318];
+}
 /* Tab bar: a white sticker tray holding pill tabs. The active tab is a peach sticker. */
 @utility tabbar {
   display: inline-flex;
