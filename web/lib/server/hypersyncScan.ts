@@ -51,6 +51,9 @@ export function hypersyncScan(
     async head() {
       // Envio may trail the node, or run ahead of what is final. A range is only scanned once both have it.
       const [finalized, indexed] = await Promise.all([finalizedHead(), hypersync.getHeight()]);
+      // The height needs no token, so a revoked or wrong one passes it and fails the first range query.
+      // One empty block asks for a token too, so that case falls back to the node like any Envio outage.
+      await hypersync.get({ fromBlock: indexed, toBlock: indexed + 1, fieldSelection: {} });
       return finalized < BigInt(indexed) ? finalized : BigInt(indexed);
     },
     async txs(from, to) {
