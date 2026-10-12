@@ -28,7 +28,7 @@ export function Providers({ children }: { children: ReactNode }) {
       config={{
         // Wallet-first: people bring a wallet (MetaMask & co.) and link socials to it, or sign in
         // with a social that is already linked to one. Embedded wallets are opt-in (see config).
-        loginMethods: ["google", "twitter", "discord", "wallet"],
+        loginMethods: ["twitter", "discord", "wallet"],
         appearance: { theme: "dark", showWalletLoginFirst: true },
         embeddedWallets: {
           ethereum: { createOnLogin: PRIVY_EMBEDDED_WALLETS ? "users-without-wallets" : "off" },

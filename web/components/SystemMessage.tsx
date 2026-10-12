@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { SwapIcon, TagIcon, UsersIcon } from "@/components/Icons";
+import { ProviderIcon, SwapIcon, TagIcon, UsersIcon } from "@/components/Icons";
 import { useProfile } from "@/hooks/useProfiles";
 import { profilePath } from "@/lib/about";
 import type { ClubInfo } from "@/lib/clubs";
 import { explorerTx } from "@/lib/config";
 import { ago, shortAddress } from "@/lib/format";
+import { handleLabel } from "@/lib/profiles";
 import { SYSTEM_GROUP_SHOWN, type SystemEvent, type SystemKind } from "@/lib/systemFeed";
 
 /** The kinds that are lines: a challenge has a card of its own (ADR 0045). */
@@ -19,7 +20,14 @@ function Name({ address }: { address: string }) {
   const profile = useProfile(address);
   return (
     <Link href={profilePath(address)} className="sys-name" title={address}>
-      {profile ? profile.handle : shortAddress(address)}
+      {profile ? (
+        <>
+          <ProviderIcon provider={profile.provider} className="mr-1 inline size-3 align-[-0.1em]" />
+          {handleLabel(profile)}
+        </>
+      ) : (
+        shortAddress(address)
+      )}
     </Link>
   );
 }

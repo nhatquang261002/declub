@@ -31,7 +31,7 @@ const START = [
     title: PRIVY_APP_ID ? "Sign in" : "Connect a wallet",
     body: PRIVY_APP_ID ? (
       <>
-        Press <b>Sign in</b> and use Google, X, Discord or a wallet. Then link the wallet that holds your assets.
+        Press <b>Sign in</b> and use X, Discord or a wallet. Then link the wallet that holds your assets.
       </>
     ) : (
       <>

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { isAddress } from "viem";
 import { CopyAddress } from "@/components/CopyAddress";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, ExternalIcon, UserIcon, XLogoIcon } from "@/components/Icons";
+import { ExternalIcon, ProviderIcon, UserIcon } from "@/components/Icons";
 import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { EditProfile } from "@/components/profile/EditProfile";
@@ -81,7 +81,7 @@ function Profile({ address }: { address: string }) {
             {profile && (
               <p className="flex flex-wrap items-center gap-x-2 text-sm">
                 <span className="chip chip-mint" title={`The ${PROFILE_LABEL[profile.provider]} account linked to this wallet, checked when they signed in`}>
-                  <BadgeCheckIcon />
+                  <ProviderIcon provider={profile.provider} />
                   Verified {PROFILE_LABEL[profile.provider]}
                 </span>
                 {xUrl ? (
@@ -91,7 +91,6 @@ function Profile({ address }: { address: string }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-bold underline decoration-dotted underline-offset-2"
                   >
-                    {profile.provider === "twitter" && <XLogoIcon className="size-3.5" />}
                     {handle}
                     <ExternalIcon className="size-3 opacity-60" />
                   </a>

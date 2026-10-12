@@ -7,7 +7,7 @@ import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useConnection } from "wagmi";
 import { PageHeader } from "@/components/Page";
 import { useToast } from "@/components/Toast";
-import { KIND_LABEL, SOCIAL_KINDS, linkedRows, type AccountKind, type LinkedRow, type SocialKind } from "@/lib/accounts";
+import { KIND_LABEL, SOCIAL_KINDS, linkedRows, type AccountKind, type LinkedRow } from "@/lib/accounts";
 import { PRIVY_APP_ID } from "@/lib/config";
 import { CopyAddress } from "@/components/CopyAddress";
 import { RewardsClaim } from "@/components/RewardsClaim";
@@ -55,9 +55,7 @@ function Account() {
   const wallets = rows.filter((row) => row.kind === "wallet");
   const hasKind = (kind: AccountKind) => rows.some((row) => row.kind === kind);
 
-  const link: Record<SocialKind, () => void> = {
-    email: privy.linkEmail,
-    google: privy.linkGoogle,
+  const link: Record<(typeof SOCIAL_KINDS)[number], () => void> = {
     twitter: privy.linkTwitter,
     discord: privy.linkDiscord,
   };
@@ -104,9 +102,9 @@ function Account() {
       <section className="page-section px-5 py-5">
         <h2 className="text-lg font-semibold">Linked accounts</h2>
         <p className="mt-1 text-sm text-muted">
-          Link a Google, X or Discord account to your wallet to sign in with it later, without opening your wallet first. They are for signing in and recovery.
-          You need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders
-          unless you turn it on in your{" "}
+          Link an X or Discord account to your wallet to sign in with it later, without opening your wallet first. They are for signing in and recovery. You
+          need an X or Discord account linked to post on a Club’s Board, and an X account for your X posts to count. Nothing is shown to other traders unless
+          you turn it on in your{" "}
           <Link href="/profile" className="font-bold underline">
             profile
           </Link>

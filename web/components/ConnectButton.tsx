@@ -198,7 +198,7 @@ function ConnectedWallet({
 
 /**
  * Signed in, but no wallet reached wagmi. Either the account has a wallet linked that isn't
- * connected in this browser yet (the usual case for a returning Google / X / Discord sign-in), or
+ * connected in this browser yet (the usual case for a returning X / Discord sign-in), or
  * it has none. Either way the header needs a way forward and a way out, so this menu offers
  * connecting or linking a wallet, and always sign out.
  */
@@ -276,7 +276,7 @@ function NoWalletMenu({
   );
 }
 
-/** Sign in with Privy (Google, X, Discord or a wallet); the wallet reaches wagmi from there. */
+/** Sign in with Privy (X, Discord or a wallet); the wallet reaches wagmi from there. */
 function PrivyConnect() {
   const { ready, authenticated, user, login, logout, linkWallet, connectWallet } = usePrivy();
   const wallets = useWallets();

@@ -143,7 +143,7 @@ Matcher (`matcher/README.md`): `MATCHER_PRIVATE_KEY`, `MATCHER_RPC_URL`, and `MA
 
 ### 2.4 Privy, cron and matcher
 
-- **Privy dashboard:** allow the test host's origin; enable wallet, Google, X and Discord login, and email for linking; embedded wallets off; add the webhook endpoint `https://<host>/api/webhooks/privy` for `user.linked_account`, `user.unlinked_account`, `user.transferred_account` and `user.deleted`.
+- **Privy dashboard:** allow the test host's origin; enable wallet, X and Discord login; embedded wallets off; add the webhook endpoint `https://<host>/api/webhooks/privy` for `user.linked_account`, `user.unlinked_account`, `user.transferred_account` and `user.deleted`.
 - **Cron:** a scheduler calls `GET https://<host>/api/cron/fills` with `Authorization: Bearer <CRON_SECRET>` every minute. Vercel Hobby crons run only daily, which is too slow ([ADR 0019](adr/0019-fill-watcher.md)).
 - **Holdings sampler and epoch close** ([ADR 0040](adr/0040-points-floor-held-average-public-backing.md)): `GET https://<host>/api/cron/holdings` and `GET https://<host>/api/cron/close` with the same header, once a day each (`web/vercel.json` does it on Vercel, Hobby's daily cron is enough). Calling either twice the same day does nothing the second time.
 - **Matcher:** running for the whole session, with its log visible to the engineer. Note the matcher key's MON balance at start and end.
@@ -226,7 +226,7 @@ Start M-DEAL-03 and M-SIG-09 early in the session: they wait for a 1-hour expiry
 | M-WAL-04 | P1 | Several wallets, switch the active one | A has two wallets linked (link the second on `/settings` with **Link another wallet**) | 1. On `/settings`, press **Use this wallet** on the second. 2. Open `/deals` and the bell. 3. Switch back. | The active wallet shows **In use**. Header, **For you** tab and notifications follow the active wallet. | — |
 | M-WAL-05 | P1 | Account change inside the wallet extension | A on a deal page of their own deal | 1. In MetaMask, switch to another account without using the app. 2. Look at the deal page dock. 3. Start a transaction. | The header and dock update to the new account (no "Your deal is live" for a non-maker). No transaction is ever sent from the previous account. | — |
 | M-WAL-06 | P1 | Sign out | A signed in | 1. **Sign out** from the wallet menu. 2. Reload `/history`, `/settings`, a Club page. | Header reads **Sign in**. `/settings` offers **Sign in**. History asks to connect. Club writes need sign-in again. | Automated: WEB-04 |
-| M-WAL-07 | P2 | Injected-wallet fallback and embedded wallets | A build without `NEXT_PUBLIC_PRIVY_APP_ID`; separately, a build with `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` | 1. Without Privy: press **Connect wallet**. 2. Open `/settings`. 3. With embedded wallets on: sign in with Google on a fresh profile, create the wallet, open export. | 1. "Connect a wallet / Choose an installed wallet to continue." lists the EIP-6963 wallets; trading works. 2. `/settings` explains the app uses an installed wallet. 3. An embedded wallet is created and connects; export shows Privy's warning. | — |
+| M-WAL-07 | P2 | Injected-wallet fallback and embedded wallets | A build without `NEXT_PUBLIC_PRIVY_APP_ID`; separately, a build with `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` | 1. Without Privy: press **Connect wallet**. 2. Open `/settings`. 3. With embedded wallets on: sign in with X on a fresh profile, create the wallet, open export. | 1. "Connect a wallet / Choose an installed wallet to continue." lists the EIP-6963 wallets; trading works. 2. `/settings` explains the app uses an installed wallet. 3. An embedded wallet is created and connects; export shows Privy's warning. | — |
 
 ### 4.2 Create (CRE)
 
@@ -369,7 +369,7 @@ This is the live checklist in [10 · Privy](10-privy.md#what-remains-to-validate
 |---|---|---|---|---|---|---|
 | M-MOB-01 | P1 | Phone width | Desktop browser at 375 px | Walk through Create, a deal page, `/deals`, `/history`, a Club. | No horizontal scroll, the dock and steppers fit, buttons are reachable, the header shows **Switch network** when needed. | — |
 | M-MOB-02 | P1 | Wallet in-app browser | Phone wallet with in-app browser | Sign in, take a deal, sign a swap. | Every prompt opens in the wallet and returns to the page; typed-data signing shows the fields. | — |
-| M-MOB-03 | P2 | Social sign-in on mobile | Phone browser without a wallet | Sign in with X or Google. | Signed in; the page explains how to connect the linked wallet. | — |
+| M-MOB-03 | P2 | Social sign-in on mobile | Phone browser without a wallet | Sign in with X or Discord. | Signed in; the page explains how to connect the linked wallet. | — |
 
 ### 4.14 Errors and edge cases (ERR)
 

@@ -1,6 +1,6 @@
 # ADR 0010: Privy sign-in and linked accounts
 
-**Status:** Accepted · 2026-10-01 · Frontend only. No contract, matcher or pool change.
+**Status:** Accepted · 2026-10-01 · Frontend only. No contract, matcher or pool change. Amended 2026-10-12: Google is no longer a sign-in or link option (it did not work reliably); a Google account that is already linked is still listed so it can be unlinked.
 
 ## Context
 
@@ -10,13 +10,13 @@ The app connects injected wallets only. Anyone without MetaMask or Rabby can't u
 
 **Add Privy as an optional layer under wagmi.** `NEXT_PUBLIC_PRIVY_APP_ID` switches it on; blank keeps the injected-wallet connect, so the app still runs (and builds) without a Privy account.
 
-- **Wallet-first.** People already own a wallet. Sign-in is Google, X, Discord or "wallet" (listed first), and a social account is another way into a wallet, in both directions:
-  - *Wallet first, social later:* sign in with the wallet, then link Google / X / Discord on `/account`. Next time the social account signs in.
+- **Wallet-first.** People already own a wallet. Sign-in is X, Discord or "wallet" (listed first), and a social account is another way into a wallet, in both directions:
+  - *Wallet first, social later:* sign in with the wallet, then link X / Discord on `/account`. Next time the social account signs in.
   - *Social first, wallet later:* a social sign-in with no wallet connected shows **Link a wallet** in the header. If a wallet is already linked but not connected in this browser (the usual return visit), it shows **Connect wallet** with the linked address.
   - Several linked wallets: `/account` shows which one is in use and switches between connected ones.
 - **Embedded wallets are opt-in** (`NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true`, and enabled in the Privy dashboard). Off by default, so nobody is given a wallet they didn't bring. When on, a social sign-in with no wallet creates one.
 - **wagmi stays the interface.** `@privy-io/wagmi` swaps the config and provider; every `useReadContract`, `useWriteContract` and `useSignTypedData` call is unchanged. Embedded wallets are EOAs, so EIP-712 intents and the contracts' `msg.sender` assumptions hold as before.
-- **Linked accounts** live on `/account`: link or unlink email, Google, X, Discord and extra wallets, and export the embedded wallet's key. Linking is for sign-in and recovery. **Nothing is shown to other traders** by this ADR: showing a maker's verified handle needs a server that maps address to Privy user. That is [ADR 0011](0011-verified-profiles.md).
+- **Linked accounts** live on `/account`: link or unlink X, Discord and extra wallets (email and Google only appear, to be unlinked, when already linked), and export the embedded wallet's key. Linking is for sign-in and recovery. **Nothing is shown to other traders** by this ADR: showing a maker's verified handle needs a server that maps address to Privy user. That is [ADR 0011](0011-verified-profiles.md).
 - **Chain:** Monad testnet is passed as Privy's `defaultChain` and only supported chain.
 
 ## Consequences
