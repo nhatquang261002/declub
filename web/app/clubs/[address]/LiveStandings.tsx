@@ -139,7 +139,8 @@ export function LiveStandings({
 
       <p className="mt-4 text-xs text-muted">
         Points come from Holders backing your posts and replies, engaging with other members, active days, your X posts about the Club, swaps and challenges. An
-        estimate, a few minutes old; holdings are read again when the epoch is built, so it can still change.{" "}
+        estimate that updates about every 5 minutes, so a new post can take that long to show. NFTs count as an average over the week, read once a day, and
+        again when the epoch is built, so it can still change.{" "}
         <Link href="/guide#rewards" className="font-semibold underline underline-offset-2">
           How points work
         </Link>

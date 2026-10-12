@@ -218,6 +218,7 @@ export function ClubMembers({ token, symbol, now }: { token: string; symbol: str
           </p>
         )}
       </div>
+      <p className="-mt-2 mb-4 text-xs text-muted">The ranking updates about once a minute, so a new post or swap can take a moment to show.</p>
 
       {isLoading ? (
         <Loading label="Loading members" rows={5} />
