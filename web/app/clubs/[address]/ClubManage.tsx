@@ -14,6 +14,7 @@ import { MAX_DESCRIPTION, MAX_LINKS } from "@/lib/clubPosts";
 import { MAX_X_ACCOUNTS, MAX_X_TAGS, normalizeTag } from "@/lib/xPosts";
 import { isOwnerOrAdmin } from "@/lib/clubRoles";
 import { ago } from "@/lib/format";
+import { ClubPack } from "./ClubPack";
 import { Panel } from "./parts";
 import { RewardSettings } from "./RewardSettings";
 import { CopyAddress } from "@/components/CopyAddress";
@@ -45,6 +46,8 @@ const ACTIONS: Record<string, string> = {
   cancel_challenge: "cancelled a challenge:",
   settle_challenge: "settled a challenge:",
   prize_sent: "sent a challenge prize:",
+  add_pack: "added to the Club’s emoji and stickers:",
+  remove_pack: "removed from the Club’s emoji and stickers:",
 };
 
 const field = "input border-2 border-[#111318]/25 bg-white focus:border-[#111318]";
@@ -356,6 +359,10 @@ export function ClubManage({ token, role, now }: { token: string; role: ViewerRo
           <PageEditor token={token} />
         </Panel>
       )}
+
+      <Panel title="Emoji and stickers">
+        <ClubPack token={token} />
+      </Panel>
 
       {owner && page?.coin && (
         <Panel title={`${page.coin.symbol} holders`}>

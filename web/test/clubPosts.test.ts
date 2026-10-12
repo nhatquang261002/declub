@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MAX_DESCRIPTION, POST_MAX, checkProfileEdit, cleanText, parseLink, pinnedFirst, viewPost, type StoredPost } from "../lib/clubPosts";
 
+const CLUB = "0x220a2C52FD27252e7Cd6163A7bF1b6ae159D26e4";
+
 describe("cleanText", () => {
   it("trims, collapses spaces and turns line breaks and control characters into spaces", () => {
     assert.deepEqual(cleanText("  WTB   a Chog\n\nwith a crown\t! "), { ok: true, text: "WTB a Chog with a crown !" });
@@ -48,26 +50,26 @@ describe("viewPost", () => {
   const hidden: StoredPost = { ...post, hidden: "reports" };
 
   it("shows a visible post to everyone and never the author's user id", () => {
-    const v = viewPost(post, { staff: false }, false);
+    const v = viewPost(CLUB, post, { staff: false }, false);
     assert.equal(v.text, "secret");
     assert.deepEqual(v.link, { kind: "deal", id: "1" });
     assert.ok(!JSON.stringify(v).includes("author"));
   });
 
   it("redacts a hidden post for others, but not for its author or staff", () => {
-    const other = viewPost(hidden, { userId: "someone", staff: false }, false);
+    const other = viewPost(CLUB, hidden, { userId: "someone", staff: false }, false);
     assert.equal(other.text, null);
     assert.equal(other.link, undefined);
     assert.equal(other.hidden, "reports");
-    assert.equal(viewPost(hidden, { userId: "author", staff: false }, false).text, "secret");
-    assert.equal(viewPost(hidden, { userId: "mod", staff: true }, false).text, "secret");
+    assert.equal(viewPost(CLUB, hidden, { userId: "author", staff: false }, false).text, "secret");
+    assert.equal(viewPost(CLUB, hidden, { userId: "mod", staff: true }, false).text, "secret");
   });
 
   it("marks mine and pinned, and gives the report count to staff only", () => {
-    assert.equal(viewPost(post, { userId: "author", staff: false }, true).mine, true);
-    assert.equal(viewPost(post, { userId: "author", staff: false }, true).pinned, true);
-    assert.equal(viewPost(hidden, { userId: "mod", staff: true }, false, 3).reports, 3);
-    assert.equal("reports" in viewPost(hidden, { userId: "author", staff: false }, false, 3), false);
+    assert.equal(viewPost(CLUB, post, { userId: "author", staff: false }, true).mine, true);
+    assert.equal(viewPost(CLUB, post, { userId: "author", staff: false }, true).pinned, true);
+    assert.equal(viewPost(CLUB, hidden, { userId: "mod", staff: true }, false, 3).reports, 3);
+    assert.equal("reports" in viewPost(CLUB, hidden, { userId: "author", staff: false }, false, 3), false);
   });
 });
 

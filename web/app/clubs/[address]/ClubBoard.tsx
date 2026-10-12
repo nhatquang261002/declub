@@ -164,6 +164,7 @@ export function ClubBoard({ token, symbol, archived, now }: { token: string; sym
             ) : (
               <PostItem
                 key={item.post.id}
+                club={token}
                 post={item.post}
                 role={me.role}
                 now={now}

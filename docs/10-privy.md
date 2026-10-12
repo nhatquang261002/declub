@@ -126,6 +126,11 @@ Without them, production has no store and those features switch off; development
 in-memory store, which is lost on restart and is not a production
 persistence strategy.
 
+Pictures in Board posts ([ADR 0056](adr/0056-post-pictures-and-emoji.md)) are kept in a **private** Vercel
+Blob store. Create one in the Vercel dashboard (Storage → Blob → Private), connect it to the project (that sets
+`BLOB_READ_WRITE_TOKEN`) and use a separate store for each flavor. Without the token, production refuses posts
+with a picture and text posts carry on; development keeps pictures in memory.
+
 The Privy dashboard must allow the deployed origin and enable the login methods the app is
 expected to expose: wallet, Google, X, Discord, and email if users should be able to link it
 for recovery (the app's own config doesn't offer email as a login method). Enable embedded wallets

@@ -6,6 +6,7 @@ import { ActionMenu } from "@/components/ActionMenu";
 import { ClubAvatar, ClubCover } from "@/components/ClubArt";
 import { BadgeCheckIcon, ChatIcon, FlagIcon, HeartIcon, SearchIcon, SwapIcon } from "@/components/Icons";
 import { linkHref, linkLabel, Thread, XPostCard } from "@/components/PostItem";
+import { PostText } from "@/components/PostText";
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
@@ -128,7 +129,9 @@ export function TimelineCard({ post, club, joined, now }: { post: TimelinePost; 
           )}
         </div>
 
-        {post.text !== null && <p className={`post-text break-words whitespace-pre-wrap ${quote ? "tl-quote" : "text-base leading-7"}`}>{post.text}</p>}
+        {post.text !== null && (
+          <PostText club={post.club} text={post.text} className={`post-text break-words whitespace-pre-wrap ${quote ? "tl-quote" : "text-base leading-7"}`} />
+        )}
         {post.link?.kind === "x" && <XPostCard id={post.link.id} card={post.x} now={now} />}
         {post.link && post.link.kind !== "x" && (
           <Link href={linkHref(post.link)} className="post-link">

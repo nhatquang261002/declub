@@ -47,6 +47,7 @@ Without Upstash credentials, local development uses an in-memory store.
 | `PRIVY_APP_SECRET` | `web/.env.local` | Server-side Privy |
 | `PRIVY_WEBHOOK_SIGNING_SECRET` | `web/.env.local` | Privy webhook verification |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | `web/.env.local` | Persistent store |
+| `BLOB_READ_WRITE_TOKEN` | `web/.env.local` | Pictures in Board posts (a private Vercel Blob store, ADR 0056) |
 | `CRON_SECRET` | `web/.env.local` | Fill watcher authorization |
 | `FILL_WATCHER_START_BLOCK` | `web/.env.local` | Fill watcher start |
 | `CLUB_ADMIN_USER_IDS` | `web/.env.local` | App administrators |

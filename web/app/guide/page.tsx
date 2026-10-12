@@ -126,8 +126,8 @@ const TABS = [
     title: "Board",
     body: (
       <>
-        Short posts from members, with replies and likes under them. Order them by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post
-        can link one of the Club&apos;s own deals.
+        Short posts from members, with replies and likes under them. A post can carry emoji, the Club&apos;s own emoji and stickers, and one picture. Order them
+        by a lens: Newest, Most active, Holders or Following. A <i>Looking for</i> post can link one of the Club&apos;s own deals.
       </>
     ),
   },
@@ -192,7 +192,9 @@ const MOMENTUM_RULES = [
 const POST_RULES = [
   "Be a member, link an X or Discord account, and turn on “Show my X or Discord handle” on your Profile page.",
   "Your Club wallet signs each post. It costs no gas and moves nothing, and it makes the post yours: anyone can check it, here or in another app.",
-  `Plain text, up to ${POST_MAX} characters. No formatting, and links in the text aren't clickable.`,
+  `Up to ${POST_MAX} characters of text. No formatting, and links in the text aren't clickable.`,
+  "Add emoji and stickers with the buttons under the text, and one picture with the picture button. The app shrinks the picture for you, and a hidden post hides it too.",
+  "Every Club has stickers, like :gm: and :lfg:, and can add emoji and stickers of its own. Type :name: or pick them from the sticker button.",
   `A note can share one X post, shown as a card. A “Looking for” post can attach a deal${swapIntents ? " or a signed swap" : ""}.`,
   `One post every ${POST_COOLDOWN_SEC} seconds, and ${POSTS_PER_HOUR} an hour in each Club.`,
   "Delete your own posts whenever you like.",
@@ -203,13 +205,13 @@ const ROLES: ReadonlyArray<{ icon: React.ReactNode; role: string; who: string; c
     icon: <CrownIcon className="size-4" />,
     role: "Owner",
     who: "The wallet the collection's contract names as its owner, once it presses Claim. Or someone the app's admins picked.",
-    can: `Edits the description and up to ${MAX_LINKS} links, links the project's X account, sets whether coin holders get the badge, pins up to ${MAX_PINNED} posts, appoints up to ${MAX_MODERATORS} moderators, can limit posting to Holders, collects the Club fund, and can hand the Club to another member.`,
+    can: `Edits the description and up to ${MAX_LINKS} links, links the project's X account, sets whether coin holders get the badge, pins up to ${MAX_PINNED} posts, adds the Club's own emoji and stickers, appoints up to ${MAX_MODERATORS} moderators, can limit posting to Holders, collects the Club fund, and can hand the Club to another member.`,
   },
   {
     icon: <ShieldIcon className="size-4" />,
     role: "Moderator",
     who: "Appointed by the Owner.",
-    can: "Hides, restores and deletes posts, and bans or unbans members of this Club, but can't lift a ban the Owner made. Can't act on the Owner or other moderators.",
+    can: "Hides, restores and deletes posts, adds and removes the Club's emoji and stickers, and bans or unbans members of this Club, but can't lift a ban the Owner made. Can't act on the Owner or other moderators.",
   },
   {
     icon: <UsersIcon className="size-4" />,

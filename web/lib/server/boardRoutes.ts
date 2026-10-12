@@ -7,6 +7,7 @@ import {
   createSignedPost,
   createSignedReply,
   exportReplies,
+  readPostImage,
   listReplies,
   deletePost,
   exportPosts,
@@ -40,6 +41,9 @@ import type { Store } from "./store";
 import { isStaff } from "../clubRoles";
 import { lensOf } from "../lenses";
 import { parsePostMessage, parseReplyMessage, socialDomain, SOCIAL_TYPES } from "../social";
+import { DEFAULT_STICKERS, PACK_EDGE, PACK_EMOJI_MAX, PACK_IMAGE_MAX_BYTES, PACK_STICKER_MAX } from "../clubPack";
+import { addToPack, loadPack, packItems, readPackImage, removeFromPack } from "./clubPack";
+import { parsePostImage } from "./postImages";
 import { clubRulesView, listRewardBans, setRewardBan, updateRules } from "./rewardSettings";
 import {
   cancelChallenge,
@@ -77,6 +81,13 @@ const REFUSALS: Record<string, [number, string]> = {
   bad_kind: [400, "A post is a note or a “looking for”."],
   empty: [400, "Write something first."],
   too_long: [400, "Posts are at most 280 characters."],
+  bad_image: [422, "Use a PNG, JPEG or WebP picture under 1 MB. The app shrinks larger ones for you."],
+  bad_name: [400, "A name is 2 to 24 lowercase letters, digits or _, with at least one letter."],
+  bad_pack_kind: [400, "Add it as an emoji or a sticker."],
+  name_taken: [409, "That name is already used for the other kind. Pick another."],
+  pack_full: [409, `A Club can have ${PACK_EMOJI_MAX} emoji and ${PACK_STICKER_MAX} stickers. Remove one first.`],
+  images_unavailable: [503, "Pictures aren’t available right now. Post without one, or try again later."],
+  image_limit: [429, "You’ve posted as many pictures as you can today. Try again tomorrow."],
   bad_link: [400, "A “looking for” post links a deal id or a signed-swap hash; a note links an X post."],
   link_not_found: [404, "That deal or signed swap wasn’t found."],
   link_mismatch: [422, "That deal or signed swap doesn’t involve this Club’s asset."],
@@ -202,10 +213,93 @@ export function postsHandlers(registry: Registry, deps: RouteDeps = {}) {
       if (f instanceof Response) return f;
       const body = await bodyOf(request);
       // Every post is signed by its author's Club wallet (ADR 0023), so it can be exported and checked.
-      const result = await createSignedPost(f.store, f.entry, f.user.id, { message: parsePostMessage(body.message), signature: body.signature }, deps);
+      // A picture comes as a data URL beside the message, which signs its SHA-256; `null` is one that isn't acceptable.
+      const picture = body.image === undefined ? undefined : parsePostImage(body.image);
+      const result = await createSignedPost(f.store, f.entry, f.user.id, { message: parsePostMessage(body.message), signature: body.signature, picture }, deps);
       // `xShare` tells the author whether their X post counted, and if not, why.
       return result.ok ? json({ enabled: true, post: result.post, ...(result.xShare ? { xShare: result.xShare } : {}) }, 201) : refuse(result.reason);
     },
+  };
+}
+
+/**
+ * GET /api/clubs/[token]/posts/[id]/image: a post's picture (ADR 0056). Public for a post that isn't
+ * hidden; for a hidden one only its author and staff get it, and send their token.
+ */
+export function postImageHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function GET(request: Request, ctx: ItemCtx) {
+    const read = await publicRead(registry, ctx, request, { enabled: false });
+    if (read instanceof Response) return read;
+    const { entry, store } = read;
+    const viewer = await softViewer(request, deps);
+    const result = await readPostImage(store, entry, (await ctx.params).id, { userId: viewer?.id }, deps);
+    if (!result.ok) return refuse(result.reason, result.reason === "not_found" ? "Not found." : undefined);
+    // Hiding a post can't recall a cached copy, so a public one is kept only briefly.
+    return pictureResponse(result.bytes, result.type, result.hidden || viewer ? "private, no-store" : "public, max-age=300, s-maxage=300");
+  };
+}
+
+/** A stored picture as a response. The bytes were checked as a picture, but this must never run as a page. */
+const pictureResponse = (bytes: Uint8Array, type: string, cache: string) =>
+  new Response(bytes as BodyInit, {
+    headers: { "Content-Type": type, "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox", "Cache-Control": cache },
+  });
+
+type PackCtx = { params: Promise<{ token: string; name: string }> };
+
+/**
+ * A Club's own emoji and stickers (ADR 0057). GET (public) lists them, with the built-in stickers and the limits; PUT (staff)
+ * adds one or replaces the one of that name, `{ name, kind: "emoji" | "sticker", image }` with a
+ * PNG, JPEG or WebP `data:` URL under 256 KB; DELETE (staff) removes `{ name }`.
+ */
+export function packHandlers(registry: Registry, deps: RouteDeps = {}) {
+  return {
+    async GET(request: Request, ctx: Ctx) {
+      const read = await publicRead(registry, ctx, request, { enabled: false, pack: [] });
+      if (read instanceof Response) return read;
+      const { entry, store } = read;
+      return Response.json(
+        {
+          enabled: true,
+          pack: packItems(entry.address, await loadPack(store, entry.address)),
+          // Every Club has these too, unless its own pack has the same name.
+          builtin: DEFAULT_STICKERS,
+          limits: { emoji: PACK_EMOJI_MAX, sticker: PACK_STICKER_MAX, bytes: PACK_IMAGE_MAX_BYTES, edge: PACK_EDGE },
+        },
+        { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
+      );
+    },
+
+    async PUT(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const picture = parsePostImage(body.image, PACK_IMAGE_MAX_BYTES);
+      const result = await addToPack(f.store, f.entry, f.actor, { name: body.name, kind: body.kind, picture }, deps);
+      if (result.ok) return json({ enabled: true, pack: result.items, replaced: result.replaced });
+      return result.reason === "bad_image"
+        ? refuse("bad_image", "Use a PNG, JPEG or WebP picture under 256 KB. The app shrinks larger ones for you.")
+        : refuse(result.reason);
+    },
+
+    async DELETE(request: Request, ctx: Ctx) {
+      const f = await front(registry, ctx, request, deps, "club-mod");
+      if (f instanceof Response) return f;
+      const body = await bodyOf(request);
+      const result = await removeFromPack(f.store, f.entry, f.actor, body.name, deps);
+      return result.ok ? json({ enabled: true, pack: result.items }) : refuse(result.reason);
+    },
+  };
+}
+
+/** GET /api/clubs/[token]/pack/[name]: one emoji or sticker's picture. Public. */
+export function packImageHandler(registry: Registry, deps: RouteDeps = {}) {
+  return async function GET(request: Request, ctx: PackCtx) {
+    const read = await publicRead(registry, ctx, request, { enabled: false });
+    if (read instanceof Response) return read;
+    const result = await readPackImage(read.store, read.entry, (await ctx.params).name, deps);
+    if (!result.ok) return refuse(result.reason, result.reason === "not_found" ? "Not found." : undefined);
+    return pictureResponse(result.bytes, result.type, "public, max-age=300, s-maxage=300");
   };
 }
 
@@ -255,7 +349,14 @@ export function feedHandler(registry: Registry) {
     const { entry, store } = read;
     const [posts, replies] = await Promise.all([exportPosts(store, entry), exportReplies(store, entry)]);
     return Response.json(
-      { enabled: true, club: entry.address, domain: socialDomain(), types: { Post: SOCIAL_TYPES.Post, Reply: SOCIAL_TYPES.Reply }, posts, replies },
+      {
+        enabled: true,
+        club: entry.address,
+        domain: socialDomain(),
+        types: { Post: SOCIAL_TYPES.Post, ImagePost: SOCIAL_TYPES.ImagePost, Reply: SOCIAL_TYPES.Reply },
+        posts,
+        replies,
+      },
       { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
     );
   };

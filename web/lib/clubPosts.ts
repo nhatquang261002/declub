@@ -2,9 +2,10 @@ import { MAX_X_TAGS, normalizeTag, parseXStatus, type SignalStrength, type XAcco
 
 /**
  * Club posts (ADR 0016, docs/09-clubs.md): the first user-written text in the app, so the rules
- * are strict and live in one pure place. Posts are plain text, rendered as text and never as HTML or
- * markdown; control characters are stripped. A post may carry one link, kept apart from the text: a deal or signed swap on a "Looking
- * for" post, or an X post on a note (ADR 0024).
+ * are strict and live in one pure place. A post's text is plain text, rendered as text and never as
+ * HTML or markdown; control characters are stripped. A post may also carry one picture (ADR 0056) and
+ * name its Club's own emoji (ADR 0057), and one link, kept apart from the text: a deal or signed swap
+ * on a "Looking for" post, or an X post on a note (ADR 0024).
  */
 export const POST_MAX = 280;
 export const POSTS_PER_HOUR = 5;
@@ -21,6 +22,14 @@ export const POSTS_SHOWN = 100;
 export const REPLIES_KEPT = 50;
 export const REPLIES_PER_HOUR = 20;
 export const REPLY_COOLDOWN_SEC = 10;
+/** A post may carry one picture (ADR 0056): raster only, shrunk in the browser, kept in object storage. */
+export const POST_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+export type PostImageType = (typeof POST_IMAGE_TYPES)[number];
+/** The most a picture may weigh, decoded. The browser shrinks to `POST_IMAGE_EDGE` first, which is usually 100–400 KB. */
+export const POST_IMAGE_MAX_BYTES = 1_000_000;
+/** Pictures are scaled down to fit this many pixels on the longer side before they are signed and sent. */
+export const POST_IMAGE_EDGE = 1600;
+export const POST_IMAGES_PER_DAY = 10;
 
 export type PostKind = "note" | "looking";
 /** A deal or a signed swap a "Looking for" post points at, or an X post a note shares. */
@@ -48,6 +57,8 @@ export type StoredPost = {
   signed?: { signature: `0x${string}`; at: number };
   /** A shared X post's card, read when it was posted. Not part of what was signed. */
   x?: StoredXCard;
+  /** The picture, kept in object storage under this post's id; its SHA-256 is part of what was signed. */
+  image?: StoredPostImage;
   /** On a reply: the top-level post it answers. Replies have no link and aren't on the Board list. */
   parent?: string;
   /**
@@ -57,6 +68,12 @@ export type StoredPost = {
    */
   entry?: string;
 };
+
+/** What is known about a post's picture; the bytes live in object storage (`lib/server/postImages.ts`). */
+export type StoredPostImage = { type: PostImageType; size: number; hash: `0x${string}` };
+
+/** Where a post's picture is served from. */
+export const postImageUrl = (club: string, postId: string) => `/api/clubs/${club.toLowerCase()}/posts/${postId}/image`;
 
 /**
  * The card, plus whether the post is the author's own (their linked X account) and, if it counted
@@ -85,6 +102,8 @@ export type PublicPost = {
   signed: boolean;
   /** A shared X post's card; hidden with the text. */
   x?: StoredXCard;
+  /** The post's picture, hidden with the text. On a hidden post only its author and staff see it, and must send their token to fetch it. */
+  image?: { url: string; type: PostImageType };
   /** How many replies a top-level post has; on a reply, the post it answers. */
   replies?: number;
   parent?: string;
@@ -132,6 +151,7 @@ export function linkFor(kind: PostKind, input: unknown): PostLink | null {
 }
 
 export function viewPost(
+  club: string,
   post: StoredPost,
   viewer: { userId?: string; staff: boolean },
   pinned: boolean,
@@ -149,6 +169,7 @@ export function viewPost(
     text: seeText ? post.text : null,
     ...(post.link && seeText ? { link: post.link } : {}),
     ...(post.x && seeText ? { x: post.x } : {}),
+    ...(post.image && seeText ? { image: { url: postImageUrl(club, post.id), type: post.image.type } } : {}),
     hidden: post.hidden ?? null,
     pinned,
     mine,
