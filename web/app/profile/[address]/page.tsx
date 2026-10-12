@@ -14,7 +14,7 @@ import { ProfileClubs, ProfileDeals, ProfileFollowing, ProfilePosts } from "@/co
 import { ProfileTrophies } from "@/components/profile/ProfileTrophies";
 import { useNow } from "@/hooks/useNow";
 import { useFollows } from "@/hooks/useSocial";
-import { useFollowGraph, useMyWallets, useWalletProfile } from "@/hooks/useWalletProfile";
+import { useCatchUpLinkedWallets, useFollowGraph, useMyWallets, useWalletProfile } from "@/hooks/useWalletProfile";
 import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { PROFILE_LABEL, handleLabel, profileUrl } from "@/lib/profiles";
@@ -46,6 +46,7 @@ function Profile({ address }: { address: string }) {
   const now = useNow(30_000);
   const mine = useMyWallets().has(address);
   const card = useWalletProfile(address, mine);
+  useCatchUpLinkedWallets(mine);
   const follows = useFollows();
   const graph = useFollowGraph(address);
   const [editing, setEditing] = useState(false);
