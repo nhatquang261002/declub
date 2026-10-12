@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { ActionMenu, type MenuAction } from "@/components/ActionMenu";
 import { FollowButton } from "@/components/FollowButton";
 import {
@@ -24,7 +25,9 @@ import {
 import { Tooltip } from "@/components/Tooltip";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { Who } from "@/components/Who";
+import { PostText } from "@/components/PostText";
 import { Spinner } from "@/components/Spinner";
+import { useAccessToken } from "@/hooks/useAccessToken";
 import { useClubActions, useClubReplies } from "@/hooks/useClubBoard";
 import { POST_MAX, type PostLink, type PublicPost, type StoredXCard } from "@/lib/clubPosts";
 import { isXImage } from "@/lib/xPosts";
@@ -121,16 +124,66 @@ export function postActions({
 // Reports no longer hide a post (ADR 0040); posts they hid before stay hidden until staff act.
 const HIDDEN_NOTE = { reports: "Hidden after reports", moderator: "Hidden by a moderator" } as const;
 
+/**
+ * A post's picture (ADR 0056). A post that isn't hidden has a public address, so the browser loads it
+ * itself. A hidden post's picture goes only to its author and staff, who must send their token, so it
+ * is fetched with it and shown from memory.
+ */
+function PostPicture({ image, hidden }: { image: NonNullable<PublicPost["image"]>; hidden: boolean }) {
+  const getToken = useAccessToken();
+  const [fetched, setFetched] = useState<string | "failed">();
+  useEffect(() => {
+    if (!hidden || !getToken) return;
+    let url: string | undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(image.url, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) throw new Error();
+        url = URL.createObjectURL(await res.blob());
+        if (!cancelled) setFetched(url);
+      } catch {
+        if (!cancelled) setFetched("failed");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [hidden, getToken, image.url]);
+
+  if (hidden) {
+    if (fetched === undefined || fetched === "failed") {
+      return <p className="post-picture post-picture-note">{fetched === "failed" ? "The picture couldn’t be loaded." : "Loading the picture…"}</p>;
+    }
+    return (
+      <span className="post-picture">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={fetched} alt="Picture in the post" />
+      </span>
+    );
+  }
+  return (
+    <a href={image.url} target="_blank" rel="noopener noreferrer" className="post-picture">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={image.url} alt="Picture in the post" loading="lazy" />
+    </a>
+  );
+}
+
 /** What a post needs to open its thread (ADR 0032): the Club, and the reader's Club wallet to sign replies with. */
 type ThreadContext = { token: string; wallet?: string; canReply: boolean };
 
 /**
- * One post. The text is plain text: React escapes it and nothing here turns it into a link, so
- * what a member types can't become markup or a clickable address. What each viewer may do is
+ * One post. The text is plain text: React escapes it and nothing here turns it into a link (only a
+ * `:name:` the Club has becomes its picture), so what a member types can't become markup or a
+ * clickable address. What each viewer may do is
  * decided by the server; the menu only follows the viewer's role so they aren't offered actions
  * that would be refused.
  */
 export function PostItem({
+  club,
   post,
   role,
   actions,
@@ -138,6 +191,8 @@ export function PostItem({
   follows,
   thread,
 }: {
+  /** The Club the post is in, whose emoji and stickers its text can use. */
+  club: string;
   post: PublicPost;
   /** Set on a top-level post to offer its replies; left out on a reply. */
   thread?: ThreadContext;
@@ -250,7 +305,8 @@ export function PostItem({
             </span>
           </p>
         )}
-        {post.text !== null && <p className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap">{post.text}</p>}
+        {post.text !== null && <PostText club={club} text={post.text} className="post-text text-[0.95rem] leading-6 break-words whitespace-pre-wrap" />}
+        {post.image && <PostPicture image={post.image} hidden={!!post.hidden} />}
         {post.link?.kind === "x" && <XPostCard id={post.link.id} card={post.x} now={now} />}
         {role !== undefined && !post.hidden && (
           <div className="mt-1 flex gap-2">
@@ -311,6 +367,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
   const [text, setText] = useState("");
   const actions = postActions({ report, like, remove, hide, ban });
   const length = [...text].length;
+  const area = useRef<HTMLTextAreaElement>(null);
 
   return (
     <div className="mt-2 rounded-xl border-2 border-[#111318]/15 bg-white/60">
@@ -320,7 +377,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
         replies.length > 0 && (
           <ul>
             {replies.map((r) => (
-              <PostItem key={r.id} post={r} role={role} actions={actions} now={now} />
+              <PostItem key={r.id} club={context.token} post={r} role={role} actions={actions} now={now} />
             ))}
           </ul>
         )
@@ -337,6 +394,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
             Your reply
           </label>
           <textarea
+            ref={area}
             id={`reply-${parent}`}
             className="input min-h-10 flex-1 resize-y border-2 border-[#111318]/25 bg-white text-sm focus:border-[#111318]"
             rows={1}
@@ -346,6 +404,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
             readOnly={reply.isPending}
             onChange={(event) => setText(event.target.value)}
           />
+          <EmojiPicker box={area} text={text} setText={setText} club={context.token} disabled={reply.isPending} align="right" />
           <button
             type="submit"
             className="btn-primary px-3 py-2 text-sm"

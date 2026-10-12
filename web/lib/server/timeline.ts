@@ -86,6 +86,7 @@ async function present(store: Store, page: Listed[], userId: string | undefined)
   );
   return page.map(({ token, post }, i) => ({
     ...viewPost(
+      token,
       post,
       { userId, staff: false },
       false,

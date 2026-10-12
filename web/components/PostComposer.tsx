@@ -1,10 +1,13 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
-import { LinkIcon, XLogoIcon } from "@/components/Icons";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { EmojiPicker } from "@/components/EmojiPicker";
+import { CrossIcon, ImageIcon, LinkIcon, XLogoIcon } from "@/components/Icons";
 import { Spinner } from "@/components/Spinner";
 import { WalletAvatar } from "@/components/WalletAvatar";
+import { useToast } from "@/components/Toast";
 import { useClubActions } from "@/hooks/useClubBoard";
+import { MAX_PICTURE_FILE_BYTES, shrinkPostPicture, type PostPictureDraft } from "@/lib/browserImage";
 import { POST_MAX, type PostKind } from "@/lib/clubPosts";
 
 const KINDS: { value: PostKind; label: string; hint: string }[] = [
@@ -53,18 +56,46 @@ function CharRing({ length }: { length: number }) {
 export function PostComposer({ token, wallet, xHint, picker }: { token: string; wallet?: string; xHint?: string; picker?: ReactNode }) {
   const textId = useId();
   const { post, postStage } = useClubActions(token);
+  const toast = useToast();
   const [kind, setKind] = useState<PostKind>("note");
   const [text, setText] = useState("");
   const [link, setLink] = useState("");
+  const [picture, setPicture] = useState<PostPictureDraft>();
+  const [preparing, setPreparing] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
   const length = [...text].length;
+  const area = useRef<HTMLTextAreaElement>(null);
   const hint = KINDS.find((k) => k.value === kind)!.hint;
+
+  // The preview is an object URL; give it back when the picture goes or the box does.
+  useEffect(() => () => (picture ? URL.revokeObjectURL(picture.previewUrl) : undefined), [picture]);
+
+  async function onFile(chosen: File | undefined) {
+    if (file.current) file.current.value = "";
+    if (!chosen) return;
+    if (!chosen.type.startsWith("image/") || chosen.size > MAX_PICTURE_FILE_BYTES) {
+      toast.show({ tone: "warn", title: "That file won’t work", message: "Pick a picture under 25 MB." });
+      return;
+    }
+    setPreparing(true);
+    try {
+      setPicture(await shrinkPostPicture(chosen));
+    } catch (error) {
+      toast.error(error);
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   return (
     <form
       className="club-panel mb-5 p-4 sm:p-5"
       onSubmit={(event) => {
         event.preventDefault();
-        post.mutate({ kind, text, wallet, ...(link.trim() ? { link: link.trim() } : {}) }, { onSuccess: () => (setText(""), setLink("")) });
+        post.mutate(
+          { kind, text, wallet, picture, ...(link.trim() ? { link: link.trim() } : {}) },
+          { onSuccess: () => (setText(""), setLink(""), setPicture(undefined)) },
+        );
       }}
     >
       <div className="flex gap-3">
@@ -92,6 +123,7 @@ export function PostComposer({ token, wallet, xHint, picker }: { token: string; 
             Your post
           </label>
           <textarea
+            ref={area}
             id={textId}
             className="input min-h-24 resize-y border-2 border-[#111318]/25 bg-white text-[0.95rem] focus:border-[#111318]"
             value={text}
@@ -100,6 +132,15 @@ export function PostComposer({ token, wallet, xHint, picker }: { token: string; 
             readOnly={post.isPending}
             onChange={(event) => setText(event.target.value)}
           />
+          {picture && (
+            <div className="picture-draft">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={picture.previewUrl} alt="The picture you are adding" />
+              <button type="button" aria-label="Remove the picture" disabled={post.isPending} onClick={() => setPicture(undefined)}>
+                <CrossIcon className="size-3.5" />
+              </button>
+            </div>
+          )}
           {kind === "note" && (
             <div className="flex flex-col gap-1.5">
               <label className="relative">
@@ -136,15 +177,29 @@ export function PostComposer({ token, wallet, xHint, picker }: { token: string; 
                 ? postStage === "sending"
                   ? "Signed. Posting it to the Club…"
                   : "Waiting for you in your wallet. If nothing opened, check your wallet extension."
-                : "Plain text. Your Club wallet signs each post, so it’s yours to take anywhere."}
+                : "Plain text, with emoji or one picture. Your Club wallet signs each post, so it’s yours to take anywhere."}
             </p>
-            <div className="flex items-center gap-3">
-              <CharRing length={length} />
+            <div className="flex items-center gap-1">
+              <EmojiPicker box={area} text={text} setText={setText} club={token} disabled={post.isPending} />
+              <input ref={file} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={(event) => void onFile(event.target.files?.[0])} />
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={picture ? "Change the picture" : "Add a picture"}
+                aria-busy={preparing}
+                disabled={post.isPending || preparing}
+                onClick={() => file.current?.click()}
+              >
+                {preparing ? <Spinner /> : <ImageIcon className="size-5" />}
+              </button>
+              <span className="mx-2">
+                <CharRing length={length} />
+              </span>
               <button
                 type="submit"
                 className="btn-primary btn-sm px-5"
                 aria-busy={post.isPending}
-                disabled={post.isPending || text.trim().length === 0 || length > POST_MAX}
+                disabled={post.isPending || preparing || text.trim().length === 0 || length > POST_MAX}
               >
                 {post.isPending && <Spinner />}
                 {post.isPending ? (postStage === "sending" ? "Posting…" : "Confirm in wallet…") : "Sign & post"}

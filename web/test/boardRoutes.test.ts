@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 import { profileKey, userWalletsKey } from "../lib/profiles";
 import type { UserGate } from "../lib/server/gate";
 import {
@@ -8,7 +8,10 @@ import {
   deletePostHandler,
   hideHandler,
   logHandler,
+  packHandlers,
+  packImageHandler,
   pinHandler,
+  postImageHandler,
   postsHandlers,
   profileHandlers,
   purgeHandler,
@@ -17,8 +20,10 @@ import {
   rolesHandler,
   xLinkHandlers,
 } from "../lib/server/boardRoutes";
+import { saveRoles } from "../lib/server/clubState";
 import { joinClub } from "../lib/server/members";
 import { membershipHandlers } from "../lib/server/memberRoutes";
+import { memoryImageStore, parsePostImage } from "../lib/server/postImages";
 import { getStore } from "../lib/server/store";
 import { makeRegistry, parseAssets } from "../lib/verifiedAssets";
 
@@ -344,5 +349,158 @@ describe("X posts and the project's X account (ADR 0024)", () => {
     assert.equal((await xl.POST(req("POST", { action: "nope" }), ctx())).status, 400);
     assert.equal((await xl.DELETE(req("DELETE", { handle: "ChogNFT" }), ctx())).status, 200);
     assert.equal((await xl.DELETE(req("DELETE", { handle: "ChogNFT" }), ctx())).status, 404);
+  });
+});
+
+describe("post pictures", () => {
+  // Their own members, so what the tests above did to the others (bans, a purge) can't reach these.
+  before(async () => {
+    Object.assign(users, { pic1: 61, pic2: 62, picmod: 63 });
+    for (const id of ["pic1", "pic2", "picmod"]) {
+      const n = users[id]!;
+      await store.set(profileKey(wallet(n)), { provider: "twitter", handle: `u${n}`, userId: id, updatedAt: 1 });
+      await store.setMembers(userWalletsKey(id), [wallet(n)]);
+      assert.ok((await joinClub(store, reg.clubFor(NFT)!, id, [wallet(n)], { holdings: async () => [0n] })).ok);
+    }
+    await saveRoles(store, NFT.toLowerCase(), { owner: "own", moderators: ["picmod"] });
+  });
+  const images = memoryImageStore();
+  const withImages = { ...deps, images };
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 5)]);
+  const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
+  const pic = parsePostImage(dataUrl)!;
+  const send = (extra: Record<string, unknown>) => {
+    const body = signed("with a picture");
+    return postsHandlers(reg, withImages).POST(req("POST", { ...body, message: { ...body.message, image: pic.hash }, ...extra }), ctx());
+  };
+
+  it("takes a signed picture beside the message, and serves it with headers that keep it a picture", async () => {
+    as("pic1");
+    await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:pic1`, `declub:rl:club-post-hr:${NFT.toLowerCase()}:pic1`);
+    const created = await send({ image: dataUrl });
+    assert.equal(created.status, 201, JSON.stringify(await created.clone().json()));
+    const { post } = await created.json();
+    assert.equal(post.image.type, "image/png");
+
+    const served = await postImageHandler(reg, withImages)(req("GET", undefined, { authorization: "Bearer none" }), item(post.id));
+    assert.equal(served.status, 200);
+    assert.equal(served.headers.get("content-type"), "image/png");
+    assert.equal(served.headers.get("x-content-type-options"), "nosniff");
+    assert.match(served.headers.get("content-security-policy") ?? "", /sandbox/);
+    assert.match(served.headers.get("cache-control") ?? "", /public/);
+    assert.deepEqual(Buffer.from(await served.arrayBuffer()), png);
+
+    const signedIn = await postImageHandler(reg, withImages)(req("GET", undefined, { authorization: "Bearer t" }), item(post.id));
+    assert.match(signedIn.headers.get("cache-control") ?? "", /no-store/, "a reader's answer is never shared");
+  });
+
+  it("answers the refusals with their statuses", async () => {
+    as("pic1");
+    const reset = () => store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:pic1`, `declub:rl:club-post-hr:${NFT.toLowerCase()}:pic1`);
+    await reset();
+    assert.equal((await send({})).status, 422, "signed over a picture that wasn't sent");
+    await reset();
+    assert.equal((await send({ image: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" })).status, 422, "SVG is never taken");
+    await reset();
+    const noStore = await postsHandlers(reg, { ...deps, images: null }).POST(
+      req("POST", { ...signed("x"), message: { ...signed("x").message, image: pic.hash }, image: dataUrl }),
+      ctx(),
+    );
+    assert.equal(noStore.status, 503);
+    assert.equal((await noStore.json()).error, "images_unavailable");
+  });
+
+  it("hides a hidden post's picture from everyone but its author and staff", async () => {
+    as("pic1");
+    await store.del(`declub:rl:club-post-cd:${NFT.toLowerCase()}:pic1`, `declub:rl:club-post-hr:${NFT.toLowerCase()}:pic1`);
+    const body = signed("hide my picture");
+    const pic2 = parsePostImage(`data:image/png;base64,${Buffer.concat([png, Buffer.from([1])]).toString("base64")}`)!;
+    const created = await postsHandlers(reg, withImages).POST(
+      req("POST", {
+        ...body,
+        message: { ...body.message, image: pic2.hash },
+        image: `data:image/png;base64,${Buffer.concat([png, Buffer.from([1])]).toString("base64")}`,
+      }),
+      ctx(),
+    );
+    const { post } = await created.json();
+    as("picmod");
+    assert.equal((await hideHandler(reg, withImages)(req("POST", { hidden: true }), item(post.id))).status, 200);
+    const get = postImageHandler(reg, withImages);
+    assert.equal((await get(req("GET", undefined, { authorization: "Bearer none" }), item(post.id))).status, 404);
+    as("pic2");
+    assert.equal((await get(req("GET", undefined, { authorization: "Bearer t" }), item(post.id))).status, 404);
+    as("pic1");
+    const own = await get(req("GET", undefined, { authorization: "Bearer t" }), item(post.id));
+    assert.equal(own.status, 200);
+    assert.match(own.headers.get("cache-control") ?? "", /no-store/);
+    as("picmod");
+    assert.equal((await get(req("GET", undefined, { authorization: "Bearer t" }), item(post.id))).status, 200);
+  });
+});
+
+describe("club emoji and stickers", () => {
+  // Uses the members the post-picture tests made: pic1 is a member, picmod a Moderator.
+  const images = memoryImageStore();
+  const handlers = packHandlers(reg, { ...deps, images });
+  const png = (fill: number, size = 24) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(size, fill)]);
+  const dataUrl = (bytes: Buffer) => `data:image/png;base64,${bytes.toString("base64")}`;
+  const named = (name: string) => ({ params: Promise.resolve({ token: NFT, name }) });
+
+  it("lets staff add one, shows it to anyone, and serves its picture as a picture", async () => {
+    as("pic1");
+    const refused = await handlers.PUT(req("PUT", { name: "chog_wave", kind: "emoji", image: dataUrl(png(1)) }), ctx());
+    assert.equal(refused.status, 403, "a member can't add");
+
+    as("picmod");
+    const added = await handlers.PUT(req("PUT", { name: "chog_wave", kind: "emoji", image: dataUrl(png(1)) }), ctx());
+    assert.equal(added.status, 200, JSON.stringify(await added.clone().json()));
+    assert.equal((await added.json()).replaced, false);
+
+    const listed = await handlers.GET(req("GET", undefined, { authorization: "Bearer none" }), ctx());
+    assert.equal(listed.status, 200);
+    assert.match(listed.headers.get("cache-control") ?? "", /public/);
+    const body = await listed.json();
+    assert.deepEqual(
+      body.pack.map((i: { name: string; kind: string }) => [i.name, i.kind]),
+      [["chog_wave", "emoji"]],
+    );
+    assert.equal(JSON.stringify(body).includes(wallet(63)), false, "who added it stays private");
+    assert.equal(body.limits.emoji, 50);
+    assert.ok(
+      body.builtin.length === 12 && body.builtin.some((i: { name: string; kind: string }) => i.name === "gm" && i.kind === "sticker"),
+      "the built-in stickers are listed apart from the Club's own",
+    );
+
+    const served = await packImageHandler(reg, { ...deps, images })(req("GET", undefined, { authorization: "Bearer none" }), named("chog_wave"));
+    assert.equal(served.status, 200);
+    assert.equal(served.headers.get("content-type"), "image/png");
+    assert.equal(served.headers.get("x-content-type-options"), "nosniff");
+    assert.match(served.headers.get("content-security-policy") ?? "", /sandbox/);
+    assert.deepEqual(Buffer.from(await served.arrayBuffer()), png(1));
+    assert.equal((await packImageHandler(reg, { ...deps, images })(req("GET"), named("missing"))).status, 404);
+  });
+
+  it("refuses what isn't acceptable with the right status", async () => {
+    as("picmod");
+    const put = (body: object, h = handlers) => h.PUT(req("PUT", body), ctx());
+    assert.equal((await put({ name: "big", kind: "emoji", image: dataUrl(png(2, 300_000)) })).status, 422, "over 256 KB");
+    assert.equal((await put({ name: "svg", kind: "emoji", image: "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=" })).status, 422);
+    assert.equal((await put({ name: "x", kind: "emoji", image: dataUrl(png(3)) })).status, 400, "name too short");
+    assert.equal((await put({ name: "fine", kind: "gif", image: dataUrl(png(3)) })).status, 400, "unknown kind");
+    const noStore = await put({ name: "fine", kind: "emoji", image: dataUrl(png(3)) }, packHandlers(reg, { ...deps, images: null }));
+    assert.equal(noStore.status, 503);
+    assert.equal((await noStore.json()).error, "images_unavailable");
+  });
+
+  it("lets staff remove one, and not a member", async () => {
+    as("pic1");
+    assert.equal((await handlers.DELETE(req("DELETE", { name: "chog_wave" }), ctx())).status, 403);
+    as("picmod");
+    assert.equal((await handlers.DELETE(req("DELETE", { name: "nope_name" }), ctx())).status, 404);
+    const removed = await handlers.DELETE(req("DELETE", { name: "chog_wave" }), ctx());
+    assert.equal(removed.status, 200);
+    assert.deepEqual((await removed.json()).pack, []);
+    assert.equal((await packImageHandler(reg, { ...deps, images })(req("GET"), named("chog_wave"))).status, 404);
   });
 });

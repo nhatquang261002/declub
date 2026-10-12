@@ -5,6 +5,7 @@ import { CHAIN_ID, DECLUB_ESCROW_ADDRESS, RPC_URL } from "../config";
 import {
   LIKES_PER_HOUR,
   MAX_PINNED,
+  POST_IMAGES_PER_DAY,
   POSTS_KEPT,
   POSTS_PER_HOUR,
   POSTS_SHOWN,
@@ -17,6 +18,7 @@ import {
   cleanText,
   linkFor,
   pinnedFirst,
+  postImageUrl,
   viewPost,
   type ClubProfile,
   type CoinHolders,
@@ -46,6 +48,8 @@ import {
   type SignedReply,
 } from "../social";
 import { clubAssets, type AssetEntry, type ClubEntry } from "../verifiedAssets";
+import { purgePack } from "./clubPack";
+import { imagesOf, postImageKey, type ImageStore, type PostPicture } from "./postImages";
 import { activeKey, recordActive } from "./activeDays";
 import { backingKey, recordBacking } from "./backing";
 import { rivals, votingClosed } from "./challengeState";
@@ -103,6 +107,8 @@ export type Deps = XDeps & {
   verifyReply?: (signer: Address, message: ReplyMessage, signature: Hex) => Promise<boolean>;
   /** The rewards epochs a post's active day is recorded against; the configured ones by default. */
   epochs?: { genesis: number; length: number };
+  /** Where post pictures are kept (ADR 0056); object storage in production, `null` for none. */
+  images?: ImageStore | null;
 };
 
 /** Who is acting: their Privy user id and a wallet to name them by in the log. */
@@ -180,6 +186,8 @@ type PostRefusal =
   | "link_unavailable"
   | "x_not_found"
   | "x_unavailable"
+  | "images_unavailable"
+  | "image_limit"
   | "cooldown"
   | "rate_limited";
 
@@ -189,6 +197,8 @@ type PostInput = {
   link?: unknown;
   /** A post `createSignedPost` checked: it takes the message's id and keeps the signature. */
   signed?: { message: PostMessage; signature: Hex };
+  /** The post's picture, already checked (`parsePostImage`); its hash is the one the message signed. */
+  picture?: PostPicture;
 };
 
 /** Who may act on a Club's Board: a member of a Club that isn't archived, and who hasn't been banned from it. */
@@ -219,7 +229,7 @@ async function sentBefore(store: Store, token: string, userId: string, id: strin
   const existing = await getPost(store, token, id);
   if (!existing) return null;
   if (existing.userId !== userId) return { ok: false, reason: "wrong_signer" } as const;
-  return { ok: true, post: viewPost(existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) } as const;
+  return { ok: true, post: viewPost(token, existing, { userId, staff: isStaff(await roleIn(store, token, userId, deps)) }, false) } as const;
 }
 
 export async function createPost(
@@ -238,6 +248,8 @@ export async function createPost(
   const kind: PostKind = input.kind;
   const text = cleanText(input.text);
   if (!text.ok) return { ok: false, reason: text.reason };
+  const images = input.picture ? imagesOf(deps) : null;
+  if (input.picture && !images) return { ok: false, reason: "images_unavailable" };
 
   let link: PostLink | undefined;
   let card: XCard | undefined;
@@ -271,6 +283,7 @@ export async function createPost(
   // Limits last, so a post the server would refuse anyway doesn't use one up.
   if (!(await withinLimit(store, `club-post-cd:${token}`, userId, 1, POST_COOLDOWN_SEC))) return { ok: false, reason: "cooldown" };
   if (!(await withinLimit(store, `club-post-hr:${token}`, userId, POSTS_PER_HOUR, 3600))) return { ok: false, reason: "rate_limited" };
+  if (input.picture && !(await withinLimit(store, "club-post-img", userId, POST_IMAGES_PER_DAY, 86_400))) return { ok: false, reason: "image_limit" };
 
   const id = input.signed ? postId(input.signed.message) : randomUUID().replaceAll("-", "");
   // A shared X post counts toward the Club's activity only if it passes every X-share rule.
@@ -285,8 +298,24 @@ export async function createPost(
     at: nowOf(deps),
     ...(input.signed ? { signed: { signature: input.signed.signature, at: input.signed.message.at } } : {}),
     ...(card && xShare ? { x: { ...card, own: xShare.own, counted: xShare.counted } } : {}),
+    ...(input.picture ? { image: { type: input.picture.type, size: input.picture.bytes.length, hash: input.picture.hash } } : {}),
   };
-  await store.set(postKey(token, post.id), post);
+  // The picture goes first, so a post never points at one that isn't there; if the post then fails, it is taken back.
+  if (images && input.picture) {
+    try {
+      await images.put(postImageKey(token, id), input.picture.bytes, input.picture.type);
+    } catch {
+      return { ok: false, reason: "images_unavailable" };
+    }
+  }
+  try {
+    await store.set(postKey(token, post.id), post);
+  } catch (error) {
+    await images?.del(postImageKey(token, id)).catch(() => undefined);
+    throw error;
+  }
+  // The Club keeps `POSTS_KEPT` posts: the oldest falls off the list with this one, and takes its picture.
+  await dropOldestPicture(store, token, deps);
   await store.rank(postsKey(token), [{ member: post.id, score: post.at }], POSTS_KEPT);
   // Every post is indexed by its author's wallet (the export reads only the signed ones; the inbox, all).
   await store.rank(walletPostsKey(post.wallet), [{ member: `${token}:${post.id}`, score: post.at }], POSTS_KEPT);
@@ -294,10 +323,20 @@ export async function createPost(
   await recordActive(store, token, post, deps.epochs?.genesis, deps.epochs?.length);
   // A Holder's post adds to Momentum, once a day (ADR 0047).
   if (row.holder) await recordMomentumPost(store, token, post);
-  return { ok: true, post: viewPost(post, { userId, staff: isStaff(role) }, false, undefined, undefined, 0), ...(xShare ? { xShare } : {}) };
+  return { ok: true, post: viewPost(token, post, { userId, staff: isStaff(role) }, false, undefined, undefined, 0), ...(xShare ? { xShare } : {}) };
 }
 
-type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
+/** When the ranking is full, its lowest post is about to fall off it, and its picture goes with it. */
+async function dropOldestPicture(store: Store, token: string, deps: Deps) {
+  const images = imagesOf(deps);
+  if (!images) return;
+  const kept = await store.ranked(postsKey(token), POSTS_KEPT);
+  if (kept.length < POSTS_KEPT) return;
+  const oldest = await getPost(store, token, kept[kept.length - 1]!);
+  if (oldest?.image) await images.del(postImageKey(token, oldest.id)).catch(() => undefined);
+}
+
+type SignedPostRefusal = PostRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer" | "bad_image";
 
 const viemVerifyPost = (signer: Address, message: PostMessage, signature: Hex) => verifySocialSignature(signer, postTypedData(message), signature);
 const viemVerifyReply = (signer: Address, message: ReplyMessage, signature: Hex) => verifySocialSignature(signer, replyTypedData(message), signature);
@@ -311,13 +350,16 @@ export async function createSignedPost(
   store: Store,
   entry: ClubEntry,
   userId: string,
-  body: { message: PostMessage | null; signature: unknown },
+  body: { message: PostMessage | null; signature: unknown; picture?: PostPicture | null },
   deps: Deps = {},
 ): Promise<{ ok: true; post: PublicPost; xShare?: XShareVerdict } | { ok: false; reason: SignedPostRefusal }> {
-  const { message, signature } = body;
+  const { message, signature, picture } = body;
   if (!message || typeof signature !== "string" || !/^0x[0-9a-fA-F]+$/.test(signature)) return { ok: false, reason: "unsigned" };
   const token = entry.address.toLowerCase();
   if (message.club.toLowerCase() !== token) return { ok: false, reason: "wrong_club" };
+  // The picture sent must be the one the author signed, byte for byte (the message carries its SHA-256).
+  if (picture === null || (message.image && !picture)) return { ok: false, reason: "bad_image" };
+  if (!message.image !== !picture || (picture && picture.hash !== message.image)) return { ok: false, reason: "not_clean" };
   // What was signed must be what is stored: the cleaned text, and the link in canonical form.
   const text = cleanText(message.text);
   if (!text.ok) return { ok: false, reason: text.reason };
@@ -341,7 +383,7 @@ export async function createSignedPost(
     store,
     entry,
     userId,
-    { kind: message.kind, text: message.text, link: message.link || undefined, signed: { message, signature: signature as Hex } },
+    { kind: message.kind, text: message.text, link: message.link || undefined, signed: { message, signature: signature as Hex }, picture },
     deps,
   );
 }
@@ -356,8 +398,16 @@ function toSigned(token: string, post: StoredPost): SignedPost | null {
   return {
     id: post.id,
     signer: getAddress(post.wallet),
-    message: { club: getAddress(token), kind: post.kind, text: post.text, link: linkString(post.link), at: post.signed.at },
+    message: {
+      club: getAddress(token),
+      kind: post.kind,
+      text: post.text,
+      link: linkString(post.link),
+      at: post.signed.at,
+      ...(post.image ? { image: post.image.hash } : {}),
+    },
     signature: post.signed.signature,
+    ...(post.image ? { image: { url: postImageUrl(token, post.id), type: post.image.type } } : {}),
   };
 }
 
@@ -390,6 +440,34 @@ export async function walletPosts(store: Store, wallet: string, limit = POSTS_KE
 // Unsigned posts have a random 32-hex id; signed ones their 64-hex struct hash.
 export const getPost = (store: Store, token: string, id: string) =>
   /^(?:[0-9a-f]{32}|[0-9a-f]{64})$/.test(id) ? store.get<StoredPost>(postKey(token, id)) : Promise.resolve(null);
+
+/**
+ * A post's picture for `viewer`. A hidden post's picture goes only to its author and to staff, like
+ * its text; everyone else is told there is nothing, so hiding a post hides what it carries.
+ */
+export async function readPostImage(
+  store: Store,
+  entry: AssetEntry,
+  id: string,
+  viewer: { userId?: string },
+  deps: Deps = {},
+): Promise<{ ok: true; bytes: Uint8Array; type: string; hidden: boolean } | { ok: false; reason: "not_found" | "images_unavailable" }> {
+  const token = entry.address.toLowerCase();
+  const post = await getPost(store, token, id);
+  if (!post?.image) return { ok: false, reason: "not_found" };
+  if (post.hidden && !(viewer.userId && (post.userId === viewer.userId || isStaff(await roleIn(store, token, viewer.userId, deps))))) {
+    return { ok: false, reason: "not_found" };
+  }
+  const images = imagesOf(deps);
+  if (!images) return { ok: false, reason: "images_unavailable" };
+  let found: Awaited<ReturnType<ImageStore["get"]>>;
+  try {
+    found = await images.get(postImageKey(token, id));
+  } catch {
+    return { ok: false, reason: "images_unavailable" };
+  }
+  return found ? { ok: true, bytes: found.bytes, type: post.image.type, hidden: !!post.hidden } : { ok: false, reason: "not_found" };
+}
 
 /**
  * The Club's posts as `viewer` sees them: pinned first, then newest first. Hidden posts show only
@@ -448,6 +526,7 @@ export async function listPosts(
   return {
     posts: ordered.map((p) =>
       viewPost(
+        token,
         p,
         { userId: viewer.userId, staff },
         pinned.includes(p.id),
@@ -531,7 +610,7 @@ export async function createReply(
   // Indexed by wallet for the author's inbox; the wallet export leaves replies out.
   await store.rank(walletPostsKey(reply.wallet), [{ member: `${token}:${id}`, score: reply.at }], POSTS_KEPT);
   await recordBacking(store, token, { kind: "reply", id, userId, at: reply.at }, deps.epochs?.genesis, deps.epochs?.length);
-  return { ok: true, post: viewPost(reply, { userId, staff: isStaff(role) }, false) };
+  return { ok: true, post: viewPost(token, reply, { userId, staff: isStaff(role) }, false) };
 }
 
 type SignedReplyRefusal = ReplyRefusal | "unsigned" | "wrong_club" | "not_clean" | "stale" | "bad_signature" | "wrong_signer";
@@ -588,7 +667,7 @@ export async function listReplies(
   const likes = await Promise.all(rows.map((r) => (r.hidden ? 0 : store.countMembers(likesKey(token, r.id)))));
   return {
     ok: true,
-    replies: rows.map((r, i) => viewPost(r, { userId: viewer.userId, staff }, false, undefined, { count: likes[i]!, liked: liked.has(r.id) })),
+    replies: rows.map((r, i) => viewPost(token, r, { userId: viewer.userId, staff }, false, undefined, { count: likes[i]!, liked: liked.has(r.id) })),
   };
 }
 
@@ -652,6 +731,11 @@ export async function deletePost(
   await store.del(...(await threadKeys(store, token, id)));
   if (post.parent) await store.removeMember(repliesKey(token, post.parent), id);
   if (post.link?.kind === "x") await removeXShare(store, token, post.link.id, id);
+  // A picture left behind can't be reached once the post is gone, so a failed delete isn't worth refusing this one.
+  if (post.image)
+    await imagesOf(deps)
+      ?.del(postImageKey(token, id))
+      .catch(() => undefined);
   await unpin(store, token, id);
   if (!own) await log(store, entry, actor, "delete_post", id);
   return { ok: true };
@@ -742,7 +826,7 @@ export async function listReported(store: Store, entry: AssetEntry, userId: stri
       continue;
     }
     const [reports, holderReports] = await Promise.all([store.countMembers(reportsKey(token, post.id)), store.countMembers(countedReportsKey(token, post.id))]);
-    items.push({ post: viewPost(post, { userId, staff: true }, false, reports), reports, holderReports });
+    items.push({ post: viewPost(token, post, { userId, staff: true }, false, reports), reports, holderReports });
   }
   return items.sort((a, b) => b.holderReports - a.holderReports || b.reports - a.reports || b.post.at - a.post.at).slice(0, 100);
 }
@@ -1035,17 +1119,25 @@ type PurgeCounts = { members: number; posts: number };
  * profile, bans of that Club, the log and the activity log. For hidden Clubs, admin only; nothing
  * calls it by itself.
  */
-export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "now"> = {}): Promise<PurgeCounts> {
+export async function purgeClub(store: Store, token: string, deps: Pick<Deps, "now" | "images"> = {}): Promise<PurgeCounts> {
   const lower = token.toLowerCase();
   const ids = await store.members(membersKey(lower));
   await Promise.all(ids.map((id) => store.removeMember(userClubsKey(id), lower)));
   await store.del(...ids.map((id) => memberKey(lower, id)), membersKey(lower));
 
   const postIds = await store.ranked(postsKey(lower), POSTS_KEPT);
+  const withPicture = (await store.getMany<StoredPost>(postIds.map((id) => postKey(lower, id)))).flatMap((post) =>
+    post?.image ? [postImageKey(lower, post.id)] : [],
+  );
+  if (withPicture.length > 0)
+    await imagesOf(deps)
+      ?.del(...withPicture)
+      .catch(() => undefined);
   const keys = (await Promise.all(postIds.map((id) => threadKeys(store, lower, id)))).flat();
   await store.del(...keys, postsKey(lower), ...ids.map((id) => likedKey(lower, id)));
   await store.del(rolesKey(lower), clubProfileKey(lower), banKey(lower), logKey(lower), activityKey(lower));
   await purgeXShares(store, lower);
+  await purgePack(store, lower, deps);
   await store.del(momentumPostsKey(lower));
   // Club Rewards' per-Club records: streaks, the cached standings, and every epoch's active days and backing.
   const epochs = Math.max(0, epochAt(Math.floor(nowOf(deps) / 1000)) + 1);

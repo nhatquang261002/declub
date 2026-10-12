@@ -1,6 +1,6 @@
 import { getAddress, hashStruct, isAddress, type Address, type Hex } from "viem";
 import { CHAIN_ID } from "./config";
-import { cleanText, linkFor, type PostLink } from "./clubPosts";
+import { cleanText, linkFor, type PostImageType, type PostLink } from "./clubPosts";
 import { xStatusUrl } from "./xPosts";
 
 /**
@@ -17,6 +17,19 @@ export const SOCIAL_TYPES = {
     { name: "kind", type: "string" },
     { name: "text", type: "string" },
     { name: "link", type: "string" },
+    { name: "at", type: "uint64" },
+  ],
+  /**
+   * A post with a picture (ADR 0056). `image` is the SHA-256 of the picture's bytes, so the signature
+   * covers the picture and anyone can check a copy against it. A separate type, so posts without a
+   * picture keep their ids and signatures.
+   */
+  ImagePost: [
+    { name: "club", type: "address" },
+    { name: "kind", type: "string" },
+    { name: "text", type: "string" },
+    { name: "link", type: "string" },
+    { name: "image", type: "bytes32" },
     { name: "at", type: "uint64" },
   ],
   /** A reply to a top-level post (ADR 0032): `parent` is the post's id. A separate type, so posts' ids stay as they were. */
@@ -46,8 +59,11 @@ export const signingTime = () => Math.floor(Date.now() / 1000);
 /** How far a signed record's `at` may be from the server's clock when it's submitted. */
 export const SIGNED_SKEW_SEC = 300;
 
-/** A post as signed. `at` is unix seconds; `link` is "", a deal id, an intent hash or an X post link. */
-export type PostMessage = { club: Address; kind: "note" | "looking"; text: string; link: string; at: number };
+/**
+ * A post as signed. `at` is unix seconds; `link` is "", a deal id, an intent hash or an X post link.
+ * `image` is the SHA-256 of the post's picture; a post with one is an `ImagePost`, signed as such.
+ */
+export type PostMessage = { club: Address; kind: "note" | "looking"; text: string; link: string; at: number; image?: Hex };
 export type FollowMessage = { follower: Address; target: Address; following: boolean; at: number };
 /** A membership as signed: `wallet` is the one the Members list shows for the member. */
 export type JoinMessage = { club: Address; wallet: Address; at: number };
@@ -58,7 +74,8 @@ export type ReplyMessage = { club: Address; parent: string; text: string; at: nu
 export const linkString = (link: PostLink | undefined) =>
   !link ? "" : link.kind === "deal" ? link.id : link.kind === "intent" ? link.hash : xStatusUrl(link.id);
 
-const wirePost = (m: PostMessage) => ({ ...m, at: BigInt(m.at) });
+const wirePost = (m: PostMessage) => ({ club: m.club, kind: m.kind, text: m.text, link: m.link, at: BigInt(m.at) });
+const wireImagePost = (m: PostMessage & { image: Hex }) => ({ ...wirePost(m), image: m.image });
 const wireFollow = (m: FollowMessage) => ({ ...m, at: BigInt(m.at) });
 const wireJoin = (m: JoinMessage) => ({ ...m, at: BigInt(m.at) });
 const wireReply = (m: ReplyMessage) => ({ ...m, at: BigInt(m.at) });
@@ -67,14 +84,19 @@ export const joinTypedData = (m: JoinMessage, chainId = CHAIN_ID) =>
   ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Join", message: wireJoin(m) }) as const;
 
 export const postTypedData = (m: PostMessage, chainId = CHAIN_ID) =>
-  ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Post", message: wirePost(m) }) as const;
+  m.image
+    ? ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "ImagePost", message: wireImagePost({ ...m, image: m.image }) } as const)
+    : ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Post", message: wirePost(m) } as const);
 
 export const followTypedData = (m: FollowMessage, chainId = CHAIN_ID) =>
   ({ domain: socialDomain(chainId), types: SOCIAL_TYPES, primaryType: "Follow", message: wireFollow(m) }) as const;
 
 /** A post's id: its struct hash, without the 0x. The same signed post is the same post. */
 export const postId = (m: PostMessage) =>
-  hashStruct({ data: wirePost(m), primaryType: "Post", types: SOCIAL_TYPES })
+  (m.image
+    ? hashStruct({ data: wireImagePost({ ...m, image: m.image }), primaryType: "ImagePost", types: SOCIAL_TYPES })
+    : hashStruct({ data: wirePost(m), primaryType: "Post", types: SOCIAL_TYPES })
+  )
     .slice(2)
     .toLowerCase();
 
@@ -110,9 +132,12 @@ export function parseReplyMessage(input: unknown): ReplyMessage | null {
   return { club: getAddress(m.club), parent: m.parent, text: m.text, at: m.at };
 }
 
+/** The SHA-256 of a picture's bytes as a post signs it: 0x and 64 lowercase hex digits. */
+export const IMAGE_HASH = /^0x[0-9a-f]{64}$/;
+
 /**
  * The post a client should sign for this input, or why it can't be one: the text cleaned and the
- * link in canonical form, exactly as the server will check them.
+ * link in canonical form, exactly as the server will check them. `image` is the picture's hash, if it has one.
  */
 export function draftPost(
   club: Address,
@@ -120,6 +145,7 @@ export function draftPost(
   text: string,
   link: string,
   at: number,
+  image?: Hex,
 ): { ok: true; message: PostMessage } | { ok: false; reason: "empty" | "too_long" | "bad_link" } {
   const clean = cleanText(text);
   if (!clean.ok) return clean;
@@ -129,7 +155,7 @@ export function draftPost(
     if (!parsed) return { ok: false, reason: "bad_link" };
     canonical = linkString(parsed);
   }
-  return { ok: true, message: { club: getAddress(club), kind, text: clean.text, link: canonical, at } };
+  return { ok: true, message: { club: getAddress(club), kind, text: clean.text, link: canonical, at, ...(image ? { image } : {}) } };
 }
 
 /** A post message from a request body, or null when it isn't one. Nothing is trusted yet. */
@@ -140,7 +166,8 @@ export function parsePostMessage(input: unknown): PostMessage | null {
   if (m.kind !== "note" && m.kind !== "looking") return null;
   if (typeof m.text !== "string" || typeof m.link !== "string") return null;
   if (typeof m.at !== "number" || !Number.isSafeInteger(m.at) || m.at < 0) return null;
-  return { club: getAddress(m.club), kind: m.kind, text: m.text, link: m.link, at: m.at };
+  if (m.image !== undefined && (typeof m.image !== "string" || !IMAGE_HASH.test(m.image))) return null;
+  return { club: getAddress(m.club), kind: m.kind, text: m.text, link: m.link, at: m.at, ...(m.image ? { image: m.image as Hex } : {}) };
 }
 
 /** A join message from a request body or a backup file, or null when it isn't one. */
@@ -169,6 +196,8 @@ export type SignedPost = {
   signer: Address;
   message: PostMessage;
   signature: Hex;
+  /** Where the picture can be fetched, for a post that has one; its SHA-256 is `message.image`. */
+  image?: { url: string; type: PostImageType };
 };
 
 /** A signed reply as the export serves it. */

@@ -109,6 +109,21 @@ export const CrossIcon = (p: P) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </Icon>
 );
+export const ImageIcon = (p: P) => (
+  <Icon {...p}>
+    <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+    <circle cx="9" cy="10" r="1.5" />
+    <path d="m4 17 5-4.5 3.5 3L15 13l5 4.5" />
+  </Icon>
+);
+export const SmileIcon = (p: P) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M8.5 14a4 4 0 0 0 7 0" />
+    <circle cx="9.2" cy="9.8" r=".6" fill="currentColor" />
+    <circle cx="14.8" cy="9.8" r=".6" fill="currentColor" />
+  </Icon>
+);
 export const MoreIcon = (p: P) => (
   <Icon {...p}>
     <circle cx="5.5" cy="12" r="1" fill="currentColor" />

@@ -41,7 +41,7 @@ and the [user guide](docs/07-user-guide.md) for the current app experience.
 
 ### 1. An open social graph the members own
 
-Each Club has a Board for posts, replies, likes and pins. Posts and follows are signed by the member's wallet and can be exported in full, so the social graph belongs to the community, not a platform, and nobody can lock it in or delete it. The community runs its own Club: the Owner and Moderators moderate the Board, the Owner sets the reward rules, and Holders vote on challenge winners. A cross-Club Timeline lets anyone discover other communities.
+Each Club has a Board for posts, replies, likes and pins. A post can carry emoji, a picture, and the Club's own emoji and stickers. Posts and follows are signed by the member's wallet and can be exported in full, so the social graph belongs to the community, not a platform, and nobody can lock it in or delete it. The community runs its own Club: the Owner and Moderators moderate the Board, the Owner sets the reward rules, and Holders vote on challenge winners. A cross-Club Timeline lets anyone discover other communities.
 
 ### 2. Competitive feeds
 
@@ -171,7 +171,7 @@ model in [docs/04-security.md](docs/04-security.md).
 | Web | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | Chain access | wagmi 3, viem 2, TanStack Query; Alchemy RPC; Envio HyperSync for log scans on the server |
 | Identity | Privy (sign-in, linked X and Discord handles, webhooks via svix), EIP-712 signatures |
-| Data | Upstash Redis for Clubs, posts, follows and profiles; the chain for deals and holdings |
+| Data | Upstash Redis for Clubs, posts, follows and profiles; a private Vercel Blob store for post pictures and Club emoji and stickers; the chain for deals and holdings |
 | Matcher | Node.js 24 with built-in SQLite, viem; hosted on Railway |
 | Rewards | Merkle distributor, weekly epochs built by `npm run rewards:epoch` |
 | Tests | Foundry, Node test runner, end-to-end checks on a local Anvil chain |

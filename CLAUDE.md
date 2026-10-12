@@ -62,8 +62,8 @@ Full model in `docs/04-security.md`; read it before touching a contract. The goa
 
 - Never trust the client: verify EIP-712 signatures, ownership of the NFT or Club role, and moderator or Owner rights on the server for every write. Receipts are checked on chain (fills, prizes, sponsorships); don't accept a client's claim that something happened.
 - Cron routes (`/api/cron/*`) and operator actions require `CRON_SECRET`; Privy webhooks are verified with Svix. Fail closed when a secret is missing.
-- Secrets (`PRIVY_APP_SECRET`, Upstash tokens, `X_BEARER_TOKEN`, operator and demo keys) stay server-side: nothing secret under a `NEXT_PUBLIC_` name, in logs, or in committed files.
-- Escape user content (posts, names, bios); never `dangerouslySetInnerHTML` on it. Uploads (avatars) are type- and size-checked. Server-side fetches of user-influenced URLs (token metadata, X posts) use a timeout and `redirect: "error"`, as in `collectionScan.ts` and `xPosts.ts`; follow that pattern.
+- Secrets (`PRIVY_APP_SECRET`, Upstash tokens, `BLOB_READ_WRITE_TOKEN`, `X_BEARER_TOKEN`, operator and demo keys) stay server-side: nothing secret under a `NEXT_PUBLIC_` name, in logs, or in committed files.
+- Escape user content (posts, names, bios); never `dangerouslySetInnerHTML` on it. Uploads (avatars, post pictures, Club emoji and stickers) are type-, byte- and size-checked on the server whatever the browser did; SVG is never taken, and pictures are served by the app (never from a public store address) with `nosniff` and a `sandbox` policy. Server-side fetches of user-influenced URLs (token metadata, X posts) use a timeout and `redirect: "error"`, as in `collectionScan.ts` and `xPosts.ts`; follow that pattern.
 - Keep the user-safety guards: trust chips and lookalike warnings, the contract-address confirm before accepting a swap, the `/approvals` revoke page, the long-lived signature warning. A feature that weakens them needs an ADR.
 - Verified-asset data (`web/data/assets.json`) only changes what the UI shows; it is never a security boundary.
 

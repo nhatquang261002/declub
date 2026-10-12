@@ -1,12 +1,14 @@
 "use client";
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { call, type ViewerRole } from "@/hooks/useClubMembership";
 import { useSocialSign, type SocialStage } from "@/hooks/useSocial";
 import type { PublicChallenge } from "@/lib/challenges";
+import type { PostPictureDraft } from "@/lib/browserImage";
+import { withDefaults, type PackItem, type PackKind } from "@/lib/clubPack";
 import type { PostKind, PublicPost } from "@/lib/clubPosts";
 import type { LensId } from "@/lib/lenses";
 import { draftPost, draftReply, postTypedData, replyTypedData, signingTime } from "@/lib/social";
@@ -152,6 +154,28 @@ export function useClubPage(token: string) {
   return query.data;
 }
 
+const NO_PACK: PackItem[] = [];
+
+/**
+ * A Club's own emoji and stickers (ADR 0057): `items` are its own, `all` adds the built-in stickers
+ * it hasn't replaced, and `byName` looks either up. The built-ins need no read. Pass `enabled: false`
+ * where a Club's own aren't needed (a post without a `:shortcode:`), so a Board of plain posts never
+ * asks. Every post of a Club shares one read, kept for a few minutes.
+ */
+export function useClubPack(token: string | undefined, enabled = true) {
+  const query = useQuery({
+    queryKey: ["club-pack", token?.toLowerCase()],
+    queryFn: () => read<{ enabled: boolean; pack: PackItem[] }>(`/api/clubs/${token}/pack`),
+    enabled: enabled && !!token,
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+  const items = query.data?.pack ?? NO_PACK;
+  const all = useMemo(() => withDefaults(items), [items]);
+  const byName = useMemo(() => new Map(all.map((item) => [item.name, item])), [all]);
+  return { items, all, byName };
+}
+
 /** Every write to a Club's board or staff tools: signs the request, reports errors, refreshes what changed. */
 export function useClubActions(token: string) {
   const getToken = useAccessToken();
@@ -185,8 +209,9 @@ export function useClubActions(token: string) {
     replyStage,
     // A post is signed by the member's Club wallet before it's sent (ADR 0023).
     post: useAct(
-      async (v: { kind: PostKind; text: string; link?: string; wallet?: string }) => {
-        const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime());
+      async (v: { kind: PostKind; text: string; link?: string; wallet?: string; picture?: PostPictureDraft }) => {
+        // A picture is signed by its hash (ADR 0056) and sent beside the message.
+        const draft = draftPost(token as `0x${string}`, v.kind, v.text, v.link ?? "", signingTime(), v.picture?.hash);
         if (!draft.ok) {
           throw new Error(
             draft.reason !== "bad_link"
@@ -201,7 +226,11 @@ export function useClubActions(token: string) {
           setPostStage("signing");
           const { signature } = await sign(postTypedData(draft.message), v.wallet);
           setPostStage("sending");
-          result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", { message: draft.message, signature });
+          result = await send<{ xShare?: XShareVerdict }>("POST", "/posts", {
+            message: draft.message,
+            signature,
+            ...(v.picture ? { image: v.picture.dataUrl } : {}),
+          });
         } finally {
           setPostStage(undefined);
         }
@@ -293,6 +322,9 @@ export function useClubActions(token: string) {
       ["club-profile", "club-log", "club-members"],
       "Saved.",
     ),
+    // The Club's emoji and stickers (ADR 0057): staff add or replace one by name, and remove it.
+    packAdd: useAct((v: { name: string; kind: PackKind; image: string }) => send("PUT", "/pack", v), ["club-pack", "club-log"], "Added."),
+    packRemove: useAct((name: string) => send("DELETE", "/pack", { name }), ["club-pack", "club-log"], "Removed."),
     // Linking the project's X account (ADR 0024): a code to post from it, then the post's link.
     xStart: useAct((handle: string) => send<{ handle: string; code: string; text: string; until: number }>("POST", "/x", { action: "start", handle }), []),
     xVerify: useAct((v: { handle: string; url: string }) => send("POST", "/x", { action: "verify", ...v }), ["club-profile", "club-log"], "X account linked."),

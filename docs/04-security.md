@@ -247,6 +247,55 @@ The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club a
 | **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
 | **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |
 
+## Post pictures
+
+[ADR 0056](adr/0056-post-pictures-and-emoji.md). A post may carry one picture, signed by its SHA-256 and kept in a private Vercel Blob store (`web/lib/server/postImages.ts`, `web/lib/server/board.ts`). It moves no assets.
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **The picture is swapped after the post is signed** | The signed `ImagePost` carries the SHA-256 of the bytes; the server refuses a picture whose hash isn't the signed one, and the export carries the hash so anyone can check a copy | `postImages.test.ts`: refuses a picture that isn't the one signed; covers the picture |
+| **A picture is attached to a post that didn't sign one** (or a signed one is dropped) | A message with `image` needs the picture, and a picture needs a message with `image` | `postImages.test.ts`: refuses a picture that isn't the one signed, or that is missing or unwanted |
+| **A script runs from an upload** (SVG, a page served as an image) | Only PNG, JPEG and WebP whose first bytes match their type; the response is `nosniff` with `Content-Security-Policy: default-src 'none'; sandbox` and the stored type, never the client's | `postImages.test.ts`: refuses SVG, GIF, other types, wrong bytes; `boardRoutes.test.ts`: serves it with headers that keep it a picture |
+| **A hidden post's picture stays public** | The store is private and only the app reads it; `readPostImage` gives a hidden post's picture to its author and staff alone, and the Board's view drops it for everyone else | `postImages.test.ts`: goes with the text when a moderator hides the post; `boardRoutes.test.ts`: hides a hidden post's picture |
+| **A hidden post's picture is served from a cache** | A reader's answer is `private, no-store`; the public copy lives at most five minutes | `boardRoutes.test.ts`: serves it with headers that keep it a picture |
+| **One member fills the store** | 1 MB a picture, 10 a day and the post limits (5 an hour, 30 seconds apart); the oldest post's picture goes when the Board's 500th post falls off, with the post, and when the Club is purged | `postImages.test.ts`: limits pictures a day; ends when the post falls off a full Board |
+| **A picture outlives its post** | Deleting a post, purging a Club and trimming the Board each delete the object; a failed delete leaves an unreachable object, not a reachable one | `postImages.test.ts`: ends with its post; ends when the Club is purged |
+| **A post points at a picture that was never stored** | The picture is written before the post; if it can't be, the post is refused | `postImages.test.ts`: is refused, and not posted, when the store fails |
+| **The store token leaks** | `BLOB_READ_WRITE_TOKEN` is a server value, never `NEXT_PUBLIC_`, never logged; production without it refuses pictures | none (a configuration rule) |
+
+### Accepted limitations
+
+- **No scanning.** Nobody looks at a picture unless a member reports it. A moderator's hide is immediate, apart from a copy cached for up to five minutes.
+- **The server doesn't re-encode,** so a file made by hand keeps its metadata. It is the sender's own picture.
+- **The store dump leaves out the bytes** ([ADR 0055](adr/0055-full-store-dump.md)): the post row keeps the hash, so a recovered copy can be checked, but Blob needs its own backup.
+
+## Club emoji and stickers
+
+[ADR 0057](adr/0057-club-emoji-and-stickers.md). Staff keep a set of named pictures that members use as `:name:` in posts (`web/lib/server/clubPack.ts`). They share the private picture store of [post pictures](#post-pictures) and move no assets.
+
+### Threats
+
+| Threat | Mitigation | Test |
+|---|---|---|
+| **A member adds, replaces or removes one** | Every write checks the caller's role on the server: Owner, Moderator or app admin, from the Club's roles and `CLUB_ADMIN_USER_IDS`, never from the request | `clubPack.test.ts`: refuses a member, a stranger and an archived Club; `boardRoutes.test.ts`: lets staff add one, and not a member |
+| **A script runs from an upload** (SVG, a page served as an image) | PNG, JPEG or WebP whose first bytes match the type; served with the stored type, `nosniff` and `Content-Security-Policy: default-src 'none'; sandbox` | `clubPack.test.ts`: holds the picture to the pack's size; `boardRoutes.test.ts`: refuses what isn't acceptable, serves it as a picture |
+| **A shortcode becomes markup** | A post's text is still text: `PostText` builds React elements from the Club's list, so a name outside it, or any other text, is escaped like the rest. The picture's `src` is the server's own address, never taken from the text | `clubPack.test.ts`: leaves a name the Club doesn't have as the text it is |
+| **One Club fills the store** | 50 emoji and 20 stickers, 256 KB each, so well under 20 MB; a replaced or removed picture, and a purge, delete the objects | `clubPack.test.ts`: stops at 50 emoji and 20 stickers; replaces a picture without leaving the old one behind; goes with the Club when it is purged |
+| **A removed picture stays visible** | Removing deletes the object and the row at once; a copy cached by a browser or the CDN lives at most five minutes. A replaced picture has a new address | `clubPack.test.ts`: lets staff remove one, takes its picture with it |
+| **A name is made to look like something else** (`:30:` in a time) | A name needs a letter, and a `:name:` the Club doesn't have is left as text | `clubPack.test.ts`: names are 2 to 24 lowercase letters, digits or _, with a letter |
+| **The list names a picture that was never stored** | The picture is written first; if that fails nothing is listed | `clubPack.test.ts`: refuses a bad name, kind or picture, and a store that is missing or failing |
+| **A built-in sticker carries script or loads something** | They are our own static SVG files, never an upload (uploads still refuse SVG), shown only in an `<img>`; a test fails if any has a script, handler, link, image, style or external reference | `clubPack.test.ts`: carry nothing but shapes |
+| **A staff change leaves no trace** | Every add, replace and removal is in the Moderation log, by wallet | `clubPack.test.ts`: lets the Owner, a Moderator and an app admin add |
+
+### Accepted limitations
+
+- **Old posts change with the pack,** by design: the signed text does not.
+- **No scanning,** and a staff member can add anything under the limits. The Owner can remove it and a Moderator's additions are in the log. Removing is immediate, apart from a cached copy.
+- **Two staff changing the set at once** can lose one of the two (the row is read, changed and saved whole), as for the Club page. Staff are few and slow, and the loser sees it missing.
+- **The store dump leaves out the bytes** ([ADR 0055](adr/0055-full-store-dump.md)); Blob needs its own backup.
+
 ## Server store backups
 
 The server store holds the sponsor ledger and the Club member lists ([ADR 0053](adr/0053-back-up-sponsors-and-members.md)), which nothing else can recreate, and the built epochs with the Holders' proofs ([ADR 0054](adr/0054-resumable-epoch-build-and-epoch-backup.md)). The first two keep a signature and the third a root the chain holds; a restore re-checks them. A full dump of the rest ([ADR 0055](adr/0055-full-store-dump.md), `npm run store:backup`) restores unchecked; a nightly workflow runs it, in a private repository only.

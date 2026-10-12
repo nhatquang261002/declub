@@ -52,11 +52,11 @@ One file per decision, numbered in the order they were made. The **Status** line
 
 | # | Decision | Status |
 |---|---|---|
-| [0016](0016-clubs-and-momentum.md) | Clubs and Momentum: a community per verified asset | Accepted, reports amended by 0040 |
+| [0016](0016-clubs-and-momentum.md) | Clubs and Momentum: a community per verified asset | Accepted, reports amended by 0040, posts by 0056 and 0057 |
 | [0021](0021-declub-pivot.md) | De(al) Club: Clubs are the product, swaps fund them | Accepted |
 | [0025](0025-clubs-are-for-nft-collections.md) | Only collections have Clubs; a memecoin joins one | Accepted |
 | [0026](0026-owner-sets-the-coin-holder-rule.md) | The Owner sets the coin-holder rule | Accepted |
-| [0023](0023-signed-posts-and-lenses.md) | Signed posts, follows and feed lenses | Accepted |
+| [0023](0023-signed-posts-and-lenses.md) | Signed posts, follows and feed lenses | Amended by 0056 |
 | [0030](0030-likes-club-inbox-and-recap.md) | Likes, the Club inbox and the weekly recap | Accepted |
 | [0031](0031-share-a-deal-on-x.md) | Share a deal on X | Accepted |
 | [0041](0041-timeline.md) | A timeline of Board posts across Clubs | Accepted |
@@ -85,6 +85,8 @@ Read in this order: the money (0022), then how points work (0038, 0040, 0044), t
 | [0053](0053-back-up-sponsors-and-members.md) | Back up sponsors and members: kept signatures, export and a checked restore | Accepted |
 | [0054](0054-resumable-epoch-build-and-epoch-backup.md) | A resumable epoch build, and a backup of built epochs | Accepted |
 | [0055](0055-full-store-dump.md) | A full dump of the server store | Accepted |
+| [0056](0056-post-pictures-and-emoji.md) | Pictures in Board posts, signed by hash and kept in object storage; an emoji list | Amended by 0057 |
+| [0057](0057-club-emoji-and-stickers.md) | A Club's own emoji and stickers, used as :shortcodes: and added by its staff | Accepted |
 
 ## Challenges
 

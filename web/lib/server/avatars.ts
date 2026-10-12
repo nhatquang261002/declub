@@ -63,7 +63,7 @@ const startsWith = (bytes: Uint8Array, ...head: number[]) => head.every((b, i) =
 const ascii = (bytes: Uint8Array, from: number, text: string) => Buffer.from(bytes.subarray(from, from + text.length)).toString("latin1") === text;
 
 /** Whether the bytes are what the type says, so a stored picture can't be some other kind of file. */
-function looksLike(type: AvatarImageType, bytes: Uint8Array): boolean {
+export function looksLike(type: AvatarImageType, bytes: Uint8Array): boolean {
   switch (type) {
     case "image/png":
       return startsWith(bytes, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
