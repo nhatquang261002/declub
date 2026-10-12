@@ -82,6 +82,16 @@ describe("hypersyncScan", () => {
     assert.equal(await scanOf(client, 300n).head(), 300n); // Envio is ahead of it
   });
 
+  it("fails the head when Envio rejects the token, though it still reads the height", async () => {
+    const revoked: HypersyncLike = {
+      getHeight: async () => 1_000,
+      get: async () => {
+        throw new Error("http response status code 403 Forbidden: Your token has been revoked");
+      },
+    };
+    await assert.rejects(() => scanOf(revoked).head(), /403/);
+  });
+
   it("scans in ranges much wider than the public RPC allows", () => {
     assert.equal(scanOf(fakeHypersync([], 1).client).range, HYPERSYNC_RANGE);
     assert.ok(HYPERSYNC_RANGE > 100);

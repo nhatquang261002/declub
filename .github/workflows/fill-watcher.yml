@@ -1,5 +1,6 @@
-# The fill watcher (ADR 0019) on a free schedule. Vercel's Hobby plan runs a cron once a day at most,
-# so GitHub calls the route instead, every 5 minutes (GitHub's shortest interval, and it can run late).
+# The fill watcher (ADR 0019) as a backup schedule. Vercel's Hobby plan runs a cron once a day at most.
+# This asks for every 5 minutes, but on a free repo GitHub throttles scheduled runs to every few hours, so
+# point an external scheduler (docs/11-test-plan.md) at the route for a real 1–2 minute cadence.
 #
 # Repository secrets (Settings > Secrets and variables > Actions):
 #   SITE_URL     https://declub.fun, no trailing slash

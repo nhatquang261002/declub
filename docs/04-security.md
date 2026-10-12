@@ -243,7 +243,7 @@ The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club a
 |---|---|---|
 | **A wrong or hostile HyperSync answer** makes the watcher record a fill or event that didn't happen | HyperSync only names transactions. Each one is passed to `recordFills` and `recordActivity`, which read the receipt from the node and record only what its logs say | `fillWatcher.test.ts`: records nothing twice, keeps the cursor before a chunk it couldn't finish |
 | **HyperSync is behind or ahead of the node,** so the cursor passes blocks that weren't scanned or aren't final | `head()` is the lower of the node's finalized block and HyperSync's height | `hypersyncScan.test.ts`: only treats blocks as scanned when both the node and Envio have them |
-| **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height can't be read the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
+| **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height or a one-block token check can't be read (a revoked token fails the check, not the height) the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
 | **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
 | **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |
 
