@@ -77,7 +77,7 @@ const START_STEPS = [
     title: PRIVY_APP_ID ? "Sign in and link your wallet" : "Connect a wallet",
     body: PRIVY_APP_ID ? (
       <>
-        Press <b>Sign in</b> with Google, X, Discord or a wallet, then link the wallet that holds your NFTs on the <b>Account</b> page.
+        Press <b>Sign in</b> with X, Discord or a wallet, then link the wallet that holds your NFTs on the <b>Account</b> page.
       </>
     ) : (
       <>

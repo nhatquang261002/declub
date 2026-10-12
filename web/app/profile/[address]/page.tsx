@@ -6,7 +6,7 @@ import { useState } from "react";
 import { isAddress } from "viem";
 import { CopyAddress } from "@/components/CopyAddress";
 import { FollowButton } from "@/components/FollowButton";
-import { BadgeCheckIcon, ExternalIcon, UserIcon, XLogoIcon } from "@/components/Icons";
+import { ExternalIcon, ProviderIcon, UserIcon } from "@/components/Icons";
 import { Tabs } from "@/components/Tabs";
 import { WalletAvatar } from "@/components/WalletAvatar";
 import { EditProfile } from "@/components/profile/EditProfile";
@@ -14,7 +14,7 @@ import { ProfileClubs, ProfileDeals, ProfileFollowing, ProfilePosts } from "@/co
 import { ProfileTrophies } from "@/components/profile/ProfileTrophies";
 import { useNow } from "@/hooks/useNow";
 import { useFollows } from "@/hooks/useSocial";
-import { useFollowGraph, useMyWallets, useWalletProfile } from "@/hooks/useWalletProfile";
+import { useCatchUpLinkedWallets, useFollowGraph, useMyWallets, useWalletProfile } from "@/hooks/useWalletProfile";
 import { explorerAddress } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { PROFILE_LABEL, handleLabel, profileUrl } from "@/lib/profiles";
@@ -46,6 +46,7 @@ function Profile({ address }: { address: string }) {
   const now = useNow(30_000);
   const mine = useMyWallets().has(address);
   const card = useWalletProfile(address, mine);
+  useCatchUpLinkedWallets(mine);
   const follows = useFollows();
   const graph = useFollowGraph(address);
   const [editing, setEditing] = useState(false);
@@ -80,7 +81,7 @@ function Profile({ address }: { address: string }) {
             {profile && (
               <p className="flex flex-wrap items-center gap-x-2 text-sm">
                 <span className="chip chip-mint" title={`The ${PROFILE_LABEL[profile.provider]} account linked to this wallet, checked when they signed in`}>
-                  <BadgeCheckIcon />
+                  <ProviderIcon provider={profile.provider} />
                   Verified {PROFILE_LABEL[profile.provider]}
                 </span>
                 {xUrl ? (
@@ -90,7 +91,6 @@ function Profile({ address }: { address: string }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-bold underline decoration-dotted underline-offset-2"
                   >
-                    {profile.provider === "twitter" && <XLogoIcon className="size-3.5" />}
                     {handle}
                     <ExternalIcon className="size-3 opacity-60" />
                   </a>

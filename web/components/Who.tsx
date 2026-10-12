@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { XLogoIcon } from "@/components/Icons";
+import { ProviderIcon } from "@/components/Icons";
 import { useProfile } from "@/hooks/useProfiles";
 import { profilePath } from "@/lib/about";
 import { shortAddress } from "@/lib/format";
@@ -59,7 +59,7 @@ export function Who({
 
   const label = (
     <>
-      {profile.provider === "twitter" && <XLogoIcon className="size-3 shrink-0" />}
+      <ProviderIcon provider={profile.provider} className="size-3 shrink-0" />
       <span className="font-semibold">{profile.provider === "twitter" ? `@${profile.handle}` : profile.handle}</span>
     </>
   );

@@ -13,8 +13,6 @@ export type LinkedRow = {
   embedded?: boolean;
 };
 
-export type SocialKind = Exclude<AccountKind, "wallet">;
-
 export const KIND_LABEL: Record<AccountKind, string> = {
   email: "Email",
   google: "Google",
@@ -23,8 +21,11 @@ export const KIND_LABEL: Record<AccountKind, string> = {
   wallet: "Wallet",
 };
 
-/** The linked accounts that can sit beside a wallet, in display order. */
-export const SOCIAL_KINDS: SocialKind[] = ["google", "twitter", "discord"];
+/**
+ * The accounts the app offers to link, in display order. Email and Google are still listed when
+ * already linked, so they can be unlinked, but are not offered.
+ */
+export const SOCIAL_KINDS = ["twitter", "discord"] as const;
 
 /** Linked accounts as flat rows. Only the kinds the app offers are listed, Ethereum wallets only. */
 export function linkedRows(user: User | null): LinkedRow[] {

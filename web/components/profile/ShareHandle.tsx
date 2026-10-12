@@ -111,7 +111,7 @@ export function ShareHandle() {
           <Link href="/settings" className="font-bold underline">
             account settings
           </Link>{" "}
-          to turn this on. Discord works too; Google and email are never shown.
+          to turn this on. Discord works too; email is never shown.
         </p>
       )}
     </section>

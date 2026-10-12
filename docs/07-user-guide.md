@@ -6,7 +6,7 @@ The in-app version of this guide has two bases, side by side: **Clubs** at `/gui
 
 ## Sign in
 
-- **Sign in** (top right) opens Privy. You can use Google, X, Discord or a wallet; the wallet option is listed first. If you sign in with a social account and this browser has no wallet for it, the button turns into **Connect wallet** or **Link a wallet**.
+- **Sign in** (top right) opens Privy. You can use X, Discord or a wallet; the wallet option is listed first. If you sign in with a social account and this browser has no wallet for it, the button turns into **Connect wallet** or **Link a wallet**.
 - On a deployment without Privy, the button says **Connect wallet** and lists the wallets installed in your browser.
 - On the wrong network the button turns into **Switch to Monad Testnet** (**Switch to Monad** on mainnet).
 - You need test MON for gas, and for any MON you put in a deal.
@@ -106,7 +106,7 @@ Your own page (**Your profile** in the wallet menu) has **Edit profile**, signed
 
 **Account settings** (in the wallet menu; signed in with Privy) lets you:
 
-- link or unlink email, Google, X and Discord;
+- link or unlink X and Discord;
 - link several wallets and choose the one you trade with (**Use this wallet**);
 - claim your Club rewards;
 - export the key of an embedded wallet, if the deployment creates them.

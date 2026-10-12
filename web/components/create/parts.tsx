@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { isAddress } from "viem";
-import { EyeIcon, XLogoIcon } from "@/components/Icons";
+import { EyeIcon, ProviderIcon } from "@/components/Icons";
 import { Select } from "@/components/Select";
 import { DealSheet, DealStage } from "@/components/DealSheet";
 import { Who } from "@/components/Who";
@@ -174,7 +174,7 @@ function HandleMatches({ matches, onPick }: { matches: HandleMatch[]; onPick: (w
                 onClick={() => onPick(wallet)}
               >
                 <span className="flex items-center gap-1.5">
-                  {match.provider === "twitter" && <XLogoIcon className="size-3 shrink-0" />}
+                  <ProviderIcon provider={match.provider} className="size-3 shrink-0" />
                   <span className="font-semibold">{handleLabel(match)}</span>
                   <span className="text-xs text-muted">on {PROFILE_LABEL[match.provider]}</span>
                 </span>

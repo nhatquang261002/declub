@@ -105,7 +105,7 @@ There's no on-chain "reject". It would cost the recipient gas and change nothing
 
 **Must have (Phases 1–2)**, all built
 
-- Monad wallet connection: Privy sign-in (Google, X, Discord or a wallet), or an injected wallet without Privy ([ADR 0010](adr/0010-privy-sign-in.md))
+- Monad wallet connection: Privy sign-in (X, Discord or a wallet), or an injected wallet without Privy ([ADR 0010](adr/0010-privy-sign-in.md))
 - Create a deal: exact NFT ↔ NFT, NFT + MON ↔ NFT, NFT ↔ NFT + MON
 - Escrow on create, atomic fill
 - Cancel, expiry, reclaiming expired deals

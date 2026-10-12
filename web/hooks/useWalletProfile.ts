@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePrivy } from "@privy-io/react-auth";
 import { useConnection } from "wagmi";
 import { useToast } from "@/components/Toast";
+import { profileCall } from "@/components/profile/api";
 import { useAccessToken } from "@/hooks/useAccessToken";
 import { read } from "@/hooks/useClubBoard";
 import { timelineView, type TimelinePage } from "@/hooks/useTimeline";
@@ -92,13 +94,40 @@ const usePrivyWallets = (): string[] => {
 };
 const useNoWallets = (): string[] => [];
 /** PRIVY_APP_ID is fixed at build time, so the same hook runs for the life of the app (see `useAccessToken`). */
-const useLinkedWallets: () => string[] = PRIVY_APP_ID ? usePrivyWallets : useNoWallets;
+export const useLinkedWallets: () => string[] = PRIVY_APP_ID ? usePrivyWallets : useNoWallets;
 
 /** The wallets the viewer can say are theirs: the ones linked to their sign-in, and the one connected now. */
 export function useMyWallets(): ReadonlySet<string> {
   const linked = useLinkedWallets();
   const { address } = useConnection();
   return new Set([...linked, ...(address ? [address.toLowerCase()] : [])]);
+}
+
+/**
+ * Copies the owner's name, bio, avatar and shared handle onto a wallet they just linked. The server
+ * keeps one row per wallet and the webhook does this too, but only where it is registered; each of
+ * these reads catches up on its own, so a newly linked wallet's profile isn't blank until the
+ * owner opens the edit panel. Runs once per set of linked wallets.
+ */
+export function useCatchUpLinkedWallets(enabled: boolean) {
+  const getToken = useAccessToken();
+  const queryClient = useQueryClient();
+  const linked = useLinkedWallets().slice().sort().join(",");
+  const done = useRef("");
+
+  useEffect(() => {
+    if (!enabled || !getToken || !linked || done.current === linked) return;
+    done.current = linked;
+    const call = <T extends { message?: string }>(path: string, method: "GET" | "PUT", body?: unknown) =>
+      profileCall<T>(getToken, path, "Couldn't sync your profile.", method, body);
+    (async () => {
+      await Promise.all([call("/api/about", "GET"), call("/api/avatar", "GET"), call("/api/profile", "PUT", { refresh: true })]);
+      await queryClient.invalidateQueries({ queryKey: ["wallet-profile"] });
+    })().catch(() => {
+      // Cosmetic: the next visit tries again.
+      done.current = "";
+    });
+  }, [enabled, getToken, linked, queryClient]);
 }
 
 /** The signed-in user's own name and bio, read and changed through `/api/about`. */

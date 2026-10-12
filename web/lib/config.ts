@@ -95,7 +95,7 @@ export const SHOW_INTENTS = !!DECLUB_INTENTS_ADDRESS;
 
 /**
  * Privy app id (ADR 0010). Optional: blank keeps the plain injected-wallet connect, so the app
- * runs without a Privy account. Set it to add email / Google / X / Discord sign-in, embedded
+ * runs without a Privy account. Set it to add X / Discord sign-in, embedded
  * wallets and linked accounts.
  */
 export const PRIVY_APP_ID = env.privyAppId?.trim() || undefined;

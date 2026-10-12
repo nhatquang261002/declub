@@ -10,11 +10,11 @@ state and Clubs.
 
 | Capability | Current behavior | Frontend / server surface |
 |---|---|---|
-| Sign-in | Privy can sign in with a wallet, Google, X, or Discord (`loginMethods: google, twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on the app's network (Monad testnet, or Monad mainnet in the mainnet flavor). Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
-| Linked accounts | A signed-in user can link and unlink email, Google, X, Discord, and wallets. Privy prevents removing the last usable sign-in method. | `/settings`, `components/ConnectButton.tsx` |
+| Sign-in | Privy can sign in with a wallet, X, or Discord (`loginMethods: twitter, discord, wallet`). Wallet login is shown first (`showWalletLoginFirst`), in the dark theme, on the app's network (Monad testnet, or Monad mainnet in the mainnet flavor). Email is linkable from the account screen but is not currently a configured login method. | `components/ConnectButton.tsx`, `hooks/useSignIn.ts`, `components/Providers.tsx` |
+| Linked accounts | A signed-in user can link X, Discord and wallets, and unlink them (and an email or Google account that was linked earlier). Privy prevents removing the last usable sign-in method. | `/settings`, `components/ConnectButton.tsx` |
 | Multiple wallets | Linked wallets are shown on `/settings`; a connected wallet can be made active without changing the account. | `/settings`, `useSetActiveWallet` |
 | Embedded wallets | Disabled by default (`createOnLogin: "off"`). Set `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` and enable embedded wallets in the Privy dashboard to create one at login for users who have no wallet (`"users-without-wallets"`). | `components/Providers.tsx`, `lib/config.ts` |
-| Shared trader profiles | A user explicitly shares an X or Discord profile. Google and email can be linked for sign-in/recovery but are never shown as trader profiles. | `/profile/<address>` (edit), `/api/profile`, `lib/server/profileSync.ts` |
+| Shared trader profiles | A user explicitly shares an X or Discord profile. Only X and Discord can be linked; an email or Google account linked earlier is never shown as a trader profile. | `/profile/<address>` (edit), `/api/profile`, `lib/server/profileSync.ts` |
 | Handle-based deals | A maker can find a shared X or Discord handle, choose one of that user's shared wallets, and lock the taker address in the deal flow. | `/create`, `/api/profiles/lookup`, `lib/server/handleLookup.ts` |
 | Server authorization | Per-user routes accept a Privy access token, verify it server-side, then fetch the user from Privy. The browser cannot choose the user id, handle, or wallet to authorize. | `lib/server/privy.ts`, `lib/server/gate.ts` |
 | Clubs | Membership, roles, moderation, and Holder checks are keyed to the Privy user. Linked Ethereum wallets are synchronized so a wallet unlink stops counting for Holder status. | `/clubs`, `/clubs/[address]`, `lib/server/members.ts` |
@@ -132,8 +132,7 @@ Blob store. Create one in the Vercel dashboard (Storage → Blob → Private), c
 with a picture and text posts carry on; development keeps pictures in memory.
 
 The Privy dashboard must allow the deployed origin and enable the login methods the app is
-expected to expose: wallet, Google, X, Discord, and email if users should be able to link it
-for recovery (the app's own config doesn't offer email as a login method). Enable embedded wallets
+expected to expose: wallet, X and Discord. The app offers no email or Google login. Enable embedded wallets
 only when the product decision and `NEXT_PUBLIC_PRIVY_EMBEDDED_WALLETS=true` agree.
 
 For a local webhook test, expose the dev server with a tunnel and register the tunnel URL in
@@ -145,8 +144,8 @@ The code paths and signed-request tests exist, but live validation is an operati
 Before calling the Privy integration production-ready, run this checklist against the actual
 deployed app and Privy project:
 
-- [ ] Sign in with a wallet; link X, Discord, email, and a second wallet as applicable.
-- [ ] Return using Google, X, or Discord and connect or switch to the intended wallet.
+- [ ] Sign in with a wallet; link X, Discord and a second wallet as applicable.
+- [ ] Return using X or Discord and connect or switch to the intended wallet.
 - [ ] Enable a shared profile and verify that another browser sees the profile beside the wallet.
 - [ ] Find that user by X or Discord handle in `/create`, select the wallet, and complete a
       deal visibility check.
