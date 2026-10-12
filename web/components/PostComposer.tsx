@@ -119,28 +119,48 @@ export function PostComposer({ token, wallet, xHint, picker }: { token: string; 
             </div>
             {picker}
           </div>
-          <label className="sr-only" htmlFor={textId}>
-            Your post
-          </label>
-          <textarea
-            ref={area}
-            id={textId}
-            className="input min-h-24 resize-y border-2 border-[#111318]/25 bg-white text-[0.95rem] focus:border-[#111318]"
-            value={text}
-            maxLength={POST_MAX * 2}
-            placeholder={kind === "looking" ? "WTB any Chog with a crown, 2 MON over floor" : hint}
-            readOnly={post.isPending}
-            onChange={(event) => setText(event.target.value)}
-          />
-          {picture && (
-            <div className="picture-draft">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={picture.previewUrl} alt="The picture you are adding" />
-              <button type="button" aria-label="Remove the picture" disabled={post.isPending} onClick={() => setPicture(undefined)}>
-                <CrossIcon className="size-3.5" />
+          <div className="composer-field">
+            <label className="sr-only" htmlFor={textId}>
+              Your post
+            </label>
+            <textarea
+              ref={area}
+              id={textId}
+              className="composer-text"
+              value={text}
+              maxLength={POST_MAX * 2}
+              placeholder={kind === "looking" ? "WTB any Chog with a crown, 2 MON over floor" : hint}
+              readOnly={post.isPending}
+              onChange={(event) => setText(event.target.value)}
+            />
+            {picture && (
+              <div className="picture-draft">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={picture.previewUrl} alt="The picture you are adding" />
+                <button type="button" aria-label="Remove the picture" disabled={post.isPending} onClick={() => setPicture(undefined)}>
+                  <CrossIcon className="size-3.5" />
+                </button>
+              </div>
+            )}
+            <div className="composer-bar">
+              <EmojiPicker box={area} text={text} setText={setText} club={token} disabled={post.isPending} />
+              <EmojiPicker box={area} text={text} setText={setText} club={token} kind="sticker" disabled={post.isPending} />
+              <input ref={file} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={(event) => void onFile(event.target.files?.[0])} />
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={picture ? "Change the picture" : "Add a picture"}
+                aria-busy={preparing}
+                disabled={post.isPending || preparing}
+                onClick={() => file.current?.click()}
+              >
+                {preparing ? <Spinner /> : <ImageIcon className="size-5" />}
               </button>
+              <span className="ml-auto pr-1">
+                <CharRing length={length} />
+              </span>
             </div>
-          )}
+          </div>
           {kind === "note" && (
             <div className="flex flex-col gap-1.5">
               <label className="relative">
@@ -177,24 +197,9 @@ export function PostComposer({ token, wallet, xHint, picker }: { token: string; 
                 ? postStage === "sending"
                   ? "Signed. Posting it to the Club…"
                   : "Waiting for you in your wallet. If nothing opened, check your wallet extension."
-                : "Plain text, with emoji or one picture. Your Club wallet signs each post, so it’s yours to take anywhere."}
+                : "Plain text, with emoji, a sticker or one picture. Your Club wallet signs each post, so it’s yours to take anywhere."}
             </p>
             <div className="flex items-center gap-1">
-              <EmojiPicker box={area} text={text} setText={setText} club={token} disabled={post.isPending} />
-              <input ref={file} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={(event) => void onFile(event.target.files?.[0])} />
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={picture ? "Change the picture" : "Add a picture"}
-                aria-busy={preparing}
-                disabled={post.isPending || preparing}
-                onClick={() => file.current?.click()}
-              >
-                {preparing ? <Spinner /> : <ImageIcon className="size-5" />}
-              </button>
-              <span className="mx-2">
-                <CharRing length={length} />
-              </span>
               <button
                 type="submit"
                 className="btn-primary btn-sm px-5"

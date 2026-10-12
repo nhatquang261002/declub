@@ -25,8 +25,9 @@ lives in the git log and the relevant ADRs.
 - [ ] Build proper infrastructure for the project: hosting, monitoring, backups and a real cron/queue in place of the free GitHub-scheduled fill watcher and the single Redis store (the sponsor ledger, member lists, built epochs and, unchecked, the whole store now export and restore: `rewards:sponsor --export`, `members:backup`, `rewards:backup`, `store:backup`; `store:backup` runs nightly from `store-backup.yml` once the repo is private; still to do: an off-site copy, and a backup of the pictures in Vercel Blob, which the store dump leaves out, [ADR 0056](adr/0056-post-pictures-and-emoji.md))
 - [ ] Improve in-app posting:
   - [x] One picture per post, signed by its hash and kept in private object storage ([ADR 0056](adr/0056-post-pictures-and-emoji.md))
-  - [x] Emoji list in the composer and the reply box (ADR 0056)
+  - [x] Emoji and sticker buttons on a tool row in the composer, and in the reply box (ADR 0056)
   - [x] A Club's own emoji and stickers, added by staff and used as `:name:`, and twelve built-in stickers every Club has ([ADR 0057](adr/0057-club-emoji-and-stickers.md))
+  - [ ] Make a Club's own emoji and stickers members-only: the pack list and its pictures go only to members and staff (the built-in stickers stay open), the pictures are fetched with the member's token and shown from memory, and everyone else sees `:name:` as text; amends ADR 0057
   - [ ] Browser-test pictures and Club emoji end to end (M-CLB-07, M-CLB-08) once the Blob store is on the deployed environment
   - [ ] Cap a picture's pixel dimensions on the server (today only type, bytes and file size are checked, so a small file can declare a huge canvas)
   - [ ] GIFs (needs the dimension cap first; a raw upload keeps the animation, so the file-size limits are the only shrinking), and a still poster for people who prefer less motion

@@ -405,6 +405,7 @@ export function Thread({ parent, context, role, now }: { parent: string; context
             onChange={(event) => setText(event.target.value)}
           />
           <EmojiPicker box={area} text={text} setText={setText} club={context.token} disabled={reply.isPending} align="right" />
+          <EmojiPicker box={area} text={text} setText={setText} club={context.token} kind="sticker" disabled={reply.isPending} align="right" />
           <button
             type="submit"
             className="btn-primary px-3 py-2 text-sm"

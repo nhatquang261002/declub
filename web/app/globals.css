@@ -1647,6 +1647,13 @@ a.chip:hover { border-color: #111318; background: white; }
 .emoji-btn:hover,
 .emoji-btn:focus-visible { background: white; outline: none; }
 
+/* The post box: the text, the picture being added and the tool row share one outline. */
+.composer-field { border: 2px solid rgb(17 19 24 / 0.25); border-radius: 0.75rem; background: white; }
+.composer-field:focus-within { border-color: #111318; }
+.composer-text { display: block; width: 100%; min-height: 6rem; resize: vertical; padding: 0.75rem 0.9rem 0.25rem; border: 0; background: transparent; font-size: 0.95rem; outline: none; }
+.composer-field .picture-draft { margin: 0.25rem 0.75rem 0.5rem; }
+.composer-bar { display: flex; align-items: center; gap: 0.15rem; padding: 0.25rem 0.5rem 0.4rem; border-top: 1px solid rgb(17 19 24 / 0.1); }
+
 /* A Club's own emoji and stickers (ADR 0057): in a post's text, in the list, and on the Manage tab. */
 .club-emoji { display: inline-block; height: 1.5em; width: auto; max-width: 3em; vertical-align: -0.35em; }
 .club-sticker { display: inline-block; height: 6rem; width: auto; max-width: 100%; margin: 0.15rem 0.1rem; vertical-align: bottom; }
