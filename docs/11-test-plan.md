@@ -144,7 +144,7 @@ Matcher (`matcher/README.md`): `MATCHER_PRIVATE_KEY`, `MATCHER_RPC_URL`, and `MA
 ### 2.4 Privy, cron and matcher
 
 - **Privy dashboard:** allow the test host's origin; enable wallet, X and Discord login; embedded wallets off; add the webhook endpoint `https://<host>/api/webhooks/privy` for `user.linked_account`, `user.unlinked_account`, `user.transferred_account` and `user.deleted`.
-- **Cron:** a scheduler calls `GET https://<host>/api/cron/fills` with `Authorization: Bearer <CRON_SECRET>` every minute. Vercel Hobby crons run only daily, which is too slow ([ADR 0019](adr/0019-fill-watcher.md)).
+- **Cron:** a scheduler calls `GET https://<host>/api/cron/fills` with `Authorization: Bearer <CRON_SECRET>` every 1–2 minutes. Vercel Hobby crons run only daily, which is too slow ([ADR 0019](adr/0019-fill-watcher.md)). `.github/workflows/fill-watcher.yml` is a backup only: on a free repo GitHub fires scheduled runs every few hours. A free cron-job.org job works: the exact `https://` URL with no `www.` and no trailing slash (a redirect drops the header), header `Authorization: Bearer <CRON_SECRET>`, timeout 60 s. A 401 means the secret differs from Vercel's, and a Vercel change needs a redeploy.
 - **Holdings sampler and epoch close** ([ADR 0040](adr/0040-points-floor-held-average-public-backing.md)): `GET https://<host>/api/cron/holdings` and `GET https://<host>/api/cron/close` with the same header, once a day each (`web/vercel.json` does it on Vercel, Hobby's daily cron is enough). Calling either twice the same day does nothing the second time.
 - **Matcher:** running for the whole session, with its log visible to the engineer. Note the matcher key's MON balance at start and end.
 
