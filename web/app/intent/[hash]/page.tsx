@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { Hex } from "viem";
 import { useConnection, useReadContract } from "wagmi";
@@ -185,13 +186,45 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
         </DealDock>
       )}
       {!mine && live && (
-        <DealDock tone="blocked" eyebrow="How this settles" title="A matcher settles this, not a button">
+        <DealDock tone="blocked" eyebrow="How this settles" title="Sign the other side and a matcher settles both">
           <p className="text-sm text-muted">
             Signed swaps aren&apos;t accepted by hand. When a wallet&apos;s own signed swap fits this one, the matcher settles both in one transaction.
           </p>
+          <MatchPanel row={row} me={me} info={info} />
           <ConsentNotice />
         </DealDock>
       )}
+    </div>
+  );
+}
+
+/**
+ * The way in for another wallet: "Create a matching swap", offered only to a wallet that holds what the swap
+ * wants. Approvals don't count (the create steps handle them), only balance and ownership, so the button
+ * never leads to a form the wallet can't fill.
+ */
+function MatchPanel({ row, me, info }: { row: PoolIntent; me?: `0x${string}`; info: ReturnType<typeof useIntentsTokenInfo>["info"] }) {
+  const { intent } = row;
+  const readiness = useIntentReadiness(me, intent.want, info, "token");
+  const wants = intent.want.map((a) => formatAsset(a, info.get(a.token.toLowerCase()))).join(", ");
+
+  if (!me) return <p className="text-sm text-muted">Sign in to see if you hold what this swap wants ({wants}) and can match it.</p>;
+  if (readiness.isLoading) return <p className="text-sm text-muted">Checking your wallet for what this swap wants…</p>;
+  if (readiness.problems.length > 0) {
+    return <p className="text-sm text-muted">{readiness.problems.join(" ")}</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="flex items-center gap-2 text-sm font-semibold text-[#1f7a55]">
+        <CheckIcon className="size-4 shrink-0" />
+        You hold what it wants: {wants}
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link href={`/create?match=${row.hash}`} className="btn-primary">
+          Create a matching swap
+        </Link>
+        <span className="text-xs text-muted">Fills in the other side for you. You still check it, choose a deadline and sign.</span>
+      </div>
     </div>
   );
 }

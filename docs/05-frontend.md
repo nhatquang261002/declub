@@ -208,11 +208,11 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 
 | Where | What |
 |---|---|
-| `/create` | Step 1 opens with **How should it settle?**: *Lock assets now* (the three deal kinds, as before) or *Sign only*. Sign only runs `SignedFlow`: want (no MON), give plus a deadline (default 1 hour), then review, the consent notice, **approve** and **Sign and post**. Both steps link back to *Lock assets* for a deal that needs MON or a trait request |
+| `/create` | Step 1 opens with **How should it settle?**: *Lock assets now* (the three deal kinds, as before) or *Sign only*. Sign only runs `SignedFlow`: want (no MON), give plus a deadline (default 1 hour), then review, the consent notice, **approve** and **Sign and post**. Both steps link back to *Lock assets* for a deal that needs MON or a trait request. `/create?match=<swap id>` opens the wizard on *Sign only* at step 2 with the sides mirrored from that swap (`hooks/useMatchDraft.ts`, `assetsToDraft`): you give what it wants, you want what it gives. A swap that is yours, closed, or unreadable shows a notice and the usual empty form |
 | `/deals` | Locked deals and signed swaps in one grid, each tagged **Locked** or **Signed**. A *Type* filter (All types / Locked / Signed) sits beside the MON and sort filters. Search, MON and sort apply to both |
 | `/history` | The wallet's signed swaps in every status beside its locked deals, with the same All / Active / Completed / Expired filter |
-| `/guide/deals#settlement` | *Locked deals vs signed swaps*: two cards with one anchored entry per chip, a folded side-by-side table (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
-| `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain** |
+| `/guide/deals#settlement` | *Locked deals vs signed swaps*: four-step pictures of how a locked deal and a signed swap settle (`app/guide/DealVisuals.tsx`; without intents the locked one sits under *Take a deal*), two cards with one anchored entry per chip, a folded side-by-side table (`#cant-fail`, `#costs-gas`, `#assets-locked`, `#free`, `#nothing-locked`, `#can-fail`), plus three FAQ entries. Shown only when intents are enabled. The sign review's consent notice links here too |
+| `/intent/[hash]` | One signed swap: status and what it means, both sides, and for a settled one the cycle and what the maker received. The maker also gets approve-again (when paused), **Remove from pool** and **Cancel on-chain**; any other wallet that holds what the swap wants (balance and ownership, not approvals; `MatchPanel`, via `useIntentReadiness`) gets **Create a matching swap** on an open one, beside a line saying so. Without the assets, or signed out, the page says why instead |
 | `/intents`, `/intents/new` | Compatibility redirects to `/deals` and `/create`; the signed-intent UI is now embedded in those screens |
 
 | File | Purpose |
@@ -220,6 +220,7 @@ Signed intents ([ADR 0008](adr/0008-trade-intents.md), [0009](adr/0009-ring-swap
 | `lib/intents.ts` | The EIP-712 types and domain, the struct hash (the intent's id), the pool's JSON shapes and their parsers, status copy, deadline presets, `nonceBit`, and `intentAsListing` (a signed swap shaped like an escrow deal, so the list and filters treat both alike) |
 | `lib/pool.ts` | The HTTP client. Pool rejections become readable copy; rows whose recomputed hash doesn't match are dropped |
 | `hooks/usePool.ts` | `usePoolInfo` (also flags a pool for another chain or contract), `useIntents`, `useIntent`, `useSettlements` |
+| `hooks/useMatchDraft.ts` | The mirrored rows for `/create?match=`, or why the swap can't be matched |
 | `hooks/useIntentReadiness.ts` | What stands between a wallet and an intent that can settle: balance, ownership, and required approval checks |
 | `hooks/useSignFlow.ts` | Sign and post an intent, or sign a cancel. Free, no gas; reuses `TxState` with an added `posting` stage so `TxButton` works unchanged |
 | `components/create/SettlementPicker.tsx` | The *Lock assets now* / *Sign only* choice: two cards, each with three chips (plus or minus) that open a tooltip |
