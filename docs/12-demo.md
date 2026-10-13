@@ -23,7 +23,7 @@ Only the demo holdings are minted: 61 tokens over 13 wallets. Each mirror's `own
 - shared profiles, avatars (each persona's first NFT), Club memberships with their join dates;
 - roles, moderators and the moderation log;
 - each Club's description, mainnet link, X tags and pinned post;
-- 24 signed posts over twelve days;
+- 33 signed posts over twelve days, nine of them hints at features (deals, signed swaps, rings, Rewards, challenges, follows, safety);
 - 23 signed follows.
 
 ## Demo contracts
