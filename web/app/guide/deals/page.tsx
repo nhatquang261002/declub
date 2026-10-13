@@ -10,7 +10,6 @@ import { NETWORK } from "@/lib/network";
 import { PROTOCOL, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
 import { CARD, CardGrid, GuideBody, GuideEnd, GuideHero, MUTED, Section, Steps, type GuideSection } from "../parts";
-import { DealPlayer } from "../DealPlayer";
 
 // The Deals guide, beside the main Clubs guide at /guide. The create screen's settlement chips link here by anchor
 // (/guide/deals#cant-fail and the rest, from lib/settlementTerms.ts).
@@ -225,10 +224,6 @@ const MODES = [
 const SIGNED_FAQ: ReadonlyArray<[string, string]> = [
   ["Where are my assets in a signed swap?", "They never leave your wallet. They only move at the moment a match settles, and only if they are still there."],
   [
-    "How do I match someone's signed swap?",
-    "You can't accept it by hand. Open its page and press Create a matching swap. It fills in the other side: you give what they want and get what they give. Check it, choose a deadline, approve what you give and sign. The matcher then settles the two together.",
-  ],
-  [
     "Should I lock my assets or just sign?",
     "Lock them when the other side must be certain it will go through: a specific buyer, a big trade, or anything with MON or a trait. Sign when you want a quick swap of NFTs and tokens without locking anything or paying gas to post.",
   ],
@@ -359,14 +354,6 @@ export default function GuidePage() {
               <b>Nothing can half-happen.</b> Both sides move in one transaction. If any part fails, the whole thing is undone and everyone keeps what they had.
             </span>
           </p>
-
-          {/* With signed swaps on, the settlement section plays this with a Locked / Signed toggle instead. */}
-          {!swapIntents && (
-            <>
-              <h3 className="mt-10 mb-4 text-lg font-black">Watch a deal happen</h3>
-              <DealPlayer signed={false} />
-            </>
-          )}
         </Section>
 
         {swapIntents && (
@@ -376,9 +363,6 @@ export default function GuidePage() {
             title="Lock your assets, or just sign"
             intro={<>Every deal settles one of two ways, and you choose when you create it. Both show up in the same list, tagged Locked or Signed.</>}
           >
-            <DealPlayer signed />
-
-            <h3 className="mt-10 mb-4 text-lg font-black">Which one to pick</h3>
             <div className="grid gap-4 md:grid-cols-2">
               {MODES.map(({ mode, title, bestFor }) => (
                 <div key={mode} className={`${CARD} p-5 sm:p-6`}>

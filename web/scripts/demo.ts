@@ -10,7 +10,6 @@
  *   node --import ./test/register.mjs scripts/demo.ts market    # open deals for testers: 20 random, 20 cheap, a few bundles
  *   node --import ./test/register.mjs scripts/demo.ts signed    # signed deals (DeClubIntents) in the pool
  *   node --import ./test/register.mjs scripts/demo.ts social    # profiles, members, roles, posts, follows, avatars
- *   node --import ./test/register.mjs scripts/demo.ts hints     # only the posts marked `hint`, for a world that already has its social step
  *   node --import ./test/register.mjs scripts/demo.ts challenges  # a challenge of every judging mode and phase
  *   node --import ./test/register.mjs scripts/demo.ts art       # each Club's tile art, into public/art/clubs/ (convert
  *                                                               # to a ~480px PNG after: Chog's is WebP)
@@ -695,7 +694,7 @@ async function main() {
     return;
   }
 
-  if (step === "social" || step === "hints") {
+  if (step === "social") {
     const { syncProfile } = await import("../lib/server/profileSync");
     const { joinClub } = await import("../lib/server/members");
     const { saveRoles, loadProfile, saveProfile, appendLog, readLog } = await import("../lib/server/clubState");
@@ -713,47 +712,44 @@ async function main() {
     const presenterUser = await findPresenter();
     const userIdOf = (k: HolderKey) => (k === "you" ? (presenterUser?.id ?? null) : demoUserId(k));
 
-    // Profiles, members and roles are done by the social step; hints only adds posts.
-    if (step === "social") {
-      // 1. Profiles: each persona shares a Discord handle (posting needs a shared profile).
-      for (const k of personaKeys) {
-        await syncProfile(
-          store,
-          demoUserId(k),
-          [
-            { type: "wallet", chain_type: "ethereum", address: persona(k).address },
-            { type: "discord_oauth", username: PERSONAS[k].handle },
-          ] as never,
-          false,
-        );
-      }
-      console.log(`profiles: ${personaKeys.length}`);
+    // 1. Profiles: each persona shares a Discord handle (posting needs a shared profile).
+    for (const k of personaKeys) {
+      await syncProfile(
+        store,
+        demoUserId(k),
+        [
+          { type: "wallet", chain_type: "ethereum", address: persona(k).address },
+          { type: "discord_oauth", username: PERSONAS[k].handle },
+        ] as never,
+        false,
+      );
+    }
+    console.log(`profiles: ${personaKeys.length}`);
 
-      // 2. Members: everyone in each Club they hold in, plus EXTRA_MEMBERS; joined before their first post.
-      const memberships: [HolderKey, ClubKey][] = [...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])), ...EXTRA_MEMBERS];
-      for (const [k, c] of memberships) {
-        const userId = userIdOf(k);
-        if (!userId) continue;
-        const firstPost = Math.max(0, ...POSTS.filter((p) => p.club === c && p.by === k).map((p) => p.ago));
-        const joinedAt = now - (Math.max(firstPost, 24) + 12 + (k.length % 5) * 7) * HOUR;
-        const walletsOf = k === "you" ? presenterUser!.wallets : [persona(k).address];
-        const result = await joinClub(store, entryOf(c), userId, walletsOf, { now: () => joinedAt });
-        if (!result.ok) throw new Error(`${k} couldn't join ${c}: ${result.reason}`);
-      }
-      console.log(`memberships: ${memberships.length}`);
+    // 2. Members: everyone in each Club they hold in, plus EXTRA_MEMBERS; joined before their first post.
+    const memberships: [HolderKey, ClubKey][] = [...clubKeys.flatMap((c) => HOLDINGS[c].map(([k]) => [k, c] as [HolderKey, ClubKey])), ...EXTRA_MEMBERS];
+    for (const [k, c] of memberships) {
+      const userId = userIdOf(k);
+      if (!userId) continue;
+      const firstPost = Math.max(0, ...POSTS.filter((p) => p.club === c && p.by === k).map((p) => p.ago));
+      const joinedAt = now - (Math.max(firstPost, 24) + 12 + (k.length % 5) * 7) * HOUR;
+      const walletsOf = k === "you" ? presenterUser!.wallets : [persona(k).address];
+      const result = await joinClub(store, entryOf(c), userId, walletsOf, { now: () => joinedAt });
+      if (!result.ok) throw new Error(`${k} couldn't join ${c}: ${result.reason}`);
+    }
+    console.log(`memberships: ${memberships.length}`);
 
-      // 3. Roles and the Owner's claim, with the log lines the app would have written.
-      for (const c of clubKeys) {
-        const token = clubAddress(c);
-        const owner = userIdOf(CLUBS[c].owner);
-        const moderators = CLUBS[c].moderators.map(demoUserId);
-        await saveRoles(store, token, { ...(owner ? { owner } : {}), moderators });
-        if ((await readLog(store, token, 1)).length === 0 && owner) {
-          const ownerWallet = walletOf(CLUBS[c].owner).toLowerCase();
-          await appendLog(store, token, { actor: ownerWallet, action: "claim_owner", target: ownerWallet }, now - 320 * HOUR);
-          for (const m of CLUBS[c].moderators) {
-            await appendLog(store, token, { actor: ownerWallet, action: "appoint_moderator", target: persona(m).address.toLowerCase() }, now - 300 * HOUR);
-          }
+    // 3. Roles and the Owner's claim, with the log lines the app would have written.
+    for (const c of clubKeys) {
+      const token = clubAddress(c);
+      const owner = userIdOf(CLUBS[c].owner);
+      const moderators = CLUBS[c].moderators.map(demoUserId);
+      await saveRoles(store, token, { ...(owner ? { owner } : {}), moderators });
+      if ((await readLog(store, token, 1)).length === 0 && owner) {
+        const ownerWallet = walletOf(CLUBS[c].owner).toLowerCase();
+        await appendLog(store, token, { actor: ownerWallet, action: "claim_owner", target: ownerWallet }, now - 320 * HOUR);
+        for (const m of CLUBS[c].moderators) {
+          await appendLog(store, token, { actor: ownerWallet, action: "appoint_moderator", target: persona(m).address.toLowerCase() }, now - 300 * HOUR);
         }
       }
     }
@@ -767,7 +763,7 @@ async function main() {
     };
     const pinned = new Map<ClubKey, string[]>();
     let posted = 0;
-    for (const p of POSTS.filter((p) => step === "social" || p.hint).sort((a, b) => b.ago - a.ago)) {
+    for (const p of [...POSTS].sort((a, b) => b.ago - a.ago)) {
       const at = seconds(now - p.ago * HOUR);
       const text = cleanText(p.text);
       if (!text.ok) throw new Error(`Post "${p.text}" is ${text.reason}`);
@@ -789,7 +785,6 @@ async function main() {
       posted++;
     }
     console.log(`posts: ${posted}`);
-    if (step === "hints") return;
 
     // 5. Club profiles: description, the mainnet collection, X tags, pins and the Owner's claim.
     for (const c of clubKeys) {

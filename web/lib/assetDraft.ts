@@ -1,4 +1,4 @@
-import { formatUnits, isAddress, parseUnits, type Address } from "viem";
+import { isAddress, parseUnits, type Address } from "viem";
 import { MAX_NFTS_PER_SIDE, MAX_TOKENS_PER_SIDE } from "./config";
 import { erc20Asset, nativeAsset, nftAsset, nftCount, sameAsset, type Asset, type PlainKind } from "./assets";
 import { parseMon } from "./format";
@@ -13,24 +13,6 @@ export const newRow = (kind: PlainKind, token = "", value = ""): DraftRow => ({
   token,
   value,
 });
-
-/**
- * Assets back into create-form rows, for prefilling a form from an existing swap. Null when an
- * ERC-20 amount can't be written yet (its decimals haven't been read) or the side holds something
- * a signed swap can't (MON, a trait request), so a half-filled form is never offered.
- */
-export function assetsToDraft(assets: readonly Asset[], decimalsOf: (token: Address) => number | undefined): DraftRow[] | null {
-  const rows: DraftRow[] = [];
-  for (const asset of assets) {
-    if (asset.kind === "erc721") rows.push(newRow("erc721", asset.token, asset.id.toString()));
-    else if (asset.kind === "erc20") {
-      const decimals = decimalsOf(asset.token);
-      if (decimals === undefined) return null;
-      rows.push(newRow("erc20", asset.token, formatUnits(asset.amount, decimals)));
-    } else return null;
-  }
-  return rows;
-}
 
 /** ERC-20 addresses typed so far, for one batch of symbol/decimals reads. */
 export function draftTokens(rows: readonly DraftRow[]): Address[] {
