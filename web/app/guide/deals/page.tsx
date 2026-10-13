@@ -10,7 +10,7 @@ import { NETWORK } from "@/lib/network";
 import { PROTOCOL, percent } from "@/lib/rewards";
 import { termsFor } from "@/lib/settlementTerms";
 import { CARD, CardGrid, GuideBody, GuideEnd, GuideHero, MUTED, Section, Steps, type GuideSection } from "../parts";
-import { LockedDealVisual, SignedSwapVisual } from "../DealVisuals";
+import { DealPlayer } from "../DealPlayer";
 
 // The Deals guide, beside the main Clubs guide at /guide. The create screen's settlement chips link here by anchor
 // (/guide/deals#cant-fail and the rest, from lib/settlementTerms.ts).
@@ -360,11 +360,11 @@ export default function GuidePage() {
             </span>
           </p>
 
-          {/* With signed swaps on, the settlement section shows this beside the signed one. */}
+          {/* With signed swaps on, the settlement section plays this with a Locked / Signed toggle instead. */}
           {!swapIntents && (
             <>
-              <h3 className="mt-10 mb-4 text-lg font-black">How a deal works</h3>
-              <LockedDealVisual />
+              <h3 className="mt-10 mb-4 text-lg font-black">Watch a deal happen</h3>
+              <DealPlayer signed={false} />
             </>
           )}
         </Section>
@@ -376,11 +376,7 @@ export default function GuidePage() {
             title="Lock your assets, or just sign"
             intro={<>Every deal settles one of two ways, and you choose when you create it. Both show up in the same list, tagged Locked or Signed.</>}
           >
-            <h3 className="mb-4 text-lg font-black">How a locked deal works</h3>
-            <LockedDealVisual />
-
-            <h3 className="mt-10 mb-4 text-lg font-black">How a signed swap works</h3>
-            <SignedSwapVisual />
+            <DealPlayer signed />
 
             <h3 className="mt-10 mb-4 text-lg font-black">Which one to pick</h3>
             <div className="grid gap-4 md:grid-cols-2">
