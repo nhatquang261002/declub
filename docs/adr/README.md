@@ -30,7 +30,7 @@ One file per decision, numbered in the order they were made. The **Status** line
 | [0003](0003-no-indexer-in-v1.md) | No indexer; the chain is the source of truth | Amended by 0004, relaxed by 0012, 0020 |
 | [0004](0004-read-deals-from-storage.md) | Read deals from storage, not event logs | Accepted |
 | [0019](0019-fill-watcher.md) | Fill watcher: a cron route records fills and Club activity | Amended by 0051 |
-| [0020](0020-server-side-deal-book.md) | The server searches and filters the whole deal book | Accepted |
+| [0020](0020-server-side-deal-book.md) | The server searches and filters the whole deal book | Accepted, amended 2026-10-13 (Newest first spans both kinds) |
 | [0051](0051-hypersync-for-the-fill-watcher.md) | The fill watcher finds transactions with Envio HyperSync | Accepted |
 | [0052](0052-check-epoch-fees-against-fee-logs.md) | `rewards:verify` checks the epoch's fees against `FeeCharged` logs | Accepted |
 | [0027](0027-on-chain-asset-search.md) | One on-chain search over tokens and collections | Accepted |

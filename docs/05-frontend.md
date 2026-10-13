@@ -238,7 +238,7 @@ Choices worth knowing:
 - **Paused intents** (the pool's `stale`) show why in plain words and, for the maker, the approval to fix it. The matcher revives it on its next 30s pass.
 - **Matched in a ring.** `CycleView` lists each wallet's whole `give` and who got it. A pair reads "Swap", three or four wallets "Ring of N". The maker's detail page also shows what they received, surplus included.
 - **Notifications.** The bell also lists the wallet's intents: settled, paused (needs action) and dropped, derived from the pool like the deal ones. Settled and dropped ones from before a wallet's first visit are marked read.
-- **Ordering in the merged list:** deals have an id but no timestamp, and a signed swap has a timestamp but no id, so there is no honest "newest" across both. Signed swaps come first; *Ending soon* sorts the two together by expiry or deadline.
+- **Ordering in the merged list:** *Newest first* puts both kinds in one list by creation time. A signed swap carries its own; a locked deal's is read from its `TradeCreated` log with Envio HyperSync and kept ([ADR 0020](adr/0020-server-side-deal-book.md)). A locked deal not dated yet takes the time of the next newer one, and without `ENVIO_API_TOKEN` locked deals come first. *Ending soon* sorts both kinds by expiry or deadline, equal ones newest first.
 - **NFTs are picked, not typed.** The sign flow uses the same `AssetEditor` and `NftPicker` as a locked deal; the give side passes `owner={address}`, so the picker shows the wallet's own NFTs.
 - **Not built:** counterparty restriction and trait wants (the contract has neither), per-token info beyond symbol and decimals, and push alerts while no tab is open.
 

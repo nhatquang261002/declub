@@ -40,10 +40,16 @@ const query = (over: Partial<BookQuery> = {}): BookQuery => ({
   ...over,
 });
 
-const source = (deals: Deal[], signed: PoolIntent[] = [], info: Map<string, TokenLabel> = new Map()): BookSource => ({
+const source = (
+  deals: Deal[],
+  signed: PoolIntent[] = [],
+  info: Map<string, TokenLabel> = new Map(),
+  createdAt: Map<bigint, number> = new Map(),
+): BookSource => ({
   deals,
   openSigned: signed.map(intentAsListing),
   allSigned: signed.map(intentAsListing),
+  createdAt,
   info,
 });
 
@@ -174,6 +180,49 @@ describe("pageBook", () => {
     assert.equal(pageBook(source(book, rows), query({ kind: "signed" }), NOW).total, rows.length);
   });
 
+  it("puts locked deals and signed swaps in one newest-first order once locked deals have a time", () => {
+    // Signed swaps were made 600, 1200 and 1800 s ago (signedRow(n) is n * 600 s old).
+    const rows = [signedRow(1), signedRow(2), signedRow(3)];
+    const created = new Map([
+      [3n, NOW - 100],
+      [2n, NOW - 900],
+      [1n, NOW - 5_000],
+    ]);
+    const page = pageBook(source([deal(3), deal(2), deal(1)], rows, new Map(), created), query(), NOW);
+    assert.deepEqual(
+      page.items.map((t) => ("signed" in t ? `s${Number(t.signed.createdAt - NOW) / -600}` : `d${t.id}`)),
+      ["d3", "s1", "d2", "s2", "s3", "d1"],
+    );
+    const old = pageBook(source([deal(3), deal(2), deal(1)], rows, new Map(), created), query({ tab: "all" }), NOW);
+    assert.equal(old.items.length, 6);
+    assert.equal("signed" in old.items[1], true);
+  });
+
+  it("gives a locked deal with no time the time of the next newer one, and the newest count as just made", () => {
+    // Deal 4 is too new to be read yet, 2 and 1 are unread: they sit with deal 3, 700 s old.
+    const created = new Map([[3n, NOW - 700]]);
+    const page = pageBook(source([deal(4), deal(3), deal(2), deal(1)], [signedRow(1), signedRow(2)], new Map(), created), query(), NOW);
+    assert.deepEqual(
+      page.items.map((t) => ("signed" in t ? "s" : Number(t.id))),
+      [4, "s", 3, 2, 1, "s"], // the signed swaps are 600 and 1200 s old
+    );
+  });
+
+  it("breaks ties between equal deadlines by newest first, signed swaps included", () => {
+    const sameDeadline = BigInt(NOW + 3_600);
+    const rows = [signedRow(1), signedRow(2)]; // deadline NOW + 3600
+    const created = new Map([
+      [2n, NOW - 100],
+      [1n, NOW - 5_000],
+    ]);
+    const book = [deal(2, { expiry: sameDeadline }), deal(1, { expiry: sameDeadline })];
+    const page = pageBook(source(book, rows, new Map(), created), query({ filters: { ...DEFAULT_FILTERS, sort: "ending-soon" } }), NOW);
+    assert.deepEqual(
+      page.items.map((t) => ("signed" in t ? "s" : Number(t.id))),
+      [2, "s", "s", 1],
+    );
+  });
+
   it("pages, and counts every page", () => {
     const many = Array.from({ length: 9 }, (_, i) => deal(9 - i));
     const page = pageBook(source(many), query({ page: 3, size: 4 }), NOW);
@@ -290,6 +339,52 @@ describe("createBook", () => {
     assert.deepEqual(read.info.get(NFT.toLowerCase()), { symbol: "CHOG", name: "Chog Genesis" });
     assert.deepEqual(read.info.get(USD.toLowerCase()), { symbol: "mUSD", name: "Mock USD" });
     assert.deepEqual([...state.tokenReads].sort(), [NFT.toLowerCase(), USD.toLowerCase()].sort());
+  });
+
+  it("reads creation times only for deals that have none, from where it left off", async () => {
+    let clock = 0;
+    const { reader, state } = fakeReader([deal(1), deal(2)]);
+    const asked: bigint[] = [];
+    reader.created = async (from) => {
+      asked.push(from);
+      return { times: new Map(state.deals.map((d) => [d.id, 1_000 + Number(d.id)] as const)), next: from + 50n };
+    };
+    const book = createBook(reader, null, { ttlMs: 0, createdRetryMs: 5_000, now: () => clock });
+    assert.deepEqual(
+      [...(await book.source("open")).createdAt],
+      [
+        [1n, 1_001],
+        [2n, 1_002],
+      ],
+    );
+    clock = 10_000;
+    await book.source("open");
+    assert.deepEqual(asked, [0n], "every deal has a time, so nothing more is asked");
+
+    state.deals = [...state.deals, deal(3)];
+    await book.source("open");
+    assert.deepEqual(asked, [0n, 50n]);
+    assert.equal((await book.source("open")).createdAt.get(3n), 1_003);
+  });
+
+  it("serves the book without times when they can't be read, and tries again later", async () => {
+    let clock = 0;
+    const { reader } = fakeReader([deal(1)]);
+    let up = false;
+    let asked = 0;
+    reader.created = async (from) => {
+      asked++;
+      if (!up) throw new Error("envio down");
+      return { times: new Map([[1n, 500]]), next: from + 1n };
+    };
+    const book = createBook(reader, null, { ttlMs: 0, createdRetryMs: 5_000, now: () => clock });
+    assert.equal((await book.source("open")).createdAt.size, 0);
+    clock = 1_000;
+    await book.source("open");
+    assert.equal(asked, 1, "not before the retry delay");
+    up = true;
+    clock = 6_000;
+    assert.equal((await book.source("open")).createdAt.get(1n), 500);
   });
 
   it("keeps the deals when the pool is down, and says so", async () => {

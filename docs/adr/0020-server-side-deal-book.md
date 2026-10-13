@@ -2,6 +2,8 @@
 
 **Status:** Accepted · 2026-10-03 · Web only. No contract, matcher or pool change. Lifts the "search, filters or sorting" trigger of [ADR 0003](0003-no-indexer-in-v1.md) without an indexer, reading storage as [ADR 0004](0004-read-deals-from-storage.md) does.
 
+**Amended 2026-10-13:** *Newest first* orders locked deals and signed swaps together by creation time. A locked deal's time is read from its `TradeCreated` log with HyperSync ([ADR 0051](0051-hypersync-for-the-fill-watcher.md)) and kept in the book, since the contract doesn't store it. Before this, locked deals always sat above signed swaps.
+
 ## Context
 
 The deals page searched and filtered in the browser, over the newest 200 deals it had read (`tradeCount`, then one multicall of `getTrade`). Anything older couldn't be found, and every visitor paid for the same 200 reads. A Club's market had the same limit. ADR 0003 named search and filters as the point to add an indexer, and ADR 0019 named a hosted indexer as the answer for server-side filtering.

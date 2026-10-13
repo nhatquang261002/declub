@@ -1,5 +1,6 @@
-import type { Log, LogField, LogFilter, Query, QueryResponse } from "@envio-dev/hypersync-client";
+import type { Block, BlockField, Log, LogField, LogFilter, Query, QueryResponse } from "@envio-dev/hypersync-client";
 import type { Address, Hex } from "viem";
+import { CHAIN_ID } from "../config";
 import type { ChainScan } from "./fillWatcher";
 
 /**
@@ -8,6 +9,27 @@ import type { ChainScan } from "./fillWatcher";
  * queries and a backfill from the deploy block takes one run. It only says which transactions to
  * look at: the watcher still reads each receipt from the node and records nothing else (ADR 0019).
  */
+
+const HYPERSYNC_TIMEOUT_MS = 5_000;
+
+/**
+ * The Envio client when `ENVIO_API_TOKEN` is set, null when not. The token is server-side only.
+ * HyperSync serves a chain at `<chain id>.hypersync.xyz`, so both flavors use the same code.
+ */
+export async function loadHypersync(): Promise<HypersyncLike | null> {
+  const apiToken = process.env.ENVIO_API_TOKEN?.trim();
+  if (!apiToken) return null;
+  // Loaded on demand: it is a native module the other routes have no use for.
+  const { HypersyncClient } = await import("@envio-dev/hypersync-client");
+  return new HypersyncClient({
+    url: `https://${CHAIN_ID}.hypersync.xyz`,
+    apiToken,
+    // The client's defaults (30 s, 12 retries) could outlast the route's 60 s. A connection to Envio can stall
+    // for as long as its timeout; if it still can't answer, the caller falls back.
+    httpReqTimeoutMillis: HYPERSYNC_TIMEOUT_MS,
+    maxNumRetries: 3,
+  });
+}
 
 /** What the scan uses of the Envio client, so a test can stand in for it. */
 export type HypersyncLike = {
@@ -24,20 +46,45 @@ export const HYPERSYNC_RANGE = 200_000;
 
 /**
  * Every log in blocks `from`..`to` (inclusive) that matches `selection`, with `fields` filled in,
- * following the query's `nextBlock` until the range is done.
+ * following the query's `nextBlock` until the range is done. `blockFields` also returns the blocks
+ * the logs are in.
  */
-export async function collectLogs(hypersync: HypersyncLike, from: bigint, to: bigint, selection: LogFilter, fields: LogField[]): Promise<Log[]> {
+async function collect(hypersync: HypersyncLike, from: bigint, to: bigint, selection: LogFilter, fields: LogField[], blockFields: BlockField[] = []) {
   const logs: Log[] = [];
+  const blocks: Block[] = [];
   const end = Number(to) + 1; // `toBlock` is exclusive
   let next = Number(from);
   while (next < end) {
-    const page = await hypersync.get({ fromBlock: next, toBlock: end, logs: [selection], fieldSelection: { log: fields } });
+    const page = await hypersync.get({ fromBlock: next, toBlock: end, logs: [selection], fieldSelection: { log: fields, block: blockFields } });
     logs.push(...page.data.logs.filter((log) => !log.removed));
+    blocks.push(...page.data.blocks);
     // A page that moves nowhere would repeat forever. Stop, and let the run fail and be retried.
     if (page.nextBlock <= next) throw new Error(`HyperSync stopped at block ${next} while asked for ${from}..${to}.`);
     next = page.nextBlock;
   }
-  return logs;
+  return { logs, blocks };
+}
+
+export async function collectLogs(hypersync: HypersyncLike, from: bigint, to: bigint, selection: LogFilter, fields: LogField[]): Promise<Log[]> {
+  return (await collect(hypersync, from, to, selection, fields)).logs;
+}
+
+/**
+ * When each trade was created (unix seconds), from the `TradeCreated` logs of `contract` in blocks
+ * `from`..`to`. The trade id is the event's first indexed argument. The contract keeps no creation
+ * time, so the deal book (ADR 0020) reads it here to put locked deals and signed swaps in one order.
+ */
+export async function tradeCreationTimes(hypersync: HypersyncLike, contract: Address, created: Hex, from: bigint, to: bigint): Promise<Map<bigint, number>> {
+  const { logs, blocks } = await collect(hypersync, from, to, { address: [contract], topics: [[created]] }, ["BlockNumber", "Topic1"], ["Number", "Timestamp"]);
+  const stamps = new Map<number, number>();
+  for (const block of blocks) if (block.number !== undefined && block.timestamp !== undefined) stamps.set(block.number, block.timestamp);
+  const times = new Map<bigint, number>();
+  for (const log of logs) {
+    const id = log.topics[1];
+    const at = log.blockNumber === undefined ? undefined : stamps.get(log.blockNumber);
+    if (id && at !== undefined) times.set(BigInt(id), at);
+  }
+  return times;
 }
 
 export function hypersyncScan(

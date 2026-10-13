@@ -205,11 +205,14 @@ function Body({ row, me, now }: { row: PoolIntent; me?: `0x${string}`; now: numb
  */
 function MatchPanel({ row, me, info }: { row: PoolIntent; me?: `0x${string}`; info: ReturnType<typeof useIntentsTokenInfo>["info"] }) {
   const { intent } = row;
-  const readiness = useIntentReadiness(me, intent.want, info, "token");
+  // The same fee the create form counts, so a wallet with only MON for WMON is offered the wrap, not turned away.
+  const { fee, isLoading: feeLoading } = useIntentFee();
+  const readiness = useIntentReadiness(me, intent.want, info, "token", fee);
+  const wraps = readiness.steps.some((step) => step.key.startsWith("wrap:"));
   const wants = intent.want.map((a) => formatAsset(a, info.get(a.token.toLowerCase()))).join(", ");
 
   if (!me) return <p className="text-sm text-muted">Sign in to see if you hold what this swap wants ({wants}) and can match it.</p>;
-  if (readiness.isLoading) return <p className="text-sm text-muted">Checking your wallet for what this swap wants…</p>;
+  if (readiness.isLoading || feeLoading) return <p className="text-sm text-muted">Checking your wallet for what this swap wants…</p>;
   if (readiness.problems.length > 0) {
     return <p className="text-sm text-muted">{readiness.problems.join(" ")}</p>;
   }
@@ -217,7 +220,7 @@ function MatchPanel({ row, me, info }: { row: PoolIntent; me?: `0x${string}`; in
     <div className="space-y-2">
       <p className="flex items-center gap-2 text-sm font-semibold text-[#1f7a55]">
         <CheckIcon className="size-4 shrink-0" />
-        You hold what it wants: {wants}
+        {wraps ? `You can cover what it wants: ${wants}` : `You hold what it wants: ${wants}`}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Link href={`/create?match=${row.hash}`} className="btn-primary">
@@ -225,6 +228,7 @@ function MatchPanel({ row, me, info }: { row: PoolIntent; me?: `0x${string}`; in
         </Link>
         <span className="text-xs text-muted">Fills in the other side for you. You still check it, choose a deadline and sign.</span>
       </div>
+      {wraps && <p className="text-xs text-muted">You hold the MON for it but not as WMON. The first step wraps what you need.</p>}
     </div>
   );
 }

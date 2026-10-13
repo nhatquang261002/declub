@@ -61,7 +61,10 @@ function matchesMon(deal: Deal, mon: MonFilter): boolean {
   }
 }
 
-/** Free-text query, MON filter and sorting (lib/dealFilters.ts) over DeClubEscrow deals and signed swaps. */
+/**
+ * Free-text query, MON filter and sorting (lib/dealFilters.ts) over DeClubEscrow deals and signed swaps.
+ * "Newest" keeps the order it is given; "ending soon" sorts stably, so equal deadlines stay newest first.
+ */
 export function applyDealFilters<T extends Deal>(deals: T[], filters: DealFilters, now: number, info: ReadonlyMap<string, TokenLabel>): T[] {
   const out = deals.filter((t) => matchesQuery(t, filters.query, info) && matchesMon(t, filters.mon));
   if (filters.sort === "ending-soon") {
@@ -69,7 +72,7 @@ export function applyDealFilters<T extends Deal>(deals: T[], filters: DealFilter
       const rank = endingSoonRank(a, now) - endingSoonRank(b, now);
       if (rank !== 0) return rank;
       if (a.expiry !== b.expiry && endingSoonRank(a, now) === 0) return a.expiry < b.expiry ? -1 : 1;
-      return a.id === b.id ? 0 : a.id < b.id ? 1 : -1;
+      return 0;
     });
   }
   return out;
