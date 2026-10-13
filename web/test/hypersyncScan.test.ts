@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { Query, QueryResponse } from "@envio-dev/hypersync-client";
 import type { Address, Hex } from "viem";
 import type { ChainScan } from "../lib/server/fillWatcher";
-import { HYPERSYNC_RANGE, hypersyncScan, withFallback, type HypersyncLike } from "../lib/server/hypersyncScan";
+import { HYPERSYNC_RANGE, hypersyncScan, tradeCreationTimes, withFallback, type HypersyncLike } from "../lib/server/hypersyncScan";
 
 const ESCROW: Address = "0x73591F76d7deE66F683A979cEffb4356982EE1bB";
 const TOPIC: Hex = `0x${"ab".repeat(32)}`;
@@ -95,6 +95,69 @@ describe("hypersyncScan", () => {
   it("scans in ranges much wider than the public RPC allows", () => {
     assert.equal(scanOf(fakeHypersync([], 1).client).range, HYPERSYNC_RANGE);
     assert.ok(HYPERSYNC_RANGE > 100);
+  });
+});
+
+describe("tradeCreationTimes", () => {
+  const topicOf = (id: number) => `0x${id.toString(16).padStart(64, "0")}`;
+
+  /** Envio answering a creation query: logs with the trade id in topic 1, and the blocks they are in. */
+  function fakeCreations(made: Array<{ id: number; block: number; at: number }>, pageBlocks = Infinity) {
+    const queries: Query[] = [];
+    const client: HypersyncLike = {
+      getHeight: async () => 1_000,
+      async get(query) {
+        queries.push(query);
+        const stop = Math.min(query.toBlock ?? 1_001, query.fromBlock + pageBlocks);
+        const here = made.filter((m) => m.block >= query.fromBlock && m.block < stop);
+        return {
+          nextBlock: stop,
+          totalExecutionTime: 0,
+          data: {
+            blocks: here.map((m) => ({ number: m.block, timestamp: m.at })),
+            transactions: [],
+            logs: here.map((m) => ({ blockNumber: m.block, topics: [TOPIC, topicOf(m.id)] })),
+            traces: [],
+          },
+        } as QueryResponse;
+      },
+    };
+    return { client, queries };
+  }
+
+  it("maps each trade id to the time of the block it was created in, across pages", async () => {
+    const { client, queries } = fakeCreations(
+      [
+        { id: 1, block: 10, at: 1_700_000_010 },
+        { id: 2, block: 14, at: 1_700_000_030 },
+        { id: 3, block: 14, at: 1_700_000_030 },
+      ],
+      4,
+    );
+    const times = await tradeCreationTimes(client, ESCROW, TOPIC, 10n, 19n);
+    assert.deepEqual(
+      [...times],
+      [
+        [1n, 1_700_000_010],
+        [2n, 1_700_000_030],
+        [3n, 1_700_000_030],
+      ],
+    );
+    assert.deepEqual(queries[0].logs, [{ address: [ESCROW], topics: [[TOPIC]] }]);
+    assert.deepEqual(queries[0].fieldSelection.block, ["Number", "Timestamp"]);
+  });
+
+  it("leaves out a trade whose block it wasn't given", async () => {
+    const client: HypersyncLike = {
+      getHeight: async () => 1_000,
+      get: async (query) =>
+        ({
+          nextBlock: (query.toBlock ?? 0) + 0,
+          totalExecutionTime: 0,
+          data: { blocks: [], transactions: [], logs: [{ blockNumber: 12, topics: [TOPIC, topicOf(5)] }], traces: [] },
+        }) as QueryResponse,
+    };
+    assert.equal((await tradeCreationTimes(client, ESCROW, TOPIC, 10n, 19n)).size, 0);
   });
 });
 

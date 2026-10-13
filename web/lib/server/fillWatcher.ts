@@ -5,7 +5,7 @@ import { chain } from "../chain";
 import { CHAIN_ID, RPC_URL } from "../config";
 import { ACTIVITY_CONTRACTS, recordActivity, viemReader, type IngestOptions, type Reader } from "./activity";
 import { FILL_CONTRACTS, recordFills } from "./fills";
-import { hypersyncScan, withFallback } from "./hypersyncScan";
+import { hypersyncScan, loadHypersync, withFallback } from "./hypersyncScan";
 import type { Store } from "./store";
 
 /**
@@ -46,8 +46,6 @@ const DEFAULT_RANGE = 100;
 let cached: PublicClient | undefined;
 const client = () => (cached ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
-const HYPERSYNC_TIMEOUT_MS = 5_000;
-
 const finalizedHead = async () => (await client().getBlock({ blockTag: "finalized" })).number;
 
 function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
@@ -61,24 +59,10 @@ function viemScan(contracts: readonly Address[] = WATCHED): ChainScan {
   };
 }
 
-/**
- * Envio HyperSync when `ENVIO_API_TOKEN` is set (ADR 0051), the node's own logs when not. The token
- * is server-side only. HyperSync serves a chain at `<chain id>.hypersync.xyz`, so both flavors
- * use the same code.
- */
+/** Envio HyperSync when `ENVIO_API_TOKEN` is set (ADR 0051), the node's own logs when not. */
 async function defaultScan(): Promise<ChainScan> {
-  const apiToken = process.env.ENVIO_API_TOKEN?.trim();
-  if (!apiToken || WATCHED.length === 0) return viemScan();
-  // Loaded on demand: it is a native module the other routes have no use for.
-  const { HypersyncClient } = await import("@envio-dev/hypersync-client");
-  const hypersync = new HypersyncClient({
-    url: `https://${CHAIN_ID}.hypersync.xyz`,
-    apiToken,
-    // The client's defaults (30 s, 12 retries) could outlast the route's 60 s. A connection to Envio can stall
-    // for as long as its timeout; if it still can't answer, the run falls back to the node.
-    httpReqTimeoutMillis: HYPERSYNC_TIMEOUT_MS,
-    maxNumRetries: 3,
-  });
+  const hypersync = await loadHypersync();
+  if (!hypersync || WATCHED.length === 0) return viemScan();
   return withFallback(hypersyncScan(hypersync, finalizedHead, WATCHED, EVENTS.map(toEventSelector)), viemScan());
 }
 

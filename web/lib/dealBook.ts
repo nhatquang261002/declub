@@ -96,13 +96,15 @@ export function parseBookQuery(p: URLSearchParams): BookQuery | string {
   };
 }
 
-/** What the server filters: the whole locked book, newest first, and the pool's signed swaps. */
+/** What the server filters: the whole locked book, newest first by id, and the pool's signed swaps. */
 export type BookSource = {
   deals: readonly Deal[];
   /** Live signed swaps, newest first. */
   openSigned: readonly SignedListing[];
   /** Signed swaps of every status, for the "all" tab. */
   allSigned: readonly SignedListing[];
+  /** When each locked deal was created (unix seconds), by trade id. Missing for a deal not read yet, or without HyperSync. */
+  createdAt: ReadonlyMap<bigint, number>;
   /** Token and collection symbols and names, so a search for "USDC" or "Chog" finds the deals that hold it. */
   info: ReadonlyMap<string, TokenLabel>;
 };
@@ -116,6 +118,23 @@ type BookResult = {
 };
 
 const isLive = (t: Listing, now: number) => t.status === "open" && !isExpired(t, now);
+
+/**
+ * Locked deals (newest first by id) and signed swaps (newest first) in one list, newest first. A
+ * signed swap carries its creation time; a locked deal's is read from the chain (`createdAt`). One
+ * not read yet takes the time of the next newer deal, so ids stay in order, and the newest ones
+ * count as just made. That is also the order when no times are known at all.
+ */
+function newestFirst(locked: readonly Deal[], signed: readonly SignedListing[], createdAt: ReadonlyMap<bigint, number>): Listing[] {
+  let ceiling = Infinity;
+  const rows: Array<{ at: number; listing: Listing }> = locked.map((listing) => {
+    ceiling = Math.min(createdAt.get(listing.id) ?? ceiling, ceiling);
+    return { at: ceiling, listing };
+  });
+  for (const listing of signed) rows.push({ at: listing.signed.createdAt, listing });
+  // Stable, so equal times keep locked ahead of signed.
+  return rows.sort((a, b) => b.at - a.at).map((row) => row.listing);
+}
 
 /** One page of the book, with the same tabs, search, filters and sorting the deals page offers. */
 export function pageBook(source: BookSource, q: BookQuery, now: number): BookResult {
@@ -133,18 +152,14 @@ export function pageBook(source: BookSource, q: BookQuery, now: number): BookRes
   const signedOpen = newestSigned(signed(source.openSigned));
   const signedAll = newestSigned(signed(source.allSigned));
 
-  // Locked deals arrive newest-first by trade id. Keep them ahead of signed rows for the default
-  // sort so a newly created escrow deal reaches the front of the book instead of sitting behind
-  // every signed listing. Ending-soon applies its own ordering across both kinds below.
-  const combined = q.filters.sort === "newest" ? [...locked, ...signedOpen] : [...signedOpen, ...locked];
+  // Newest first across both kinds; "ending soon" then sorts this stably, so equal deadlines stay newest first.
+  const combined = newestFirst(locked, signedOpen, source.createdAt);
   const live = filter(combined).filter((t) => isLive(t, now));
   // Public offers plus private ones addressed to the viewer. A signed swap is open to anyone.
   const open = live.filter((t) => !t.taker || sameAddress(t.taker, q.viewer));
   // Only a locked deal can be addressed to one wallet.
   const forYou = q.viewer ? live.filter((t) => sameAddress(t.taker, q.viewer)) : [];
-  const allCombined =
-    q.filters.sort === "newest" ? [...locked, ...signedAll] : [...signedAll, ...locked];
-  const list = q.tab === "open" ? open : q.tab === "for-you" ? forYou : filter(allCombined);
+  const list = q.tab === "open" ? open : q.tab === "for-you" ? forYou : filter(newestFirst(locked, signedAll, source.createdAt));
 
   const start = (q.page - 1) * q.size;
   return { items: list.slice(start, start + q.size), total: list.length, counts: { open: open.length, forYou: forYou.length } };

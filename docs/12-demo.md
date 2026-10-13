@@ -12,7 +12,7 @@ The hackathon demo runs on Monad testnet, on mirrors of three mainnet collection
 | skrumpeys (SKRUMP) | `0xb0da…c2d0` | 3,333 | evmfs.xyz | `pixel.warden` |
 | r3tards (R3TARDS) | `0x2007…0c29` | 1,033 | scatter.art | `intern_zero` |
 
-Only the demo holdings are minted: 61 tokens over 13 wallets. Each mirror's `owner()` is handed to its Club's Owner, so the claimed Owner and the chain agree.
+Only the demo holdings are minted: 75 tokens over 13 wallets (the last 14, in Skrumpeys and r3tards, are spare NFTs for the cheap signed deals). Each mirror's `owner()` is handed to its Club's Owner, so the claimed Owner and the chain agree.
 
 **Thirteen personas** (`web/scripts/demo/content.ts`), each with a Discord handle. The app doesn't link Discord handles, so no persona points at a real person's X account. The presenter's own wallet (`DEMO_PRESENTER_WALLET`) holds in all three Clubs and owns the Chog Club, but posts nothing: posting is for the live demo.
 
@@ -23,7 +23,7 @@ Only the demo holdings are minted: 61 tokens over 13 wallets. Each mirror's `own
 - shared profiles, avatars (each persona's first NFT), Club memberships with their join dates;
 - roles, moderators and the moderation log;
 - each Club's description, mainnet link, X tags and pinned post;
-- 24 signed posts over twelve days;
+- 33 signed posts over twelve days, nine of them hints at features (deals, signed swaps, rings, Rewards, challenges, follows, safety);
 - 23 signed follows.
 
 ## Demo contracts

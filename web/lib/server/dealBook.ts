@@ -1,4 +1,4 @@
-import { createPublicClient, erc20Abi, http, type Address, type PublicClient } from "viem";
+import { createPublicClient, erc20Abi, getAbiItem, http, toEventSelector, type Address, type PublicClient } from "viem";
 import { deClubEscrowAbi } from "../abi";
 import type { TokenLabel } from "../assets";
 import { chain } from "../chain";
@@ -7,6 +7,7 @@ import type { BookSource } from "../dealBook";
 import { toDeal, type Deal } from "../deals";
 import { intentAsListing, type PoolIntent } from "../intents";
 import { listIntents } from "../pool";
+import { loadHypersync, tradeCreationTimes } from "./hypersyncScan";
 
 /**
  * The whole deal book, held by the server so it can be searched and filtered past the newest 200
@@ -17,6 +18,9 @@ import { listIntents } from "../pool";
  * - Open deals (expired ones included, until reclaimed) are read again on each refresh, along with
  *   `tradeCount` for the new ones. A refresh happens at most every `ttlMs`, and requests that arrive
  *   during one share it.
+ * - A deal's creation time never changes, and the contract doesn't keep it, so it is read from the
+ *   `TradeCreated` logs with Envio HyperSync (ADR 0051) when `ENVIO_API_TOKEN` is set. It puts
+ *   locked deals and signed swaps in one newest-first order. Without it, locked deals come first.
  * - Symbols and names never change either, so each token or NFT collection is read once (one that
  *   doesn't answer is tried again after a while). Signed swaps are read the same way as locked deals.
  *
@@ -31,6 +35,11 @@ export type BookReader = {
   trades(ids: readonly bigint[]): Promise<(Deal | null)[]>;
   /** Symbol and name of each token or NFT collection that answers. */
   tokenInfo(tokens: readonly Address[]): Promise<Map<string, TokenLabel>>;
+  /**
+   * Creation times (unix seconds) of the trades created from block `from` on, and the block to
+   * resume from. Left out when there is no HyperSync.
+   */
+  created?(from: bigint): Promise<{ times: Map<bigint, number>; next: bigint }>;
 };
 
 /** The pool's book (matcher/). null when the intents contract isn't configured. */
@@ -45,6 +54,8 @@ type BookOptions = {
   parallel?: number;
   /** How long a token that didn't answer is left alone. */
   tokenRetryMs?: number;
+  /** How long to wait before asking for creation times again, when some are still missing. */
+  createdRetryMs?: number;
   now?: () => number;
 };
 
@@ -61,11 +72,15 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
   const batch = Math.max(1, options.batch ?? 100);
   const parallel = Math.max(1, options.parallel ?? 4);
   const tokenRetryMs = options.tokenRetryMs ?? 10 * 60_000;
+  const createdRetryMs = options.createdRetryMs ?? 10_000;
   const now = options.now ?? Date.now;
 
   const closed = new Map<bigint, Deal>();
   const tokens = new Map<string, TokenLabel>();
   const tokenMisses = new Map<string, number>();
+  const createdAt = new Map<bigint, number>();
+  let createdFrom = 0n;
+  let createdTried = -Infinity;
   let deals: { at: number; list: Deal[] } | null = null;
   let refreshing: Promise<Deal[]> | null = null;
   const pool = new Map<"open" | "all", { at: number; rows: PoolIntent[] }>();
@@ -97,8 +112,21 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
       const deal = closed.get(id) ?? fresh.get(id);
       if (deal) list.push(deal);
     }
-    await readTokens(list);
+    await Promise.all([readTokens(list), readCreated(list)]);
     return list;
+  }
+
+  /** Looks for the creation time of deals that have none, from the block after the last one read. */
+  async function readCreated(list: readonly Deal[]) {
+    if (!reader.created || list.every((deal) => createdAt.has(deal.id)) || now() - createdTried < createdRetryMs) return;
+    createdTried = now();
+    try {
+      const { times, next } = await reader.created(createdFrom);
+      for (const [id, at] of times) createdAt.set(id, at);
+      createdFrom = next;
+    } catch {
+      // Without times the book is ordered as if there were none, and this is tried again.
+    }
   }
 
   async function readTokens(list: readonly Pick<Deal, "offered" | "requested">[]) {
@@ -185,6 +213,7 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
         deals: list,
         openSigned,
         allSigned,
+        createdAt,
         info: tokens,
         signedError: failed ? (failed instanceof Error ? failed.message : "The intent pool couldn't be read.") : null,
       };
@@ -195,8 +224,20 @@ export function createBook(reader: BookReader, intents: IntentReader, options: B
 let cachedClient: PublicClient | undefined;
 const client = () => (cachedClient ??= createPublicClient({ chain, transport: http(RPC_URL) }) as PublicClient);
 
+const TRADE_CREATED = toEventSelector(getAbiItem({ abi: deClubEscrowAbi, name: "TradeCreated" }));
+
 function viemBookReader(contract: Address): BookReader {
+  let hypersync: ReturnType<typeof loadHypersync> | undefined;
   return {
+    created: async (from) => {
+      const envio = await (hypersync ??= loadHypersync());
+      // Without a token there are no times, and the book keeps its locked-first order.
+      if (!envio) return { times: new Map(), next: from };
+      // Envio's own height, so a block it hasn't indexed yet isn't skipped for good.
+      const height = BigInt(await envio.getHeight());
+      if (height < from) return { times: new Map(), next: from };
+      return { times: await tradeCreationTimes(envio, contract, TRADE_CREATED, from, height), next: height + 1n };
+    },
     tradeCount: () => client().readContract({ address: contract, abi: deClubEscrowAbi, functionName: "tradeCount" }),
     async trades(ids) {
       const results = await client().multicall({

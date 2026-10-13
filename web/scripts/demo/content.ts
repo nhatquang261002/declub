@@ -69,7 +69,11 @@ export const CLUBS: Record<
   },
 };
 
-/** Minted in this order, so each holder's token ids are a run that follows the one before. */
+/**
+ * Minted in this order, so each holder's token ids are a run that follows the one before. The last entry of a Club
+ * is a second mint to a holder who already has one, to leave more free NFTs for the cheap signed deals; Chog has none
+ * because its mirror belongs to the presenter. `idOf` reads only a holder's first run.
+ */
 export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
   chog: [
     ["you", 3],
@@ -90,6 +94,9 @@ export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
     ["tide", 2],
     ["lou", 1],
     ["cope", 1],
+    ["bulmba", 3],
+    ["hanoi", 2],
+    ["tide", 2],
   ],
   r3tards: [
     ["intern", 5],
@@ -100,6 +107,9 @@ export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
     ["slow", 2],
     ["candle", 1],
     ["nadsworth", 1],
+    ["cope", 3],
+    ["slow", 2],
+    ["oatmilk", 2],
   ],
 };
 
@@ -173,6 +183,13 @@ export const SIGNED: { gives: number; wantsNfts?: number; wantsMon?: "cheap" | "
   { gives: 1, wantsNfts: 1, wantsMon: "cheap" },
   { gives: 1, wantsMon: "cheap" },
   { gives: 1, wantsMon: "random" },
+  // The last six ask only a few cents, like the cheap `market` deals, so a fresh faucet wallet can take one.
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 2, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
 ];
 
 /**
@@ -189,9 +206,10 @@ export const RINGS: { legs: 2 | 3 | 4; closer: boolean }[] = [
 /**
  * Board posts. `ago` is how long before the social step ran, in hours; the ones that talk about
  * this run's swaps are minutes old, so they come after them. A post with `ref` is a "looking" post
- * linking the open trade of that name. `pin` pins it (the Owner's posts).
+ * linking the open trade of that name. `pin` pins it (the Owner's posts). `hint` marks a post that
+ * nudges a feature; the `hints` step adds just those to a world that is already built.
  */
-export type Post = { club: ClubKey; by: PersonaKey; ago: number; text: string; ref?: string; pin?: boolean };
+export type Post = { club: ClubKey; by: PersonaKey; ago: number; text: string; ref?: string; pin?: boolean; hint?: boolean };
 
 export const POSTS: Post[] = [
   // Chog
@@ -204,6 +222,21 @@ export const POSTS: Post[] = [
   { club: "chog", by: "hanoi", ago: 70, text: "Chog + skrump pair on my profile now. Monad PFP maxi." },
   { club: "chog", by: "slow", ago: 40, text: "Momentum on this Club is climbing. Every swap counts, so keep them coming." },
   { club: "chog", by: "mika", ago: 0.03, text: "One of mine is up for 0.3 MON. Holders get first look.", ref: "mika-chog" },
+  {
+    club: "chog",
+    by: "nadsworth",
+    ago: 12,
+    text: "Anyone want to make a deal? I'd swap a Chog for a skrump. List it in the Market tab and the escrow holds it until someone takes it.",
+    hint: true,
+  },
+  {
+    club: "chog",
+    by: "hanoi",
+    ago: 8,
+    text: "Tip: sign a swap instead of locking the NFT. Signing costs nothing, the NFT stays in your wallet, and it fills when someone matches it.",
+    hint: true,
+  },
+  { club: "chog", by: "slow", ago: 5, text: "Rewards tab: your MON from last epoch is waiting. Claim it, unclaimed rewards just sit there.", hint: true },
   // skrumpeys
   { club: "skrumpeys", by: "warden", ago: 300, text: "Welcome to the skrumpeys Club. Post your skrump, keep it kind, swap what you don't love.", pin: true },
   { club: "skrumpeys", by: "bulmba", ago: 270, text: "Bulmba background gang where you at" },
@@ -212,6 +245,27 @@ export const POSTS: Post[] = [
   { club: "skrumpeys", by: "lou", ago: 100, text: "Poop hat is the best hat. This is not a debate." },
   { club: "skrumpeys", by: "cope", ago: 0.07, text: "Traded a r3tard for a skrump today. Cross-Club swaps are underrated." },
   { club: "skrumpeys", by: "warden", ago: 20, text: "Club fund update: the Owner share goes back into the community. More on that this week." },
+  {
+    club: "skrumpeys",
+    by: "tide",
+    ago: 14,
+    text: "Looking to trade up. Got a r3tard and some MON for a skrump. Bundles work too, so offer more than one if you like.",
+    hint: true,
+  },
+  {
+    club: "skrumpeys",
+    by: "lou",
+    ago: 6,
+    text: "Before you accept a swap, read the contract address it asks you to confirm. And clear old approvals on the /approvals page now and then.",
+    hint: true,
+  },
+  {
+    club: "skrumpeys",
+    by: "warden",
+    ago: 3,
+    text: "Follow the people whose posts you like. Your Timeline can show every Club or only the ones you joined.",
+    hint: true,
+  },
   { club: "skrumpeys", by: "bulmba", ago: 0.03, text: "Letting one of my skrumps go for 0.1 MON.", ref: "bulmba-skrump" },
   // r3tards
   { club: "r3tards", by: "intern", ago: 280, text: "Certified. Club is open. Interns, report to the board.", pin: true },
@@ -220,6 +274,21 @@ export const POSTS: Post[] = [
   { club: "r3tards", by: "oatmilk", ago: 130, text: "Picked up two r3tards. My Chogs needed coworkers." },
   { club: "r3tards", by: "fresh", ago: 90, text: "Member, not a holder yet. Board still lets me post, which is nice." },
   { club: "r3tards", by: "tide", ago: 0.06, text: "Bought another r3tard off intern for 0.05 MON. Intern energy." },
+  {
+    club: "r3tards",
+    by: "cope",
+    ago: 11,
+    text: "Three-way swaps are real. Sign what you give and what you want, and the matcher closes the ring when the NFTs line up.",
+    hint: true,
+  },
+  {
+    club: "r3tards",
+    by: "fresh",
+    ago: 7,
+    text: "Check the Challenges tab. The Owner sets a task, you share an X post to enter, and the prize goes to the best entry.",
+    hint: true,
+  },
+  { club: "r3tards", by: "intern", ago: 2, text: "Every swap lands in the Club's activity and moves Momentum. Anyone want to make a deal today?", hint: true },
   { club: "r3tards", by: "cope", ago: 0.03, text: "One r3tard for 0.12 MON, open to anyone.", ref: "cope-r3tard" },
 ];
 
