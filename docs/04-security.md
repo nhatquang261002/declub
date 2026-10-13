@@ -235,7 +235,7 @@ contracts/test/rewards/
 
 ## Fill watcher
 
-The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club activity that feed History and Momentum. It holds no keys and moves no assets. It may find transactions with Envio HyperSync ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)).
+The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club activity that feed History and Momentum. It holds no keys and moves no assets. It may find transactions with Envio HyperSync ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md)). The deal book also reads locked deals' creation times from it, for sorting only ([ADR 0020](adr/0020-server-side-deal-book.md)).
 
 ### Threats
 
@@ -245,6 +245,7 @@ The fill watcher ([ADR 0019](adr/0019-fill-watcher.md)) records fills and Club a
 | **HyperSync is behind or ahead of the node,** so the cursor passes blocks that weren't scanned or aren't final | `head()` is the lower of the node's finalized block and HyperSync's height | `hypersyncScan.test.ts`: only treats blocks as scanned when both the node and Envio have them |
 | **HyperSync is down or refuses** (outage, rate limit) and stops the watcher | If the height or a one-block token check can't be read (a revoked token fails the check, not the height) the run scans the node's logs instead; a later failure fails the run with the cursor unmoved | `hypersyncScan.test.ts`: `withFallback` cases |
 | **A page that doesn't advance** loops the run until the host kills it | A page whose `nextBlock` doesn't pass the block asked for fails the run, and the next run resumes from the cursor | `hypersyncScan.test.ts`: fails rather than loop when an answer moves nowhere |
+| **A wrong or missing creation time** puts a deal in the wrong place in the list | The time only orders the Deals list. It gates no fill and no payment, and every action re-reads the deal from the chain. A failed read leaves the book as it was and is retried every 10 s; a deal with no time takes its newer neighbour's | `dealBook.test.ts`: gives a locked deal with no time the time of the next newer one; serves the book without times when they can't be read |
 | **The Envio token leaks** | Read from the server environment only; never `NEXT_PUBLIC_`, never logged | none (a configuration rule) |
 
 ## Post pictures

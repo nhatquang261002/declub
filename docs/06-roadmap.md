@@ -20,6 +20,7 @@ lives in the git log and the relevant ADRs.
 - [ ] Run the manual testnet pass with two real wallets
 - [ ] Run the rewards epoch and claim flow on testnet
 - [ ] Run the fill watcher on testnet with `ENVIO_API_TOKEN` and backfill from the deploy block ([ADR 0051](adr/0051-hypersync-for-the-fill-watcher.md); built and unit-tested, not yet run against HyperSync)
+- [ ] Check Deals' Newest first on testnet with `ENVIO_API_TOKEN`: locked deals and signed swaps interleave by creation time ([ADR 0020](adr/0020-server-side-deal-book.md); built and unit-tested, not yet run against HyperSync)
 - [ ] Turn on X reach: set `X_BEARER_TOKEN` (the code is built; off by default)
 - [ ] Complete the go/no-go checklist in [11 · Test plan](11-test-plan.md)
 

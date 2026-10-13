@@ -90,7 +90,7 @@ A small Node service for signed intents ([ADR 0008](adr/0008-trade-intents.md), 
 
 ### Indexer (deferred)
 
-Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md), [0051](adr/0051-hypersync-for-the-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
+Still deferred. Deals are read from storage (`tradeCount` + multicall `getTrade`), since the public RPC caps `eth_getLogs` at 100 blocks; the server keeps the whole book in memory for search and filters ([ADR 0020](adr/0020-server-side-deal-book.md)), reading each locked deal's creation time from its `TradeCreated` log with HyperSync so the two kinds sort together, and a cron follows fills ([ADR 0019](adr/0019-fill-watcher.md), [0051](adr/0051-hypersync-for-the-fill-watcher.md)). Add an indexer when re-reading the open deals every few seconds gets expensive, or for history only events hold. See [ADR 0003](adr/0003-no-indexer-in-v1.md) and [ADR 0004](adr/0004-read-deals-from-storage.md).
 
 ## Key flows
 

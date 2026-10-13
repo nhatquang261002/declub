@@ -143,7 +143,7 @@ Browser (Next.js, wagmi + viem, Privy) ──► Monad: DeClubEscrow  (locked sw
 
 The public Monad RPC answers `eth_getLogs` for only 100 blocks at a time, so following a
 week of swaps from logs isn't practical. HyperSync answers any block range in a few queries.
-We use its Node client in two places:
+We use its Node client in three places:
 
 - **Activity feed and Club stats.** A cron (`/api/cron/fills`) asks HyperSync for every
   transaction that created or filled a deal on our contracts, then reads
@@ -155,9 +155,14 @@ We use its Node client in two places:
   totals every `FeeCharged` log in the epoch's window and fails if the Clubs were credited
   more fees than the contracts charged. Code: [`feeCheck.ts`](web/lib/server/feeCheck.ts).
   Why: [ADR 0052](docs/adr/0052-check-epoch-fees-against-fee-logs.md).
+- **Deal order.** The deal book reads when each locked deal was created from its `TradeCreated`
+  log, once per deal, so *Newest first* can mix locked deals with signed swaps (the contract
+  keeps no creation time). Only the order depends on it. Code:
+  [`hypersyncScan.ts`](web/lib/server/hypersyncScan.ts), [`dealBook.ts`](web/lib/server/dealBook.ts).
+  Why: [ADR 0020](docs/adr/0020-server-side-deal-book.md).
 
-Set `ENVIO_API_TOKEN` (server-side) to turn both on. Without it the watcher scans the node
-100 blocks at a time and the fee check is skipped.
+Set `ENVIO_API_TOKEN` (server-side) to turn all three on. Without it the watcher scans the node
+100 blocks at a time, the fee check is skipped, and locked deals are listed ahead of signed swaps.
 
 The full diagram, components and trade-offs are in [docs/02-architecture.md](docs/02-architecture.md),
 the contracts in [docs/03-contract-design.md](docs/03-contract-design.md) and the threat
