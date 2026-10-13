@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useConnection } from "wagmi";
 import { KindPicker, type KindAvailability } from "@/components/create/KindPicker";
 import { MultiFlow } from "@/components/create/MultiFlow";
 import { SettlementPicker } from "@/components/create/SettlementPicker";
 import { SignedFlow } from "@/components/create/SignedFlow";
 import { StepHeading } from "@/components/create/parts";
 import { Stepper } from "@/components/create/Stepper";
-import { PageHeader, RequireWallet } from "@/components/Page";
+import { Alert } from "@/components/Alert";
+import { EmptyState, PageHeader, RequireWallet } from "@/components/Page";
+import { useMatchDraft, type MatchDraft } from "@/hooks/useMatchDraft";
 import { swapIntents, swapEscrow } from "@/lib/contracts";
 import { DEFAULT_TERMS, type Step, type Terms, type DealKind, type Settlement } from "@/lib/createFlow";
 
@@ -50,16 +55,33 @@ export default function CreatePage() {
           </ol>
         }
       >
-        <CreateWizard />
+        <Suspense>
+          <CreateEntry />
+        </Suspense>
       </RequireWallet>
     </>
   );
 }
 
-function CreateWizard() {
-  const [step, setStep] = useState<Step>(1);
+/**
+ * `/create?match=<swap id>` starts a signed swap that mirrors that one (a button on its page). The swap is read
+ * once before the wizard mounts, so its later polls can't rebuild a form that is being filled in.
+ */
+function CreateEntry() {
+  const { address } = useConnection();
+  const draft = useMatchDraft(useSearchParams().get("match"), address);
+  const [match, setMatch] = useState<MatchDraft | null>(null);
+  if (!match && draft.state !== "loading") setMatch(draft);
+  if (!match) return <EmptyState>Loading the swap to match…</EmptyState>;
+  return <CreateWizard match={match} />;
+}
+
+function CreateWizard({ match }: { match: MatchDraft }) {
+  const mirror = match.state === "ready" && swapIntents ? match : null;
+  // A mirror starts on "what are you giving", where the deadline is chosen; the ask is already filled in.
+  const [step, setStep] = useState<Step>(mirror ? 2 : 1);
   const [kind, setKind] = useState<DealKind | null>(null);
-  const [settlement, setSettlement] = useState<Settlement>("escrow");
+  const [settlement, setSettlement] = useState<Settlement>(mirror ? "signed" : "escrow");
   const signed = settlement === "signed" && !!swapIntents;
   const [terms, setTerms] = useState<Terms>(DEFAULT_TERMS);
 
@@ -67,6 +89,20 @@ function CreateWizard() {
 
   return (
     <div className="space-y-8">
+      {mirror && (
+        <Alert tone="info" title="Matching a signed swap">
+          This is the other side of{" "}
+          <Link href={`/intent/${mirror.hash}`} className="font-mono font-bold underline">
+            {mirror.hash.slice(2, 10)}
+          </Link>
+          : you give what it wants and get what it gives. Check both sides, pick a deadline, then sign. The matcher settles the two together.
+        </Alert>
+      )}
+      {match.state === "unavailable" && (
+        <Alert tone="warn" title="Can't match that swap">
+          {match.reason}
+        </Alert>
+      )}
       <Stepper current={step} onJump={setStep} />
 
       {step === 1 && (
@@ -90,6 +126,7 @@ function CreateWizard() {
       {signed && (
         <SignedFlow
           key="signed"
+          prefill={mirror ?? undefined}
           step={step}
           onStep={setStep}
           onUseEscrow={() => {

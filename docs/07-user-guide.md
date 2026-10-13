@@ -74,6 +74,8 @@ When signed swaps are on, step 1 of Create asks how the deal settles. Both kinds
 - **Cancel on-chain** costs gas and makes the signature useless for good. It stays on the page after you remove the swap from the pool, until the deadline.
 - **Paused** means your wallet can't honour the swap right now (the asset moved, or an approval was revoked). Fix it and the swap comes back.
 
+**Matching someone's signed swap.** You can't accept a signed swap by hand. On another wallet's open swap, press **Create a matching swap**. The button shows only if your wallet holds what the swap wants, with a line saying so; otherwise the page says what you're missing. Create opens on the other side, filled in: you give what they want and get what they give. Check it, choose a deadline, approve and sign. The matcher then settles the two in one transaction.
+
 Each NFT can be in only one of your open signed swaps at a time, and your open swaps together can't give more of a token than your wallet holds. The pool takes up to 20 open swaps per wallet. Remove a swap from the pool to free what it gives.
 
 ## Fees

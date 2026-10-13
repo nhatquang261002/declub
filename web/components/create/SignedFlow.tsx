@@ -34,6 +34,8 @@ type Props = {
   onStep: (step: Step) => void;
   /** Back to "Lock assets now", for a deal that needs MON or a trait request. */
   onUseEscrow: () => void;
+  /** Rows to start from, when this swap mirrors another one (see useMatchDraft). */
+  prefill?: { give: DraftRow[]; want: DraftRow[] };
 };
 
 /**
@@ -42,7 +44,7 @@ type Props = {
  * transactions are approvals, so the contract can move the assets when a match settles.
  * Owns the asset rows, so going back a step keeps them.
  */
-export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
+export function SignedFlow({ step, onStep, onUseEscrow, prefill }: Props) {
   const { address } = useConnection();
   const router = useRouter();
   const approval = useTxFlow();
@@ -50,8 +52,8 @@ export function SignedFlow({ step, onStep, onUseEscrow }: Props) {
   const pool = usePoolInfo();
   const { fee, pending: pendingFee, isLoading: feeLoading } = useIntentFee();
 
-  const [giveRows, setGiveRows] = useState<DraftRow[]>(() => [newRow("erc721")]);
-  const [wantRows, setWantRows] = useState<DraftRow[]>(() => [newRow("erc20", MOCK_ERC20_ADDRESS ?? "")]);
+  const [giveRows, setGiveRows] = useState<DraftRow[]>(() => prefill?.give ?? [newRow("erc721")]);
+  const [wantRows, setWantRows] = useState<DraftRow[]>(() => prefill?.want ?? [newRow("erc20", MOCK_ERC20_ADDRESS ?? "")]);
   const [deadline, setDeadline] = useState<DeadlineKey>(DEFAULT_DEADLINE);
   const [scope, setScope] = useState<NftScope>("token");
   // Set once the swap is posted: the signing state is idle again by then, but its page is still opening.
