@@ -217,9 +217,29 @@ async function main() {
         console.log(`${c}: ${planned} already minted`);
         continue;
       }
-      if (next !== 1n) throw new Error(`${c} has ${next - 1n} minted, not 0 or ${planned}: deploy a fresh mirror.`);
-      for (const [who, count] of HOLDINGS[c]) {
-        await send(wallets.bank, { address: token, abi: mirrorAbi, functionName: "mintBatch", args: [walletOf(who), BigInt(count)] });
+      // A world built before HOLDINGS grew has its first entries minted: carry on from the first one not yet minted.
+      let skip = Number(next - 1n);
+      const todo = HOLDINGS[c].filter(([, count]) => {
+        if (skip >= count) {
+          skip -= count;
+          return false;
+        }
+        if (skip) throw new Error(`${c} has ${next - 1n} minted, which ends inside a holding: deploy a fresh mirror.`);
+        return true;
+      });
+      // Only the mirror's owner can mint: the bank until the hand-over below, then the Club's Owner if that is a persona.
+      const owner = (await pub.readContract({ address: token, abi: mirrorAbi, functionName: "owner" })).toLowerCase();
+      const ownerKey = personaKeys.find((k) => persona(k).address.toLowerCase() === owner);
+      const minter = owner === bank.address.toLowerCase() ? wallets.bank : ownerKey && wallets.personas[ownerKey];
+      if (!minter) throw new Error(`${c}'s owner ${owner} is neither the bank nor a persona: it can't mint the rest of its holdings.`);
+      if (ownerKey && minter !== wallets.bank) {
+        // Monad bills the gas limit: about 0.15 MON covers a mint with the headroom.
+        const need = parseEther("0.15") * BigInt(todo.length);
+        const balance = await pub.getBalance({ address: persona(ownerKey).address });
+        if (balance < need) await transfer(wallets.bank, persona(ownerKey).address, need - balance);
+      }
+      for (const [who, count] of todo) {
+        await send(minter, { address: token, abi: mirrorAbi, functionName: "mintBatch", args: [walletOf(who), BigInt(count)] });
         console.log(`${c}: minted ${count} to ${who}`);
       }
     }

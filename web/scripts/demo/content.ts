@@ -69,7 +69,11 @@ export const CLUBS: Record<
   },
 };
 
-/** Minted in this order, so each holder's token ids are a run that follows the one before. */
+/**
+ * Minted in this order, so each holder's token ids are a run that follows the one before. The last entry of a Club
+ * is a second mint to a holder who already has one, to leave more free NFTs for the cheap signed deals; Chog has none
+ * because its mirror belongs to the presenter. `idOf` reads only a holder's first run.
+ */
 export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
   chog: [
     ["you", 3],
@@ -90,6 +94,9 @@ export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
     ["tide", 2],
     ["lou", 1],
     ["cope", 1],
+    ["bulmba", 3],
+    ["hanoi", 2],
+    ["tide", 2],
   ],
   r3tards: [
     ["intern", 5],
@@ -100,6 +107,9 @@ export const HOLDINGS: Record<ClubKey, [HolderKey, number][]> = {
     ["slow", 2],
     ["candle", 1],
     ["nadsworth", 1],
+    ["cope", 3],
+    ["slow", 2],
+    ["oatmilk", 2],
   ],
 };
 
@@ -173,6 +183,13 @@ export const SIGNED: { gives: number; wantsNfts?: number; wantsMon?: "cheap" | "
   { gives: 1, wantsNfts: 1, wantsMon: "cheap" },
   { gives: 1, wantsMon: "cheap" },
   { gives: 1, wantsMon: "random" },
+  // The last six ask only a few cents, like the cheap `market` deals, so a fresh faucet wallet can take one.
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
+  { gives: 2, wantsMon: "cheap" },
+  { gives: 1, wantsMon: "cheap" },
 ];
 
 /**
